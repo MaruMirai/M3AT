@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Defs>
+
+  <KeyBindingCategoryDef>
+    <defName>M3AT</defName>
+    <label>M3AT</label>
+    <description>Keys for M3AT's flying freecam.</description>
+  </KeyBindingCategoryDef>
+
+  <KeyBindingDef>
+    <defName>M3AT_Freecam</defName>
+    <label>flying freecam on/off</label>
+    <category>M3AT</category>
+    <defaultKeyCodeA>F6</defaultKeyCodeA>
+  </KeyBindingDef>
+
+  <KeyBindingDef>
+    <defName>M3AT_FreecamUp</defName>
+    <label>freecam: up</label>
+    <category>M3AT</category>
+    <defaultKeyCodeA>RightShift</defaultKeyCodeA>
+  </KeyBindingDef>
+
+  <KeyBindingDef>
+    <defName>M3AT_FreecamDown</defName>
+    <label>freecam: down</label>
+    <category>M3AT</category>
+    <defaultKeyCodeA>RightControl</defaultKeyCodeA>
+  </KeyBindingDef>
+
+  <KeyBindingDef>
+    <defName>M3AT_FreecamBoost</defName>
+    <label>freecam - double speed</label>
+    <category>M3AT</category>
+    <defaultKeyCodeA>LeftShift</defaultKeyCodeA>
+  </KeyBindingDef>
+
+  <KeyBindingDef>
+    <defName>M3AT_FreecamPointer</defName>
+    <label>freecam - toggle pointer</label>
+    <category>M3AT</category>
+    <defaultKeyCodeA>LeftControl</defaultKeyCodeA>
+  </KeyBindingDef>
+
+</Defs>

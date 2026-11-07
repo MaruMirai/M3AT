@@ -1,0 +1,16 @@
+# M3AT fishing rod colours (anim_scripts/make_rod.py); fixed (no stuff)
+
+newmtl rod_blank
+Kd 0.160 0.120 0.100
+
+newmtl rod_cork
+Kd 0.720 0.560 0.360
+
+newmtl rod_reel
+Kd 0.550 0.570 0.600
+
+newmtl rod_guide
+Kd 0.800 0.800 0.820
+
+newmtl fishing_line
+Kd 0.900 0.920 0.880

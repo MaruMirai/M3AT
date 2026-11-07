@@ -1,0 +1,13 @@
+schema_version = "1.0.0"
+
+id = "smooth_fatten"
+version = "1.0.0"
+name = "Smooth Fatten"
+tagline = "Shrink/Fatten in steps with smoothing, so corners round off"
+maintainer = "Maru's Pawn Models"
+type = "add-on"
+tags = ["Mesh", "Modeling"]
+
+blender_version_min = "4.2.0"
+
+license = ["SPDX:GPL-3.0-or-later"]

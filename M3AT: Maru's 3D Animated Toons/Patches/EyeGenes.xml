@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Patch>
+  <!-- Facial Animation's colours for the eye genes. Its eye art is dark and is multiplied by the colour, so its red, with
+       a lot of blue in it, comes out hot pink, and its gray comes out no paler than an ordinary eye. Conditional, as the
+       defs are there only with Facial Animation. -->
+  <Operation Class="PatchOperationConditional">
+    <xpath>Defs/FacialAnimation.EyeballColorDef[defName="Eyes_Red_EyeColor"]/eyeballColor</xpath>
+    <match Class="PatchOperationReplace">
+      <xpath>Defs/FacialAnimation.EyeballColorDef[defName="Eyes_Red_EyeColor"]/eyeballColor</xpath>
+      <value>
+        <eyeballColor>RGB(1,0.1,0.08)</eyeballColor>
+      </value>
+    </match>
+  </Operation>
+  <Operation Class="PatchOperationConditional">
+    <xpath>Defs/FacialAnimation.EyeballColorDef[defName="Eyes_Gray_EyeColor"]/eyeballColor</xpath>
+    <match Class="PatchOperationReplace">
+      <xpath>Defs/FacialAnimation.EyeballColorDef[defName="Eyes_Gray_EyeColor"]/eyeballColor</xpath>
+      <value>
+        <eyeballColor>RGB(0.9,0.9,0.92)</eyeballColor>
+      </value>
+    </match>
+  </Operation>
+</Patch>

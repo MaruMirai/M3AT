@@ -1,0 +1,46 @@
+# Build output
+Source/obj/
+Source/bin/
+
+# Third-party reference copy of IsoRim (not part of this mod)
+3819577715/
+
+# Editor and OS files
+.vs/
+.vscode/
+.idea/
+*.user
+*.blend1
+.DS_Store
+Thumbs.db
+
+# Hair built from other mods' sprites (archive/export_hair.sh): their art, so never shipped or committed.
+M3AT: Maru's 3D Animated Toons/Models/chibi/hair/
+
+# Vanilla weapon sprites extracted for posing in the preview; the game's art, not ours.
+weapon_sprites/
+
+# Python bytecode
+__pycache__/
+meshyAPIkey
+geminiAPIkey
+
+# Parts of an avatar whose terms forbid passing them on: never committed. The ears and tail made for the pawn go in the rig.
+Models/*kemo*
+Models/*cat ears*
+
+# Meshy API key, kept under a name the scripts do not read: never committed.
+meshyAPIkeyInactive
+
+# A symlink to node_modules elsewhere on this machine (the shrinkwrap driver's playwright-core).
+generationAssets/node_modules
+
+# Claude Code's local lock file; .claude/settings.json (the IsoRim check hook) is committed.
+.claude/scheduled_tasks.lock
+
+# Generation work (Meshy/Gemini inputs, outputs and renders): development scratch, kept locally only.
+generationAssets/
+
+# Kept only for reference (older or discarded versions) and preview renders: local only.
+Models/unused/
+previews/

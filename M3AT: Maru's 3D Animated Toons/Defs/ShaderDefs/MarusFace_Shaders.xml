@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Defs>
+  <!-- Facial Animation's face layers on the chibi's head, sun-lit like the head (Shaders\MarusFace.*.glsl, from the
+       IsoRim Nals Experimentals Patch).
+       See-through, depth-tested, no depth write, so IsoRim's light pass on the head (3099) darkens them at night.
+       Each layer's material sets its own queue (2950 + its place in the stack) so they draw in order. -->
+  <ShaderDef>
+    <defName>MarusFaceLayer</defName>
+    <shaderProgram>
+      <vertexShaderFileName>MarusFace.vert.glsl</vertexShaderFileName>
+      <fragmentShaderFileName>MarusFace.frag.glsl</fragmentShaderFileName>
+      <blendMode>Alpha</blendMode>
+      <depthWrite>false</depthWrite>
+      <cullMode>None</cullMode>
+      <renderQueue>2950</renderQueue>
+      <textureWrapOverrides>
+        <li>
+          <key>_MaskTwo</key>
+          <value>Clamp</value>
+        </li>
+        <li>
+          <key>_MainTex</key>
+          <value>Clamp</value>
+        </li>
+        <li>
+          <key>_MaskTex</key>
+          <value>Clamp</value>
+        </li>
+      </textureWrapOverrides>
+    </shaderProgram>
+  </ShaderDef>
+
+  <!-- Highlights (the game's MoteGlow): added on, unlit, after the light overlay like the game draws them. -->
+  <ShaderDef>
+    <defName>MarusFaceGlow</defName>
+    <shaderProgram>
+      <vertexShaderFileName>MarusFace.vert.glsl</vertexShaderFileName>
+      <fragmentShaderFileName>MarusFace.frag.glsl</fragmentShaderFileName>
+      <blendMode>Additive</blendMode>
+      <depthWrite>false</depthWrite>
+      <cullMode>None</cullMode>
+      <renderQueue>3151</renderQueue>
+      <textureWrapOverrides>
+        <li>
+          <key>_MainTex</key>
+          <value>Clamp</value>
+        </li>
+      </textureWrapOverrides>
+    </shaderProgram>
+  </ShaderDef>
+</Defs>

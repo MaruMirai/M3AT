@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ModMetaData>
+  <name>M3AT: Maru's 3D Animated Toons</name>
+  <author>maru mirai</author>
+  <packageId>marumirai.M3AT</packageId>
+  <supportedVersions>
+    <li>1.7</li>
+  </supportedVersions>
+  <modDependencies>
+    <li>
+      <packageId>brrainz.harmony</packageId>
+      <displayName>Harmony</displayName>
+      <steamWorkshopUrl>steam://url/CommunityFilePage/2009463077</steamWorkshopUrl>
+    </li>
+    <li>
+      <packageId>Peren.IsoRim17</packageId>
+      <displayName>IsoRim</displayName>
+      <steamWorkshopUrl>steam://url/CommunityFilePage/3819577715</steamWorkshopUrl>
+    </li>
+    <li>
+      <packageId>Nals.FacialAnimation</packageId>
+      <displayName>[NL] Facial Animation - WIP</displayName>
+      <steamWorkshopUrl>steam://url/CommunityFilePage/1635901197</steamWorkshopUrl>
+    </li>
+    <li>
+      <packageId>Nals.FacialAnimationExperimentals</packageId>
+      <displayName>[NL] Facial Animation - Experimentals</displayName>
+      <steamWorkshopUrl>steam://url/CommunityFilePage/2581693737</steamWorkshopUrl>
+    </li>
+  </modDependencies>
+  <loadAfter>
+    <li>brrainz.harmony</li>
+    <li>Peren.IsoRim17</li>
+    <li>Nals.FacialAnimation</li>
+    <li>Nals.FacialAnimationExperimentals</li>
+  </loadAfter>
+  <description>Animated 3D pawns for IsoRim Waylith!
+Early WIP so expect some missing/jank/generic anims and other scuff, they'll be improved over time.
+
+Some features:
+Basic anims for all the main stuff, movement, work, combat etc, more soon
+Wearable 3D apparel for everything in base game and all DLC + some of CE
+All hair mods supported via instant sprite-to-3d conversion + hair shows under hats
+Carrying/aiming/firing anims for all IsoRim's 3D weapons or sprite generated slab versions
+Visible holstered weapons, equipped or inventoried, with draw/holster anims
+Bodies for each of rimworld's body types, + gender differences + optional variation 
+Visible worn equipment packs using IsoRim's models
+New camera mode designed for play with the more detailed pawns
+Visible injuries, bandages, scars, and missing limbs, matching the type and location, and severity
+Modeled and animated gene parts
+Injury-reactive idle and movement animations
+Ragdolls with optional physics flinging
+Smooth baby-adult growth and pregnancy for biotech
+Various body settings sliders
+CE support - backpack models, reload and hunker anims, webbing layer over armor support
+Optimization - GPU skinning, low poly models
+(Obviously still fairly performance heavy for a mod, I'll look for improvements)
+
+
+Serving suggestions:
+CE + IsoRimWaylith-CEPack
+Facial animation Retexture
+(Both used in screenshots)
+
+Aiming to add support for more mods after working vanilla anims more, check back here to see</description>
+</ModMetaData>

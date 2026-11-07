@@ -1,0 +1,273 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Defs>
+  <!-- The runtime-skinned chibi's body, lit by IsoRim's sun from its own smooth normals (Shaders\MarusSmooth.*.glsl, a copy
+       of IsoRim's IsoRimSolid def with that one change). Render state as IsoRimSolid, but it also sets stencil bit 64
+       (the one bit neither the game nor IsoRim uses) wherever it is drawn, and MarusOutline is drawn only where that bit
+       is clear: the chibi's outline is its silhouette alone, never a line over its own body. -->
+  <ShaderDef>
+    <defName>MarusSmooth</defName>
+    <shaderProgram>
+      <vertexShaderFileName>MarusSmooth.vert.glsl</vertexShaderFileName>
+      <fragmentShaderFileName>MarusSmooth.frag.glsl</fragmentShaderFileName>
+      <useTexture>false</useTexture>
+      <blendMode>Opaque</blendMode>
+      <cullMode>None</cullMode>
+      <stencilEnabled>true</stencilEnabled>
+      <stencilCompare>Always</stencilCompare>
+      <stencilPassOp>Replace</stencilPassOp>
+      <stencilRef>64</stencilRef>
+      <stencilReadMask>64</stencilReadMask>
+      <stencilWriteMask>64</stencilWriteMask>
+      <renderQueue>2000</renderQueue>
+    </shaderProgram>
+  </ShaderDef>
+
+  <!-- The chibi's hair (SkinnedFigure.DrawHair): the same, textured with the hairstyle's sprites and cut out below alpha
+       0.5, as IsoRimSolidTex is to IsoRimSolid. Its vertex stage is IsoRimTex.vert.glsl's (MarusSmoothTex.vert.glsl),
+       as IsoRim's textured light pass uses, so that pass lands on the hair's exact depth. It sets
+       stencil bit 64 as MarusSmooth does (not where it is cut out). -->
+  <ShaderDef>
+    <defName>MarusSmoothTex</defName>
+    <shaderProgram>
+      <vertexShaderFileName>MarusSmoothTex.vert.glsl</vertexShaderFileName>
+      <fragmentShaderFileName>MarusSmooth.frag.glsl</fragmentShaderFileName>
+      <useTexture>true</useTexture>
+      <blendMode>Opaque</blendMode>
+      <cullMode>None</cullMode>
+      <stencilEnabled>true</stencilEnabled>
+      <stencilCompare>Always</stencilCompare>
+      <stencilPassOp>Replace</stencilPassOp>
+      <stencilRef>64</stencilRef>
+      <stencilReadMask>64</stencilReadMask>
+      <stencilWriteMask>64</stencilWriteMask>
+      <renderQueue>2001</renderQueue>
+      <textureWrapOverrides>
+        <li>
+          <key>_MainTex</key>
+          <value>Clamp</value>
+        </li>
+      </textureWrapOverrides>
+    </shaderProgram>
+  </ShaderDef>
+
+  <!-- The hair's light pass (SkinnedFigure.HairMaterial): the very program of MarusSmoothTex, with the render state of
+       IsoRim's IsoRimLitMarkTex: multiplies the colour already there by its own cell's light and sets stencil bit 32 so
+       the game's overlay skips the pixel. Drawn with the same mesh and matrix, so it meets the hair at its exact depth. -->
+  <ShaderDef>
+    <defName>MarusSmoothTexMark</defName>
+    <shaderProgram>
+      <vertexShaderFileName>MarusSmoothTex.vert.glsl</vertexShaderFileName>
+      <fragmentShaderFileName>MarusSmooth.frag.glsl</fragmentShaderFileName>
+      <useTexture>true</useTexture>
+      <blendMode>Custom</blendMode>
+      <blendSrcFactor>DstColor</blendSrcFactor>
+      <blendDstFactor>SrcColor</blendDstFactor>
+      <depthWrite>false</depthWrite>
+      <cullMode>None</cullMode>
+      <stencilEnabled>true</stencilEnabled>
+      <stencilCompare>NotEqual</stencilCompare>
+      <stencilPassOp>Replace</stencilPassOp>
+      <stencilRef>32</stencilRef>
+      <stencilReadMask>32</stencilReadMask>
+      <stencilWriteMask>32</stencilWriteMask>
+      <renderQueue>3099</renderQueue>
+      <textureWrapOverrides>
+        <li>
+          <key>_MainTex</key>
+          <value>Clamp</value>
+        </li>
+      </textureWrapOverrides>
+    </shaderProgram>
+  </ShaderDef>
+
+  <!-- The chibi's solid faces again just after IsoRim's ambient occlusion (its queues 2450 and 2451) and screen-space
+       shadows (2452 and 2453; each a full-screen pass that paints the picture back, so this can't share a queue with them;
+       OutlineOrder.cs AfterOcclusion), so the figure takes none of either: the same programs at the depth already there,
+       writing no depth or stencil, so stencil bit 64 stays clear for what comes after. Before the face layers (2950 on). -->
+  <ShaderDef>
+    <defName>MarusSmoothAfterAO</defName>
+    <shaderProgram>
+      <vertexShaderFileName>MarusSmooth.vert.glsl</vertexShaderFileName>
+      <fragmentShaderFileName>MarusSmooth.frag.glsl</fragmentShaderFileName>
+      <useTexture>false</useTexture>
+      <blendMode>Opaque</blendMode>
+      <depthWrite>false</depthWrite>
+      <cullMode>None</cullMode>
+      <renderQueue>2454</renderQueue>
+    </shaderProgram>
+  </ShaderDef>
+
+  <ShaderDef>
+    <defName>MarusSmoothTexAfterAO</defName>
+    <shaderProgram>
+      <vertexShaderFileName>MarusSmoothTex.vert.glsl</vertexShaderFileName>
+      <fragmentShaderFileName>MarusSmooth.frag.glsl</fragmentShaderFileName>
+      <useTexture>true</useTexture>
+      <blendMode>Opaque</blendMode>
+      <depthWrite>false</depthWrite>
+      <cullMode>None</cullMode>
+      <renderQueue>2454</renderQueue>
+      <textureWrapOverrides>
+        <li>
+          <key>_MainTex</key>
+          <value>Clamp</value>
+        </li>
+      </textureWrapOverrides>
+    </shaderProgram>
+  </ShaderDef>
+
+  <!-- The chibi's outlines (SkinnedFigure.OutlineMaterial): IsoRim's IsoRimOutline (an inside-out shell, only the faces
+       turned away from the camera, pushed back in depth; the moving outline's push away from the camera comes from
+       _OutlinePush in the vertex stage), on the chibi's own program, so that it can have a light pass of its own.
+       Drawn only where stencil bit 64 is clear, so never over the chibi's own solid faces (MarusSmooth, MarusSmoothTex
+       set it). Each figure's copies of these materials get their own run of queues (Source/OutlineOrder.cs): its solids,
+       its outline, then MarusStencilClear, so one chibi's body doesn't hide another's outline. -->
+  <ShaderDef>
+    <defName>MarusOutline</defName>
+    <shaderProgram>
+      <vertexShaderFileName>MarusSmooth.vert.glsl</vertexShaderFileName>
+      <fragmentShaderFileName>MarusSmooth.frag.glsl</fragmentShaderFileName>
+      <useTexture>false</useTexture>
+      <blendMode>Opaque</blendMode>
+      <cullMode>Front</cullMode>
+      <depthBiasConstantFactor>-1</depthBiasConstantFactor>
+      <depthBiasSlopeFactor>-1</depthBiasSlopeFactor>
+      <stencilEnabled>true</stencilEnabled>
+      <stencilCompare>NotEqual</stencilCompare>
+      <stencilPassOp>Keep</stencilPassOp>
+      <stencilRef>64</stencilRef>
+      <stencilReadMask>64</stencilReadMask>
+      <stencilWriteMask>0</stencilWriteMask>
+      <renderQueue>2000</renderQueue>
+    </shaderProgram>
+  </ShaderDef>
+
+  <!-- The outline with the "Outer outline only" option off (SkinnedFigure.Silhouette): the same without the stencil test,
+       so as IsoRim's: lines over the body too, where a part is far enough in front of what is behind it. -->
+  <ShaderDef>
+    <defName>MarusOutlineLines</defName>
+    <shaderProgram>
+      <vertexShaderFileName>MarusSmooth.vert.glsl</vertexShaderFileName>
+      <fragmentShaderFileName>MarusSmooth.frag.glsl</fragmentShaderFileName>
+      <useTexture>false</useTexture>
+      <blendMode>Opaque</blendMode>
+      <cullMode>Front</cullMode>
+      <depthBiasConstantFactor>-1</depthBiasConstantFactor>
+      <depthBiasSlopeFactor>-1</depthBiasSlopeFactor>
+      <renderQueue>2000</renderQueue>
+    </shaderProgram>
+  </ShaderDef>
+
+  <!-- Clears stencil bit 64 again over a figure's meshes once its outline is drawn (SkinnedFigure.SetSlot): no colour,
+       no depth test or write, so it covers every pixel the figure set, hidden or not. -->
+  <ShaderDef>
+    <defName>MarusStencilClear</defName>
+    <shaderProgram>
+      <vertexShaderFileName>MarusSmooth.vert.glsl</vertexShaderFileName>
+      <fragmentShaderFileName>MarusSmooth.frag.glsl</fragmentShaderFileName>
+      <useTexture>false</useTexture>
+      <blendMode>Opaque</blendMode>
+      <depthTest>false</depthTest>
+      <depthWrite>false</depthWrite>
+      <colorWrite>false</colorWrite>
+      <cullMode>None</cullMode>
+      <stencilEnabled>true</stencilEnabled>
+      <stencilCompare>Always</stencilCompare>
+      <stencilPassOp>Replace</stencilPassOp>
+      <stencilRef>0</stencilRef>
+      <stencilReadMask>64</stencilReadMask>
+      <stencilWriteMask>64</stencilWriteMask>
+      <renderQueue>2000</renderQueue>
+    </shaderProgram>
+  </ShaderDef>
+
+  <!-- Sets stencil bit 64 over IsoRim's models carried on the figure (its held and holstered weapons, drawn by IsoRim's own
+       materials, which set no bit; SkinnedFigure.DrawJoined), where they show, so they join the chibi's silhouette: its
+       outline isn't drawn over them, nor theirs over the body. No colour or depth write; the depth test as IsoRim's
+       solids', so it passes on the model's own faces, already drawn. -->
+  <ShaderDef>
+    <defName>MarusStencilSet</defName>
+    <shaderProgram>
+      <vertexShaderFileName>MarusSmooth.vert.glsl</vertexShaderFileName>
+      <fragmentShaderFileName>MarusSmooth.frag.glsl</fragmentShaderFileName>
+      <useTexture>false</useTexture>
+      <blendMode>Opaque</blendMode>
+      <depthWrite>false</depthWrite>
+      <colorWrite>false</colorWrite>
+      <cullMode>None</cullMode>
+      <stencilEnabled>true</stencilEnabled>
+      <stencilCompare>Always</stencilCompare>
+      <stencilPassOp>Replace</stencilPassOp>
+      <stencilRef>64</stencilRef>
+      <stencilReadMask>64</stencilReadMask>
+      <stencilWriteMask>64</stencilWriteMask>
+      <renderQueue>2000</renderQueue>
+    </shaderProgram>
+  </ShaderDef>
+
+  <!-- Its light pass: the same program, cull and depth bias, with the render state of IsoRim's IsoRimLitMark, so it meets
+       the outline at its exact depth. -->
+  <ShaderDef>
+    <defName>MarusOutlineMark</defName>
+    <shaderProgram>
+      <vertexShaderFileName>MarusSmooth.vert.glsl</vertexShaderFileName>
+      <fragmentShaderFileName>MarusSmooth.frag.glsl</fragmentShaderFileName>
+      <useTexture>false</useTexture>
+      <blendMode>Custom</blendMode>
+      <blendSrcFactor>DstColor</blendSrcFactor>
+      <blendDstFactor>SrcColor</blendDstFactor>
+      <depthWrite>false</depthWrite>
+      <cullMode>Front</cullMode>
+      <depthBiasConstantFactor>-1</depthBiasConstantFactor>
+      <depthBiasSlopeFactor>-1</depthBiasSlopeFactor>
+      <stencilEnabled>true</stencilEnabled>
+      <stencilCompare>NotEqual</stencilCompare>
+      <stencilPassOp>Replace</stencilPassOp>
+      <stencilRef>32</stencilRef>
+      <stencilReadMask>32</stencilReadMask>
+      <stencilWriteMask>32</stencilWriteMask>
+      <renderQueue>3099</renderQueue>
+    </shaderProgram>
+  </ShaderDef>
+
+  <!-- MarusSmooth's light pass (SkinnedFigure.SkinMark): the very program of MarusSmooth, with the render state of
+       IsoRim's IsoRimLitMark, which IsoRim's own light pass for it (IsoGlow.Use) has. Put in as that pass's shader, as
+       IsoRim's vertex stage doesn't pose a mesh skinned on the graphics card (GpuSkinning.cs) and would light it at rest. -->
+  <ShaderDef>
+    <defName>MarusSmoothMark</defName>
+    <shaderProgram>
+      <vertexShaderFileName>MarusSmooth.vert.glsl</vertexShaderFileName>
+      <fragmentShaderFileName>MarusSmooth.frag.glsl</fragmentShaderFileName>
+      <useTexture>false</useTexture>
+      <blendMode>Custom</blendMode>
+      <blendSrcFactor>DstColor</blendSrcFactor>
+      <blendDstFactor>SrcColor</blendDstFactor>
+      <depthWrite>false</depthWrite>
+      <cullMode>None</cullMode>
+      <stencilEnabled>true</stencilEnabled>
+      <stencilCompare>NotEqual</stencilCompare>
+      <stencilPassOp>Replace</stencilPassOp>
+      <stencilRef>32</stencilRef>
+      <stencilReadMask>32</stencilReadMask>
+      <stencilWriteMask>32</stencilWriteMask>
+      <renderQueue>3099</renderQueue>
+    </shaderProgram>
+  </ShaderDef>
+
+  <!-- A visor's glass (SkinnedFigure.DrawVisor: sub-mesh 1 of a garment with visor lines): MarusSmooth's program with
+       _Glass 1, blended over what is behind it, writing no depth or stencil. Queue 3000: after the face layers (2950 on)
+       and the wounds (2999), so the face shows through it, and before IsoRim's light pass (3099), whose passes for the
+       head and the helmet's inside behind it, at their depth, light the glass with them. -->
+  <ShaderDef>
+    <defName>MarusGlass</defName>
+    <shaderProgram>
+      <vertexShaderFileName>MarusSmooth.vert.glsl</vertexShaderFileName>
+      <fragmentShaderFileName>MarusSmooth.frag.glsl</fragmentShaderFileName>
+      <useTexture>false</useTexture>
+      <blendMode>Alpha</blendMode>
+      <depthWrite>false</depthWrite>
+      <cullMode>None</cullMode>
+      <renderQueue>3000</renderQueue>
+    </shaderProgram>
+  </ShaderDef>
+</Defs>
