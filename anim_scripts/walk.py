@@ -84,6 +84,15 @@ DRAFTED = {
     'melee': {'R': (-0.2946, -0.329, 0.2319), 'R_turn': (-64.6928, 1.9417, 117.7251), 'R_elbow': 3.0, 'L': (0.2748, -0.3776, 0.3486), 'L_turn': (-28.55, -33.9862, -117.3661), 'body': dict(DROP=0.07, NARROW=0.0, STAGGER=0.22, LEAN=4.0)},
     # Open hands up in front of the face, the right a little higher and further out.
     'unarmed': {'R': (-0.1667, -0.3951, 0.5415), 'R_turn': (-27.3696, 45.7186, 145.2212), 'L': (0.1937, -0.236, 0.4861), 'L_turn': (-36.5014, -37.3041, -128.3353), 'body': dict(DROP=0.07, NARROW=0.0, STAGGER=0.22, LEAN=4.0)},
+    # With a shield up (Combat Extended's, held in the left fist, walk.shield_at): the one-handed kinds' stances, the
+    # weapon hand kept out to the right clear of the shield's back. 'shield': the left arm is the shield guard's
+    # (SHIELD_FIST), whatever L says. Each one-handed weapon (ONE_HANDED types) of a kind with one of these gets its own
+    # (shield_<defName>, shielded_entry): this one with the hand and weapon moved together as the weapon's own drafted
+    # entry has them against its kind's, so it keeps its own grip. The game plays them in place of drafted_<kind> while
+    # the shield is up (WalkFigures.DraftedClip); a two-handed weapon keeps its own stance.
+    'shield_pistol': {'R': (-0.3108, -0.2677, 0.1639), 'R_turn': (-75.3907, -42.6764, 105.976), 'R_elbow': 56.0, 'shield': True},
+    'shield_melee': {'R': (-0.3188, -0.3192, 0.2792), 'R_turn': (-64.6928, 1.9417, 117.7251), 'R_elbow': 3.0, 'shield': True, 'body': dict(DROP=0.07, NARROW=0.0, STAGGER=0.22, LEAN=4.0)},
+    'shield_unarmed': {'R': (-0.2404, -0.435, 0.3911), 'R_turn': (-27.3696, 45.7186, 145.2212), 'shield': True, 'body': dict(DROP=0.07, NARROW=0.0, STAGGER=0.22, LEAN=4.0)},
     # Each weapon of the game and its expansions, by defName (drafted_<defName>), to set one by one. 'kind': the entry
     # above it starts from (drafted_entry), taking each hand, turn and body number the weapon doesn't give (None: left free,
     # or a turn left lined up with the forearm). One that gives nothing of its own is its kind's stance, and gets no clip
@@ -151,8 +160,51 @@ DRAFTED = {
     'MeleeWeapon_PlasmaSword': {'kind': 'melee', 'R': (-0.0715, -0.4229, 0.3852), 'R_elbow': 51.0, 'L': (0.0876, -0.4249, 0.4605), 'L_turn': (-96.4636, -10.6086, -103.345), 'L_elbow': 51.0},
     'MeleeWeapon_PsyfocusStaff': {'kind': 'melee', 'R': (-0.0286, -0.3974, 0.3898), 'R_turn': (-27.0989, 18.4927, 113.5556), 'R_elbow': 20.0, 'L': (0.1817, -0.3299, 0.502), 'L_turn': (-118.8454, -48.3207, -89.2827)},
 }
+SHIELD = 'shield_'   # the shield stances' names: SHIELD + a one-handed kind (DRAFTED), or + a weapon's defName (derived)
+ONE_HANDED = ('handgun', 'melee_1h', 'grenade')   # the weapon types (WEAPON_TYPES) that take the shield stances
+
+def shield_weapon(name):
+    """The weapon (or kind) a shield stance's name is for ('shield_pistol': 'pistol'), or None for any other name."""
+    return name[len(SHIELD):] if name.startswith(SHIELD) and name not in WEAPONS else None
+
+def shielded_names():
+    """The weapons that get a shield stance of their own (shield_<defName>): one-handed, of a kind with one, and held
+    otherwise than their kind is (their own drafted hand or turn), so the kind's would put their grip elsewhere."""
+    out = []
+    for name, entry in DRAFTED.items():
+        kind = entry.get('kind')
+        if kind is None or SHIELD + kind not in DRAFTED or weapon_type(name) not in ONE_HANDED:
+            continue
+        own, base = drafted_entry(name), drafted_entry(kind)
+        if any(own.get(k) != base.get(k) for k in ('R', 'R_turn')):
+            out.append(name)
+    return out
+
+def shielded_entry(name):
+    """A weapon's shield stance: its kind's (DRAFTED's shield_<kind>), with the right hand moved as a whole with the
+    weapon in it, so that the weapon's own drafted hand and turn stand to the kind's shield stance as they do to the
+    kind's plain one (the change C from the kind's plain hand turn to its shield one, put on the weapon's turn and on its
+    wrist's offset from the kind's)."""
+    kind = DRAFTED[name]['kind']
+    out = dict(drafted_entry(SHIELD + kind))
+    own, base = drafted_entry(name), drafted_entry(kind)
+    if out.get('R') is None or own.get('R') is None or base.get('R') is None:
+        return out
+    def turn(e):
+        return Euler([math.radians(v) for v in e['R_turn']], 'XYZ').to_matrix() if e.get('R_turn') is not None else None
+    C = Matrix.Identity(3)
+    if turn(out) is not None and turn(base) is not None:
+        C = turn(out) @ turn(base).inverted()
+    out['R'] = tuple(round(v, 4) for v in Vector(out['R']) + C @ (Vector(own['R']) - Vector(base['R'])))
+    if turn(own) is not None and turn(base) is not None and turn(out) is not None:
+        out['R_turn'] = tuple(round(math.degrees(a), 4) for a in (C @ turn(own)).to_euler('XYZ'))
+    return out
+
 def drafted_entry(name):
-    """A DRAFTED entry with its kind's under it (its 'kind'): the hands, turns and body it poses with."""
+    """A DRAFTED entry with its kind's under it (its 'kind'): the hands, turns and body it poses with. A weapon's shield
+    stance not in the table is worked out from its kind's (shielded_entry)."""
+    if name not in DRAFTED and shield_weapon(name) in DRAFTED:
+        return shielded_entry(shield_weapon(name))
     entry = DRAFTED[name]
     if 'kind' not in entry:
         return entry
@@ -1184,6 +1236,8 @@ except FileNotFoundError:
 # it lifts its arms out of the rest pose, to where it closes best). From the waist up only (TALK_UPPER), as the rub is,
 # so the game can lay it over the idle, the sit or the walk (WalkFigures.TalkOf).
 TALK_UPPER = {'spine.001': 1.0}   # in place of UPPER: from the waist up
+TALK_NECK = ('spine.004', 'spine.005')   # the neck's bones, bent on the chest as the standing pose bends them (talk_at)
+TALK_NOD = 0.6   # share of the clip's nodding (about its mean, which is bowed) kept on the levelled head
 try:
     with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'talk_clip.json')) as _f:
         TALK_CLIP = json.load(_f)
@@ -1638,6 +1692,22 @@ SHIELD_ELBOW = 25.0  # degrees the elbow is swung out and up (arm_to's lift), so
 SHIELD_YAW = 22.0    # degrees the shield's face is turned out to the left of straight ahead in the guard
 SHIELD_TIP = 4.0     # and its top tipped back
 SHIELD_UPPER = {'shoulder.L': 1.0}   # in place of UPPER: the left arm only
+# Taking a shield carried on the back into the guard (shield_draw_at, one clip per shield, shield_draw_<garment>, as each
+# sits on the back in its own .glb): the left hand round the left side to the shield's left edge (shield_rim: the edge
+# at the middle of its height), the trunk turned to bring it in reach, closing on the edge palm in by SHIELD_GRAB; then
+# round the side again into the guard. The game moves the shield from the back into the hand from there: first onto
+# the hand as the clip holds it at the grab (held_grip, over SHIELD_SLIDE, as the game pushes it out past what is on the
+# back), then turning in the hand to the guard's grip (held_at) for the rest of the clip. It plays it backwards to put
+# the shield back.
+SHIELD_DRAW_FRAMES = 24
+SHIELD_DRAW_SECONDS = 1.0   # game seconds to take it from the back into the guard (and to put it back)
+SHIELD_GRAB = 0.45   # share of shield_draw at which the hand closes on the shield's edge
+SHIELD_SLIDE = 0.12  # share after that over which the game takes the shield from where it is on the back onto the hand
+SHIELD_APPROACH = 0.12   # leg lengths out to the left (and forward) of the edge the hand comes in from and leaves by
+SHIELD_RIM_PALM = (-1.0, 0.0, 0.0)   # the way the palm faces on the edge (chest's frame): in, toward the shield's middle
+SHIELD_DRAW_TWIST = 45.0   # degrees the trunk may turn to the left to bring the edge into reach, at most (searched)
+SHIELD_DRAW_LEAN = 10.0    # and lean forward
+SHIELD_DRAW_UPPER = {'spine.001': 0.5, 'spine.002': 1.0}   # in place of UPPER: the trunk and the left arm
 
 # Flinching from a hit (flinch_at): one jolt, the trunk thrown the way the blow pushes it, the head held back up out of
 # it, the shoulders shrugged and the forearms drawn up in front. It is added on top of whatever the pawn is doing (the
@@ -2361,7 +2431,12 @@ def stand_at(t, drafted=None):
     saved = {k: g[k] for k in stand}
     g.update(stand)
     try:
-        return pose_at(0.29, sway=sway, breath=breath, grips=grips)   # 0.29: feet flat, as stand_pose
+        X, clamp = pose_at(0.29, sway=sway, breath=breath, grips=grips)   # 0.29: feet flat, as stand_pose
+        if grips is not None and grips.get('shield'):
+            # The left arm in the shield guard, as shield_at holds it (the game lays that over it too).
+            fist = X[CHEST_BONE] @ (head[HIPS] + Vector(SHIELD_FIST) * LEG)
+            clamp = max(clamp, hip_hand_straight(X, fist, lift=SHIELD_ELBOW, palm=SHIELD_PALM))
+        return X, clamp
     finally:
         g.update(saved)
 
@@ -2745,10 +2820,29 @@ def rub_at(t):
     hips and legs, each upper bone kept where it is from the clip's hips. Returns the pose and the worst overreach."""
     return upper_from(stand_pose(), mocap_at(RUB_CLIP, t, Quaternion())), 0.0
 
+talk_nods = {}   # the clip's mean head pitch (degrees), by its source frames, once worked out
+
 def talk_at(t):
     """Talking at t (0 .. 1 round the loop; see TALK_CLIP): the clip from the waist up on the standing pose's hips and
-    legs, as rub_at is. Returns the pose and the worst overreach."""
-    return upper_from(stand_pose(), mocap_at(TALK_CLIP, t, Quaternion())), 0.0
+    legs, as rub_at is. The clip hunches the chest forward but holds the neck upright and bows the head, so the neck
+    stood behind the chest and the face looked at the floor: the neck's two bones are bent on the chest as the standing
+    pose bends them, and the head is put level as the standing pose holds it, with TALK_NOD of the clip's own nodding
+    about its mean kept. Returns the pose and the worst overreach."""
+    B = stand_pose()
+    key = (TALK_CLIP['source'], TALK_CLIP['action'], TALK_CLIP['first'], TALK_CLIP['last'])
+    if key not in talk_nods:
+        n = TALK_CLIP['frames']
+        talk_nods[key] = sum(pitch_of(upper_from(dict(B), mocap_at(TALK_CLIP, f / n, Quaternion())), HEAD)
+                             for f in range(n)) / n
+    X = upper_from(dict(B), mocap_at(TALK_CLIP, t, Quaternion()))
+    nod = pitch_of(X, HEAD) - talk_nods[key]
+    for b in TALK_NECK:
+        parent = bones[b].parent.name
+        want = pitch_of(X, parent) + pitch_of(B, b) - pitch_of(B, parent)
+        turn_branch(X, b, about(X[b] @ head[b], (1, 0, 0), want - pitch_of(X, b)))
+    want = pitch_of(B, HEAD) + nod * TALK_NOD
+    turn_branch(X, HEAD, about(X[HEAD] @ head[HEAD], (1, 0, 0), want - pitch_of(X, HEAD)))
+    return X, 0.0
 
 def reload_at(t):
     """Reloading at t (0 .. 1 through it; see RELOAD_CLIP): the clip from the waist up on the standing pose's hips and
@@ -3792,6 +3886,87 @@ def shield_rest():
     M = X[hn].inverted() @ T(X[hn] @ rest_fist) @ R
     grip = (R.to_3x3().inverted() @ (X[hn].to_3x3() @ ra)).normalized()
     return M, grip
+
+def shield_rim(places):
+    """Where the left hand takes a shield on the back (armature rest space): its left edge (the figure's left, +x) at
+    the middle of its height, from the shield's rest places (armature space, rows of three)."""
+    zs = [p[2] for p in places]
+    lo, hi = min(zs), max(zs)
+    band = [Vector(p) for p in places if abs(p[2] - (lo + hi) / 2) <= (hi - lo) / 6] or [Vector(p) for p in places]
+    edge = max(p.x for p in band)
+    near = [p for p in band if p.x >= edge - 0.02 * (hi - lo)]
+    return sum(near, Vector()) / len(near)
+
+shield_draw_cache = {}
+
+def shield_draw_keys(rim):
+    """shield_draw's working for a shield whose edge is at rim (shield_rim): the left wrist (as hip_draw_keys': leg lengths
+    from the middle of the hips, in the chest's frame) and the hand's turn (chest's frame) hanging ('hang'), closed on the
+    edge ('grab', with the trunk turned 'twist' and leant 'lean', the least that brings it in reach) and in the guard
+    ('end'); 'come', where it comes in from beside the edge; 'gap', the leg lengths it was left out of reach."""
+    rim = Vector(rim)
+    cache = (tuple(round(v, 5) for v in rim), SHIELD_FIST, SHIELD_PALM, SHIELD_ELBOW, SHIELD_RIM_PALM, SHIELD_APPROACH,
+             SHIELD_DRAW_TWIST, SHIELD_DRAW_LEAN, DRAW_BEND_COST, DRAFT_DROP, DRAFT_LEAN, DRAFT_NARROW)
+    if cache in shield_draw_cache:
+        return shield_draw_cache[cache]
+    hn, pack = 'hand.L', GEAR['pack']['bone']
+    def held(X):
+        return (X[CHEST_BONE].inverted() @ (X[hn] @ head[hn]) - head[HIPS]) / LEG, \
+            X[CHEST_BONE].to_quaternion().inverted() @ X[hn].to_quaternion()
+    keys = {}
+    keys['hang'], keys['hang_turn'] = held(hip_body()[0])
+    keys['end'], keys['end_turn'] = held(shield_at(0.0)[0])
+    best = None
+    for twist in range(0, int(SHIELD_DRAW_TWIST) + 1, 5):
+        for lean in (0.0, SHIELD_DRAW_LEAN * 0.5, SHIELD_DRAW_LEAN):
+            X, _ = hip_body(lean=lean, twist=twist)
+            Y = dict(X)
+            over = hip_hand_straight(Y, X[pack] @ rim, lift=0.0, palm=SHIELD_RIM_PALM)
+            cost = (twist * twist + lean * lean) * DRAW_BEND_COST + (over / LEG) ** 2 * 1000.0
+            if best is None or cost < best[0]:
+                best = (cost, twist, lean, Y, over)
+    _, keys['twist'], keys['lean'], Y, over = best
+    keys['grab'], keys['grab_turn'] = held(Y)
+    keys['come'] = keys['grab'] + Vector((SHIELD_APPROACH, -SHIELD_APPROACH, 0))
+    keys['gap'] = over / LEG
+    shield_draw_cache[cache] = keys
+    return keys
+
+def shield_draw_at(t, rim):
+    """shield_draw at t for a shield whose edge is at rim (frames at t = 0, 1/n .. (n-1)/n as export_loop takes them,
+    the last the guard's first frame): the left hand from hanging round the left side to the shield's edge by
+    SHIELD_GRAB, the trunk turning to meet it, then round again into the guard. The game plays it backwards to put the
+    shield back. Returns the pose and the worst overreach."""
+    g = shield_draw_keys(rim)
+    t = min(1.0, t * SHIELD_DRAW_FRAMES / (SHIELD_DRAW_FRAMES - 1))
+    if t <= SHIELD_GRAB:
+        u = smooth(t / SHIELD_GRAB)
+        share = u
+        place = round_body(g['hang'], g['come'], g['grab'], u, 'L')
+        q0, q1, v = g['hang_turn'], g['grab_turn'], min(1.0, u / 0.8)
+        fist = u * u
+        lift = 0.0
+    else:
+        u = smooth((t - SHIELD_GRAB) / (1.0 - SHIELD_GRAB))
+        share = 1.0 - u
+        place = round_body(g['grab'], g['come'], g['end'], u, 'L')
+        q0, q1, v = g['grab_turn'], g['end_turn'], u
+        fist = 1.0
+        lift = SHIELD_ELBOW * u
+    X, clamp = hip_body(lean=g['lean'] * share, twist=g['twist'] * share)
+    wrist = X[CHEST_BONE] @ (head[HIPS] + place * LEG)
+    if q0.dot(q1) < 0:
+        q1 = -q1
+    turn = q0.slerp(q1, v).to_euler('XYZ')
+    clamp = max(clamp, arm_to('L', 1, wrist, X, turn=[math.degrees(n) for n in turn], lift=lift))
+    close_hand(X, 'L', 1, fist)
+    return X, clamp
+
+def shield_grip_rest(rim):
+    """A shield taken by its edge: the matrix (armature space) from its rest place on the back to its place at rest on
+    hand.L, as shield_draw holds it where the hand closes on it, which hand.L's move then takes to any pose."""
+    X, _ = shield_draw_at(SHIELD_GRAB * (SHIELD_DRAW_FRAMES - 1) / SHIELD_DRAW_FRAMES, rim)
+    return X['hand.L'].inverted() @ X[GEAR['pack']['bone']]
 
 hip_draw_cache = {}
 

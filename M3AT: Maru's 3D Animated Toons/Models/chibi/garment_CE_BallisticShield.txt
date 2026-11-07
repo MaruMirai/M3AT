@@ -9,6 +9,10 @@ texture garment_CE_BallisticShield.png
 # fist, which hand.L then moves.
 held yes
 held_at 0.22712 -0.03436 0.97326 -0.29966 0.86154 -0.45886 -0.21725 0.91150 0.45405 0.88785 -0.07461 -0.58636
+# held_grip: the same to its place at rest on hand.L as shield_draw_<name>'s hand takes it by its edge, and
+# held_rim the edge (model space), where the hand closes on it.
+held_grip 0.81910 0.54491 -0.17930 -0.56694 -0.55078 0.65964 -0.51139 0.12778 -0.16039 0.51763 0.84044 -0.31422
+held_rim -0.14824 0.59723 -0.09162
 # visor k ...: its own triangles (its f lines, from 0) that are glass, drawn see-through.
 visor 109 110 111 112 113 114 115 116 117 118
 # hide k ...: body triangles (skin.txt's f lines, from 0) left out while it is worn.

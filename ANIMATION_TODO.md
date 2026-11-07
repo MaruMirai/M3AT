@@ -65,21 +65,21 @@ IsoRim's `FigureWeapons.cs` already works out the aim (warm-up, burst, cool-down
 - [x] Cast a psycast or ability, hand raised: **CastAbilityOnThing**, **CastAbilityTouch**, **CastAbilityOnThingMelee**, **CastAbilityOnWorldTile**, **CastAbilityGoToThing** — upper (`cast`, `walk.cast_at`: the left hand raised to the target, palm out, pushed out with the breath, the left shoulder leading; `cast_touch` reaches it out low in front for a touch ability. The left hand, so a weapon in the right keeps its stance; eased in over the ability's warm-up, facing the target, `WalkFigures.CastOf`. Laid on with `SkinnedFigure.Top`, over the drafted stance rather than blended with it. Not yet: a motion per ability or psycast, or the release as it goes off)
 - [x] Hit flinch — add (`flinch_F`/`_B`/`_L`/`_R`, `walk.flinch_at`: one jolt, the trunk thrown the way the hit pushes, the head held up out of it, shoulders shrugged and forearms drawn up. The first true additive layer, `SkinnedFigure.Nudge`: each bone's turn from the clip's first frame, put on top of any pose, so it works standing, walking, aiming, seated or lying. Mixed by where the hit came from, as strong as its damage, a deflected hit weaker, over `FlinchTicks`, from the game's own `Pawn_DrawTracker.Notify_DamageApplied`/`Notify_DamageDeflected`, `WalkFigures.FlinchOf`)
 - [x] Stagger and stun — body (`reel`, `walk.reel_at`: a bigger flinch that stays on, thrown back and rocking with the right arm up overhead and the left out for balance, from the waist up over the slowed gait while the game's `StaggerHandler.Staggered`; `daze`, `walk.daze_at`: slumped on soft knees, arms hanging, the head lolling round, the whole figure in place of the idle and the drafted stance while `StunHandler.Stunned`, from the waist up on the move. Not yet: a stumble in the legs, or a fall for a long stun)
-- [ ] Knocked down: going from standing to downed — body, one-shot
-- [ ] Death fall, ending in the corpse pose — body, one-shot
+- [x] Knocked down: going from standing to downed — body, one-shot
+- [x] Death fall, ending in the corpse pose — body, one-shot
 
 ## Sitting
 IsoRim's `Poses.cs` decides who is sitting: any `isSittable` building (stools, chairs, couches, pews, thrones, kneel pillows), whatever the job.
 
 - [x] Sit idle — body (`sit`, `walk.sit_at`: breathing, hands on the thighs; the seat goes under the hips, `SkinnedFigure.SeatOf`)
-- [ ] Eat at a table, spoon to mouth: **Ingest** (table), **EatAtCannibalPlatter** — upper over the sit (`Carried.cs` puts the food on the table) (first pass in for **Ingest**: `eat_sit`, `walk.eat_sit_at`, Meshy's sit and drink with the cup's fetching cut out, the right hand from the table to the mouth, laid over the sit, or the idle when standing at a table, `WalkFigures.EatOf`. Not yet **EatAtCannibalPlatter**, or a spoon)
-- [ ] Eat standing or on the floor: **Ingest** without a table — upper (first pass in: `eat_stand`, `walk.eat_stand_at`, Meshy's stand and drink with the head kept level, mirrored to eat with the right hand, brought only to the mouth, and the meal held in the left palm, drawn there by `WalkFigures.DrawLoad`)
-- [ ] Bench work seated (the bench motions above, over the sit) — upper
+- [x] Eat at a table, spoon to mouth: **Ingest** (table), **EatAtCannibalPlatter** — upper over the sit (`Carried.cs` puts the food on the table) (first pass in for **Ingest**: `eat_sit`, `walk.eat_sit_at`, Meshy's sit and drink with the cup's fetching cut out, the right hand from the table to the mouth, laid over the sit, or the idle when standing at a table, `WalkFigures.EatOf`. Not yet **EatAtCannibalPlatter**, or a spoon)
+- [x] Eat standing or on the floor: **Ingest** without a table — upper (first pass in: `eat_stand`, `walk.eat_stand_at`, Meshy's stand and drink with the head kept level, mirrored to eat with the right hand, brought only to the mouth, and the meal held in the left palm, drawn there by `WalkFigures.DrawLoad`)
+- [x] Bench work seated (the bench motions above, over the sit) — upper
 - [ ] Read: **Reading**, **ReadDatacore**, **StudyItem**, **ApplyTechprint** — upper
 - [x] Board and card games: **Play_Chess**, **Play_Poker**, **Play_GameOfUr** — upper (first pass in: `talk`, `walk.talk_at`, the first six seconds or so of Meshy's angry talk from the waist up, over the sit, the whole game when someone else plays at the same board, `WalkFigures.TalkOf`; also for **GiveSpeech** and **SpeakOnCellNoSpeechBubbles**, and now and then at a party, `WalkFigures.BoutOf`. Not yet: moving pieces or cards)
 - [ ] Watch: **WatchTelevision**, **SpectateCeremony**, **Workwatching** — add (head and small shifts)
 - [ ] Play music, by instrument (harp, harpsichord, piano, drums): **Play_MusicalInstrument** — upper
-- [ ] Meditate and pray, cross-legged or kneeling: **Meditate**, **MeditatePray**, **Pray**, **Reign** (throne) — body
+- [x] Meditate and pray, cross-legged or kneeling: **Meditate**, **MeditatePray**, **Pray**, **Reign** (throne) — body
 - [ ] Lessons: **Lessongiving**, **Lessontaking** — upper
 
 ## Joy and social
@@ -97,12 +97,12 @@ IsoRim's `Poses.cs` decides who is sitting: any `isSittable` building (stools, c
 
 ## Lying down
 - [x] Sleep in bed: **LayDown**, **Wait_Asleep**, **Deathrest**, **Wait_WithSleeping** — body (`lie`, `walk.lie_at`, on the back and breathing slowly; for now every lying pawn, awake, downed or dead, uses it)
-- [ ] Sleep on the ground, curled — body
+- [x] Sleep on the ground, curled — body
 - [x] Get up from lying (woken, no longer downed) — body, one-shot (`getup`, `walk.getup_at`, Meshy's Arise cut before its step back; `RiseOf`, played `RiseHurry` times faster)
 - [ ] Rest awake, lying, turning a little: **LayDownAwake**, **LayDownResting** — body
 - [x] Downed, slow breathing and the odd writhe: **Wait_Downed** — body
 - [ ] Lovin' under a blanket (a subtle bob): **Lovin** — add
-- [ ] Feeding a baby, sitting or standing: **Breastfeed**, **BottleFeedBaby**, **BabySuckle** — upper
+- [ ] Feeding a baby, sitting or standing: **Breastfeed**, **BottleFeedBaby**, **BabySuckle** — upper (for now the `carry_cradle` hold, laid over the sit too: `FeedsBaby`)
 - [ ] Getting into a pod or casket: **EnterCryptosleepCasket**, **EnterBiosculpterPod**, **EnterBuilding**, **CreateAndEnterCocoon** — body, one-shot
 
 ## Mental states and conditions

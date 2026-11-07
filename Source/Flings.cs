@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using HarmonyLib;
 using RimWorld;
 using RimWorld.Planet;
 using UnityEngine;
@@ -13,8 +14,10 @@ namespace M3AT
     // on the game's ticks, here, whether or not anyone is looking: it uses no real time, no drawing and no random numbers,
     // so where a body ends up is the same every time and for every player. A body's cell follows the point as it crosses
     // cells. Its ragdoll (Ragdoll.cs), which runs on the drawing side, chases the point with its hips (Ragdoll.Following)
-    // and has nothing to say about where it goes. A flying weapon is off the map while it flies (kept here, so saved here),
-    // and put down where it lands by the game's own GenPlace.
+    // and has nothing to say about where it goes. A flying weapon stays spawned on the cell it left while it flies, only
+    // hidden there (Hidden: left out of the map mesh and the realtime drawing), so the map saves it as any other thing and
+    // a save loaded without this mod finds it lying where it was dropped; this only keeps a reference to it and its
+    // flight. It is put down where it lands by the game's own GenPlace.
     public sealed class Flings : MapComponent
     {
         private const float TickSeconds = 1f / 60f;
@@ -55,7 +58,7 @@ namespace M3AT
             public ThingWithComps thing;
             public Pawn pawn;       // who dropped it (for the way of the blow, and the hand it is drawn from)
             public IntVec3 from;    // the cell it left
-            public bool started;    // off the map and flying; before that, lying where the game dropped it
+            public bool started;    // flying (hidden where it lies); before that, lying where the game dropped it
             public Vector3 at;
             public Vector3 speed;
             public Vector3 axis;    // what it tumbles about
@@ -68,7 +71,7 @@ namespace M3AT
 
             public void ExposeData()
             {
-                Scribe_Deep.Look(ref thing, "thing");
+                Scribe_References.Look(ref thing, "thing");
                 Scribe_References.Look(ref pawn, "pawn");
                 Scribe_Values.Look(ref from, "from");
                 Scribe_Values.Look(ref started, "started");
@@ -85,9 +88,72 @@ namespace M3AT
         private float since;   // game seconds since the last tick, for drawing between them
         private readonly Func<float, float, bool> blocked;
 
+        // The weapons in flight on every map, hidden where they lie. Read while the map mesh is printed, so locked. Things
+        // of a game since left are let go of when the next one adds one.
+        private static readonly HashSet<Thing> flying = new HashSet<Thing>();
+        private static Game flyingGame;
+
         public Flings(Map map) : base(map)
         {
             blocked = Blocked;
+        }
+
+        // The game's two ways of drawing an item on the ground, kept off the weapons in flight. First, so that a prefix
+        // after it that draws the thing its own way (IsoRim's bake of its model) is skipped with the original.
+        public static void Patch(Harmony harmony)
+        {
+            // Two prefixes: the thing is TakePrintFrom's first argument but DynamicDrawPhaseAt's instance (its first
+            // argument is the phase, which Harmony refuses to bind to a Thing).
+            harmony.Patch(AccessTools.Method(typeof(SectionLayer_ThingsGeneral), "TakePrintFrom"),
+                prefix: new HarmonyMethod(typeof(Flings), nameof(PrintHiddenPrefix)) { priority = Priority.First });
+            harmony.Patch(AccessTools.Method(typeof(Thing), nameof(Thing.DynamicDrawPhaseAt)),
+                prefix: new HarmonyMethod(typeof(Flings), nameof(DrawHiddenPrefix)) { priority = Priority.First });
+        }
+
+        private static bool PrintHiddenPrefix(Thing __0)
+        {
+            return !Hidden(__0);
+        }
+
+        private static bool DrawHiddenPrefix(Thing __instance)
+        {
+            return !Hidden(__instance);
+        }
+
+        public static bool Hidden(Thing thing)
+        {
+            if (flying.Count == 0 || thing == null)
+            {
+                return false;   // (most of the time, without the lock: this is on every realtime thing's drawing)
+            }
+            lock (flying)
+            {
+                return flying.Contains(thing);
+            }
+        }
+
+        private static void Hide(Thing thing, bool hide)
+        {
+            lock (flying)
+            {
+                if (hide)
+                {
+                    if (flyingGame != Current.Game)
+                    {
+                        flying.Clear();
+                        flyingGame = Current.Game;
+                    }
+                    flying.Add(thing);
+                }
+                else
+                {
+                    flying.Remove(thing);
+                }
+            }
+            if (thing.Spawned)
+            {
+                thing.DirtyMapMesh(thing.Map);
+            }
         }
 
         private static Flings Of(Thing thing)
@@ -285,6 +351,14 @@ namespace M3AT
                 }
                 Launch(item);
             }
+            else if (item.thing == null || !item.thing.Spawned || item.thing.Map != map)
+            {
+                if (item.thing != null)
+                {
+                    Hide(item.thing, false);   // picked up or destroyed in the air: the game's now
+                }
+                return true;
+            }
             bool down = Fly(ref item.at, ref item.speed, blocked, ItemRadius);
             item.turned += ItemTurns * TickSeconds;
             if (!down)
@@ -318,7 +392,7 @@ namespace M3AT
                 angle = Unit(seed, 1) * 360f;
                 push = 0f;
             }
-            item.thing.DeSpawn();
+            Hide(item.thing, true);
             item.at = item.from.ToVector3Shifted();
             item.at.y = ItemHeight;
             item.speed = Quaternion.AngleAxis(angle, Vector3.up) * Vector3.forward * (ItemLeast + push) + Vector3.up * ItemUp;
@@ -340,6 +414,12 @@ namespace M3AT
             {
                 cell = item.from;
             }
+            Hide(item.thing, false);
+            if (cell == item.thing.Position)
+            {
+                return;
+            }
+            item.thing.DeSpawn();
             if (!GenPlace.TryPlaceThing(item.thing, cell, map, ThingPlaceMode.Near))
             {
                 GenSpawn.Spawn(item.thing, item.from, map);
@@ -407,6 +487,13 @@ namespace M3AT
                 }
                 bodies.RemoveAll(b => b.pawn == null);
                 items.RemoveAll(i => i.thing == null);
+                foreach (Item item in items)
+                {
+                    if (item.started)
+                    {
+                        Hide(item.thing, true);
+                    }
+                }
             }
         }
     }

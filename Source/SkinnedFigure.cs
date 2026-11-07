@@ -111,6 +111,7 @@ namespace M3AT
                                         // the weapon (WalkFigures.WornGarments); it hides nothing and is in no clearance (HeldMask)
             public bool heldOnBack;     // and with a held_at line: carried on the back as exported, and in the hand while shown (Shields.cs)
             public Matrix4x4 heldAt;    // and that line: from its rest place on the back to its rest place in the left fist
+            public Matrix4x4? heldGrip; // and its held_grip line: from there to its rest place on hand.L as shield_draw takes it by its edge
             public Color? colour;       // a garment's own colour, in place of the apparel's (the shoes); null: the apparel's
             public int[] hides;       // a garment's: the body triangles (numbered as skin.txt's) under it, left out while it is worn
             public bool[] glass;      // a garment's: which of its triangles are glass (a helmet's visor), drawn see-through (DrawVisor); null: none
@@ -327,7 +328,7 @@ namespace M3AT
             public bool gearPack;      // and whether an equipment pack is drawn on its back
             public float packScale = 1f;   // the size an equipment pack is drawn at, of this figure's: as big on every pawn
             public float backpackScale = 1f;   // and a backpack, likewise, a child's being a smaller one
-            public bool shieldHeld;   // a shield carried on the back is in the hand now (Shielding)
+            public float shieldOut;   // how far a shield carried on the back is through being taken into the hand: 0 on the back, 1 in the guard (Shielding)
             public float shieldOver = float.NegativeInfinity;   // and how far out the weapons holstered under it stand (ShieldPush)
             public int standOn = -1;   // the thigh of the one leg it stands on (Balance); -1: none
             public float balance;   // and how far the hips are moved over that foot (0 .. 1)
@@ -884,6 +885,17 @@ namespace M3AT
                             piece.heldOnBack = true;
                         }
                         break;
+                    case "held_grip":
+                        if (p.Length > 12)
+                        {
+                            Matrix4x4 h = Matrix4x4.identity;
+                            for (int r = 0; r < 3; r++)
+                            {
+                                h.SetRow(r, new Vector4(Num(p[1 + 4 * r]), Num(p[2 + 4 * r]), Num(p[3 + 4 * r]), Num(p[4 + 4 * r])));
+                            }
+                            piece.heldGrip = h;
+                        }
+                        break;
                     case "colour":
                         piece.colour = new Color(Num(p[1]), Num(p[2]), Num(p[3]));
                         break;
@@ -1111,6 +1123,11 @@ namespace M3AT
                 {
                     HipGrab = Num(p[1]);
                     HipSlide = Num(p[2]);
+                }
+                else if (p[0] == "shield_timing" && p.Length > 2)
+                {
+                    ShieldGrab = Num(p[1]);
+                    ShieldSlide = Num(p[2]);
                 }
                 else if (p[0] == "weapon_type" || p[0] == "type_scale")
                 {

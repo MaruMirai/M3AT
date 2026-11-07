@@ -25,6 +25,7 @@ ISORIM_PACK_TALL = 0.40
 ISORIM_PACK_MIDDLE = 0.226
 SLAB_HALF_DEPTH = 0.025 # WalkFigures.SlabHalfDepth: cells, half of IsoRim's slab
 STACK_GAP = 0.005       # WalkFigures.StackGap: model units left between two weapons lying on each other
+NO_CLEARANCE_DEFS = ("Apparel_Bandolier", "CE_Apparel_TacVest")   # SkinnedFigure.NoClearanceDefs: webbing lain over, not pushed out by
 
 # What a figure has on (Posed.Wearing): the body's keys as ((name, amount), ...), the garments worn by name, and whether an
 # equipment pack is drawn on its back. Grown and of the standard size in the preview, so both pack scales are 1. gear_belt:
@@ -83,6 +84,35 @@ def outer(verts, tris, point, way, far=HOLSTER_DEPTH):
             best = max(best, along[hit].max())
     return best
 
+def quaternion(m):
+    """The turn of a 3x3 matrix (no size) as (w, x, y, z)."""
+    w = np.sqrt(max(0.0, 1.0 + m[0, 0] + m[1, 1] + m[2, 2])) / 2
+    x = np.copysign(np.sqrt(max(0.0, 1.0 + m[0, 0] - m[1, 1] - m[2, 2])) / 2, m[2, 1] - m[1, 2])
+    y = np.copysign(np.sqrt(max(0.0, 1.0 - m[0, 0] + m[1, 1] - m[2, 2])) / 2, m[0, 2] - m[2, 0])
+    z = np.copysign(np.sqrt(max(0.0, 1.0 - m[0, 0] - m[1, 1] + m[2, 2])) / 2, m[1, 0] - m[0, 1])
+    q = np.array((w, x, y, z))
+    return q / np.linalg.norm(q)
+
+def turn_of(q):
+    """A (w, x, y, z) turn as a 3x3 matrix."""
+    w, x, y, z = q
+    return np.array(((1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)),
+                     (2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)),
+                     (2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y))))
+
+def between(a, b, u):
+    """WalkFigures.Between for 4x4 matrices of a turn and a place: u of the way from a to b, the turn slerped."""
+    qa, qb = quaternion(a[:3, :3]), quaternion(b[:3, :3])
+    if qa @ qb < 0:
+        qb = -qb
+    d = min(1.0, qa @ qb)
+    angle = np.arccos(d)
+    q = qa if angle < 1e-6 else (np.sin((1 - u) * angle) * qa + np.sin(u * angle) * qb) / np.sin(angle)
+    m = np.identity(4)
+    m[:3, :3] = turn_of(q / np.linalg.norm(q))
+    m[:3, 3] = a[:3, 3] * (1 - u) + b[:3, 3] * u
+    return m
+
 class Piece:
     """The body or a garment as exported: rest places, triangles, weights, each key's moves."""
     def __init__(self, path):
@@ -92,6 +122,8 @@ class Piece:
         weighted = 0
         self.held = False     # a shield (its held line): in no clearance, as SkinnedFigure.HeldMask
         self.held_at = None   # and carried on the back: its held_at line, rest on the back to rest in the left fist
+        self.held_grip = None   # and its held_grip line: rest on the back to rest on hand.L as shield_draw takes it by its edge
+        self.held_rim = None    # and its held_rim line: that edge (model space)
         with open(path) as f:
             for line in f:
                 w = line.split()
@@ -114,6 +146,11 @@ class Piece:
                 elif w[0] == 'held_at' and len(w) > 12:
                     self.held_at = np.identity(4)
                     self.held_at[:3, :] = np.array([float(x) for x in w[1:13]]).reshape(3, 4)
+                elif w[0] == 'held_grip' and len(w) > 12:
+                    self.held_grip = np.identity(4)
+                    self.held_grip[:3, :] = np.array([float(x) for x in w[1:13]]).reshape(3, 4)
+                elif w[0] == 'held_rim' and len(w) > 3:
+                    self.held_rim = np.array([float(x) for x in w[1:4]])
                 elif w[0] == 'key':
                     moves = self.keys.setdefault(w[1], {})
                     bones = self.bone_keys.setdefault(w[1], {})
@@ -175,6 +212,11 @@ class Figure:
             p = self.pieces[name] = Piece(os.path.join(self.folder, self.garment_files[name]))
         return p
 
+    def unclear(self, name):
+        """Whether a garment is in no clearance (SkinnedFigure.UnclearMask): a pack, a shield or NO_CLEARANCE_DEFS webbing."""
+        piece = self.piece(name)
+        return self.is_pack(name) or piece.held or any(d in NO_CLEARANCE_DEFS for d in piece.defs)
+
     def is_pack(self, name):
         """Whether a garment is drawn as a pack (SkinnedFigure.IsPack)."""
         return any(d in self.packs for d in self.piece(name).defs)
@@ -224,7 +266,7 @@ class Figure:
     def clearance(self, mix, mask, h):
         """SkinnedFigure.Clearance: how far a slot is pushed out: how much further out the outermost surface near it stands,
         the shape's body or any garment in mask but a pack or a shield, than the bare base body's does where the slot was set."""
-        mask = tuple(g for g in mask if not self.is_pack(g) and not self.piece(g).held)
+        mask = tuple(g for g in mask if not self.unclear(g))
         key = ('push', mix, mask, h.size, h.bone, tuple(h.at), tuple(h.aim), tuple(h.outward), None if h.spots is None else h.spots.tobytes())
         push = self.cache.get(key)
         if push is not None:
@@ -326,6 +368,16 @@ class Figure:
         h = rig[0]
         return h.bone, piece.rest + self.bone_move(h.bone, worn.mix) + h.outward * self.shield_push(worn, rig, over)
 
+    def shield_on_hand(self, worn, g, turned):
+        """ShieldPlace part way through shield_draw, less the hand's turn: (hand.L, its vertices at rest in the shape) as
+        held turned (0 .. 1) of the way from held_grip, as the hand takes it by its edge, to held_at, the guard's grip."""
+        piece = self.piece(g)
+        b = self.bone_index['hand.L']
+        c = np.identity(4)
+        c[:3, 3] = piece.rest.mean(0)   # turned about its own middle, as ShieldPlace
+        m = between(piece.held_grip @ c, piece.held_at @ c, turned) @ np.linalg.inv(c)
+        return b, piece.rest @ m[:3, :3].T + m[:3, 3] + self.bone_move(b, worn.mix)
+
     def pack_outer(self, worn, way):
         """PackOuter: the outermost thing worn on the back along way, any pack there; minus infinity for none."""
         most = -np.inf
@@ -356,7 +408,7 @@ class Figure:
 
     def side_surface(self, mix, mask, h):
         """SideSurface: the furthest out along a slot's way that the shape's body or the clothes worn stand beside it."""
-        mask = tuple(g for g in mask if not self.is_pack(g) and not self.piece(g).held)
+        mask = tuple(g for g in mask if not self.unclear(g))
         key = ('side', mix, mask, h.bone, tuple(h.at), tuple(h.aim), tuple(h.outward))
         best = self.cache.get(key)
         if best is not None:

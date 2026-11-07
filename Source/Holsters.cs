@@ -94,6 +94,33 @@ namespace M3AT
             }
         }
 
+        // Webbing that holsters, packs and gear lie over rather than are pushed out by: the heavy bandolier and Combat
+        // Extended's tactical vest are thin straps and pouches, and pushing a weapon or pack out past their pouches left it
+        // standing well off the back.
+        private static readonly string[] NoClearanceDefs = { "Apparel_Bandolier", "CE_Apparel_TacVest" };
+
+        // The worn-garment bits of the garments in no clearance: packs (placed by it), shields (they go with the hand) and
+        // the NoClearanceDefs webbing.
+        private GarmentMask unclearMask = -1;
+        private GarmentMask UnclearMask
+        {
+            get
+            {
+                if (unclearMask < 0)
+                {
+                    unclearMask = PackMask | HeldMask;
+                    for (int g = 1; g < pieces.Length && g <= MaxHiding; g++)
+                    {
+                        if (System.Array.Exists(pieces[g].defs, d => System.Array.IndexOf(NoClearanceDefs, d) >= 0))
+                        {
+                            unclearMask |= GarmentBit(g);
+                        }
+                    }
+                }
+                return unclearMask;
+            }
+        }
+
         // Whether this apparel is drawn as a pack.
         public bool IsPack(ThingDef def)
         {
@@ -213,7 +240,7 @@ namespace M3AT
         // The same for a slot that is not in the list (the worn gear's, key past the weapons' slot numbers).
         private float Clearance(Shape s, GarmentMask mask, Holster h, int slot)
         {
-            mask &= ~(PackMask | HeldMask);   // a backpack is placed by this, not in the way of it (see HolsterClear); a shield goes with the hand
+            mask &= ~UnclearMask;   // a backpack is placed by this, not in the way of it (see HolsterClear); a shield goes with the hand; webbing is lain over
             (GarmentMask, int) key = (mask, slot);
             float push;
             if (s.holsterPush.TryGetValue(key, out push))
@@ -576,7 +603,7 @@ namespace M3AT
         // height, as the far ends of a long weapon may pass the hips; the clothes all along it.
         private float SideSurface(Shape s, GarmentMask mask, Holster h, int slot)
         {
-            mask &= ~(PackMask | HeldMask);
+            mask &= ~UnclearMask;
             (GarmentMask, int) key = (mask, SideKey + slot);
             float best;
             if (s.holsterPush.TryGetValue(key, out best))

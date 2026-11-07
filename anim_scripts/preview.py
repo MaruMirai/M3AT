@@ -129,6 +129,42 @@ def stance_entry(table, kind):
     """A stance entry as it poses: a weapon's drafted one with its kind's under it (walk.drafted_entry)."""
     return walk.drafted_entry(kind) if table == 'DRAFTED' else getattr(walk, table)[kind]
 
+def shield_shown(p, kind):
+    """On a shield stance (walk.DRAFTED's shield_<kind>), the weapon of that kind picked to see it with (Shield weapon),
+    or None for the kind's own look."""
+    base = walk.shield_weapon(kind) if hasattr(walk, 'shield_weapon') else None
+    chosen = getattr(p, 'shield_with', '')
+    if base is None or not chosen or walk.DRAFTED.get(chosen, {}).get('kind') != base:
+        return None
+    return chosen
+
+def drafted_pose_name(p, kind):
+    """The drafted entry a drafted clip is posed from: on a shield stance with a weapon picked that has its own
+    (walk.shielded_names), that weapon's, worked out from the kind's with its own grip; else the clip's own."""
+    chosen = shield_shown(p, kind)
+    return walk.SHIELD + chosen if chosen is not None and chosen in walk.shielded_names() else kind
+
+def weapon_name(p, what, kind):
+    """The WEAPONS entry drawn in a drafted (or cover) clip's hands: the clip's own, or on a shield stance the weapon
+    picked, else the kind's (shield_pistol: pistol)."""
+    if what not in ('drafted', 'cover'):
+        return kind
+    if hasattr(walk, 'shield_weapon') and walk.shield_weapon(kind) is not None:
+        return shield_shown(p, kind) or walk.shield_weapon(kind)
+    return kind
+
+shield_with_cache = []
+
+def shield_with_items(self, context):
+    """The one-handed weapons that can be seen in a shield stance (kept, as Blender wants the strings to live on)."""
+    items = [('NONE', "(the kind's)", "The kind's own weapon look; the hands can be moved")]
+    if hasattr(walk, 'ONE_HANDED'):
+        kinds = {walk.shield_weapon(k) for k in walk.DRAFTED if walk.shield_weapon(k) is not None}
+        items += [(k, k, 'Its shield stance (its kind\'s, with its own grip: walk.shielded_entry)')
+                  for k, e in walk.DRAFTED.items() if e.get('kind') in kinds and walk.weapon_type(k) in walk.ONE_HANDED]
+    shield_with_cache[:] = items
+    return shield_with_cache
+
 def read_stances():
     """Each DRAFTED and CARRY entry as it poses: which hands it places, whether a hand can be left free (a drafted
     side can; carry_at needs the ones it names), the body keys to offer and the keys this panel leaves alone (a
@@ -203,7 +239,7 @@ def loop_seconds(what, kind=''):
             'tread': getattr(walk, 'TREAD_SECONDS', None), 'hurt': getattr(walk, 'HURT_SECONDS', None),
             'cower': getattr(walk, 'CRY_SECONDS', None), 'hunker': getattr(walk, 'CRY_SECONDS', None),
             'cover': getattr(walk, 'COVER_SECONDS', None),
-            'lead': getattr(walk, 'LEAD_SECONDS', None), 'shield': getattr(walk, 'SHIELD_SECONDS', None), 'rub': getattr(walk, 'RUB_SECONDS', None), 'talk': getattr(walk, 'TALK_SECONDS', None),
+            'lead': getattr(walk, 'LEAD_SECONDS', None), 'shield': getattr(walk, 'SHIELD_DRAW_SECONDS' if kind else 'SHIELD_SECONDS', None), 'rub': getattr(walk, 'RUB_SECONDS', None), 'talk': getattr(walk, 'TALK_SECONDS', None),
             'reload': getattr(walk, 'RELOAD_SECONDS', None),
             'eat_sit': getattr(walk, 'EAT_SIT_SECONDS', None), 'eat_stand': getattr(walk, 'EAT_STAND_SECONDS', None), 'research': getattr(walk, 'RESEARCH_SECONDS', None), 'research_stand': getattr(walk, 'RESEARCH_SECONDS', None), 'research_floor': getattr(walk, 'RESEARCH_SECONDS', None), 'crouch': getattr(walk, 'CROUCH_SECONDS', None), 'sow': getattr(walk, 'SOW_SECONDS', None), 'bench': getattr(walk, 'BENCH_SECONDS', None), 'bench_sit': getattr(walk, 'BENCH_SIT_SECONDS', None), 'chair': getattr(walk, 'CHAIR_SECONDS', None), 'tame': getattr(walk, 'TAME_SECONDS', None), 'tame_kneel': getattr(walk, 'CROUCH_SECONDS', None), 'cast': getattr(walk, 'CAST_SECONDS', None),
             'flinch': FLINCH_SECONDS, 'reel': getattr(walk, 'REEL_SECONDS', None), 'daze': getattr(walk, 'DAZE_SECONDS', None),
@@ -340,7 +376,7 @@ def loop_pose(what, kind, t):
     if what == 'idle':
         return walk.stand_at(t)
     if what == 'drafted':
-        return walk.stand_at(t, kind)
+        return walk.stand_at(t, drafted_pose_name(props(), kind))
     if what == 'carry':
         return walk.carry_at(t, kind)
     if what == 'carried':
@@ -364,6 +400,8 @@ def loop_pose(what, kind, t):
     if what == 'lead':
         return walk.lead_at(t)
     if what == 'shield':
+        if kind:
+            return walk.shield_draw_at(shield_draw_phase(kind, t), shield_rim_of(kind))
         return walk.shield_at(t)
     if what == 'rub':
         return walk.rub_at(t)
@@ -746,6 +784,26 @@ def line_changed(kind):
             self['wp_%s_roll' % kind] = roll
         repose()
     return changed
+
+def shield_draw_phase(kind, t):
+    """How far through shield_draw taking the shield off the back ('draw/<garment>') or putting it back ('put/<garment>')
+    shown at t is."""
+    return 1.0 - t if kind.startswith('put/') else t
+
+def shield_rim_of(kind):
+    """The edge (armature rest space) by which shield_draw's hand takes the shield of a 'draw/<garment>' or
+    'put/<garment>' kind, as the export wrote it (held_rim)."""
+    fig = figure()
+    return Vector(to_rest(fig, fig.piece(kind.partition('/')[2]).held_rim))
+
+def shield_taken(what, kind, t):
+    """Where a shield carried on the back is on this clip (WalkFigures' Ease.shieldOut): 1 in the hand on the clips the game
+    plays only while it shows the weapon, part way through shield_draw on its clip, else 0 on the back; and the garment
+    that clip is for (None for any)."""
+    if what == 'shield' and kind:
+        at = shield_draw_phase(kind, t) * walk.SHIELD_DRAW_FRAMES / (walk.SHIELD_DRAW_FRAMES - 1)   # as shield_draw_at plays it
+        return min(1.0, at), kind.partition('/')[2]
+    return (1.0 if what in SHIELD_HELD else 0.0), None
 
 def hip_draw_phase(kind, t):
     """How far through hip_draw taking the hip gear ('draw') or putting it away ('put') shown at t is."""
@@ -1547,11 +1605,11 @@ def shield_over(p, fig, worn, drawn=None):
 # The clips a shield carried on the back is shown in the hand on: those the game plays only while it shows the weapon.
 SHIELD_HELD = ('drafted', 'aim', 'strike', 'shield', 'cover', 'draw', 'holster', 'reload')
 
-def draw_worn(p, held=False, drawn=None):
+def draw_worn(p, held=(0.0, None), drawn=None):
     """The garments ticked, as the game has them on: skinned from the export's weights in the shape the body keys make, a
     backpack whole on its bone where SkinnedFigure.Packed puts it, a shield whole on the back over all else there or in
-    the left fist (held). In the rest of the rig's garments' place, which the list stands in for; garments the game's
-    files don't have yet want an export, or Show worn off."""
+    the left fist, or part way between on its shield_draw clip (held: shield_taken's). In the rest of the rig's garments'
+    place, which the list stands in for; garments the game's files don't have yet want an export, or Show worn off."""
     shown = set()
     if p.worn_show:
         for obj in rig_garments():
@@ -1575,9 +1633,19 @@ def draw_worn(p, held=False, drawn=None):
                 m = moves[fig.pack_rig(g)[0].bone]
                 verts = to_rest(fig, rest) @ m[:3, :3].T + m[:3, 3]
             elif fig.is_shield(g):
-                b, rest = fig.shielded(worn, g, -np.inf if held else shield_over(p, fig, worn, drawn), held)
+                taken = held[0] if held[1] in (None, g) else 0.0
+                grab, slide = walk.SHIELD_GRAB, walk.SHIELD_SLIDE
+                b, rest = fig.shielded(worn, g, -np.inf if taken >= 1.0 else shield_over(p, fig, worn, drawn), taken >= 1.0)
                 m = moves[b]
                 verts = to_rest(fig, rest) @ m[:3, :3].T + m[:3, 3]
+                if grab < taken < 1.0 and piece.held_grip is not None:
+                    # As ShieldPlace: taken off the back onto the hand over the slide, turning in the hand to the guard's
+                    # grip over the rest of the clip (the slide here a blend of places, the game's of turns).
+                    b, rest = fig.shield_on_hand(worn, g, walk.smooth(min(1.0, (taken - grab) / (1.0 - grab))))
+                    m = moves[b]
+                    hand = to_rest(fig, rest) @ m[:3, :3].T + m[:3, 3]
+                    u = walk.smooth(min(1.0, (taken - grab) / slide)) if slide > 0 else 1.0
+                    verts = verts * (1.0 - u) + hand * u
             else:
                 rest = to_rest(fig, fig.shaped(g, worn.mix))
                 verts = np.zeros_like(rest)
@@ -1880,8 +1948,8 @@ def held_sides(p, what, kind):
         return None, ()
     table = 'DRAFTED' if what == 'drafted' else 'CARRY'
     info = registered['stances'].get((table, kind))
-    if info is None:
-        return table, ()
+    if info is None or (what == 'drafted' and drafted_pose_name(p, kind) != kind):
+        return table, ()   # (a weapon's shield stance is worked out from its kind's: move the kind's hands)
     return table, [s for s in info['sides'] if not info['toggle'] or getattr(p, sp(table, kind, s + '_on'))]
 
 def turn_set(p, table, kind, side):
@@ -1944,6 +2012,7 @@ def place_handles(p, what, kind, X, write=True):
 def place_grip(p, what, kind, write=True):
     """An arrows empty where a weapon on the 'hand' line is held, x along it and z out of its top, for the stance
     shown on its own (left where it is while playing, or when it was just moved)."""
+    kind = weapon_name(p, what, kind)
     w = getattr(walk, 'WEAPONS', {}).get(kind) if what == 'drafted' else None
     obj = bpy.data.objects.get(GRIP)
     if w is None or w['line'] != 'hand' or not p.weapon or p.over or state['chest'] is None:
@@ -1987,6 +2056,7 @@ def grip_moved(p):
     it was."""
     obj = bpy.data.objects.get(GRIP)
     what, kind = clip_of(p)
+    kind = weapon_name(p, what, kind)
     w = getattr(walk, 'WEAPONS', {}).get(kind)
     if obj is None or state['grip'] is None or w is None or w['line'] != 'hand':
         return False
@@ -2242,7 +2312,7 @@ def repose(_self=None, _context=None):
                 elif what == 'lead':
                     apply_over(Xg, Xs, 'R', walk.LEAD_UPPER)
                 elif what == 'shield':
-                    apply_over(Xg, Xs, 'L', walk.SHIELD_UPPER)
+                    apply_over(Xg, Xs, 'L', walk.SHIELD_DRAW_UPPER if kind else walk.SHIELD_UPPER)
                 elif what == 'rub':
                     apply_over(Xg, Xs, 'LR', walk.RUB_UPPER)
                 elif what == 'talk':
@@ -2269,6 +2339,8 @@ def repose(_self=None, _context=None):
                     apply_over(Xg, Xs, walk.draw_keys(kind)['side'], walk.DRAW_UPPER)
                 else:
                     entry = stance_entry('DRAFTED' if what == 'drafted' else 'CARRY', kind)
+                    if entry.get('shield'):
+                        entry = dict(entry, L=True)   # a shield stance takes the left arm too (the guard)
                     apply_over(Xg, Xs, entry.get('hands', entry))
                 X, clamp = None, max(clamp, gait_clamp)
             else:
@@ -2278,7 +2350,7 @@ def repose(_self=None, _context=None):
             state['clamp'], state['error'] = clamp, ''
             state['chest'] = X[walk.CHEST_BONE].copy() if X is not None else None
             place_handles(p, what, kind, X, write='hands' not in state['quiet'])
-            draw_weapon(p, kind if what in ('drafted', 'cover') else kind.partition('/')[0] if what == 'aim'
+            draw_weapon(p, weapon_name(p, what, kind) if what in ('drafted', 'cover') else kind.partition('/')[0] if what == 'aim'
                         else walk.strike_names()[kind][2] if what == 'strike' else 'rifle' if what == 'reload'
                         else walk.draw_keys(kind)['guard'] if what in ('draw', 'holster') else None,
                         drawn=drawn_from(what, kind, p.time % 1.0))
@@ -2286,7 +2358,7 @@ def repose(_self=None, _context=None):
             draw_load(p, what, kind)
             place_grip(p, what, kind, write='grip' not in state['quiet'])
             state['mix'] = body_mix()
-            draw_worn(p, what in SHIELD_HELD, drawn_from(what, kind, p.time % 1.0))
+            draw_worn(p, shield_taken(what, kind, p.time % 1.0), drawn_from(what, kind, p.time % 1.0))
             draw_holsters(p, drawn_from(what, kind, p.time % 1.0))
             place_holster_grip(p, write='holster' not in state['quiet'])
             draw_gear(p, hip_held(what, kind, p.time % 1.0))
@@ -2420,6 +2492,15 @@ def clip_items():
         items.append(('lead', 'Leading', 'The right hand reached a little back on a rope (walk.lead_at), over the gait on that arm only'))
     if hasattr(walk, 'shield_at'):
         items.append(('shield', 'Shield guard', 'A shield held up in the left fist in front of the shoulder while CE shows it (walk.shield_at), over the gait on that arm only; the shields are the Worn panel\'s CE_MeleeShield and CE_BallisticShield'))
+    if hasattr(walk, 'shield_draw_at'):
+        try:
+            fig = figure()
+            shields = [n for n in fig.names if fig.piece(n).held_rim is not None]
+        except OSError:
+            shields = []
+        for n in shields:
+            items += [('shield:draw/' + n, 'Shield: taking %s off the back' % n, 'The left hand round to its edge on the back and into the guard (walk.shield_draw_at), as exported (held_rim); tick it in the Worn panel to see it'),
+                      ('shield:put/' + n, 'Shield: putting %s back' % n, 'shield_draw backwards, as the game puts it back')]
     if hasattr(walk, 'cast_at'):
         items += [('cast', 'Casting', 'The left hand raised to the target, palm out (walk.cast_at), over the gait'),
                   ('cast:touch', 'Casting: touch', 'The left hand reached out low to touch (walk.cast_at)')]
@@ -2596,6 +2677,9 @@ def build_props():
         'load_thick': bpy.props.FloatProperty(name='Thickness', default=0.1, min=0.04, max=0.2, step=1, precision=2,
                                               update=repose, description="The carried item's thickness, cells (IsoRim's "
                                                                          "Forms.ItemThickness, 0.04 to 0.2)"),
+        'shield_with': bpy.props.EnumProperty(name='Shield weapon', items=shield_with_items, update=repose,
+                                              description="The weapon to see a shield stance with: its own grip in it "
+                                                          "(walk.shielded_entry), worked out from the kind's stance shown"),
         'copy_from': bpy.props.EnumProperty(name='Copy from', items=[(k, k, 'Copy from drafted_%s' % k) for k in walk.DRAFTED],
                                             description='The drafted stance to copy onto the one shown'),
         'holsters': bpy.props.BoolProperty(name='Show holsters', default=True, update=repose,
@@ -3294,8 +3378,8 @@ class MARU_PT_gait(bpy.types.Panel):
             self.draw_stance(p, 'DRAFTED' if what == 'drafted' else 'CARRY', kind)
         if what == 'carry':
             self.draw_load(p, kind)
-        if what == 'drafted' and kind in getattr(walk, 'WEAPONS', {}):
-            self.draw_weapon(p, kind)
+        if what == 'drafted' and weapon_name(p, what, kind) in getattr(walk, 'WEAPONS', {}):
+            self.draw_weapon(p, weapon_name(p, what, kind))
         if what == 'aim':
             self.draw_aim(p, kind)
         if what == 'aim' and kind.partition('/')[0] in getattr(walk, 'WEAPONS', {}):
@@ -3546,6 +3630,10 @@ class MARU_PT_gait(bpy.types.Panel):
             row = box.row(align=True)
             row.prop(p, 'copy_from', text='')
             row.operator('maru.stance_copy', icon='COPYDOWN')
+            if hasattr(walk, 'shield_weapon') and walk.shield_weapon(kind) is not None:
+                box.prop(p, 'shield_with')
+                if drafted_pose_name(p, kind) != kind:
+                    box.label(text='Worked out from this stance with its own grip: no handles', icon='INFO')
         if info['sides']:
             box.label(text='Wrists, leg lengths from the hips: x left, y back, z up')
             box.label(text='Turns (ticked: held at that turn), degrees in the chest\'s frame')

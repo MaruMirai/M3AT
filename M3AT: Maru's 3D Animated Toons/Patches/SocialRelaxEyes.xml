@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Patch>
+  <!-- Facial Animation closes a pawn's eyes the whole time it relaxes socially. Here it talks to whoever is near
+       (WalkFigures.ChatOf), so its eyes stay open; the face still blinks as usual. Conditional, as the def is there only
+       with Facial Animation. -->
+  <Operation Class="PatchOperationConditional">
+    <xpath>Defs/FacialAnimation.FaceAnimationDef[defName="SocialRelax"]/animationFrames/li/lidShapeDef</xpath>
+    <match Class="PatchOperationRemove">
+      <xpath>Defs/FacialAnimation.FaceAnimationDef[defName="SocialRelax"]/animationFrames/li/lidShapeDef</xpath>
+    </match>
+  </Operation>
+</Patch>

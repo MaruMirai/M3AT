@@ -147,7 +147,7 @@ namespace M3AT
         }
 
         // A matrix (turn, size and place) u of the way from a to b; both are a turn, a size the same every way and a place.
-        private static Matrix4x4 Between(Matrix4x4 a, Matrix4x4 b, float u)
+        internal static Matrix4x4 Between(Matrix4x4 a, Matrix4x4 b, float u)
         {
             if (u <= 0f)
             {

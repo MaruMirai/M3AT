@@ -492,6 +492,22 @@ def shield_held_at(name, g_rest, standoff):
           % ((name,) + tuple(n) + (2 * half[0], 2 * half[2], 2 * half[1]) + tuple(grip)))
     return Matrix.Scale(scale, 4) @ GAME @ world @ GAME.inverted() @ Matrix.Scale(1.0 / scale, 4)
 
+# Each shield carried on the back that the left hand takes by its edge (walk.shield_rim, armature space): name -> edge.
+# Its shield_draw_<name> clip is exported with the rest (walk.shield_draw_at).
+shield_rims = {}
+
+def shield_held_grip(name, g_rest):
+    """A shield placed on the back (its rest places, world): the matrix (game model space) from there to its place at rest
+    on hand.L as shield_draw's hand closes on its edge (walk.shield_grip_rest), which the game moves it onto before
+    turning it into the guard's grip (held_at). Records its edge in shield_rims."""
+    MW = rig.matrix_world
+    rim = walk.shield_rim([tuple(MW.inverted() @ p) for p in g_rest])
+    shield_rims[name] = rim
+    world = MW @ walk.shield_grip_rest(rim) @ MW.inverted()
+    print('SHIELD %s: taken by its edge at (%.2f, %.2f, %.2f), the hand %.4f leg lengths short of it, the trunk turned %.0f'
+          % ((name,) + tuple(rim) + (walk.shield_draw_keys(rim)['gap'], walk.shield_draw_keys(rim)['twist'])))
+    return Matrix.Scale(scale, 4) @ GAME @ world @ GAME.inverted() @ Matrix.Scale(1.0 / scale, 4)
+
 # Solid parts: a garment whose custom property "solid_parts" names sets in SOLID_PARTS (comma separated) has the vertices at
 # those rest places (within SOLID_REACH, so every copy split at a texture seam) weighted alike, the mean of their own
 # weights less the arm's, the neck's and the head's (SOLID_NOT: a backpack's top edge is by the neck, where the skin
@@ -811,6 +827,12 @@ def write_garment(g, path):
             f.write('held yes\n')
             m = shield_held_at(g.name, g_rest, props.get('standoff', 1.5))
             f.write('held_at %s\n' % ' '.join('%.5f' % (m[r][c] + 0.0) for r in range(3) for c in range(4)))
+            if hasattr(walk, 'shield_draw_at'):
+                f.write('# held_grip: the same to its place at rest on hand.L as shield_draw_<name>\'s hand takes it by its edge, and\n')
+                f.write('# held_rim the edge (model space), where the hand closes on it.\n')
+                m = shield_held_grip(g.name, g_rest)
+                f.write('held_grip %s\n' % ' '.join('%.5f' % (m[r][c] + 0.0) for r in range(3) for c in range(4)))
+                f.write('held_rim %.5f %.5f %.5f\n' % tuple(to_game(rig.matrix_world @ shield_rims[g.name])))
         if visor:
             f.write('# visor k ...: its own triangles (its f lines, from 0) that are glass, drawn see-through.\n')
             for k in range(0, len(visor), 32):
@@ -1034,6 +1056,10 @@ def write_anim(path, clips):
                 f.write('# hip_timing grab slide: walk.HIP_GRAB, where hip_draw\'s hand closes on the hip gear in its slot, and\n')
                 f.write('# walk.HIP_SLIDE, the share of the clip after that the game moves it from the slot into the hand over.\n')
                 f.write('hip_timing %.4f %.4f\n' % (walk.HIP_GRAB, walk.HIP_SLIDE))
+            if hasattr(walk, 'SHIELD_GRAB'):
+                f.write('# shield_timing grab slide: walk.SHIELD_GRAB, where shield_draw\'s hand closes on a shield\'s edge on the back,\n')
+                f.write('# and walk.SHIELD_SLIDE, the share of the clip after that the game takes it from the back onto the hand over.\n')
+                f.write('shield_timing %.4f %.4f\n' % (walk.SHIELD_GRAB, walk.SHIELD_SLIDE))
             for clip, (slot, _) in walk.draw_names().items():
                 f.write('draw_slide %s %.4f\n' % (clip, walk.DRAW_SIZES[walk.HOLSTERS[slot]['size']]['slide']))
         f.write('# tool kind model side m00 m01 m02 m03 m10 .. m23: the work_<kind> clip\'s tool, IsoRim\'s Models/<model>.obj, riding\n')
@@ -1152,10 +1178,14 @@ def export_loop(name, at, n, seconds):
 pose_worst = export_loop('idle', walk.stand_at, walk.loop_frames(walk.IDLE_SECONDS), walk.IDLE_SECONDS)
 drafted_clips = [k for k in walk.DRAFTED
                  if 'kind' not in walk.DRAFTED[k] or walk.drafted_entry(k) != walk.drafted_entry(walk.DRAFTED[k]['kind'])]
+# With a shield up: each one-handed weapon held otherwise than its kind gets its kind's shield stance with its own grip
+# (walk.shielded_entry), drafted_shield_<defName>. A shield stance takes the left arm too (the guard).
+drafted_clips += [walk.SHIELD + n for n in walk.shielded_names()] if hasattr(walk, 'shielded_names') else []
 for kind in drafted_clips:
     pose_worst = max(pose_worst, export_loop('drafted_' + kind, lambda t, k=kind: walk.stand_at(t, k),
                                              walk.loop_frames(walk.DRAFT_SECONDS), walk.DRAFT_SECONDS))
-    masks['drafted_' + kind] = upper_mask(walk.drafted_entry(kind))
+    hands = walk.drafted_entry(kind)
+    masks['drafted_' + kind] = upper_mask(dict(hands, L=True) if hands.get('shield') else hands)
 # Aiming: per aimed weapon (and kind), aim_ and fire_ (and a bow's nock_), one frame per pitch from the lowest aim to the
 # highest, laid over the gait from the waist up with both hands taken; the game picks between frames by the pitch.
 aim_worst = 0.0
@@ -1316,6 +1346,12 @@ masks['cast'] = masks['cast_touch'] = upper_mask('L', walk.CAST_UPPER)
 if hasattr(walk, 'shield_at'):
     pose_worst = max(pose_worst, export_loop('shield', walk.shield_at, walk.loop_frames(walk.SHIELD_SECONDS), walk.SHIELD_SECONDS))
     masks['shield'] = upper_mask('L', walk.SHIELD_UPPER)
+# Taking each shield carried on the back into the guard (shield_draw_<name>, the game plays it backwards to put it back):
+# the left hand round to its edge and back into the guard, the trunk turning to meet it.
+for _name, _rim in sorted(shield_rims.items()):
+    draw_worst['shield_draw_' + _name] = export_loop('shield_draw_' + _name, lambda t, r=_rim: walk.shield_draw_at(t, r),
+                                                     walk.SHIELD_DRAW_FRAMES, walk.SHIELD_DRAW_SECONDS)
+    masks['shield_draw_' + _name] = upper_mask('L', walk.SHIELD_DRAW_UPPER)
 if hasattr(walk, 'hip_hold_at'):
     pose_worst = max(pose_worst, export_loop('hip_hold', walk.hip_hold_at, walk.loop_frames(walk.HIP_SECONDS), walk.HIP_SECONDS))
     masks['hip_hold'] = upper_mask('L', walk.HIP_UPPER)
@@ -1485,6 +1521,9 @@ for clip in draws:
     g = walk.draw_keys(clip)
     print('DRAW %s (%s): trunk twist %.0f lean %.0f side %.0f, shoulder %.0f; the handle %.3f leg lengths out of reach for the game to swing to the hand; overreach %.4f'
           % (clip, g['guard'], g['body']['twist'], g['body']['lean'], g['body']['side'], g['shoulder'], g['gap'], draw_worst[clip]))
+for _name in sorted(shield_rims):
+    print('SHIELD_DRAW %s over %.1f s, the edge taken at %.2f; overreach %.4f'
+          % (_name, walk.SHIELD_DRAW_SECONDS, walk.SHIELD_GRAB, draw_worst['shield_draw_' + _name]))
 print('CARRY %s, carried %s' % (', '.join('%s %.1f s' % (k, walk.carry_seconds(k)) for k in walk.CARRY), ', '.join(k for k in walk.CARRY if k != 'item')))
 print('HURT %s over %.1f s each, laid over the gait from the waist up' % (', '.join(walk.hurt_kinds()), walk.HURT_SECONDS))
 print('COWER cower and hunker over %.1f s, cower laid over the gait from the waist up' % walk.CRY_SECONDS)

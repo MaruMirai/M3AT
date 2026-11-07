@@ -68,7 +68,7 @@ namespace M3AT
         public float freecamSpeed = DefaultFreecamSpeed;
         public float freecamScrollSpeed = DefaultFreecamScrollSpeed;   // the wheel's climb a notch, a share of the original 0.05 s of flying
         public float freecamFov = DefaultFreecamFov;
-        public bool freecamCutaway = false;   // IsoRim's own wall hiding while flying, not its complete walls (Freecam.SyncWalls)
+        public bool freecamCutaway = true;    // IsoRim's own wall hiding while flying, not its complete walls (Freecam.SyncWalls)
         public const float DefaultFreecamSensitivity = 0.05f, DefaultFreecamSpeed = 12f, DefaultFreecamFov = 70f, DefaultFreecamScrollSpeed = 0.5f;
         // Each weapon type's size changed from the export's (walk.TYPE_SCALE), against the same weapon on the ground
         // (WalkFigures.ScaleOf, over each weapon's WalkFigures.GroundRatio); a type not in it keeps the export's. Saved
@@ -116,7 +116,7 @@ namespace M3AT
             Scribe_Values.Look(ref freecamSpeed, "freecamSpeed", DefaultFreecamSpeed);
             Scribe_Values.Look(ref freecamScrollSpeed, "freecamScrollSpeed", DefaultFreecamScrollSpeed);
             Scribe_Values.Look(ref freecamFov, "freecamFov", DefaultFreecamFov);
-            Scribe_Values.Look(ref freecamCutaway, "freecamCutaway", false);
+            Scribe_Values.Look(ref freecamCutaway, "freecamCutaway", true);
             Scribe_Collections.Look(ref weaponScales, "weaponGroundScales", LookMode.Value, LookMode.Value);
             if (weaponScales == null)
             {
