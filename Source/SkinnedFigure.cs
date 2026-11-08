@@ -165,6 +165,7 @@ namespace M3AT
         private int[] boneOrder;      // parents before their children
         private bool[] armBone;       // shoulder to hand, either side (Over with arms)
         private bool[] trunkBone;     // the trunk below the neck (ReclineOf)
+        private bool[] legBone;       // the thighs down (LaidMiddleOf)
         private float[] twistShare;   // each bone's share of a twist of the trunk (Twist): the spine above the hips
         private float[] overMask;     // Over with arms: the clip's shares, each times its weight
         private readonly Dictionary<string, int> boneIndex = new Dictionary<string, int>();   // by name (anim.txt's bone lines)
@@ -1185,6 +1186,7 @@ namespace M3AT
             boneParent = parents.ToArray();
             armBone = new bool[boneHead.Length];
             trunkBone = new bool[boneHead.Length];
+            legBone = new bool[boneHead.Length];
             overMask = new float[boneHead.Length];
             foreach (KeyValuePair<string, int> pair in boneIndex)
             {
@@ -1193,6 +1195,7 @@ namespace M3AT
                 // The trunk below the neck (ReclineOf): spine to spine.004, and the pelvis bones on the hips.
                 trunkBone[pair.Value] = pair.Key == "spine" || limb == "pelvis"
                     || (limb == "spine" && string.CompareOrdinal(pair.Key, "spine.004") <= 0);
+                legBone[pair.Value] = limb == "thigh" || limb == "shin" || limb == "foot" || limb == "toe" || limb == "heel";
             }
             twistShare = new float[boneHead.Length];
             for (int i = 0; i < TwistBones.Length; i++)
@@ -2193,6 +2196,33 @@ namespace M3AT
             {
                 return found;
             }
+            Measure(shape, clip);
+            return reclines[(shape, clip)];
+        }
+
+        // Where the middle of the body of a figure laid on its back in clip's first frame comes along it (cells for a figure
+        // of size 1, laid down as WalkFigures lays a lying clip, before it is moved along), with the trunk bent by
+        // ReclineOf: so lying clips can be lined up with each other in a bed (their hips are in one place, but a clip with
+        // straight legs reaches further toward the feet). Zero if there is no such clip.
+        public float LaidMiddleOf(Shape shape, string clip)
+        {
+            float found;
+            if (shape == null || !clips.ContainsKey(clip))
+            {
+                return 0f;
+            }
+            if (!laidMiddles.TryGetValue((shape, clip), out found))
+            {
+                Measure(shape, clip);
+                found = laidMiddles[(shape, clip)];
+            }
+            return found;
+        }
+
+        // Works out ReclineOf and LaidMiddleOf for a shape and clip.
+        private void Measure(Shape shape, string clip)
+        {
+            float found;
             if (reclinePose == null)
             {
                 reclinePose = NewPosed();
@@ -2205,17 +2235,22 @@ namespace M3AT
             Chain(p, laid);
             Piece body = pieces[0];
             Vector3[] rest = ShapedPiece(shape, 0).rest;
-            List<Vector2> head = new List<Vector2>(), trunk = new List<Vector2>();
+            List<Vector2> head = new List<Vector2>(), trunk = new List<Vector2>(), bent = new List<Vector2>();
+            float legsAlong = 0f;
             Vector3 hips = laid.MultiplyPoint3x4(p.pos[boneOrder[0]]);
             for (int i = 0; i < rest.Length; i++)
             {
                 Vector3 v = Vector3.zero;
-                float onHead = 0f, onTrunk = 0f;
+                float onHead = 0f, onTrunk = 0f, onLegs = 0f;
                 for (int k = body.firstWeight[i]; k < body.firstWeight[i + 1]; k++)
                 {
                     int b = body.weightBone[k];
                     float w = body.weight[k];
                     v += p.bones[b].MultiplyPoint3x4(rest[i]) * w;
+                    if (legBone[b])
+                    {
+                        onLegs += w;
+                    }
                     if (b == headBone)
                     {
                         onHead += w;
@@ -2227,6 +2262,15 @@ namespace M3AT
                 }
                 // Laid down, the bend turns about x through the hips: only y and z matter.
                 Vector2 yz = new Vector2(v.y - hips.y, v.z - hips.z);
+                // For the middle: the legs stay as they lie under the bend (Bend turns the thighs back), the rest turns with it.
+                if (onLegs > 0.5f)
+                {
+                    legsAlong += yz.y;
+                }
+                else
+                {
+                    bent.Add(yz);
+                }
                 if (onHead > 0.5f)
                 {
                     head.Add(yz);
@@ -2251,7 +2295,13 @@ namespace M3AT
                 found = Mathf.Min(found, ReclineMost);
             }
             reclines[(shape, clip)] = found;
-            return found;
+            float c2 = Mathf.Cos(found * Mathf.Deg2Rad), s2 = Mathf.Sin(found * Mathf.Deg2Rad);
+            float along = legsAlong;
+            for (int i = 0; i < bent.Count; i++)
+            {
+                along += bent[i].x * s2 + bent[i].y * c2;   // z turned about x as LowestTurned turns y
+            }
+            laidMiddles[(shape, clip)] = rest.Length > 0 ? hips.z + along / rest.Length : 0f;
         }
 
         // The lowest of these (y, z about the hips) turned about x by the angle whose cosine and sine are c and s, as
@@ -2267,6 +2317,7 @@ namespace M3AT
         }
 
         private readonly Dictionary<(Shape, string), float> reclines = new Dictionary<(Shape, string), float>();
+        private readonly Dictionary<(Shape, string), float> laidMiddles = new Dictionary<(Shape, string), float>();
         private Posed reclinePose;   // a scratch figure ReclineOf poses
         private const float ReclineMost = 30f;   // degrees at most
         private const float ReclineStep = 0.5f;

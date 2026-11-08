@@ -96,7 +96,24 @@ namespace M3AT
         // then puts it back where it was before it was locked, away from a menu just opened under the cross.
         private static int centreFrames;
         private const int CentreFrames = 3;
+        // Where the pointer was when looking began, so going into pointer mode puts it back there rather than in the
+        // middle: the game's own reading (screen pixels, y up) and the engine window's raw cursor (whatever its own
+        // units), kept as they were read so neither's convention has to be known. Freed for a window that wants the
+        // pointer (a menu opened under the cross, a dialog), it still goes to the middle.
+        private static Vector2 lookedFrom;
+        private static object lookedFromWindow;
+        private static bool haveLookedFrom;
+        private static bool freedBack;   // the freed pointer goes back to lookedFrom, not the middle
         private static float savedPitch, savedIsoPitch;   // IsoRim's saved pitches, put back on leaving
+
+        // A menu of orders opened while looking (a right click under the cross with something selected) is kept in
+        // looking: pinned to the place it was opened over, it moves on screen as the view turns or flies, so its options
+        // are picked by turning the cross onto them, and looking away from it closes it as the game closes one the
+        // pointer leaves (FloatMenu.UpdateBaseColor, 95 px off it).
+        private static FloatMenu pinned;
+        private static Vector3 pinnedAt;   // the place under the cross when it opened, in the eye's (unsquashed) space
+        private static Vector2 pinnedOffset;   // the menu's corner from that place on screen, UI pixels
+        private const float PinnedNearest = 0.3f;   // cells in front of the eye; nearer or behind, the menu closes
 
         // View3D's private fields, as ApplyCamera writes them.
         private static AccessTools.FieldRef<Vector3> eyeRef, fwdRef, upRef, rightRef;
@@ -391,6 +408,7 @@ namespace M3AT
                 return;
             }
             on = false;
+            pinned = null;
             Remember();
             Unlock();
             if (walls != null)
@@ -668,6 +686,7 @@ namespace M3AT
                     }
                 }
             }
+            Pin();
             looking = !pointerMode && !PointerWanted();
             if (!looking)
             {
@@ -676,6 +695,7 @@ namespace M3AT
             }
             if (!lockedLast)
             {
+                KeepLookedFrom();
                 Cursor.lockState = CursorLockMode.Locked;
                 Cursor.visible = false;
                 lockedLast = true;
@@ -694,10 +714,67 @@ namespace M3AT
             Vector3 mouse = Input.mousePosition;
             Vector2 d = skipDelta ? Vector2.zero : new Vector2(mouse.x - middle.x, mouse.y - middle.y);
             skipDelta = false;
-            Warp(middle);
+            Warp(middle, null);
             float sens = Mathf.Clamp(s.freecamSensitivity, 0.01f, 1f);
             yaw = Mathf.Repeat(yaw + d.x * sens, 360f);
             pitch = Mathf.Clamp(pitch + (s.freecamInvertY ? 1f : -1f) * d.y * sens, LeastPitch, MostPitch);
+        }
+
+        // Takes up a menu of orders that opened last frame while looking, or lets go of one that has closed. The eye's
+        // fields still hold last frame's view, the one it was opened under, as Look runs before this frame's Apply.
+        private static void Pin()
+        {
+            if (pinned != null && (pointerMode || Find.WindowStack == null || !Find.WindowStack.IsOpen(pinned)))
+            {
+                bool closed = !pointerMode;
+                pinned = null;
+                // A left click off the menu closes it and also goes down on the map, beginning the game's box selection
+                // there, which while looking would stretch to wherever the cross is turned before the release.
+                Selector sel = Find.Selector;
+                if (closed && sel != null && sel.dragBox != null && Input.GetMouseButton(0))
+                {
+                    sel.dragBox.active = false;
+                }
+            }
+            if (pinned != null || pointerMode || !lockedLast || Find.WindowStack == null)
+            {
+                return;
+            }
+            foreach (Window w in Find.WindowStack.Windows)
+            {
+                FloatMenu menu = w as FloatMenu;
+                if (menu == null)
+                {
+                    continue;
+                }
+                pinned = menu;
+                pinnedAt = eyeRef() + fwdRef() * camDistRef();
+                pinnedOffset = menu.windowRect.position - new Vector2(UI.screenWidth * 0.5f, UI.screenHeight * 0.5f);
+                return;
+            }
+        }
+
+        // The pinned menu moved to where its place is seen from this frame's eye, at the end of Apply.
+        private static void MovePinned(Vector3 fwd, Vector3 right, Vector3 up, float tanHalf, float aspect)
+        {
+            if (pinned == null)
+            {
+                return;
+            }
+            Vector3 v = pinnedAt - eye;
+            float z = Vector3.Dot(v, fwd);
+            if (z < PinnedNearest)
+            {
+                pinned.Cancel();
+                pinned = null;
+                return;
+            }
+            float x = Vector3.Dot(v, right) / (z * tanHalf * aspect);
+            float y = Vector3.Dot(v, up) / (z * tanHalf);
+            Vector2 seen = new Vector2((0.5f + 0.5f * x) * UI.screenWidth, (0.5f - 0.5f * y) * UI.screenHeight);
+            Rect r = pinned.windowRect;
+            r.position = seen + pinnedOffset;
+            pinned.windowRect = r;
         }
 
         private static bool MenuOpen()
@@ -733,7 +810,7 @@ namespace M3AT
                 {
                     return true;
                 }
-                if (MenuOpen())
+                if (MenuOpen() || OverLetters(e.mousePosition))
                 {
                     return true;
                 }
@@ -817,6 +894,22 @@ namespace M3AT
             return WindowWantsPointer();
         }
 
+        // Whether a point (GUI space, y down) is on the letter stack's buttons at the screen's right edge, which aren't
+        // windows: a click there (a right click closes a letter) is the letter's, not the map's, so it leaves pointer
+        // mode as it is. The column is LetterStack.LettersOnGUI's: Letter.DrawButtonAt's 38 wide, 12 in from the edge,
+        // from the top letter (LastTopY) down; a few pixels spare round it.
+        private static bool OverLetters(Vector2 at)
+        {
+            LetterStack stack = Find.LetterStack;
+            if (stack == null || stack.LettersListForReading.Count == 0)
+            {
+                return false;
+            }
+            float right = UI.screenWidth - 12f + 4f;
+            float left = UI.screenWidth - 12f - Letter.DrawWidth - 4f;
+            return at.x >= left && at.x <= right && at.y >= stack.LastTopY && at.y <= UI.screenHeight;
+        }
+
         // A window open that wants the pointer: a menu of orders, a dialog, or a main tab such as the architect, which a
         // right click on the map can open too.
         private static bool WindowWantsPointer()
@@ -827,6 +920,10 @@ namespace M3AT
             }
             foreach (Window w in Find.WindowStack.Windows)
             {
+                if (w == pinned)
+                {
+                    continue;
+                }
                 if (w is FloatMenu || w.absorbInputAroundWindow || w.forcePause || w.preventCameraMotion
                     || w is MainTabWindow && !(w is MainTabWindow_Inspect))
                 {
@@ -845,13 +942,59 @@ namespace M3AT
                 Cursor.lockState = CursorLockMode.None;
                 Cursor.visible = true;
                 centreFrames = CentreFrames;
+                // Back where it was when looking began on going into pointer mode or leaving the freecam; to the
+                // middle when something on screen wants it there (a menu under the cross) or the game lost focus.
+                freedBack = Options.freecamPointerBack && haveLookedFrom && (pointerMode || !on) && Application.isFocused && !WindowWantsPointerBesidesTab();
             }
         }
 
-        // The pointer back to the middle of the screen: the engine's own cursor (its window's, a virtual one while
+        // A window that wants the pointer other than a main tab: the architect a right click opens going into pointer
+        // mode is at the screen's bottom, so the pointer may as well go back where it was for it.
+        private static bool WindowWantsPointerBesidesTab()
+        {
+            if (Find.WindowStack == null)
+            {
+                return false;
+            }
+            foreach (Window w in Find.WindowStack.Windows)
+            {
+                if (w == pinned || w is MainTabWindow)
+                {
+                    continue;
+                }
+                if (w is FloatMenu || w.absorbInputAroundWindow || w.forcePause || w.preventCameraMotion)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // The pointer's place as looking begins, before it is first warped to the middle.
+        private static void KeepLookedFrom()
+        {
+            Vector3 mouse = Input.mousePosition;
+            lookedFrom = new Vector2(Mathf.Clamp(mouse.x, 0f, Screen.width - 1), Mathf.Clamp(mouse.y, 0f, Screen.height - 1));
+            lookedFromWindow = null;
+            try
+            {
+                if (!warpFailed && window != null && cursorPos != null)
+                {
+                    lookedFromWindow = cursorPos.GetValue(window);
+                }
+            }
+            catch (Exception)
+            {
+                lookedFromWindow = null;
+            }
+            haveLookedFrom = true;
+        }
+
+        // The pointer to a place on screen (the middle while looking): the engine's own cursor (its window's, a virtual one while
         // locked), where its input bridge sends clicks from, and where the game reads it, so a click lands under the
         // cross and the next frame's movement is measured from there.
-        private static void Warp(Vector2 middle)
+        // atWindow is the engine window's cursor to set, as read from it; null for the middle of the window.
+        private static void Warp(Vector2 to, object atWindow)
         {
             if (warpFailed)
             {
@@ -861,9 +1004,13 @@ namespace M3AT
             {
                 if (window != null && cursorPos != null && windowSize != null && double2 != null)
                 {
-                    object size = windowSize.GetValue(window);
-                    double x = (int)intX.GetValue(size) * 0.5, y = (int)intY.GetValue(size) * 0.5;
-                    object at = double2.Invoke(new object[] { x, y });
+                    object at = atWindow;
+                    if (at == null)
+                    {
+                        object size = windowSize.GetValue(window);
+                        double x = (int)intX.GetValue(size) * 0.5, y = (int)intY.GetValue(size) * 0.5;
+                        at = double2.Invoke(new object[] { x, y });
+                    }
                     cursorPos.SetValue(window, at);
                     if (bridge != null && bridgeCursor != null && bridgeHas != null)
                     {
@@ -871,7 +1018,7 @@ namespace M3AT
                         bridgeHas.SetValue(bridge, true);
                     }
                 }
-                UnityEngine.InputSystem.InputSystem.QueueMouseMove(middle);
+                UnityEngine.InputSystem.InputSystem.QueueMouseMove(to);
             }
             catch (Exception e)
             {
@@ -1107,6 +1254,7 @@ namespace M3AT
             float fogEnd = reach * 0.92f;
             float fogStart = Mathf.Lerp(Mathf.Min(camDist * 0.8f, fogEnd * 0.5f), fogEnd, Mathf.Clamp(st.fogStart, 0f, 0.95f));
             Sky.Draw(main, fwd, right, up, tanHalf * aspect, tanHalf, near, far, fogStart, fogEnd);
+            MovePinned(fwd, right, up, tanHalf, aspect);
         }
 
         public static bool PitchPrefix(ref float __result)
@@ -1208,7 +1356,14 @@ namespace M3AT
             if (centreFrames > 0 && !lockedLast)
             {
                 centreFrames--;
-                Warp(new Vector2(Screen.width * 0.5f, Screen.height * 0.5f));
+                if (freedBack)
+                {
+                    Warp(lookedFrom, lookedFromWindow);
+                }
+                else
+                {
+                    Warp(new Vector2(Screen.width * 0.5f, Screen.height * 0.5f), null);
+                }
             }
         }
     }

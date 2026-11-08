@@ -134,6 +134,7 @@ namespace M3AT
         private const float BabyLimbsSteps = 20f;   // how many shapes the limbs grow through (each is made and kept once per body type)
         private const float BabyHeadShrink = 0.25f;   // of the mod options' head shrink a newborn takes, growing to all of it as the Babylimbs key goes (HeadShrinkOf)
         private const string BabyBody = "Fat";   // the body key a newborn takes in full, with no gender's, gone by BabyYears: round and chubby (skinned figure only)
+        private const string BedMiddleClip = "sleep";   // the lying clip the others are lined up with in a bed (LaidMiddleOf)
         private const float LieMiddle = 0.6f;   // of the head's height: how far along a figure lying on the ground (or crawling)
                                                 // the spot it is drawn at is, from its feet (in bed it is the head)
         private const float CarryEase = 4f;   // how fast a pawn takes up (or drops) a carrying pose, per real second
@@ -1707,6 +1708,14 @@ namespace M3AT
             Vector3? workBeside = null;
             string workKind = skin != null ? WorkOf(pawn, out facing, out workBeside) : null;
             float working = workKind != null ? 1f : 0f;
+            if (workKind != null && carryClip == "carry_item")
+            {
+                // At work with an item in hand (a doctor's medicine, which the game carries through the whole tend; a
+                // meal fed to a patient): the work clip, not the carry, as the carry would weigh the work out entirely.
+                // The item is still drawn between the hands (DrawLoad).
+                carryClip = null;
+                carry = 0f;
+            }
             // Anything else it is doing takes the place of the stance, the weapon put away first and drawn again after,
             // unless it is fighting with it. Work it is about to reach counts, so it arrives with its hands free; work it is
             // already at, or the like, wants them now (StepDraw hurries). A wound or the cold doesn't: they are only
@@ -5864,6 +5873,13 @@ namespace M3AT
                         yaw = ease.fellYaw.Value;   // lying where it fell, the way it fell
                     }
                     string lieClip = LieClip(pawn, dead, inBed, inBed || onCouch);
+                    if (inBed && lieClip != BedMiddleClip && skin.Has(BedMiddleClip))
+                    {
+                        // Every lying clip with its body's middle where the sleep's is: their hips are in one place, but
+                        // the awake lie's straight legs put its middle further toward the foot of the bed, so a pawn
+                        // waking or falling asleep slid along it.
+                        along += skin.LaidMiddleOf(shape, BedMiddleClip) - skin.LaidMiddleOf(shape, lieClip);
+                    }
                     float fallPhase;
                     float fall = FallOf(ease, out fallPhase);
                     // Gone limp where it lay hunkered: the ragdoll starts from that, posed where it lies, so not laid down.
