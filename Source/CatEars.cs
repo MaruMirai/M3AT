@@ -490,8 +490,8 @@ namespace M3AT
         {
             if (p.ears != null)
             {
-                DynamicModels.Retire(p.ears.solid);
-                DynamicModels.Retire(p.ears.outline);
+                Api.RetireMesh(p.ears.solid);
+                Api.RetireMesh(p.ears.outline);
             }
         }
     }

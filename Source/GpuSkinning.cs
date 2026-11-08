@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Reflection;
-using HarmonyLib;
 using UnityEngine;
 using Verse;
 using IsoRim;
@@ -21,8 +19,6 @@ namespace M3AT
         private const int MostBones = 12;   // bones a vertex is moved by on the graphics card: three texture channels of four
         private const string SmoothMarkDef = "MarusSmoothMark";
         private static readonly int bonesId = Shader.PropertyToID("_MarusBones");
-        private static readonly int ownerFloorId = Shader.PropertyToID("_IsoOwnerFloor");
-        private static readonly int flashId = Shader.PropertyToID("_IsoFlash");
 
         // Cells, model space: what IsoRim culls a mesh skinned on the graphics card by, as its vertices stay at rest. Roomy
         // enough for the figure laid down or flung about by its bones (a ragdoll, a fall), which move it off its rest pose.
@@ -30,13 +26,8 @@ namespace M3AT
 
         private static Shader smoothMark;
         private static bool gpuTried, gpuWorks;
-        private static AccessTools.FieldRef<bool> scopeActive;
-        private delegate bool ScopeSubmit(List<DynamicModels.Part> parts, ref Matrix4x4 matrix);
-        private static ScopeSubmit scopeSubmit;
-        private static Func<int, int> fadeOfFloor;
 
-        // True while meshes are posed on the graphics card: the option on, and this mod's own materials, which do it, in use
-        // (IsoRim's, used when ours are missing, don't).
+        // True while meshes are posed on the graphics card: the option on, and this mod's own materials, which do it, in use.
         public static bool GpuSkinning
         {
             get
@@ -45,8 +36,8 @@ namespace M3AT
             }
         }
 
-        // Looks once for what GPU skinning needs that isn't ours: IsoRim's figure scope and floor fade (internal), which its
-        // own draw goes through (DrawSkinned), and the skinned light pass.
+        // Looks once for the skinned light pass (MarusSmoothMark), which IsoRim's light pass is given as its program
+        // (ConfigureFigureMaterial's lightPassShader): without it the light pass would light the mesh at rest.
         private static bool GpuWorks()
         {
             if (gpuTried)
@@ -54,42 +45,23 @@ namespace M3AT
                 return gpuWorks;
             }
             gpuTried = true;
-            try
+            ShaderDef def = DefDatabase<ShaderDef>.GetNamedSilentFail(SmoothMarkDef);
+            smoothMark = def != null ? def.Shader : null;
+            if (smoothMark == null)
             {
-                ShaderDef def = DefDatabase<ShaderDef>.GetNamedSilentFail(SmoothMarkDef);
-                smoothMark = def != null ? def.Shader : null;
-                Type scope = AccessTools.TypeByName("IsoRim.FigureScope");
-                FieldInfo active = scope != null ? AccessTools.Field(scope, "Active") : null;
-                MethodInfo submit = scope != null ? AccessTools.Method(scope, "Submit") : null;
-                MethodInfo fade = AccessTools.Method(typeof(Floors), "FadeOfFloor");
-                if (smoothMark == null || active == null || submit == null || fade == null)
-                {
-                    Log.Warning(Tag + "GPU skinning can't be set up (" + (smoothMark == null ? "the " + SmoothMarkDef + " shader is missing" : "this IsoRim draws differently")
-                        + "), so pawns are posed on the CPU.");
-                    return false;
-                }
-                scopeActive = AccessTools.StaticFieldRefAccess<bool>(active);
-                scopeSubmit = (ScopeSubmit)Delegate.CreateDelegate(typeof(ScopeSubmit), submit);
-                fadeOfFloor = (Func<int, int>)Delegate.CreateDelegate(typeof(Func<int, int>), fade);
-                gpuWorks = true;
+                Log.Warning(Tag + "GPU skinning can't be set up (the " + SmoothMarkDef + " shader is missing), so pawns are posed on the CPU.");
+                return false;
             }
-            catch (Exception e)
-            {
-                Log.Warning(Tag + "GPU skinning can't be set up, so pawns are posed on the CPU: " + e.Message);
-            }
-            return gpuWorks;
+            gpuWorks = true;
+            return true;
         }
 
-        // Gives the light pass IsoRim made for one of the MarusSmooth materials (IsoGlow.Use) MarusSmooth's own program,
-        // which poses a mesh skinned on the graphics card: IsoRim's would light it at rest. Its render state is IsoRim's.
-        private static void SkinMark(Material solid)
+        // The light pass's program for the MarusSmooth materials: MarusSmooth's own, which poses a mesh skinned on the graphics
+        // card (and draws one posed here as it is); null without it, IsoRim's then.
+        private static Shader SkinMarkShader()
         {
             GpuWorks();
-            Material mark = IsoGlow.MarkFor(solid);
-            if (mark != null && smoothMark != null)
-            {
-                mark.shader = smoothMark;
-            }
+            return smoothMark;
         }
 
         // Each vertex's bones for the graphics card, made once per piece: bone + weight / 2, so the weight is the fraction
@@ -227,143 +199,64 @@ namespace M3AT
                 p.bonesBlock.SetVectorArray(bonesId, p.boneVectors);
                 p.bonesAt = p.posedAt;
             }
-            // The hit flash (HitFlash), set every draw as it fades from tick to tick. The outlines are drawn with this block
-            // too, and MarusSmooth.frag.glsl leaves them (a pushed shell, _OutlinePush) their colour.
-            p.bonesBlock.SetFloat(flashId, p.flash);
+            // (The hit flash, _IsoFlash, and the floor, _IsoOwnerFloor, are written into it by Api.SubmitFigureMesh at each draw.)
             return p.bonesBlock;
         }
 
-        private static Mesh cullBox;
+        // The figure placed so (true space, cells: position, yaw degrees about the vertical, local the model's placing).
+        private static Matrix4x4 TrueSpace(Vector3 position, float yaw, Matrix4x4 local)
+        {
+            return Matrix4x4.Translate(position) * Matrix4x4.Rotate(Quaternion.AngleAxis(yaw, Vector3.up)) * local;
+        }
 
-        // Whether a figure placed so (as DrawParts places it: true space, cells, yaw degrees, local the model's placing) can
-        // be on screen, by IsoRim's own cull (Cull.MeshVisible: the shown camera only, while the map's things are drawn,
-        // on the floor it shows on) but tested on GpuBounds, a box roomy enough for any pose, rather than on each mesh's
-        // own: Cull goes by the vertices' box as the engine last worked it out, which for ours is the rest pose (skinned on
-        // the graphics card) or stale (posed here, the vertices set without it), so close up the hair and garments were
-        // left off while on screen. A figure measured for another mod (FigureScope) is never left out.
+        // Whether a figure placed so can be on screen, by IsoRim's cull (Api.FigureVisible: the shown camera, the floor it
+        // shows on) tested on GpuBounds, a box roomy enough for any pose, rather than on each mesh's own: IsoRim would go by
+        // the vertices' box as the engine last worked it out, which for ours is the rest pose (skinned on the graphics card)
+        // or stale (posed here, the vertices set without it), so close up the hair and garments were left off while on
+        // screen. A figure drawn or measured for another mod is never left out.
         private static bool FigureOnScreen(Vector3 position, float yaw, Matrix4x4 local)
         {
-            if (scopeActive != null && scopeActive())
-            {
-                return true;
-            }
-            if (cullBox == null)
-            {
-                // Eight corners and one triangle: the engine works the box out from the vertices when the triangles are set.
-                Vector3 c = GpuBounds.center, e = GpuBounds.extents;
-                Vector3[] corners = new Vector3[8];
-                for (int i = 0; i < 8; i++)
-                {
-                    corners[i] = c + new Vector3((i & 1) != 0 ? e.x : -e.x, (i & 2) != 0 ? e.y : -e.y, (i & 4) != 0 ? e.z : -e.z);
-                }
-                cullBox = new Mesh { name = "M3AT cull box" };
-                cullBox.vertices = corners;
-                cullBox.triangles = new int[] { 0, 1, 7 };
-            }
-            float s = View3D.Squash;
-            Matrix4x4 matrix = Matrix4x4.Translate(new Vector3(position.x, position.y / s, position.z))
-                * Matrix4x4.Scale(new Vector3(1f, 1f / s, 1f))
-                * Matrix4x4.Rotate(Quaternion.AngleAxis(yaw, Vector3.up))
-                * local;
-            return Cull.MeshVisible(cullBox, Floors.DrawnMatrix(matrix));
+            return Api.FigureVisible(GpuBounds, TrueSpace(position, yaw, local));
         }
 
-        // Draws the parts of a mesh skinned on the graphics card as DynamicModels.DrawParts would (IsoRim's Submit: another
-        // mod's figure scope, the floor it is drawn on and that floor's fade, IsoRim's outline option, each part
-        // with its light pass by IsoGlow.DrawLit), but each with the pawn's bones in block: IsoRim's draw takes only its own
-        // floor block, and its batching would lose ours. Position true space (cells), yaw degrees, local the model's placing.
-        private static void DrawSkinned(List<DynamicModels.Part> parts, Vector3 position, float yaw, Matrix4x4 local, MaterialPropertyBlock block)
+        // Draws a piece's parts as a moving model's (Api.SubmitFigureMesh: another mod's figure scope, the floor it is drawn on
+        // and its fade, IsoRim's outline option, the floor and hit flash in the block, each lit part with its light pass), not
+        // culled part by part (DrawMeshes culls the whole figure first, FigureOnScreen). block: the pawn's bones for a mesh
+        // skinned on the graphics card (BlockOf), null for one posed here. flash: the hit flash, which the outlines never take.
+        private static void DrawParts(List<MeshPart> parts, Vector3 position, float yaw, Matrix4x4 local, MaterialPropertyBlock block, float flash)
         {
-            if (parts.Count == 0)
+            Matrix4x4 placed = TrueSpace(position, yaw, local);
+            for (int i = 0; i < parts.Count; i++)
             {
-                return;
-            }
-            float s = View3D.Squash;
-            Matrix4x4 matrix = Matrix4x4.Translate(new Vector3(position.x, position.y / s, position.z))
-                * Matrix4x4.Scale(new Vector3(1f, 1f / s, 1f))
-                * Matrix4x4.Rotate(Quaternion.AngleAxis(yaw, Vector3.up))
-                * local;
-            if (scopeActive() && scopeSubmit(parts, ref matrix))
-            {
-                return;   // a figure measured for another mod (Api.FigureBounds): nothing drawn
-            }
-            int floor;
-            matrix = Floors.DrawnMatrix(matrix, out floor);
-            int fadeWas = Floors.FadeSlot;
-            if (fadeWas == 0 && floor > 0)
-            {
-                Floors.FadeSlot = fadeOfFloor(floor);
-            }
-            try
-            {
-                // As RoofClip.FloorBlock gives it: 1 + the floor it stands on, 0 without floors.
-                block.SetFloat(ownerFloorId, floor >= 0 && Floors.On ? floor + 1f : 0f);
-                bool outlines = IsoRimMod.Settings.outlines;
-                for (int i = 0; i < parts.Count; i++)
+                MeshPart part = parts[i];
+                if (part.mesh == null || part.material == null)
                 {
-                    DynamicModels.Part part = parts[i];
-                    // Not culled part by part (DrawMeshes culls the whole figure first, FigureOnScreen).
-                    if (part.outline && !outlines)
-                    {
-                        continue;
-                    }
-                    IsoGlow.DrawLit(part.mesh, matrix, part.material, 0, block);
+                    continue;
                 }
-            }
-            finally
-            {
-                Floors.FadeSlot = fadeWas;
+                FigureMeshFlags flags = FigureMeshFlags.NoCull;
+                if (part.outline)
+                {
+                    flags |= FigureMeshFlags.Outline;
+                }
+                if (part.lit)
+                {
+                    flags |= FigureMeshFlags.LightPass;
+                }
+                Api.SubmitFigureMesh(part.mesh, part.material, placed, block, flags, 0, flash);
             }
         }
 
-        private static readonly List<DynamicModels.Part> submeshParts = new List<DynamicModels.Part>();
-        private static MaterialPropertyBlock submeshBlock;
-
-        // Draws one sub-mesh of a mesh with its own material (a visor's glass, DrawVisor), placed as DrawSkinned places
-        // parts, posed here or on the graphics card. No light pass. block: the pawn's bones for a mesh skinned on the
-        // graphics card (BlockOf), null for one posed here. IsoRim's internals DrawSkinned binds may be missing (GpuWorks).
+        // Draws one sub-mesh of a mesh with its own material (a visor's glass, DrawVisor), placed as DrawParts places parts,
+        // posed here or on the graphics card. No light pass. block: the pawn's bones for a mesh skinned on the graphics card
+        // (BlockOf), null for one posed here.
         private static void DrawSubmesh(Mesh mesh, int submesh, Material material, Vector3 position, float yaw, Matrix4x4 local,
             MaterialPropertyBlock block)
         {
-            float s = View3D.Squash;
-            Matrix4x4 matrix = Matrix4x4.Translate(new Vector3(position.x, position.y / s, position.z))
-                * Matrix4x4.Scale(new Vector3(1f, 1f / s, 1f))
-                * Matrix4x4.Rotate(Quaternion.AngleAxis(yaw, Vector3.up))
-                * local;
-            if (scopeActive != null && scopeActive())
-            {
-                submeshParts.Clear();
-                submeshParts.Add(new DynamicModels.Part { mesh = mesh, material = material, outline = false });
-                if (scopeSubmit(submeshParts, ref matrix))
-                {
-                    return;   // a figure measured for another mod (Api.FigureBounds): nothing drawn
-                }
-            }
             if (!FigureOnScreen(position, yaw, local))
             {
                 return;
             }
-            int floor;
-            matrix = Floors.DrawnMatrix(matrix, out floor);
-            if (block == null)
-            {
-                submeshBlock = submeshBlock ?? new MaterialPropertyBlock();
-                block = submeshBlock;
-            }
-            int fadeWas = Floors.FadeSlot;
-            if (fadeWas == 0 && floor > 0 && fadeOfFloor != null)
-            {
-                Floors.FadeSlot = fadeOfFloor(floor);
-            }
-            try
-            {
-                block.SetFloat(ownerFloorId, floor >= 0 && Floors.On ? floor + 1f : 0f);
-                Graphics.DrawMesh(mesh, matrix, material, 0, null, submesh, block);
-            }
-            finally
-            {
-                Floors.FadeSlot = fadeWas;
-            }
+            Api.SubmitFigureMesh(mesh, material, TrueSpace(position, yaw, local), block, FigureMeshFlags.NoCull, submesh);
         }
     }
 }

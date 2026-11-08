@@ -209,59 +209,29 @@ namespace M3AT
             get { return SettingsMod.Settings == null || SettingsMod.Settings.wornGear; }
         }
 
-        private sealed class GearModel
-        {
-            public Model model;
-            public Color baseColour = Color.white;
-        }
+        private static readonly Dictionary<ThingDef, string> gearMounts = new Dictionary<ThingDef, string>();
 
-        private static readonly Dictionary<WornGearDef, GearModel> gearModels = new Dictionary<WornGearDef, GearModel>();
-        private static Dictionary<string, WornGearDef> gearByApparel;
-
-        // IsoRim's worn gear def for an apparel, null for none (IsoRim's WornGear.For, which is internal).
-        private static WornGearDef GearDefOf(ThingDef apparel)
+        // The IsoRim mount an apparel's worn gear model goes on (IsoRim's worn gear: pack, belt or hip, as anim.txt's gear
+        // lines name them), null for none; read from Api.ReadThingModel once per apparel def.
+        private static string GearMountOf(Apparel a)
         {
-            if (gearByApparel == null)
+            string mount;
+            if (a == null)
             {
-                gearByApparel = new Dictionary<string, WornGearDef>();
-                foreach (WornGearDef d in DefDatabase<WornGearDef>.AllDefsListForReading)
-                {
-                    if (!d.apparel.NullOrEmpty())
-                    {
-                        gearByApparel[d.apparel] = d;
-                    }
-                }
+                return null;
             }
-            WornGearDef def;
-            return apparel != null && gearByApparel.TryGetValue(apparel.defName, out def) ? def : null;
-        }
-
-        // The gear's model with its tint materials left white to take a tint, and the colour it is drawn in (IsoRim's
-        // WornGear.ModelFor).
-        private static Model GearModelOf(WornGearDef def, Apparel a, out Color tint)
-        {
-            GearModel g;
-            if (!gearModels.TryGetValue(def, out g))
+            if (gearMounts.TryGetValue(a.def, out mount))
             {
-                g = new GearModel();
-                string root = def.modContentPack != null ? def.modContentPack.RootDir : isoRim != null ? isoRim.RootDir : null;
-                Model m = root != null && !def.model.NullOrEmpty() ? ModelLibrary.LoadFile(Path.Combine(root, def.model)) : null;
-                Color c = Color.white;
-                Model marked = m != null && def.tintMaterials != null ? ObjLoader.Marked(m, def.tintMaterials, out c) : null;
-                g.model = marked ?? m;
-                g.baseColour = marked != null ? c : Color.white;
-                gearModels[def] = g;
+                return mount;
             }
-            tint = g.baseColour;
-            if (g.model != null && a != null && def.tintMaterials != null)
+            ThingModelInfo info;
+            mount = null;
+            if (Api.ReadThingModel(a, ThingModelUse.Worn, out info) && info.Model != null)
             {
-                CompColorable colorable = a.TryGetComp<CompColorable>();
-                if (a.def.MadeFromStuff || (colorable != null && colorable.Active))
-                {
-                    tint = a.DrawColor;
-                }
+                mount = info.Mount == WornMount.Back ? "pack" : info.Mount == WornMount.Belt ? "belt" : info.Mount == WornMount.Hip ? "hip" : null;
             }
-            return g.model;
+            gearMounts[a.def] = mount;
+            return mount;
         }
 
         private const float KidPackSize = 0.7f;   // a child's backpack against a grown-up's, one size for every child: on an eight year old it looks as a grown-up's does on them
@@ -283,20 +253,19 @@ namespace M3AT
             }
             for (int i = 0; i < worn.Count; i++)
             {
-                WornGearDef def = GearDefOf(worn[i].def);
+                string mount = GearMountOf(worn[i]);
                 Matrix4x4 frame;
-                Color tint;
-                Model model;
-                if (def == null || (model = GearModelOf(def, worn[i], out tint)) == null || !skin.GearAt(fig, def.mount, mask, out frame))
+                ThingModelInfo info;
+                if (mount == null || !Api.ReadThingModel(worn[i], ThingModelUse.Worn, out info) || info.Model == null || !skin.GearAt(fig, mount, mask, out frame))
                 {
                     continue;
                 }
                 Matrix4x4 held;
-                if (def.mount == "hip" && hipHeld > 0f && skin.HipHeldAt(fig, out held))
+                if (mount == "hip" && hipHeld > 0f && skin.HipHeldAt(fig, out held))
                 {
                     frame = Between(frame, held, hipHeld);
                 }
-                DynamicModels.DrawLocal(model, at, yaw, Matrix4x4.Scale(new Vector3(size, size, size)) * frame, tint, Api.StuffSwatch(worn[i].Stuff));
+                Api.DrawModel(info.Model, at, yaw, Matrix4x4.Scale(new Vector3(size, size, size)) * frame, info.Tint, info.Swatch);
             }
         }
     }

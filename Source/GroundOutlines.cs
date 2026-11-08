@@ -13,14 +13,21 @@ namespace M3AT
     // which is the outline's ring round a thing that lies flat. The terrain at the same depth hides it, leaving only the
     // bits where the shell rises up the thing's sides. Here the corners of an item's outline that the clamp put on the
     // ground are lifted OutlineLift cells, so the ring sits just above the terrain. IsoRim's own code is not changed.
+    // IsoRim fixes this itself from its M230 (the ring lifted and drawn by IsoRimOutlineRing, a ShaderDef of its own), and
+    // then this is not patched in: it works round IsoRim's internals, which Api 62 does not cover.
     public static partial class WalkFigures
     {
         private const float OutlineLift = 0.01f;   // cells: how far above the ground an item's outline ring is lifted
+        private const string IsoRimRingDef = "IsoRimOutlineRing";   // IsoRim's own ring (M230): with it, IsoRim lifts the ring itself
 
         // Not inlined and called inside its own try, so an IsoRim without ModelBaker.Write only loses this.
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         private static void PatchGroundOutlines(Harmony harmony)
         {
+            if (DefDatabase<ShaderDef>.GetNamedSilentFail(IsoRimRingDef) != null)
+            {
+                return;   // IsoRim keeps its item outline rings off the ground itself
+            }
             MethodInfo write = AccessTools.Method(typeof(ModelBaker), "Write");
             if (write == null || write.ReturnType != typeof(bool))
             {

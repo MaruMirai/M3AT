@@ -199,7 +199,7 @@ namespace M3AT
             for (int i = 0; i < w.from.Length; i++)
             {
                 w.verts[i] = pieces[w.fromPiece[i]].rest[w.from[i]];
-                tags.Add(RoofClip.MovingTag);   // clipped under the roof over where it is drawn, as IsoRim's moving models are
+                tags.Add(Api.MovingMeshTag);   // clipped under the roof over where it is drawn, as IsoRim's moving models are
             }
             w.mesh.Clear();
             w.mesh.vertices = w.verts;

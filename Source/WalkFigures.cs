@@ -87,7 +87,7 @@ namespace M3AT
         internal const string Folder = "Models/chibi";
         private const float ScaleUp = 1.2f;   // on top of IsoRim's size for the life stage: the baked figure is 1.25 cells tall, which looks tiny beside furniture
         private const bool ColonistsOnly = false;   // true: everyone else keeps IsoRim's figure, to compare side by side
-        private const float WalkingGait = 0.5f;   // Animals.Track's gait (0 still .. 1 walking) from which the walk shows
+        private const float WalkingGait = 0.5f;   // the placing's gait (0 still .. 1 walking) from which the walk shows
         private const float RunFrom = 1.5f;   // cells per game second: the run starts to blend in (a colonist ambles at ~1.5,
         private const float RunFull = 2.5f;   // walks at ~2.3 and hurries at ~4.6 on a floor) .. and is full
         private const float RunEase = 2f;   // how fast a pawn's run amount follows its speed, per real second
@@ -167,8 +167,12 @@ namespace M3AT
         private const float FoodScale = 0.3f;   // .. and any other food being eaten (pemmican, berries, chocolate)
         private const float MealTurn = 90f;   // degrees about the vertical a meal being eaten is turned
         private const float PalmLift = 0.022f;   // model units from the hand's bone up to its palm's face (walk.HAND_HALF), where a meal eaten standing sits
-        private const float CarriedItemScale = 0.8f;   // IsoRim's Carried.ItemScale (private): a carried item's share of the game's size
+        private const float CarriedItemScale = 0.8f;   // as IsoRim draws a carried item: its share of the game's size
         private const float EatEase = 3f;   // how fast a pawn takes up eating (or leaves it), per real second
+        private const int TossInterval = 400;   // game ticks between throws at horseshoes or hoopstone (JobDriver_PlayHorseshoes' HorseshoeThrowInterval)
+        private const float TossRelease = 0.6f;   // walk.TOSS_RELEASE: how far through the toss clip the thing leaves the hand
+        private const float TossIn = 0.2f;   // walk.TOSS_AT[1]: the toss is eased in from the idle over this much of it
+        private const float TossOut = 0.85f;   // and back out to it from here, as the foot steps back
         private const float TalkEase = 2f;   // how fast a pawn takes up talking (a board game, a speech) or stops, per real second
         private const float PlayerReach = 3f;   // cells round a board game the other players are looked for in (PlaysWithOthers)
         private const float BoutEdge = 0.1f;   // of a bout (BoutOf): eased into at its start and out of at its end
@@ -202,6 +206,14 @@ namespace M3AT
         private const float PickHit = 0.7f;
         private const float PickBounce = 0.3f;
         private const float PickSlowest = 1.25f;   // a stroke is played at most this much slower than the clip's own length; a slower miner rests the pick in the rock between strokes
+        // Beating out a fire: the game beats once each time its beat verb's 1.1 s cool-down ends (Verb_BeatFire), so
+        // work_stomp and work_pat are played from those beats (BeatPhase) rather than the clock, a blow landing on the tick
+        // the game beats. Where in each clip a blow lands, and how many blows a loop (walk.STOMP_HIT, walk.PAT_HIT and
+        // walk.PAT_HITS: the stomp is one foot's stamp a loop, the pat a slap with each hand in turn).
+        private const float StompHit = 0.5f;
+        private const float PatHit = 0.25f;
+        private const int PatHits = 2;
+        private const int BeatLongest = 180;   // ticks between beats past which the last one is forgotten (a new fire, a break)
         private const float WorkEase = 3f;   // how fast a pawn takes up its work stance (or leaves it), per real second
         private const float ToolShown = 0.5f;   // how far into the work stance before the tool shows in its hand
         private const float WorkReach = 8f;   // squared cells: work further than this is still being fetched for (as Work.cs)
@@ -289,7 +301,7 @@ namespace M3AT
         {
             get { return Ragdolls && SettingsMod.Settings != null && SettingsMod.Settings.flingWeapons; }
         }
-        public static bool RetexturedWeaponModels   // the game's own weapons keep IsoRim's model whoever supplies their art (ArtPostfix)
+        public static bool RetexturedWeaponModels   // the game's own weapons keep IsoRim's model whoever supplies their art (WeaponRule)
         {
             get { return SettingsMod.Settings == null || SettingsMod.Settings.retexturedWeaponModels; }
         }
@@ -333,7 +345,7 @@ namespace M3AT
         private const float SwimTurn = 1.5f;   // game seconds a swimmer takes to tip from treading water into the front crawl (or back)
         private const string NeckBone = "spine.004";   // the joint a swimmer is sunk to (walk.NECK)
         private const string ChestBone = "spine.002";   // the joint someone working on a lying body faces (WorkOf)
-        private const float TrackTurn = 500f;   // degrees per real second IsoRim's tracker turns a figure (Animals.Advance)
+        private const float TrackTurn = 500f;   // degrees per real second IsoRim's tracker turns a figure
         private const float TurnLate = 0.1f;   // game seconds a figure takes to come round to its target once it is already firing
         private const float StepSlack = 40f;   // degrees the trunk turns over planted feet (to track an aim, a foe) before they step round
         private const float StepDone = 4f;   // and within how many degrees of the trunk's way they stop stepping
@@ -376,12 +388,9 @@ namespace M3AT
         private static readonly Dictionary<int, Ease> eases = new Dictionary<int, Ease>();
         private static readonly List<int> stale = new List<int>();
         private static bool tried, ready;
-        private static Func<float, float> sizeFor;   // IsoRim People.SizeFor (internal): figure size by life stage, for a race with no stages to grow through
-        private static Func<Pawn, float, float> pitchOf;   // IsoRim FigureWeapons.PitchOf (private): how far up a pawn aims
         private static readonly AccessTools.FieldRef<PawnFlyer, int> flyingTicks = AccessTools.FieldRefAccess<PawnFlyer, int>("ticksFlying");
         private static readonly AccessTools.FieldRef<PawnFlyer, int> flightTicks = AccessTools.FieldRefAccess<PawnFlyer, int>("ticksFlightTime");
         private static readonly AccessTools.FieldRef<JobDriver_Mine, int> pickHitIn = AccessTools.FieldRefAccess<JobDriver_Mine, int>("ticksToPickHit");
-        private static Func<Apparel, Color> apparelColour;   // IsoRim People.ApparelColour (internal): clothing's colour as IsoRim shows it
 
         private class Ease
         {
@@ -426,6 +435,9 @@ namespace M3AT
             public float eat;   // 0 .. 1: how far into eating it is (EatOf)
             public string eatClip;   // eat_sit or eat_stand (kept while it eases out of it)
             public float talk;   // 0 .. 1: how far into talking it is (TalkOf: a board game, a speech)
+            public float toss;   // 0 .. 1: how far into pitching horseshoes or hoopstone it is (Tossing)
+            public float tossAt = -1f;   // how far through the toss clip it is this frame, 0 .. 1; -1: between throws (TossPhase)
+            public float? tossFace;   // which way the pin is (degrees clockwise from north); null: none
             public bool cold;   // colder than it is comfortable (ColdOf), looked at with its legs
             public Bout rub = new Bout();   // rubbing its hands for warmth now and then while cold
             public float rubFree;   // 0 .. 1: how far it is at leisure to rub them (AtLeisure)
@@ -538,6 +550,9 @@ namespace M3AT
             public int pickSeenTick;   // the game tick it was read at
             public int pickPeriod;   // the ticks between the last strike and the next, as the game reset it
             public int pickJob = -1;   // the mining job those are for (its loadID)
+            public int beatTick = int.MinValue;   // the tick the pawn last beat a fire (its beat verb's cool-down began; BeatPhase)
+            public int beatPeriod;   // the ticks between its last two beats; 0 before a second
+            public int beatCount;   // how many beats it has made, which hand or foot is next
             public string toolKind;   // the tool line of the work stroke it was drawn in (its kind, or a variant's)
             public int frame;   // when it was last moved on
         }
@@ -701,7 +716,7 @@ namespace M3AT
             return oneHanded ? "pistol" : "rifle";
         }
 
-        // A weapon that is itself thrown: IsoRim's mark for it (Projectiles.Thrown, the vanilla verb's throw log), or Combat
+        // A weapon that is itself thrown: the vanilla verb's throw log (as IsoRim marks one), or Combat
         // Extended's grenades and pila, whose verbs CE replaces with its own (Verb_ShootCEOneUse, no throw log) and marks
         // by tag instead. CE's disposable rocket launcher shares that verb, so the verb alone won't do.
         private static bool Thrown(ThingDef weapon)
@@ -710,9 +725,13 @@ namespace M3AT
             {
                 return false;
             }
-            if (Projectiles.Thrown(weapon))
+            for (int i = 0; weapon.IsWeapon && weapon.Verbs != null && i < weapon.Verbs.Count; i++)
             {
-                return true;
+                RulePackDef log = weapon.Verbs[i].rangedFireRulepack;
+                if (log != null && log.defName == "Combat_RangedFire_Thrown")
+                {
+                    return true;   // the vanilla verb's throw log, as IsoRim tells a thrown weapon
+                }
             }
             for (int i = 0; weapon.weaponTags != null && i < weapon.weaponTags.Count; i++)
             {
@@ -828,31 +847,36 @@ namespace M3AT
         // none for it, or one that doesn't fit its sprite (as DrawModel decides).
         private static bool AsSlab(Thing weapon)
         {
-            if (weapon == null || !weaponModels)
-            {
-                return weapon != null;
-            }
-            try
-            {
-                return !ShowsModel(weapon);
-            }
-            catch (Exception)
-            {
-                return true;   // (DrawSlab will find the same and fall back to slabs)
-            }
+            return weapon != null && !ShowsModel(weapon);
         }
 
-        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         private static bool ShowsModel(Thing weapon)
         {
-            Model model = WeaponModels.ModelOf(weapon);
-            if (model == null)
+            ThingModelInfo info;
+            WeaponFit.Hold h;
+            return HeldModel(weapon, out info, out h);
+        }
+
+        // The weapon's IsoRim model as IsoRim would show it held (Api.ReadThingModel: its "Weapons as 3D models" setting, a
+        // model bound, the art and model rules) and our fit of it to its sprite (WeaponFit); false for neither.
+        private static bool HeldModel(Thing weapon, out ThingModelInfo info, out WeaponFit.Hold hold)
+        {
+            hold = null;
+            if (!Api.ReadThingModel(weapon, ThingModelUse.Held, out info) || info.Model == null)
             {
                 return false;
             }
             Graphic g = weapon.Graphic;
             Material mat = g != null ? g.MatSingleFor(weapon) : null;
-            return mat != null && WeaponFit.HoldOf(model, FitArt(weapon.def, mat), g.drawSize, weapon.def.equippedAngleOffset) != null;
+            hold = mat != null ? WeaponFit.HoldOf(info.Model, info.BarrelEnd, FitArt(weapon.def, mat), g.drawSize, weapon.def.equippedAngleOffset) : null;
+            return hold != null;
+        }
+
+        // The size of a weapon's model on the ground (cells per model unit, its ModelDef's scale); 0 if IsoRim gives none.
+        private static float GroundScaleOf(Thing weapon)
+        {
+            ThingModelInfo g;
+            return Api.ReadThingModel(weapon, ThingModelUse.Ground, out g) ? g.Scale : 0f;
         }
 
         // The name a weapon drawn as a slab takes its prefix + name clips under: its own name's slab clips, else its kind's,
@@ -929,13 +953,42 @@ namespace M3AT
             return clip;
         }
 
+        // IsoRim's Api version this needs: the figure drawers, placing, mesh submitting and model rules (Docs/Api.md part 43).
+        private const int MinimumApi = 62;
+
+        // IsoRim's options this mod goes by, read by their field names (Api.GetOption, a lookup by name) once a frame.
+        private static int optionsFrame = -1;
+        private static bool heldWeapons3D = true, workAnimations = true;
+
+        private static void ReadOptions()
+        {
+            if (optionsFrame == Time.frameCount)
+            {
+                return;
+            }
+            optionsFrame = Time.frameCount;
+            object held = Api.GetOption("heldWeapons3D"), work = Api.GetOption("workAnimations");
+            heldWeapons3D = !(held is bool) || (bool)held;
+            workAnimations = !(work is bool) || (bool)work;
+        }
+
+        private static bool HeldWeapons3D   // IsoRim's "Held weapons in 3D"
+        {
+            get { ReadOptions(); return heldWeapons3D; }
+        }
+
+        private static bool WorkAnimations   // IsoRim's work animations
+        {
+            get { ReadOptions(); return workAnimations; }
+        }
+
         static WalkFigures()
         {
             try
             {
-                if (Api.Version < 8)
+                if (Api.Version < MinimumApi)
                 {
-                    Log.Warning(Tag + "IsoRim's Api is version " + Api.Version + ", 8 or later is needed; IsoRim's figures are kept.");
+                    Log.Warning(Tag + "IsoRim's Api is version " + Api.Version + ", " + MinimumApi + " or later is needed; IsoRim's figures are kept.");
                     return;
                 }
                 foreach (ModContentPack mod in LoadedModManager.RunningModsListForReading)
@@ -949,29 +1002,13 @@ namespace M3AT
                         isoRim = mod;
                     }
                 }
-                MethodInfo draw = AccessTools.Method(typeof(People), nameof(People.Draw), new[] { typeof(Pawn), typeof(Vector3), typeof(bool) });
-                MethodInfo size = AccessTools.Method(typeof(People), "SizeFor", new[] { typeof(float) });
-                MethodInfo colour = AccessTools.Method(typeof(People), "ApparelColour", new[] { typeof(Apparel) });
-                if (content == null || draw == null)
+                if (content == null)
                 {
-                    Log.Warning(Tag + "IsoRim's People.Draw or this mod's folder was not found; IsoRim's figures are kept.");
+                    Log.Warning(Tag + "this mod's folder was not found; IsoRim's figures are kept.");
                     return;
                 }
-                if (size != null)
-                {
-                    sizeFor = (Func<float, float>)Delegate.CreateDelegate(typeof(Func<float, float>), size);
-                }
-                MethodInfo pitch = AccessTools.Method(typeof(FigureWeapons), "PitchOf", new[] { typeof(Pawn), typeof(float) });
-                if (pitch != null && pitch.ReturnType == typeof(float))
-                {
-                    pitchOf = (Func<Pawn, float, float>)Delegate.CreateDelegate(typeof(Func<Pawn, float, float>), pitch);
-                }
-                if (colour != null)
-                {
-                    apparelColour = (Func<Apparel, Color>)Delegate.CreateDelegate(typeof(Func<Apparel, Color>), colour);
-                }
+                Api.AddFigureDrawer(DrawFigure, FigureKinds.People);
                 Harmony harmony = new Harmony("MaruMirai.M3AT");
-                harmony.Patch(draw, prefix: new HarmonyMethod(typeof(WalkFigures), nameof(DrawPrefix)));
                 // Hits, for the flinch (the game's own jolt of the sprite is told the same way).
                 MethodInfo damaged = AccessTools.Method(typeof(Pawn_DrawTracker), nameof(Pawn_DrawTracker.Notify_DamageApplied));
                 MethodInfo deflected = AccessTools.Method(typeof(Pawn_DrawTracker), nameof(Pawn_DrawTracker.Notify_DamageDeflected));
@@ -1025,30 +1062,8 @@ namespace M3AT
                 }
                 FaceLayers.PatchEyes(harmony);
                 FaceLayers.PatchBlush(harmony);
-                try
-                {
-                    PatchGrenadeModels(harmony);
-                }
-                catch (Exception e)
-                {
-                    Log.Warning(Tag + "grenades without a model of their own keep their art: " + e.Message);
-                }
-                try
-                {
-                    PatchWeaponArt(harmony);
-                }
-                catch (Exception e)
-                {
-                    Log.Warning(Tag + "retextured weapons are left to IsoRim: " + e.Message);
-                }
-                try
-                {
-                    PatchGroundClothes(harmony);
-                }
-                catch (Exception e)
-                {
-                    Log.Warning(Tag + "apparel on the ground keeps IsoRim's look: " + e.Message);
-                }
+                Api.AddWeaponModelRule(WeaponRule);
+                Api.AddGroundModelRule(GroundRule);
                 try
                 {
                     PatchGroundOutlines(harmony);
@@ -1065,91 +1080,55 @@ namespace M3AT
             }
         }
 
-        // IsoRim draws a weapon as its model (WeaponModels.Uses: held, on the ground, thrown) only when the model is bound to
-        // that very weapon, not to its category. Its Grenades category is bound to its grenade, which Combat Extended's own
-        // grenades are in, so they were drawn from their art: a grenade bound by its category counts too. Not inlined and
-        // called inside its own try, so an IsoRim without WeaponModels only loses this.
-        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
-        private static void PatchGrenadeModels(Harmony harmony)
-        {
-            MethodInfo uses = AccessTools.Method(typeof(WeaponModels), nameof(WeaponModels.Uses),
-                new[] { typeof(ThingDef), typeof(ModelEntry).MakeByRefType() });
-            if (uses != null && uses.ReturnType == typeof(bool))
-            {
-                harmony.Patch(uses, postfix: new HarmonyMethod(typeof(WalkFigures), nameof(UsesPostfix)));
-            }
-        }
-
-        // IsoRim (Api 50) shows a weapon's model only while its art is its own (WeaponModels.ArtIsOwn): any sprite from a
-        // mod other than the game, the weapon's own or the model's draws the sprite instead. Combat Extended ships its own
-        // art at the vanilla guns' paths, so with it every vanilla gun and grenade lost its model. The RetexturedWeaponModels
-        // option keeps it for the game's own weapons (Core and the DLCs, whose models were made for art of that shape);
-        // another mod's weapon is left to IsoRim. Looked up by name, so an IsoRim without the check only loses this.
-        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
-        private static void PatchWeaponArt(Harmony harmony)
-        {
-            MethodInfo own = AccessTools.Method(typeof(WeaponModels), "ArtIsOwn", new[] { typeof(ThingDef), typeof(ModelEntry) });
-            if (own != null && own.ReturnType == typeof(bool))
-            {
-                harmony.Patch(own, postfix: new HarmonyMethod(typeof(WalkFigures), nameof(ArtPostfix)));
-                if (Prefs.DevMode)
-                {
-                    Log.Message(Tag + "retextured weapons: WeaponModels.ArtIsOwn patched.");
-                }
-            }
-            else if (Prefs.DevMode)
-            {
-                Log.Warning(Tag + "retextured weapons: IsoRim has no WeaponModels.ArtIsOwn(ThingDef, ModelEntry), nothing patched.");
-            }
-        }
-
-        // Dev mode: each weapon def's first answer, once (ArtPostfix), and why a weapon with no model drew its slab (DrawModel).
+        // Dev mode: each weapon def's first answer, once (WeaponRule), and why a weapon with no model drew its slab (DrawModel).
         private static readonly HashSet<ThingDef> artNoted = new HashSet<ThingDef>(), slabNoted = new HashSet<ThingDef>();
 
-        // WeaponModels.ArtIsOwn: true for one of the game's own weapons with the option on; with it off, false for one whose
-        // ModelDef RestoredModels put back. IsoRim caches its own answer
-        // per def, but this runs on every call, so the option takes at once for what is drawn each frame.
-        public static void ArtPostfix(ThingDef def, ref bool __result)
+        // Asked by IsoRim (Api.AddWeaponModelRule) whether a weapon shows its model (held, on the ground, thrown) once it has
+        // a usable one for it; null leaves it to IsoRim's own rules (its own binding, its own art). Two of those are changed:
+        //   - IsoRim shows a model bound to the weapon's category only for that very weapon. Its Grenades category is bound to
+        //     its grenade, which Combat Extended's own grenades are in, so they were drawn from their art: a grenade bound by
+        //     its category counts too.
+        //   - IsoRim (Api 50) shows a weapon's model only while its art is its own: any sprite from a mod other than the game,
+        //     the weapon's own or the model's draws the sprite instead. Combat Extended ships its own art at the vanilla guns'
+        //     paths, so with it every vanilla gun and grenade lost its model. The RetexturedWeaponModels option keeps it for
+        //     the game's own weapons (Core and the DLCs, whose models were made for art of that shape), bound by their own name,
+        //     a model rule or their picture; another mod's weapon is left to IsoRim. With it off, a weapon whose ModelDef
+        //     RestoredModels put back (another mod had removed it) shows its sprite, as that mod meant.
+        // A plain lookup (the option, the binding, the def): IsoRim may ask it off the main thread. It answers on every call,
+        // so the option takes at once for what is drawn each frame; the map's baked weapons are written again when it changes
+        // (RebakeGroundWeapons).
+        private static bool? WeaponRule(ThingDef def)
         {
-            bool theirs = __result;
-            if (def != null && RetexturedWeaponModels)
+            if (def == null || def.IsApparel)
             {
-                __result = __result || (def.modContentPack != null && def.modContentPack.IsOfficialMod);
+                return null;
             }
-            else if (def != null && RestoredModels.Has(def))
+            string how = Api.HowBound(def);
+            if (how == null)
             {
-                __result = false;   // put back by RestoredModels, which another mod had removed: off, as that mod meant
+                return null;
             }
-            if (Prefs.DevMode && def != null && artNoted.Add(def))
+            bool? answer = null;
+            if (how.StartsWith("category:"))
             {
-                Log.Message(Tag + "retextured weapons: " + def.defName + " (" + (def.modContentPack != null ? def.modContentPack.PackageIdPlayerFacing : "no mod")
-                    + ") IsoRim says its art is " + (theirs ? "its own" : "another mod's") + ", drawn as " + (__result ? "its model" : "its sprite") + ".");
+                answer = Grenade(def) ? true : (bool?)null;
             }
-        }
-
-        private static readonly Dictionary<ThingDef, bool> categoryModel = new Dictionary<ThingDef, bool>();
-
-        // WeaponModels.Uses: also true for a grenade whose model comes from its category, as Uses checks the rest
-        // (its setting on, real gear, a model that isn't flat). Cached per ThingDef, as the bindings are made at load.
-        public static void UsesPostfix(ThingDef def, ref ModelEntry entry, ref bool __result)
-        {
-            if (__result || def == null || !WeaponModels.On)
+            else if (RetexturedWeaponModels)
             {
-                return;
+                bool official = def.modContentPack != null && def.modContentPack.IsOfficialMod;
+                bool own = how == "thingDef" || how.StartsWith("rule:") || how.StartsWith("graphicPath:");
+                answer = official && own ? true : (bool?)null;
             }
-            bool counts;
-            if (!categoryModel.TryGetValue(def, out counts))
+            else if (RestoredModels.Has(def))
             {
-                ModelEntry found;
-                string how = ModelLibrary.HowBound(def);
-                counts = how != null && how.StartsWith("category:") && !def.IsApparel && GroundGear.IsGear(def) && Grenade(def)
-                    && ModelLibrary.TryGet(def, out found) && found.HasModel && !found.def.flat;
-                categoryModel[def] = counts;
+                answer = false;
             }
-            if (counts && ModelLibrary.TryGet(def, out entry))
+            if (Prefs.DevMode && UnityData.IsInMainThread && artNoted.Add(def))
             {
-                __result = true;
+                Log.Message(Tag + "weapon models: " + def.defName + " (" + (def.modContentPack != null ? def.modContentPack.PackageIdPlayerFacing : "no mod")
+                    + ", bound by " + how + ") " + (answer.HasValue ? "drawn as " + (answer.Value ? "its model" : "its sprite") : "left to IsoRim") + ".");
             }
+            return answer;
         }
 
         // Loaded on first draw (main thread, IsoRim ready). False if any file is missing: IsoRim's figure is drawn instead.
@@ -1295,39 +1274,91 @@ namespace M3AT
             return ready;
         }
 
-        // Whether the chibi stands in for IsoRim's figure (see the top).
+        // Whether the chibi stands in for IsoRim's figure (see the top), by what the pawn is; the figure drawer (DrawFigure)
+        // also leaves to IsoRim what its placing says the chibi doesn't do (attached, in an upright vat, in a gibbet).
         private static bool Handles(Pawn pawn)
         {
             if (pawn == null || pawn.story == null || (ColonistsOnly && !pawn.IsColonist))
             {
                 return false;
             }
-            if (!People.FigureRace(pawn) || People.Hidden(pawn) || !Corpses.ShownAsModel(pawn))
+            if (Api.FigureModeOf(pawn) == FigureMode.Card || Invisible(pawn))
             {
                 return false;
             }
             if (pawn.Dead)
             {
+                // Not gone to bones, nor in a gibbet cage or a grave (only spawned or carried corpses).
                 Corpse corpse = pawn.Corpse;
-                return corpse != null && (corpse.Spawned || corpse.ParentHolder is Pawn_CarryTracker) && !Corpses.Bones(pawn)
-                    && People.GibbetOf(pawn) == null;
+                return corpse != null && (corpse.Spawned || corpse.ParentHolder is Pawn_CarryTracker) && RotOf(pawn) != RotDrawMode.Dessicated;
             }
-            Building holder = Glass.HolderOf(pawn);
-            if (holder != null)
+            if (pawn.ParentHolder is IThingHolderWithDrawnPawn)
             {
-                ModelEntry vat = Glass.EntryFor(holder);
-                if ((vat != null && vat.def.heldPawnUpright) || !(pawn.ParentHolder is IThingHolderWithDrawnPawn))
-                {
-                    return false;
-                }
+                // In a building that shows who is inside: on its couch (a vat that floats them upright is IsoRim's, by the
+                // placing's InVat).
             }
             else if (!pawn.Spawned && !(pawn.ParentHolder is Pawn_CarryTracker) && !(pawn.ParentHolder is PawnFlyer))
             {
-                return false;   // a statue's subject, or somewhere else IsoRim knows how to place
+                return false;   // somewhere else IsoRim knows how to place
             }
             Vector3 point;
             float yaw;
             return !Api.AttachedPlace(pawn, out point, out yaw);
+        }
+
+        // People who are invisible must stay so: IsoRim leaves them their sprite, which the game hides (as IsoRim tells them,
+        // by a hediff named so).
+        private static bool Invisible(Pawn pawn)
+        {
+            List<Hediff> all = pawn.health != null && pawn.health.hediffSet != null ? pawn.health.hediffSet.hediffs : null;
+            for (int i = 0; all != null && i < all.Count; i++)
+            {
+                if (all[i].def != null && all[i].def.defName != null && all[i].def.defName.IndexOf("Invisib", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // The building a pawn sits on, as IsoRim seats its figures (on its feet, not moving, on a sittable edifice, at a life
+        // stage that sits: the game shifts its sprite there); null for none.
+        private static Building SeatUnder(Pawn pawn)
+        {
+            if (pawn == null || !pawn.Spawned || pawn.Dead || pawn.ageTracker == null || pawn.pather == null || pawn.pather.MovingNow
+                || pawn.GetPosture() != PawnPosture.Standing)
+            {
+                return null;
+            }
+            LifeStageDef stage = pawn.ageTracker.CurLifeStage;
+            if (stage == null || !stage.sittingOffset.HasValue)
+            {
+                return null;
+            }
+            Map map = pawn.Map;
+            Building b = map != null && pawn.Position.InBounds(map) ? pawn.Position.GetEdifice(map) : null;
+            return b != null && b.def.building != null && b.def.building.isSittable ? b : null;
+        }
+
+        // How far the game's own sitting shift has got (0 .. 1): it slides the sprite up the screen onto the seat.
+        private static float SeatAmount(Pawn pawn, Vector3 drawLoc)
+        {
+            LifeStageDef stage = pawn.ageTracker.CurLifeStage;
+            float offset = stage != null && stage.sittingOffset.HasValue ? stage.sittingOffset.Value : 0f;
+            float dz = drawLoc.z - (pawn.Position.z + 0.5f);
+            return offset > 0.001f ? Mathf.Clamp(dz, 0f, offset) / offset : 1f;
+        }
+
+        // The skin's colour as the game draws it now: rotting, a corpse's is the game's rotten colour.
+        private static Color SkinOf(Pawn pawn)
+        {
+            Color skin = pawn.story.SkinColor;
+            return pawn.Dead && RotOf(pawn) == RotDrawMode.Rotting ? PawnRenderUtility.GetRottenColor(skin) : skin;
+        }
+
+        private static RotDrawMode RotOf(Pawn pawn)
+        {
+            return pawn.Drawer != null && pawn.Drawer.renderer != null ? pawn.Drawer.renderer.CurRotDrawMode : RotDrawMode.Fresh;
         }
 
         // What the baked frames can show: standing or walking.
@@ -1337,7 +1368,7 @@ namespace M3AT
             {
                 return false;
             }
-            return !Poses.Seated(pawn, out _);
+            return SeatUnder(pawn) == null;
         }
 
         private static float SizeOf(Pawn pawn)
@@ -1348,7 +1379,7 @@ namespace M3AT
                 return Mathf.Lerp(BirthSize, 1f, Growth.Evaluate(Mathf.Clamp01(pawn.ageTracker.AgeBiologicalYearsFloat / grown))) * ScaleUp * PawnSize * GenderSize(pawn) * HeightSize(pawn);
             }
             float factor = pawn.ageTracker != null && pawn.ageTracker.CurLifeStage != null ? pawn.ageTracker.CurLifeStage.bodySizeFactor : 1f;
-            float size = sizeFor != null ? sizeFor(factor) : Mathf.Lerp(0.5f, 1f, Mathf.Clamp01(factor));
+            float size = Api.FigureSizeFor(factor);
             return size * ScaleUp * PawnSize * GenderSize(pawn) * HeightSize(pawn);
         }
 
@@ -1658,7 +1689,7 @@ namespace M3AT
             // Aiming, the weapon brought up to the aim, if the export has aim clips for it.
             float aimGame, aimDrawn;
             // (Not while it uses its hip gear: IsoRim aims the weapon for any verb the stance is busy with.)
-            bool aiming = carryClip == null && !HipVerb(pawn) && FigureWeapons.AimOf(pawn, false, out aimGame, out aimDrawn);
+            bool aiming = carryClip == null && !HipVerb(pawn) && AimOf(pawn, out aimGame, out aimDrawn);
             string aimName = skin != null && aiming ? AimName(pawn) : null;
             float aim = aimName != null ? 1f : 0f;
             int now = Find.TickManager.TicksGame;
@@ -1669,6 +1700,9 @@ namespace M3AT
             string eatClip = skin != null ? EatOf(pawn) : null;
             float eating = eatClip != null ? 1f : 0f;
             float talking = skin != null && skin.Has("talk") && TalkOf(pawn) ? 1f : 0f;
+            float tossing = skin != null && skin.Has("toss") && Tossing(pawn) ? 1f : 0f;
+            float tossAt = tossing > 0f ? TossPhase(pawn) : -1f;
+            float? tossFace = tossing > 0f ? FaceOf(pawn, pawn.CurJob.targetA) : null;
             float facing = 0f;
             Vector3? workBeside = null;
             string workKind = skin != null ? WorkOf(pawn, out facing, out workBeside) : null;
@@ -1677,7 +1711,7 @@ namespace M3AT
             // unless it is fighting with it. Work it is about to reach counts, so it arrives with its hands free; work it is
             // already at, or the like, wants them now (StepDraw hurries). A wound or the cold doesn't: they are only
             // what it does with idle hands, and would keep a hurt soldier from ever holding its weapon.
-            bool wantedNow = workKind != null || eatClip != null || talking > 0f || cowering > 0f || leading > 0f;
+            bool wantedNow = workKind != null || eatClip != null || talking > 0f || tossing > 0f || cowering > 0f || leading > 0f;
             float unused;
             Vector3? unusedBeside;
             bool handsWanted = strikeClip == null && !aiming && !Reloading(pawn)
@@ -1721,6 +1755,9 @@ namespace M3AT
                 e.lead = leading;
                 e.shield = shielding;
                 e.talk = talking;
+                e.toss = tossing;
+                e.tossAt = tossAt;
+                e.tossFace = tossFace;
                 e.cold = ColdOf(pawn);
                 e.rubFree = AtLeisure(pawn) ? 1f : 0f;
                 e.cast = casting;
@@ -1854,6 +1891,9 @@ namespace M3AT
                 e.eat = recent ? Mathf.MoveTowards(e.eat, eating * putAway, EatEase * Time.deltaTime) : eating;
                 e.eatClip = eatClip ?? e.eatClip;
                 e.talk = recent ? Mathf.MoveTowards(e.talk, talking * putAway, TalkEase * Time.deltaTime) : talking;
+                e.toss = recent ? Mathf.MoveTowards(e.toss, tossing * putAway, TalkEase * Time.deltaTime) : tossing;
+                e.tossAt = tossAt;
+                e.tossFace = tossFace ?? e.tossFace;
                 float reloading = skin != null && skin.Has("reload") ? ReloadOf(pawn, e) : 0f;
                 e.reload = recent ? Mathf.MoveTowards(e.reload, reloading, ReloadEase * Time.deltaTime) : reloading;
                 e.cast = recent ? Mathf.MoveTowards(e.cast, casting, CastEase * Time.deltaTime) : casting;
@@ -1900,7 +1940,7 @@ namespace M3AT
                 // Now and then, with the hands free and nothing else to do with them: rubbing them while cold, talking
                 // at a party (neither while it talks anyway).
                 bool idleHands = skin != null && carryClip == null && drafted <= 0f && eatClip == null && workKind == null
-                    && castClip == null && strikeClip == null && cowering <= 0f && swim <= 0f && !flying;
+                    && castClip == null && strikeClip == null && cowering <= 0f && tossing <= 0f && swim <= 0f && !flying;
                 bool atLeisure = AtLeisure(pawn);
                 e.rubFree = recent ? Mathf.MoveTowards(e.rubFree, atLeisure ? 1f : 0f, RubEase * Time.deltaTime) : (atLeisure ? 1f : 0f);
                 e.rubAt = skin != null && skin.Has("rub") ? BoutOf(pawn, e.rub, "rub", idleHands && talking <= 0f && e.cold && atLeisure, RubRestFrom, RubRestTo) : -1f;
@@ -2421,7 +2461,7 @@ namespace M3AT
                 {
                     continue;
                 }
-                float h = Forms.HeightOf(cover);
+                float h = Api.SurfaceHeight(cover);
                 top = Mathf.Max(top, h > 0f ? h : cover.def.fillPercent);
             }
             return top;
@@ -2445,7 +2485,7 @@ namespace M3AT
         {
             int now = Find.TickManager.TicksGame;
             bool can = pawn.Spawned && !pawn.Downed && pawn.GetPosture() == PawnPosture.Standing && pawn.carryTracker.CarriedThing == null
-                && Poses.SeatUnder(pawn) == null;
+                && SeatUnder(pawn) == null;
             Thing live = pawn.mindState != null ? pawn.mindState.knownExploder : null;
             if (can && live != null && live.Spawned && live.Map == pawn.Map && (pawn.Position - live.Position).LengthHorizontalSquared <= DiveReach * DiveReach)
             {
@@ -2831,7 +2871,7 @@ namespace M3AT
                             }
                             else if (b.def.fillPercent >= BlockFill)
                             {
-                                top = Mathf.Max(top, Forms.HeightOf(b));
+                                top = Mathf.Max(top, Api.SurfaceHeight(b));
                             }
                         }
                     }
@@ -2981,6 +3021,67 @@ namespace M3AT
                 return PlaysWithOthers(pawn, job);
             }
             return name == "GiveSpeech" || name == "SpeakOnCellNoSpeechBubbles";
+        }
+
+        // Pitching horseshoes or hoopstone (the game's Play_Horseshoes and Play_Hoopstone: a JobDriver_WatchBuilding that
+        // throws a horseshoe or stone fleck at the pin, target A, every TossInterval ticks while it stands at its spot),
+        // once at that spot (target B) and not lying in a bed, where the game throws from too but the figure lies down.
+        private static bool Tossing(Pawn pawn)
+        {
+            JobDef job = pawn.CurJobDef;
+            if (job == null || (job.defName != "Play_Horseshoes" && job.defName != "Play_Hoopstone"))
+            {
+                return false;
+            }
+            if (pawn.pather != null && pawn.pather.Moving || pawn.GetPosture() != PawnPosture.Standing)
+            {
+                return false;
+            }
+            LocalTargetInfo spot = pawn.CurJob.targetB;
+            return !spot.IsValid || pawn.Position == spot.Cell;
+        }
+
+        // How far through the toss clip a pawn pitching is, 0 .. 1, or -1 between throws: timed so the thing leaves the hand
+        // (TossRelease) on the tick the game throws its fleck, which is when (TicksGame + thingIDNumber.HashOffset()) is a
+        // whole number of TossIntervals (Thing.IsHashIntervalTick), so the wind-up starts before it and the follow-through
+        // goes on after.
+        private static float TossPhase(Pawn pawn)
+        {
+            float ticks = skin.SecondsOf("toss") * 60f;
+            if (ticks <= 0f)
+            {
+                return -1f;
+            }
+            int since = (Find.TickManager.TicksGame + pawn.thingIDNumber.HashOffset()) % TossInterval;
+            if (since < 0)
+            {
+                since += TossInterval;
+            }
+            int until = since == 0 ? 0 : TossInterval - since;
+            if (until <= TossRelease * ticks)
+            {
+                return TossRelease - until / ticks;
+            }
+            if (since <= (1f - TossRelease) * ticks)
+            {
+                return TossRelease + since / ticks;
+            }
+            return -1f;
+        }
+
+        // The toss's weight by how far through it is: eased in from the idle over its first TossIn and out again from
+        // TossOut, as its ends are the idle's first frame and the idle has swayed on meanwhile.
+        private static float TossWeight(float at)
+        {
+            if (at < 0f)
+            {
+                return 0f;
+            }
+            if (at < TossIn)
+            {
+                return Mathf.SmoothStep(0f, 1f, at / TossIn);
+            }
+            return at <= TossOut ? 1f : Mathf.SmoothStep(1f, 0f, (at - TossOut) / (1f - TossOut));
         }
 
         // Whether someone else is playing the same game at the same board (its job's target A) as the pawn: a pawn
@@ -3382,7 +3483,7 @@ namespace M3AT
         internal static void DrawFlying(Thing weapon, Vector3 at, Vector3 aim, Vector3 top)
         {
             Vector3 tip;
-            DrawSlab(weapon, ScaleOf(weapon.def), at, aim, top, 0f, Vector3.zero, 0f, 1f, out tip, false);   // on no figure: IsoRim's outline
+            DrawSlab(weapon, ScaleOf(weapon), at, aim, top, 0f, Vector3.zero, 0f, 1f, out tip, false);   // on no figure: IsoRim's outline
         }
 
         // Before and after the game drops what a pawn has as it goes down: the weapon it held flies off (Flings).
@@ -3562,7 +3663,7 @@ namespace M3AT
             bool vomit = job != null && job.def == JobDefOf.Vomit;
             bool meditate = job != null && pawn.jobs != null && pawn.jobs.curDriver is JobDriver_Meditate;
             string play = job != null ? PlaysByBaby(pawn) : null;
-            if (job == null || job.def == null || (!vomit && !meditate && play == null && !IsoRimMod.Settings.workAnimations) || (!coming && pawn.pather != null && pawn.pather.Moving))
+            if (job == null || job.def == null || (!vomit && !meditate && play == null && !WorkAnimations) || (!coming && pawn.pather != null && pawn.pather.Moving))
             {
                 return null;
             }
@@ -3572,8 +3673,8 @@ namespace M3AT
                 return null;
             }
             // (flat, as drawn: work on another floor, such as rock mined from the cell below it, counts by its column)
-            Vector3 to = Floors.FlatDelta(pawn.DrawPos, a.Cell.ToVector3Shifted());
-            if (coming ? !HolsterBefore(pawn, a) : Floors.FlatDelta(pawn.Position.ToVector3Shifted(), a.Cell.ToVector3Shifted()).sqrMagnitude > WorkReach)
+            Vector3 to = Api.DrawnDelta(pawn.DrawPos, a.Cell.ToVector3Shifted());
+            if (coming ? !HolsterBefore(pawn, a) : Api.DrawnDelta(pawn.Position.ToVector3Shifted(), a.Cell.ToVector3Shifted()).sqrMagnitude > WorkReach)
             {
                 return null;
             }
@@ -3638,6 +3739,9 @@ namespace M3AT
                         // same driver, JobDriver_InteractAnimal)
                         kind = AnimalKind(a, "tame", "tame_kneel");
                         break;
+                    case "BeatFire":
+                        kind = FireKind(pawn, a);
+                        break;
                     case "SmoothFloor":
                     case "RemoveFloor":
                     case "RemoveFoundation":
@@ -3683,13 +3787,13 @@ namespace M3AT
                         break;
                     case "VisitSickPawn":
                         // (the same, but a visitor the game sat on a chair by the bed only sits and talks)
-                        kind = Poses.Seated(pawn, out _) ? null : PlaceWork(pawn, a, "tend", false);
+                        kind = SeatUnder(pawn) != null ? null : PlaceWork(pawn, a, "tend", false);
                         break;
                     case "Research":
                         // (the export's own mocap: looking something over, sat at the bench over the sit, or with no seat
                         // sat cross-legged on the floor (stood at it on an export without that); on an older export, by
                         // where it is)
-                        if (skin.Has("work_research") && Poses.Seated(pawn, out _))
+                        if (skin.Has("work_research") && SeatUnder(pawn) != null)
                         {
                             kind = "research";
                         }
@@ -3731,12 +3835,12 @@ namespace M3AT
                         // by place on an export without those strokes)
                         if (bench.Contains("Stonecutter") || bench.Contains("Sculpt"))
                         {
-                            string hammer = Poses.Seated(pawn, out _) ? "hammer_bench_sit" : "hammer_bench";
+                            string hammer = SeatUnder(pawn) != null ? "hammer_bench_sit" : "hammer_bench";
                             kind = skin.Has("work_" + hammer) ? hammer : PlaceWork(pawn, a, tool, true);
                         }
                         // (a campfire, vanilla's or a mod's, is cooked at knelt on the ground, whatever its fill; sat
                         // on a seat beside it, by place as any bill)
-                        else if (bench.Contains("Campfire") && !Poses.Seated(pawn, out _) && skin.Has("work_crouch"))
+                        else if (bench.Contains("Campfire") && SeatUnder(pawn) == null && skin.Has("work_crouch"))
                         {
                             kind = "crouch";
                         }
@@ -3883,7 +3987,7 @@ namespace M3AT
         private static string PlaceWork(Pawn pawn, LocalTargetInfo at, string fallback, bool seats, string ground = "crouch")
         {
             bool high = WorkFill(pawn, at) >= BenchFill;
-            bool seated = seats && Poses.Seated(pawn, out _);
+            bool seated = seats && SeatUnder(pawn) != null;
             string kind = high ? (seated ? "bench_sit" : "bench") : (seated ? "chair" : ground);
             if (kind == ground && !skin.Has("work_" + ground))
             {
@@ -3907,14 +4011,63 @@ namespace M3AT
             {
                 return "hammer";
             }
-            bool high = false;
-            if (def != null)
-            {
-                ThingForm form = Forms.For(def);
-                high = form.form == Form3D.Flat ? def.fillPercent >= BenchFill : form.height >= BuildHigh;
-            }
-            string kind = high ? "bench" : "crouch";
+            string kind = def != null && BuiltHigh(def) ? "bench" : "crouch";
             return skin.Has("work_" + kind) ? kind : "hammer";
+        }
+
+        // How a fire is beaten out (BeatFire; target A is the fire): patted out with the palms (pat) on a person standing
+        // or a building drawn BuildHigh or more tall in its cell (furniture, a wall, a door: as BuildKind measures it, a
+        // frame by what it will be), stomped out (stomp) anywhere else (the floor, an item, a plant, a rug, a conduit);
+        // on someone lying, knelt at them as at ground work (crouch). Null (no clip, as before) on an export without it.
+        private static string FireKind(Pawn pawn, LocalTargetInfo at)
+        {
+            Fire fire = at.Thing as Fire;
+            if (fire == null || pawn.Map == null)
+            {
+                return null;
+            }
+            string kind = "stomp";
+            Pawn burning = fire.parent as Pawn;
+            if (burning != null)
+            {
+                kind = burning.GetPosture() == PawnPosture.Standing ? "pat" : "crouch";
+            }
+            else if (fire.parent == null && fire.Position.InBounds(pawn.Map))
+            {
+                List<Thing> things = fire.Position.GetThingList(pawn.Map);
+                for (int i = 0; i < things.Count; i++)
+                {
+                    if (things[i] is Building && DrawnTall(things[i].def.entityDefToBuild as ThingDef ?? things[i].def))
+                    {
+                        kind = "pat";
+                        break;
+                    }
+                }
+            }
+            return skin.Has("work_" + kind) ? kind : null;
+        }
+
+        // Whether a building is drawn BuildHigh or more tall (IsoRim's Forms height; for a def IsoRim draws flat, its
+        // fillPercent against BenchFill), or fills its cell and stops anyone passing (a wall).
+        private static bool DrawnTall(ThingDef def)
+        {
+            if (def == null)
+            {
+                return false;
+            }
+            if (def.passability == Traversability.Impassable && def.fillPercent >= 0.99f)
+            {
+                return true;
+            }
+            return BuiltHigh(def);
+        }
+
+        // Whether a building is drawn BuildHigh or more tall: its IsoRim model's height (Api.ModelHeight), or for one IsoRim
+        // draws without a model of its own (flat, or its plain shape), its fillPercent against BenchFill.
+        private static bool BuiltHigh(ThingDef def)
+        {
+            float h = Api.ModelHeight(def);
+            return h > 0f ? h >= BuildHigh : def.fillPercent >= BenchFill;
         }
 
         // How an animal is worked at, as BuildKind sorts what is built: stood at it (high: bench to milk or shear it, tame to
@@ -4027,7 +4180,7 @@ namespace M3AT
             Job job = pawn.CurJob;
             if (job != null && job.targetA.IsValid && job.targetA.Cell.IsValid && job.targetA.Cell != pawn.Position)
             {
-                Vector3 to = Floors.FlatDelta(pawn.DrawPos, job.targetA.Cell.ToVector3Shifted());
+                Vector3 to = Api.DrawnDelta(pawn.DrawPos, job.targetA.Cell.ToVector3Shifted());
                 reach = Mathf.Max(reach, Vector3.Dot(new Vector3(to.x, 0f, to.z), Quaternion.AngleAxis(yaw, Vector3.up) * Vector3.forward));
             }
             Vector3 bob = new Vector3(tip.x, WaterLine, reach);
@@ -4109,7 +4262,7 @@ namespace M3AT
             {
                 return 0f;
             }
-            if (!Ground.IsWater(t))
+            if (!Api.IsDrawnWater(t))
             {
                 return Marsh;
             }
@@ -4211,6 +4364,35 @@ namespace M3AT
                 return PickHit + since / stroke;   // the bounce off the rock after the last strike
             }
             return 0f;   // resting in the rock until it is time to wind up
+        }
+
+        // Where a fire-beating clip (work_stomp, work_pat) is for a pawn beating a fire, 0 .. 1 round it, timed so a blow
+        // lands (hit, and every 1 / hits round from there, a foot or hand each) on the tick the game beats: the tick its
+        // beat verb's cool-down began. A beat is seen only as its cool-down is drawn, so the count of beats (which hand is
+        // next) goes by those seen; the time between the last two sets the pace. Past the next beat's time it is held at
+        // the blow, the foot or palm down, until the game beats again (or the job ends). Before a beat, or long after
+        // the last, the clock.
+        private static float BeatPhase(Pawn pawn, Ease e, string clip, float hit, int hits)
+        {
+            int now = Find.TickManager.TicksGame;
+            Stance_Cooldown cooldown = pawn.stances != null ? pawn.stances.curStance as Stance_Cooldown : null;
+            if (cooldown != null && cooldown.verb is Verb_BeatFire && cooldown.startedTick != e.beatTick)
+            {
+                int gap = cooldown.startedTick - e.beatTick;
+                e.beatPeriod = gap > 0 && gap <= BeatLongest ? gap : 0;
+                e.beatTick = cooldown.startedTick;
+                e.beatCount++;
+            }
+            float seconds = skin.SecondsOf(clip);
+            int since = now - e.beatTick;
+            if (seconds <= 0f || since < 0 || since > BeatLongest)
+            {
+                return LoopPhase(pawn, clip);
+            }
+            float period = e.beatPeriod > 0 ? e.beatPeriod : seconds * 60f / hits;   // ticks a beat
+            float done = Mathf.Min(since / period, 1f);
+            float at = hit + ((e.beatCount - 1) % hits + done) / hits;
+            return at - Mathf.Floor(at);
         }
 
         // Where a clock-timed clip (the idle, the drafted stance) is for this pawn, 0 .. 1 round it: game time, so it
@@ -4427,25 +4609,11 @@ namespace M3AT
             return name;
         }
 
-        // How far up the pawn aims (degrees, down less than 0), as IsoRim pitches its own figure's weapon (FigureWeapons'
-        // PitchOf: from the hands, handsY cells over the floor, to the target's middle, floors between them as drawn); 0 if
-        // IsoRim has no such method.
+        // How far up the pawn aims (degrees, down less than 0), as IsoRim pitches its own figure's weapon (Api.AimPitch: from
+        // the hands, handsY cells over the floor, to the target's middle, floors between them as drawn).
         private static float AimPitchOf(Pawn pawn, float handsY)
         {
-            if (pitchOf == null)
-            {
-                return 0f;
-            }
-            try
-            {
-                return pitchOf(pawn, handsY);
-            }
-            catch (Exception e)
-            {
-                Log.Warning(Tag + "IsoRim's aim pitch failed, aiming level from now on: " + e.Message);
-                pitchOf = null;
-                return 0f;
-            }
+            return Api.AimPitch(pawn, handsY);
         }
 
         // How far into a shot's kick the pawn is (0 .. 1): all of it straight after it fired, easing out over the weapon's
@@ -4645,12 +4813,12 @@ namespace M3AT
         // that shows it), or reloading it. Not while it carries something, sheathed, or with IsoRim's held weapons turned off.
         private static bool WeaponShows(Pawn pawn)
         {
-            if (HeldWeapon(pawn) == null || !IsoRimMod.Settings.heldWeapons3D)
+            if (HeldWeapon(pawn) == null || !HeldWeapons3D)
             {
                 return false;
             }
             float game, drawn;
-            return (FigureWeapons.AimOf(pawn, false, out game, out drawn) && !HipVerb(pawn)) || CarriesOpenly(pawn) || Reloading(pawn);
+            return (AimOf(pawn, out game, out drawn) && !HipVerb(pawn)) || CarriesOpenly(pawn) || Reloading(pawn);
         }
 
         // The game's CarryWeaponOpenly, but an outsider at peace with the colony (a visitor, a trader's guard) shows its
@@ -4703,7 +4871,7 @@ namespace M3AT
         // ("hand": set as it is with the hand at rest and turned as the hand turns, the fist along the hand, so a hand
         // turned in the stance aims it); the sprite's top (a gun's sights) kept up, and the game's
         // equippedAngleOffset (a sword or spear's tilt in its sprite) turned out first, as SpriteSolids.DrawHeld does.
-        // Aiming, IsoRim takes the end of the barrel as drawn for where the shots start (Projectiles.FigureTip).
+        // Aiming, IsoRim takes the end of the barrel as drawn for where the shots start (Api.ReportMuzzle).
         private static void DrawWeapon(Pawn pawn, string stance, bool aiming, SkinnedFigure.Posed fig, Vector3 at, float yaw, float size, GarmentMask mask, Ease drawing)
         {
             ThingWithComps weapon = HeldWeapon(pawn);
@@ -4794,7 +4962,7 @@ namespace M3AT
                 behind = Mathf.Lerp(slotBehind, behind, drawn);
             }
             Vector3 tip;
-            Matrix4x4 world = DrawSlab(weapon, ScaleOf(weapon.def), hand, a, top, behind, at, yaw, size, out tip);
+            Matrix4x4 world = DrawSlab(weapon, ScaleOf(weapon), hand, a, top, behind, at, yaw, size, out tip);
             Ease ease = null;
             if (world != Matrix4x4.zero && eases.TryGetValue(pawn.thingIDNumber, out ease))
             {
@@ -4807,13 +4975,14 @@ namespace M3AT
             }
             if (aiming && world != Matrix4x4.zero)
             {
+                Vector2 end;
+                if (float.IsNaN(tip.x) && WeaponFit.SpriteBarrelEnd(weapon, out end))
+                {
+                    tip = world.MultiplyPoint3x4(new Vector3(end.x - 0.5f, end.y - 0.5f, 0f));   // drawn as its slab: the sprite's
+                }
                 if (!float.IsNaN(tip.x))
                 {
-                    Projectiles.FigureTipAt(pawn, weapon, tip, world.MultiplyPoint3x4(Vector3.zero));
-                }
-                else
-                {
-                    Projectiles.FigureTip(pawn, weapon, world);
+                    Api.ReportMuzzle(pawn, weapon, tip, world.MultiplyPoint3x4(Vector3.zero));
                 }
                 if (ease != null && MuzzleFlashes)
                 {
@@ -4909,14 +5078,14 @@ namespace M3AT
 
         private static readonly Vector3 NoTip = new Vector3(float.NaN, 0f, 0f);
 
-        // IsoRim's weapon models (its "Weapons as 3D models" setting, WeaponModels) are not in its Api, so an IsoRim
-        // without them (or with them changed) only costs the models: the first failure drops back to the slab for good.
-        private static bool weaponModels = true;
+        // The drawn size of a weapon held by IsoRim's figures, of its sprite's (FigureWeapons' picture: its figure's height over
+        // the game's), which Api.DrawHeldThing's scale is times.
+        private const float HandPicture = 1.25f / 1.125f;
 
-        // A weapon's sprite as IsoRim's solid slab (SpriteSolids.DrawSlab), scale (ScaleOf) of the sprite's drawn size:
+        // A weapon's sprite as IsoRim's solid slab (Api.DrawHeldThing), scale (ScaleOf) of the sprite's drawn size:
         // running along a from hand, its middle behind (a share of its length) on along a, its top toward
         // top, the def's equippedAngleOffset turned out first. A weapon with an IsoRim model draws that instead, laid
-        // into the slab as IsoRim fits it to the sprite's outline (WeaponFit, IsoRim's fit kept level), so the holds made for the
+        // into the slab as WeaponFit fits it to the sprite's outline (IsoRim's fit kept level), so the holds made for the
         // sprites still put it in the hands; tip is then its barrel's end (true cells), else NoTip. Returns where the
         // slab went (true cells), zero if it has no sprite. onFigure: drawn with the figure being drawn, the model sharing its
         // outline (SkinnedFigure.DrawJoined).
@@ -4942,62 +5111,50 @@ namespace M3AT
             Matrix4x4 slab = new Matrix4x4(x, y, Vector3.Cross(x, y).normalized * unsize, new Vector4(middle.x, middle.y, middle.z, 1f));
             Matrix4x4 world = Matrix4x4.Translate(at) * Matrix4x4.Rotate(Quaternion.AngleAxis(yaw, Vector3.up))
                 * Matrix4x4.Scale(new Vector3(size, size, size)) * slab;   // true cells
-            Matrix4x4 squash = Matrix4x4.Scale(new Vector3(1f, 1f / View3D.Squash, 1f));
-            if (weaponModels)
+            if (DrawModel(weapon, mat, g.drawSize, scale, world, onFigure, out tip))
             {
-                try
-                {
-                    if (DrawModel(weapon, mat, g.drawSize, scale, squash, world, onFigure, out tip))
-                    {
-                        return world;
-                    }
-                }
-                catch (Exception e)
-                {
-                    weaponModels = false;
-                    tip = NoTip;
-                    Log.Warning(Tag + "IsoRim's weapon models failed, weapons are drawn as sprites from now on: " + e.Message);
-                }
+                return world;
             }
-            SpriteSolids.DrawSlab(mat, Floors.DrawnMatrix(squash * world));
+            // IsoRim's slab of the sprite: it sizes the picture by HandPicture times its scale (and the slab's thickness by as
+            // much), which is undone here, so it comes out as world places it.
+            if (scale > 1e-4f)
+            {
+                Matrix4x4 picture = world * Matrix4x4.Scale(new Vector3(1f / (scale * g.drawSize.x), 1f / (scale * g.drawSize.y), 1f / scale));
+                Api.DrawHeldThing(weapon, picture, scale / HandPicture);
+            }
             return world;
         }
 
         // The weapon's IsoRim model in the slab world places (true cells), if it has one. The slab's thickness is IsoRim's
         // own, but the model is fitted to a slab as thick as a cell at the size its sprite is drawn, so that axis is
-        // scaled as the sprite is. Not inlined, so an IsoRim without WeaponModels fails at the call, inside its try.
-        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
-        private static bool DrawModel(Thing weapon, Material mat, Vector2 drawSize, float scale, Matrix4x4 squash,
-            Matrix4x4 world, bool onFigure, out Vector3 tip)
+        // scaled as the sprite is.
+        private static bool DrawModel(Thing weapon, Material mat, Vector2 drawSize, float scale, Matrix4x4 world, bool onFigure, out Vector3 tip)
         {
             tip = NoTip;
-            Model model = WeaponModels.ModelOf(weapon);
-            WeaponModels.Hold h = model != null ? WeaponFit.HoldOf(model, FitArt(weapon.def, mat), drawSize, weapon.def.equippedAngleOffset) : null;
-            if (h == null)
+            ThingModelInfo info;
+            WeaponFit.Hold h;
+            if (!HeldModel(weapon, out info, out h))
             {
                 if (Prefs.DevMode && slabNoted.Add(weapon.def))
                 {
-                    ModelEntry entry;
-                    bool bound = ModelLibrary.TryGet(weapon.def, out entry);
                     Log.Message(Tag + "retextured weapons: " + weapon.def.defName + " held as its sprite: "
-                        + (model == null ? "IsoRim gives no model (bound " + bound + ", how " + (ModelLibrary.HowBound(weapon.def) ?? "-")
-                            + ", Uses " + WeaponModels.Uses(weapon.def) + ", On " + WeaponModels.On + ")" : "its model doesn't fit the sprite") + ".");
+                        + (info.Model == null ? "IsoRim gives no model (how " + (Api.HowBound(weapon.def) ?? "-") + ")" : "its model doesn't fit the sprite") + ".");
                 }
                 return false;
             }
             if (Thrown(weapon.def))
             {
-                h = WeaponFit.AtGroundSize(h, model, weapon.def, drawSize);   // one of the heap, not the heap's size
+                h = WeaponFit.AtGroundSize(h, info.Model, GroundScaleOf(weapon), drawSize);   // one of the heap, not the heap's size
             }
             Matrix4x4 placed = world * Matrix4x4.Scale(new Vector3(1f, 1f, scale));
-            Matrix4x4 drawn = squash * placed * h.slab;   // as WeaponModels.Draw places it
-            if (Vector3.Dot(Vector3.Cross(drawn.GetColumn(0), drawn.GetColumn(1)), drawn.GetColumn(2)) < 0f)
+            Matrix4x4 model = placed * h.slab;
+            if (Vector3.Dot(Vector3.Cross(model.GetColumn(0), model.GetColumn(1)), model.GetColumn(2)) < 0f)
             {
-                drawn = drawn * Matrix4x4.Scale(new Vector3(1f, 1f, -1f));   // (a mirrored placing: its far side out, still solid)
+                model = model * Matrix4x4.Scale(new Vector3(1f, 1f, -1f));   // (a mirrored placing: its far side out, still solid)
             }
-            if (!onFigure || !SkinnedFigure.DrawJoined(model, R3DTextures.ModelTint(weapon), R3DTextures.ModelSwatch(weapon), drawn))
+            if (!onFigure || !SkinnedFigure.DrawJoined(info.Model, info.Tint, info.Swatch, model))
             {
-                WeaponModels.Draw(weapon, model, h, squash * placed);
+                Api.DrawModel(info.Model, Vector3.zero, 0f, model, info.Tint, info.Swatch);
             }
             tip = placed.MultiplyPoint3x4(h.tip);
             return true;
@@ -5009,7 +5166,7 @@ namespace M3AT
             {
                 if (worn[g] != null)
                 {
-                    Color colour = !skin.Tinted(g, worn[g]) ? Color.white : apparelColour != null ? apparelColour(worn[g]) : worn[g].DrawColor;
+                    Color colour = !skin.Tinted(g, worn[g]) ? Color.white : Api.ApparelColour(worn[g]);
                     Color? own = skin.ColourOf(g);
                     if (own.HasValue)
                     {
@@ -5031,7 +5188,7 @@ namespace M3AT
         private static bool TakesItsColour(Apparel a)
         {
             CompColorable dye = a.TryGetComp<CompColorable>();
-            return apparelColour == null || a.def.MadeFromStuff || (dye != null && dye.Active);
+            return a.def.MadeFromStuff || (dye != null && dye.Active);
         }
 
         private static Apparel[] wornBuffer;
@@ -5045,9 +5202,9 @@ namespace M3AT
                 wornBuffer = new Apparel[skin.Pieces];
             }
             SkinnedFigure.NextFigure();   // its own queues, so its outline isn't hidden by another chibi's body
-            fig.flash = HitFlash.Of(pawn);   // the game's red damage flash, on what it is drawn in (DrawMeshes, the face's layers)
+            fig.flash = HitFlash.Of(pawn, drawing != null && drawing.ForOtherMod);   // the game's red damage flash, on what it is drawn in (DrawMeshes, the face's layers)
             FaceLayers.Flash = fig.flash;
-            Color skinColour = pawn.Dead ? Corpses.Skin(pawn, pawn.story.SkinColor) : pawn.story.SkinColor;
+            Color skinColour = SkinOf(pawn);
             GarmentMask mask = WornGarments(pawn, wornBuffer);
             skin.Wearing(fig, mask, WearsGear(pawn, "pack"), PackScaleOf(size), PackScaleOf(size) * (skin.BorrowsPack(mask, wornBuffer) ? KidPackSize : 1f));
             if (skin.CarriesShield(mask))
@@ -5167,9 +5324,10 @@ namespace M3AT
             return e.dropped != 0 && e.bent < BendHold && Find.TickManager.TicksGame - e.droppedTick <= DropTicks;
         }
 
-        // What the pawn carries, as IsoRim draws it (Carried.Draw): a thing between the hands, its bottom on them and its
-        // middle at least LoadReach in front. A person this mod draws is first told where to go (holds): on the carrier's
-        // chest, in its carried_<kind> loop. The game then draws them from inside Carried.Draw (DrawHeld).
+        // What the pawn carries, as IsoRim draws it (Api.DrawCarried): a thing between the hands, its bottom on them and its
+        // middle at least LoadReach in front. A person this mod draws is drawn here (DrawHeld), on the carrier's chest in its
+        // carried_<kind> loop (holds): IsoRim would have the game draw them from inside its call, which comes back to the
+        // figure drawer while this one is busy, and IsoRim then draws its own figure.
         private static void DrawLoad(Pawn pawn, Thing load, Ease ease, SkinnedFigure.Posed fig, Vector3 at, float yaw, float size)
         {
             Vector3 wristR, wristL;
@@ -5178,7 +5336,7 @@ namespace M3AT
                 return;
             }
             Pawn held = HeldPawn(load);
-            ease.holding = held != null && HoldPerson(pawn, held.thingIDNumber, ease, fig, at, yaw, size, false) ? held.thingIDNumber : 0;
+            ease.holding = held != null && Handles(held) && HoldPerson(pawn, held.thingIDNumber, ease, fig, at, yaw, size, false) ? held.thingIDNumber : 0;
             Vector3 hands = (wristR + wristL) * 0.5f;
             hands.z = Mathf.Max(hands.z, LoadReach);
             // Eating standing, the meal sits on the left palm (between the wrist and the fingers' joint, lifted from the
@@ -5208,13 +5366,18 @@ namespace M3AT
             try
             {
                 Vector3 hold = at + Quaternion.AngleAxis(yaw, Vector3.up) * (hands * size);
+                Hold person;
                 if (held == null && ease.eatClip != null && ease.eat >= 0.5f)
                 {
                     DrawMeal(pawn, load, hold, yaw, eatenInHand ? handTurn : 0f);
                 }
+                else if (ease.holding != 0 && holds.TryGetValue(ease.holding, out person))
+                {
+                    DrawHeld(held, person);
+                }
                 else
                 {
-                    Carried.Draw(pawn, hold, yaw);
+                    Api.DrawCarried(pawn, hold, yaw);
                 }
             }
             finally
@@ -5223,9 +5386,10 @@ namespace M3AT
             }
         }
 
-        // A meal being eaten, drawn as IsoRim's Carried.Draw draws a carried item (on the table where the game's job
-        // puts it, else in the hand), but MealScale of its size (FoodScale if it isn't a meal) and turned MealTurn degrees about the vertical,
-        // plus turn (degrees, the hand holding it).
+        // A meal being eaten, drawn as IsoRim draws a carried item (on the table where the game's job puts it, else in the
+        // hand), as it shows items on the ground (Api.DrawItem: its model, else its sprite made solid), but MealScale of its
+        // size (FoodScale if it isn't a meal) and turned MealTurn degrees about the vertical, plus turn (degrees, the hand
+        // holding it).
         private static void DrawMeal(Pawn pawn, Thing meal, Vector3 hold, float yaw, float turn)
         {
             try
@@ -5240,23 +5404,13 @@ namespace M3AT
                     Building table = map != null && c.InBounds(map) ? c.GetEdifice(map) : null;
                     if (table != null && c != pawn.Position)
                     {
-                        hold.y = Forms.HeightOf(table);
+                        hold.y = Api.SurfaceHeight(table);
                     }
                 }
                 float share = meal.def.IsWithinCategory(DefDatabase<ThingCategoryDef>.GetNamedSilentFail("FoodMeals")) ? MealScale : FoodScale;
-                float scale = CarriedItemScale * share;
-                ThingForm form = Forms.For(meal.def);
-                if (form.form == Form3D.Model && form.model != null && form.model.HasModel)
+                if (!Api.DrawItem(meal, hold, yaw + MealTurn + turn, CarriedItemScale * share))
                 {
-                    Model m = form.model.Pick(meal);
-                    DynamicModels.Draw(m, hold, yaw + form.model.def.rotation + MealTurn + turn, Vector3.one * form.model.def.scale * scale,
-                        form.model.def.spriteTint ? SpriteColors.MeanFor(meal) : meal.DrawColor, R3DTextures.StuffSwatch(meal));
-                    return;
-                }
-                float thick = Mathf.Clamp(Forms.ItemThickness(meal.def), 0.04f, 0.2f) * share;
-                if (!SpriteSolids.DrawLying(meal, hold, thick, scale, MealTurn))
-                {
-                    Carried.Draw(pawn, hold, yaw);
+                    Api.DrawCarried(pawn, hold, yaw);
                 }
             }
             catch (Exception e)
@@ -5318,7 +5472,7 @@ namespace M3AT
         // A carried person (or corpse), in its carrier's arms or over its shoulder (Hold): the carried loop put on the
         // carrier's chest as posed, scaled about its hips by how much bigger or smaller it is than the carrier (a baby in an
         // adult's arms), so the hips stay where the arms hold them.
-        private static bool DrawHeld(Pawn pawn, Hold hold, ref bool __result)
+        private static bool DrawHeld(Pawn pawn, Hold hold)
         {
             try
             {
@@ -5338,10 +5492,9 @@ namespace M3AT
                 Log.Error(Tag + "drawing a carried chibi failed, IsoRim's figures are kept: " + e);
                 skin = null;
                 ready = false;
-                return true;
+                return false;
             }
-            __result = true;
-            return false;
+            return true;
         }
 
         // The whole move of a carried figure (DrawHeld): its carried loop on the carrier's chest as posed, scaled about its
@@ -5399,36 +5552,100 @@ namespace M3AT
             }
         }
 
-        // IsoRim People.Draw(pawn, drawLoc, neverAim): true when it drew the pawn as a figure.
-        public static bool DrawPrefix(Pawn pawn, Vector3 drawLoc, ref bool __result)
+        // The figure drawer (Api.AddFigureDrawer): asked for each person IsoRim would draw as a figure, after IsoRim's own
+        // gates (the 3D view and its options, hidden pawns, races drawn as cards, statues); true when the chibi drew it, and
+        // IsoRim then draws nothing of it. Until our materials can be made (IsoRim makes its own once the 3D view is up), or
+        // without them, IsoRim draws its own.
+        private static bool DrawFigure(FigureDrawContext ctx)
         {
-            if (!Handles(pawn) || !Ready())
+            Pawn pawn = ctx.Pawn;
+            if (!Handles(pawn) || !Ready() || (skin != null && !SkinnedFigure.MaterialsReady))
             {
+                return false;
+            }
+            FigureDrawContext was = drawing;
+            drawing = ctx;
+            try
+            {
+                return skin == null ? DrawBaked(ctx) : DrawSkinned(ctx);
+            }
+            finally
+            {
+                drawing = was;
+            }
+        }
+
+        private static FigureDrawContext drawing;   // the figure drawer's call being drawn, null outside it
+
+        // The aim each pawn's placing last gave (FigurePlacement.Aiming, AimGame, AimDrawn), by thingIDNumber, for what goes
+        // by it before this frame's placing is read (EaseOf, WeaponShows): IsoRim's aim, a frame behind at most, which the
+        // eases over it hide.
+        private struct AimSeen
+        {
+            public int frame;
+            public bool aiming;
+            public float game, drawn;
+        }
+
+        private static readonly Dictionary<int, AimSeen> aimsSeen = new Dictionary<int, AimSeen>();
+
+        // Whether the pawn is aiming as IsoRim's figure would (its stance busy with a ranged verb, aimed at the target as drawn),
+        // as its last placing said (within the last couple of frames: else not).
+        private static bool AimOf(Pawn pawn, out float aimGame, out float aimDrawn)
+        {
+            AimSeen seen;
+            if (pawn != null && aimsSeen.TryGetValue(pawn.thingIDNumber, out seen) && Time.frameCount - seen.frame <= 2 && seen.aiming)
+            {
+                aimGame = seen.game;
+                aimDrawn = seen.drawn;
                 return true;
             }
-            if (skin == null)
+            aimGame = aimDrawn = 0f;
+            return false;
+        }
+
+        private static void SawAim(Pawn pawn, FigurePlacement p)
+        {
+            aimsSeen[pawn.thingIDNumber] = new AimSeen { frame = Time.frameCount, aiming = p.Aiming, game = p.AimGame, drawn = p.AimDrawn };
+            if (aimsSeen.Count > 400)
             {
-                return DrawBaked(pawn, drawLoc, ref __result);
+                stale.Clear();
+                foreach (KeyValuePair<int, AimSeen> pair in aimsSeen)
+                {
+                    if (Time.frameCount - pair.Value.frame > 600)
+                    {
+                        stale.Add(pair.Key);
+                    }
+                }
+                for (int i = 0; i < stale.Count; i++)
+                {
+                    aimsSeen.Remove(stale[i]);
+                }
             }
+        }
+
+        // The skinned chibi: true when drawn.
+        private static bool DrawSkinned(FigureDrawContext ctx)
+        {
+            Pawn pawn = ctx.Pawn;
+            Vector3 drawLoc = ctx.DrawLoc;
             Hold hold;
-            // Carried, the carrier has just told them where to be (from inside Carried.Draw). Just set down, they are drawn
-            // with the rest of the map, before or after the carrier, so last frame's place will do.
+            // Just set down, they are drawn with the rest of the map, before or after the carrier, so last frame's place in
+            // its arms will do. (Carried, the carrier draws them itself, DrawLoad.)
             if (holds.TryGetValue(pawn.thingIDNumber, out hold) && (hold.frame == Time.frameCount || hold.released && hold.frame == Time.frameCount - 1))
             {
-                return DrawHeld(pawn, hold, ref __result);
+                return DrawHeld(pawn, hold);
             }
             float size = SizeOf(pawn);
             bool dead = pawn.Dead;
-            float lift = Carried.LiftOf(pawn, ref drawLoc);   // in mid-jump, or carried by a figure this mod does not draw
             float flight = skin.Has("jump") ? FlightOf(pawn) : -1f;
             // Hunkered down: flat on its front (duck_), posed where it lies, though the game has it lying. Putting out a fire
             // on itself the same way, rolling over (roll), though the game has it standing.
             bool hunkering = !dead && !pawn.Downed && (skin.Has("duck_R") && Hunkering(pawn) || skin.Has("roll") && Rolling(pawn));
             bool lying = !hunkering && (dead || pawn.GetPosture() != PawnPosture.Standing);
             bool crawling = lying && !dead && pawn.Crawling;
-            // Sitting: the game's shift up the screen taken out of drawLoc before the facing is tracked.
-            Poses.Seat seat = default(Poses.Seat);
-            bool seated = !lying && !hunkering && lift <= 0f && Poses.Seated(pawn, ref drawLoc, out seat);
+            // Sitting, as IsoRim has it (before the placing is read, for the facing only: the placing says).
+            bool seated = !lying && !hunkering && SeatUnder(pawn) != null;
             // Where it is between the walk (0) and the full run (groundPerCycle.Length - 1); the stride follows smoothly.
             Ease ease = EaseOf(pawn);
             float level = ease.run * (groundPerCycle.Length - 1);
@@ -5445,6 +5662,51 @@ namespace M3AT
             ease.duck = duck;
             bool diving = canDrop && !hunkering && skin.Has("dive_R") && skin.Has("prone_R") && DivesFromBlast(pawn, ease);
             float proneAt = canDrop && (diving || ease.proneAt > 0f) ? ProneOf(pawn, ease, diving) : 0f;
+            float wade = skin.Has("wade") ? Mathf.Clamp01(ease.depth / Shallow) : 0f;
+            float limp = ease.limpClip != null && skin.Has(ease.limpClip) ? ease.limp : 0f;
+            float ground = Mathf.Lerp(groundPerCycle[below], groundPerCycle[above], level - below);
+            float favouring = limp > 0f && ease.limpClip.StartsWith("hop_", StringComparison.Ordinal) ? hopGround : limpGround;
+            ground = crawling ? crawlGround : Mathf.Lerp(Mathf.Lerp(Mathf.Lerp(ground, favouring, limp), wadeGround, wade), swimGround, swim);
+            // Fighting hand to hand, it faces its foe, and casting its target; at work, it turns to face the work, as IsoRim's
+            // figure does. Aiming, it turns to face the aim as drawn, which IsoRim's placing does by itself (no face given);
+            // whether it aims is known from the last placing until this one is read. Between attacks the game drops the aim
+            // for a few ticks and faces a drafted pawn south, which would swing the figure round and back, so it keeps facing
+            // its last aim for AimHold.
+            int now = Find.TickManager.TicksGame;
+            float aimedGame, aimedDrawn;
+            bool aimedBefore = !dead && !lying && !ease.hipUsing && AimOf(pawn, out aimedGame, out aimedDrawn);
+            float? face = dead ? null : proneAt > 0f ? ease.proneYaw : duck > 0f && ease.duckFace.HasValue ? ease.duckFace : aimedBefore ? (float?)null
+                : !lying && ease.strikeClip != null && ease.strikeFace.HasValue ? ease.strikeFace
+                : !lying && ease.cast > 0f && ease.castFace.HasValue ? ease.castFace
+                : !lying && ease.hipUsing && ease.hipFace.HasValue ? ease.hipFace
+                : !lying && ease.work > 0f && ease.workKind != null ? ease.workFace
+                : !lying && !seated && ease.chatAt >= 0f && ease.chatFace.HasValue ? ease.chatFace
+                : !lying && !seated && ease.toss > 0f && ease.tossFace.HasValue ? ease.tossFace
+                : !lying && now - ease.aimTick <= AimHold ? ease.aimFace : (float?)null;
+            // IsoRim's placing of the figure (its tracker stepped by our stride, turned to our facing): where it stands, sits or
+            // lies, how high it is lifted (in mid-jump, or carried by a figure IsoRim draws), its yaw and stride.
+            FigurePlacement placed;
+            if (!ctx.ReadPlacement(new FigurePlacementOptions { Stride = ground * size, Face = face }, out placed))
+            {
+                return false;
+            }
+            if (placed.Situation == FigureSituation.Attached || placed.Situation == FigureSituation.InVat || placed.Situation == FigureSituation.Gibbet
+                || placed.Bones)
+            {
+                return false;   // IsoRim's own: on a host, upright in a vat, in a cage, gone to bones
+            }
+            SawAim(pawn, placed);
+            float lift = placed.Lift;
+            drawLoc.x = placed.Position.x;
+            drawLoc.z = placed.Position.z;
+            seated = placed.Situation == FigureSituation.Seated && !lying && !hunkering && lift <= 0f;
+            // The seat: its top, how far the game's own shift onto it has got, and the height IsoRim puts the feet at for that.
+            float seatLift = seated ? placed.Position.y - lift : 0f;
+            float seatAmount = seated ? SeatAmount(pawn, ctx.DrawLoc) : 0f;
+            float seatHeight = seatAmount > 1e-3f ? seatLift / seatAmount : 0f;
+            // What it lies on, as IsoRim lays its figure there: a bed's surface or its slot (a bunk's level), a couch, a
+            // corpse's shelf; the ground.
+            float lyingFloor = lying ? placed.Position.y - lift : 0f;
             bool limpFromProne = false;
             string limpPose = null;   // the clip it goes limp from, lying there
             if (lying && (ease.proneAt > 0f || wasDucked > 0f))
@@ -5515,38 +5777,25 @@ namespace M3AT
             {
                 DropDoll(pawn, ease);
             }
-            float wade = skin.Has("wade") ? Mathf.Clamp01(ease.depth / Shallow) : 0f;
-            float limp = ease.limpClip != null && skin.Has(ease.limpClip) ? ease.limp : 0f;
-            float ground = Mathf.Lerp(groundPerCycle[below], groundPerCycle[above], level - below);
-            float favouring = limp > 0f && ease.limpClip.StartsWith("hop_", StringComparison.Ordinal) ? hopGround : limpGround;
-            ground = crawling ? crawlGround : Mathf.Lerp(Mathf.Lerp(Mathf.Lerp(ground, favouring, limp), wadeGround, wade), swimGround, swim);
             float yaw, phase = 0f, gait = 0f, twist = 0f;
             bool aiming = false;
             if (dead)
             {
-                yaw = ease.fellYaw ?? pawn.Rotation.AsAngle + (Hashing.Unit(pawn.thingIDNumber, 3, 9) - 0.5f) * 60f;   // as IsoRim turns a corpse
+                yaw = ease.fellYaw ?? placed.Yaw;   // as IsoRim turns a corpse, unless it fell here
             }
             else
             {
-                // Aiming, it turns to face the aim as drawn, as IsoRim's figure does.
-                float aimGame, aimDrawn = 0f;
-                aiming = !lying && !ease.hipUsing && FigureWeapons.AimOf(pawn, false, out aimGame, out aimDrawn);
-                int now = Find.TickManager.TicksGame;
+                yaw = placed.Yaw;
+                phase = placed.StridePhase;
+                gait = placed.Gait;
+                float aimDrawn = placed.AimDrawn;
+                aiming = !lying && !ease.hipUsing && placed.Aiming;
                 if (aiming)
                 {
                     ease.aimFace = aimDrawn;
                     ease.aimTick = now;
+                    face = face ?? aimDrawn;
                 }
-                // Fighting hand to hand, it faces its foe, and casting its target; at work, it turns to face the work, as
-                // IsoRim's figure does. Between attacks the game drops the aim for a few ticks and faces a drafted pawn
-                // south, which would swing the figure round and back, so it keeps facing its last aim for AimHold.
-                float? face = proneAt > 0f ? ease.proneYaw : duck > 0f && ease.duckFace.HasValue ? ease.duckFace : aiming ? aimDrawn : !lying && ease.strikeClip != null && ease.strikeFace.HasValue ? ease.strikeFace
-                    : !lying && ease.cast > 0f && ease.castFace.HasValue ? ease.castFace
-                    : !lying && ease.hipUsing && ease.hipFace.HasValue ? ease.hipFace
-                    : !lying && ease.work > 0f && ease.workKind != null ? ease.workFace
-                    : !lying && !seated && ease.chatAt >= 0f && ease.chatFace.HasValue ? ease.chatFace
-                    : !lying && now - ease.aimTick <= AimHold ? ease.aimFace : (float?)null;
-                Animals.Track(pawn, drawLoc, lying && !crawling, ground * size, out yaw, out phase, out gait, face);
                 bool upright = !lying && !crawling && !seated && flight < 0f && swim <= 0f && rise <= 0f && proneAt <= 0f && duck <= 0f;
                 yaw = TurnedFor(pawn, ease, yaw, face, aiming, upright);
                 yaw = StepOf(ease, yaw, upright, gait, out twist);
@@ -5566,7 +5815,7 @@ namespace M3AT
                 SkinnedFigure.Posed fig = skin.For(pawn.thingIDNumber, shape);
                 float headHeight = skin.HeadHeight(shape);
                 float floor = 0f;   // cells: what it lies on
-                float sat = seated && skin.Has("sit") ? seat.amount : 0f;   // without the clip: standing on the seat
+                float sat = seated && skin.Has("sit") ? seatAmount : 0f;   // without the clip: standing on the seat
                 Matrix4x4 whole = Matrix4x4.identity;
                 ease.shownWork = 0f;   // (set below if it stands at work)
                 ease.armsOut = 0f;     // (and if it holds a weapon in the stance)
@@ -5589,57 +5838,32 @@ namespace M3AT
                 if (crawling)
                 {
                     // Face down, head first the way they go, tipped up by the game's crawl angle; the game's lurch is in
-                    // its drawn position. Other mods' turn or shift of the sprite go on top.
-                    float turn;
-                    Vector3 shift;
-                    if (BodyAnims.ReadCrawl(pawn, drawLoc, out shift, out turn))
-                    {
-                        yaw += turn;
-                        drawLoc += shift;
-                    }
+                    // its drawn position, and other mods' turn or shift of the sprite in IsoRim's placing.
                     skin.Add(fig, "crawl", phase / (2f * Mathf.PI), 1f);
                     whole = Matrix4x4.Translate(new Vector3(0f, 0f, -LieMiddle * headHeight))
-                        * Matrix4x4.Rotate(Quaternion.AngleAxis(90f - Crawl.ChestLift, Vector3.right));
+                        * Matrix4x4.Rotate(Quaternion.AngleAxis(90f - placed.ChestLift, Vector3.right));
                 }
                 else if (lying)
                 {
                     // On their back, head toward the south of the figure's own space before it is turned.
                     float along = LieMiddle * headHeight;
-                    Building_Bed bed = dead ? null : pawn.CurrentBed();
-                    Building holder = dead ? null : Glass.HolderOf(pawn);
-                    IThingHolderWithDrawnPawn drawnIn = pawn.ParentHolder as IThingHolderWithDrawnPawn;
-                    if (bed != null)
+                    // IsoRim's placing has the yaw and what it lies on: in a bed, along the bed, on its surface or the pawn's
+                    // own slot (a bunk's level; not tucked under the blanket, as IsoRim's bedding is too thin to hide the body
+                    // without it showing through); on the couch of a building that shows who is inside (gene extractor,
+                    // biosculpter pod), along the body angle the game draws them at, straining against a holding
+                    // platform's chains as the game does; else a corpse on a shelf, or the ground.
+                    bool inBed = placed.Situation == FigureSituation.InBed;
+                    bool onCouch = placed.Situation == FigureSituation.OnCouch;
+                    floor = lyingFloor;
+                    if (inBed)
                     {
-                        // In a bed the person's place is where their head is, and they lie along the bed.
-                        yaw = bed.Rotation.AsAngle;
-                        // On the bed's surface, or the pawn's own slot (a bunk's level), as IsoRim lays its figure. Not
-                        // tucked under the blanket: IsoRim's bedding is too thin to hide the body without it showing through.
-                        floor = Poses.SleeperHeight(pawn, bed);
-                        along = headHeight;
+                        along = headHeight;   // in a bed the person's place is where their head is
                     }
-                    else if (holder != null && drawnIn != null)
+                    else if (!onCouch && ease.fellYaw.HasValue)
                     {
-                        // On the couch of a building that shows who is inside (gene extractor, biosculpter pod), along the
-                        // body angle the game draws them at, straining against a holding platform's chains as the game does.
-                        yaw = drawnIn.HeldPawnBodyAngle + 180f;
-                        floor = Forms.HeightOf(holder);
-                        float swayAngle;
-                        Vector3 swayShift;
-                        if (holder is Building_HoldingPlatform && HoldingChains.Sway(pawn, out swayAngle, out swayShift))
-                        {
-                            yaw += swayAngle;
-                            drawLoc += swayShift;
-                        }
+                        yaw = ease.fellYaw.Value;   // lying where it fell, the way it fell
                     }
-                    else
-                    {
-                        floor = Corpses.RestHeight(pawn);   // a corpse on a shelf
-                        if (ease.fellYaw.HasValue)
-                        {
-                            yaw = ease.fellYaw.Value;   // lying where it fell, the way it fell
-                        }
-                    }
-                    string lieClip = LieClip(pawn, dead, bed != null, bed != null || (holder != null && drawnIn != null));
+                    string lieClip = LieClip(pawn, dead, inBed, inBed || onCouch);
                     float fallPhase;
                     float fall = FallOf(ease, out fallPhase);
                     // Gone limp where it lay hunkered: the ragdoll starts from that, posed where it lies, so not laid down.
@@ -5759,13 +5983,26 @@ namespace M3AT
                     string workClip = ease.workKind != null ? skin.Variant(WorkClipOf(ease.workKind), ease.workRoll) : null;
                     ease.toolKind = workClip != null ? workClip.Substring("work_".Length) : null;
                     float work = workClip != null && skin.Has(workClip) && sat <= 0f && !SeatedWork(ease.workKind) ? ease.work * (1f - ease.carry) * (1f - hunker) * (1f - reel) : 0f;
-                    skin.Add(fig, "idle", LoopPhase(pawn, "idle"), (1f - moving) * (1f - drafted) * (1f - sat) * (1f - hunker) * (1f - work) * (1f - daze) * (1f - reel) * up);
+                    // Pitching horseshoes or hoopstone: one underhand toss round each throw, the whole figure in place of
+                    // the idle (seated, from the waist up, below); between throws the idle.
+                    float tossing = ease.tossAt >= 0f && skin.Has("toss")
+                        ? ease.toss * TossWeight(ease.tossAt) * (1f - ease.carry) * (1f - ease.drafted) * (1f - hunker) * (1f - reel) * (1f - daze) * (1f - work) : 0f;
+                    float tossPhase = ease.tossAt * (skin.FramesOf("toss") - 1) / Mathf.Max(1, skin.FramesOf("toss"));
+                    skin.Add(fig, "idle", LoopPhase(pawn, "idle"), (1f - moving) * (1f - drafted) * (1f - sat) * (1f - hunker) * (1f - work) * (1f - daze) * (1f - reel) * (1f - tossing) * up);
+                    if (tossing > 0f)
+                    {
+                        skin.Add(fig, "toss", tossPhase, (1f - moving) * (1f - drafted) * (1f - sat) * tossing * up);
+                    }
                     skin.Add(fig, "daze", LoopPhase(pawn, "daze"), (1f - moving) * (1f - sat) * daze * up);
                     skin.Add(fig, reelClip, reelPhase, (1f - moving) * (1f - sat) * reel * up);
                     skin.Add(fig, "hunker", LoopPhase(pawn, "hunker"), (1f - moving) * (1f - drafted) * (1f - sat) * hunker * up);
                     if (work > 0f)
                     {
-                        skin.Add(fig, workClip, workClip == "work_pickaxe" ? PickPhase(pawn, ease, workClip) : LoopPhase(pawn, workClip), (1f - moving) * (1f - drafted) * work * up);
+                        float workPhase = workClip == "work_pickaxe" ? PickPhase(pawn, ease, workClip)
+                            : ease.workKind == "stomp" ? BeatPhase(pawn, ease, workClip, StompHit, 1)
+                            : ease.workKind == "pat" ? BeatPhase(pawn, ease, workClip, PatHit, PatHits)
+                            : LoopPhase(pawn, workClip);
+                        skin.Add(fig, workClip, workPhase, (1f - moving) * (1f - drafted) * work * up);
                     }
                     ease.shownWork = work * (1f - moving) * (1f - drafted) * up;
                     // Aiming: the weapon brought up out of the drafted stance and pointed at the target. Standing still,
@@ -5868,7 +6105,7 @@ namespace M3AT
                     // there, the hunch by how hurt.
                     if (ease.hurtClip != null && skin.Has(ease.hurtClip))
                     {
-                        float free = (1f - ease.drafted) * (1f - ease.carry) * (1f - bend) * (1f - ease.shownWork) * land;
+                        float free = (1f - ease.drafted) * (1f - ease.carry) * (1f - bend) * (1f - ease.shownWork) * (1f - tossing) * land;
                         skin.Over(fig, ease.hurtClip, LoopPhase(pawn, ease.hurtClip), ease.hurt * free, ease.hold * free);
                     }
                     // Cowering: hunched with both hands drawn up in front of the chest, from the waist up over the run (or
@@ -5886,7 +6123,11 @@ namespace M3AT
                     // Talking with the hands (a board game, a speech, now and then at a party) and rubbing them for
                     // warmth now and then while cold (only at leisure: AtLeisure): from the waist up over whatever the legs
                     // do, not while drafted, carrying, eating, working or bending.
-                    float idleHands = (1f - ease.drafted) * (1f - ease.carry) * (1f - bend) * (1f - ease.shownWork) * (1f - eat) * (1f - ease.cower) * land;
+                    float idleHands = (1f - ease.drafted) * (1f - ease.carry) * (1f - bend) * (1f - ease.shownWork) * (1f - eat) * (1f - ease.cower) * (1f - tossing) * land;
+                    if (tossing > 0f && sat > 0f)
+                    {
+                        skin.Over(fig, "toss", tossPhase, tossing * sat * (1f - bend) * land);
+                    }
                     float chat = BoutWeight(ease.chatAt);
                     if (skin.Has("talk") && (ease.talk > 0f || chat > 0f))
                     {
@@ -6019,11 +6260,11 @@ namespace M3AT
                 }
                 else if (sat > 0f)
                 {
-                    y = Mathf.Max(Mathf.Lerp(y, seat.height - skin.SeatOf(fig) * size, sat), -lowest * size);   // feet not through the floor
+                    y = Mathf.Max(Mathf.Lerp(y, seatHeight - skin.SeatOf(fig) * size, sat), -lowest * size);   // feet not through the floor
                 }
                 else if (seated)
                 {
-                    y += seat.Lift;
+                    y += seatLift;
                 }
                 else if (ease.depth > 0f || swim > 0f)
                 {
@@ -6083,12 +6324,14 @@ namespace M3AT
                     ease.lyingFrame = Time.frameCount;
                 }
                 bool inHands = false;
-                Thing load = pawn.carryTracker != null ? pawn.carryTracker.CarriedThing : null;
-                if (!lying && !crawling && flight < 0f && ease.dropped != 0 && Dropping(ease))
+                // Drawn for another mod (Api.DrawFigure: a portrait, a preview), without what it holds or carries.
+                bool forOther = ctx.ForOtherMod;
+                Thing load = pawn.carryTracker != null && !forOther ? pawn.carryTracker.CarriedThing : null;
+                if (!forOther && !lying && !crawling && flight < 0f && ease.dropped != 0 && Dropping(ease))
                 {
                     HoldPerson(pawn, ease.dropped, ease, fig, at, yaw, size, true);
                 }
-                if (!lying && !crawling && flight < 0f && load == null && ease.workKind == "play")
+                if (!forOther && !lying && !crawling && flight < 0f && load == null && ease.workKind == "play")
                 {
                     HoldBabyPlayed(pawn, ease, fig, at, yaw, size);
                 }
@@ -6096,12 +6339,12 @@ namespace M3AT
                 {
                     DrawLoad(pawn, load, ease, fig, at, yaw, size);
                 }
-                else if (!lying && !crawling && ease.stance != null && (ease.drawAt >= 0f ? DrawnShare(ease) > 0f : ease.drafted >= WeaponShown && WeaponShows(pawn)))
+                else if (!forOther && !lying && !crawling && ease.stance != null && (ease.drawAt >= 0f ? DrawnShare(ease) > 0f : ease.drafted >= WeaponShown && WeaponShows(pawn)))
                 {
                     DrawWeapon(pawn, ease.stance, aiming, fig, at, yaw, size, mask, ease);
                     inHands = true;
                 }
-                else if (!lying && !crawling && flight < 0f && ease.shownWork >= ToolShown)
+                else if (!forOther && !lying && !crawling && flight < 0f && ease.shownWork >= ToolShown)
                 {
                     DrawTool(pawn, ease.toolKind, fig, at, yaw, size);
                 }
@@ -6118,18 +6361,18 @@ namespace M3AT
                 Log.Error(Tag + "drawing the skinned chibi failed, IsoRim's figures are kept: " + e);
                 skin = null;
                 ready = false;   // the baked frames were not loaded
-                return true;
+                return false;
             }
-            __result = true;
-            return false;
+            return true;
         }
 
         // The baked frames: standing or walking only.
-        private static bool DrawBaked(Pawn pawn, Vector3 drawLoc, ref bool __result)
+        private static bool DrawBaked(FigureDrawContext ctx)
         {
+            Pawn pawn = ctx.Pawn;
             if (!Standing(pawn))
             {
-                return true;
+                return false;
             }
             float size = SizeOf(pawn);
             // The pose shows the nearest baked step between the walk and the full run; the stride follows smoothly.
@@ -6138,9 +6381,13 @@ namespace M3AT
             int below = Mathf.Min(Mathf.FloorToInt(level), groundPerCycle.Length - 1);
             int above = Mathf.Min(below + 1, groundPerCycle.Length - 1);
             float ground = Mathf.Lerp(groundPerCycle[below], groundPerCycle[above], level - below);
-            float yaw, phase, gait;
-            Animals.Track(pawn, drawLoc, false, ground * size, out yaw, out phase, out gait);
-            Vector3 at = new Vector3(drawLoc.x, Lift * size, drawLoc.z);
+            FigurePlacement placed;
+            if (!ctx.ReadPlacement(new FigurePlacementOptions { Stride = ground * size }, out placed) || placed.Situation != FigureSituation.Standing)
+            {
+                return false;
+            }
+            float yaw = placed.Yaw, phase = placed.StridePhase, gait = placed.Gait;
+            Vector3 at = new Vector3(placed.Position.x, Lift * size, placed.Position.z);
             ModelHandle model = idle;
             FaceLayers.Patch face = idleFace;
             if (gait >= WalkingGait)
@@ -6153,8 +6400,7 @@ namespace M3AT
             }
             Api.DrawModel(model, at, yaw, new Vector3(size, size, size), pawn.story.SkinColor);
             FaceLayers.Draw(pawn, face, at, yaw, size);
-            __result = true;
-            return false;
+            return true;
         }
     }
 }

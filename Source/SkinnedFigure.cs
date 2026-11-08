@@ -57,7 +57,7 @@ namespace M3AT
     public sealed partial class SkinnedFigure
     {
         private const string Tag = "[M3AT] ";
-        private const float OutlineWidth = 0.03f;   // cells, as IsoRim's ModelLibrary.OutlineWidth (used if it can't be read)
+        private const float OutlineWidth = 0.03f;   // cells, as IsoRim's models' outline (Api.OutlineWidth)
         // Cells the outline shell is pushed away from the camera (IsoRim pushes its moving models' by View3D.OutlinePush,
         // 0.2, to hide the shell where one part tucks into another). The chibi's needn't hide anything over its own body:
         // MarusOutline is drawn only where the body, garments and hair haven't set stencil bit 64, so it is the silhouette
@@ -262,12 +262,24 @@ namespace M3AT
             return holds.TryGetValue(kind, out h) ? h : null;
         }
 
+        // One mesh drawn with one material (Api.SubmitFigureMesh, DrawMeshes): an outline shell (left out with the outlines
+        // off, never flashing), and whether IsoRim's light pass for the material is drawn with it (lit: a material set up by
+        // Api.ConfigureFigureMaterial with one, as the solid's and IsoRim's own are; a textured piece's and the outline's light
+        // passes are parts of their own).
+        internal sealed class MeshPart
+        {
+            public Mesh mesh;
+            public Material material;
+            public bool outline;
+            public bool lit;
+        }
+
         // One piece's posed meshes for one pawn.
         internal class PieceMeshes
         {
             public Mesh solid;
             public Mesh outline;
-            public readonly List<DynamicModels.Part> parts = new List<DynamicModels.Part>();
+            public readonly List<MeshPart> parts = new List<MeshPart>();
             public Vector3[] verts;
             public Vector3[] hulled;
             public Vector3[] normals;
@@ -1263,12 +1275,11 @@ namespace M3AT
             }
         }
 
-        // The outline hull of a rest pose, per vertex, by IsoRim's own ModelLibrary.BuildHull (internal: by reflection)
-        // so the outline matches its models; if that can't be reached, the mean of the face normals round each vertex.
+        // The outline hull of a rest pose, per vertex: the mean of the face normals round each vertex, OutlineWidth long.
+        // (This looked for IsoRim's mitred hull by reflection on the wrong class, so the mean is what was always drawn;
+        // Api.BuildOutlineHull is the mitred one, should the look ever be wanted.)
         private static Vector3[] Hull(Vector3[] pos, int[] tris)
         {
-            Vector3[] soupPos = new Vector3[tris.Length];
-            Vector3[] soupNormal = new Vector3[tris.Length];
             Vector3[] mean = new Vector3[pos.Length];
             for (int i = 0; i + 2 < tris.Length; i += 3)
             {
@@ -1276,30 +1287,8 @@ namespace M3AT
                 Vector3 n = Vector3.Cross(b - a, c - a).normalized;
                 for (int k = 0; k < 3; k++)
                 {
-                    soupPos[i + k] = pos[tris[i + k]];
-                    soupNormal[i + k] = n;
                     mean[tris[i + k]] += n;
                 }
-            }
-            try
-            {
-                MethodInfo build = AccessTools.Method(typeof(ModelLibrary), "BuildHull");
-                FieldInfo widthField = AccessTools.Field(typeof(ModelLibrary), "OutlineWidth");
-                float width = widthField != null ? (float)widthField.GetValue(null) : OutlineWidth;
-                if (build != null)
-                {
-                    Vector3[] soupHull = (Vector3[])build.Invoke(null, new object[] { soupPos, soupNormal, width });
-                    Vector3[] hull = new Vector3[pos.Length];
-                    for (int i = 0; i < tris.Length; i++)
-                    {
-                        hull[tris[i]] = soupHull[i];
-                    }
-                    return hull;
-                }
-            }
-            catch (Exception e)
-            {
-                Log.Warning(Tag + "IsoRim's outline hull could not be used, a plain one is: " + e.Message);
             }
             for (int i = 0; i < mean.Length; i++)
             {
@@ -1570,32 +1559,32 @@ namespace M3AT
                 {
                     if (m != null)
                     {
-                        DynamicModels.Retire(m.solid);
-                        DynamicModels.Retire(m.outline);
+                        Api.RetireMesh(m.solid);
+                        Api.RetireMesh(m.outline);
                     }
                 }
                 if (p.hair != null)
                 {
-                    DynamicModels.Retire(p.hair.solid);
-                    DynamicModels.Retire(p.hair.outline);
+                    Api.RetireMesh(p.hair.solid);
+                    Api.RetireMesh(p.hair.outline);
                 }
                 if (p.beard != null)
                 {
-                    DynamicModels.Retire(p.beard.solid);
-                    DynamicModels.Retire(p.beard.outline);
+                    Api.RetireMesh(p.beard.solid);
+                    Api.RetireMesh(p.beard.outline);
                 }
                 RetireEars(p);
                 RetireHorns(p);
                 RetireTail(p);
                 if (p.face != null)
                 {
-                    DynamicModels.Retire(p.face.face);
-                    DynamicModels.Retire(p.face.mouth);
-                    DynamicModels.Retire(p.face.mouthLow);
+                    Api.RetireMesh(p.face.face);
+                    Api.RetireMesh(p.face.mouth);
+                    Api.RetireMesh(p.face.mouthLow);
                 }
                 if (p.wounds != null)
                 {
-                    DynamicModels.Retire(p.wounds.mesh);
+                    Api.RetireMesh(p.wounds.mesh);
                 }
                 posed.Remove(stale[i]);
             }
@@ -1648,8 +1637,8 @@ namespace M3AT
                 // or colours are set). The outline keeps every triangle, so the glass is inside the silhouette.
                 m.solid.SetTriangles(piece.shellTris, 0, false);
             }
-            m.parts.Add(new DynamicModels.Part { mesh = m.solid, material = SolidMaterial(), outline = false });
-            m.parts.Add(new DynamicModels.Part { mesh = m.outline, material = OutlineMaterial(), outline = true });
+            m.parts.Add(new MeshPart { mesh = m.solid, material = SolidMaterial(), outline = false });
+            m.parts.Add(new MeshPart { mesh = m.outline, material = OutlineMaterial(), outline = true });
             return m;
         }
 
@@ -1658,7 +1647,7 @@ namespace M3AT
             List<Vector3> tags = new List<Vector3>(verts.Length);
             for (int i = 0; i < verts.Length; i++)
             {
-                tags.Add(RoofClip.MovingTag);   // clipped under the roof over where it is drawn, as IsoRim's moving models are
+                tags.Add(Api.MovingMeshTag);   // clipped under the roof over where it is drawn, as IsoRim's moving models are
             }
             Mesh m = new Mesh();
             m.MarkDynamic();
@@ -3250,7 +3239,7 @@ namespace M3AT
                 if (!m.textureMarked && g.mark != null)
                 {
                     // The same mesh again in its light pass, drawn with the same matrix by DrawParts.
-                    m.parts.Add(new DynamicModels.Part { mesh = m.solid, material = g.mark, outline = false });
+                    m.parts.Add(new MeshPart { mesh = m.solid, material = g.mark, outline = false });
                     m.textureMarked = true;
                 }
                 DrawMeshes(p, m, g.rest.Length, textured, position, yaw, size, tint, null, default(Color), null, default(Color), tint * g.mean);
@@ -3370,27 +3359,30 @@ namespace M3AT
         // then left out: the face shows through an open visor).
         private static Material GlassMaterial()
         {
-            if (glassMaterial != null || R3DMaterials.LitModel == null)
+            if (glassMaterial != null || glassTried)
             {
                 return glassMaterial;
             }
-            if (!glassTried)
+            ShaderDef def = DefDatabase<ShaderDef>.GetNamedSilentFail(GlassDef);
+            if (def == null || def.Shader == null)
             {
                 glassTried = true;
-                ShaderDef def = DefDatabase<ShaderDef>.GetNamedSilentFail(GlassDef);
-                if (def == null || def.Shader == null)
-                {
-                    Log.Warning(Tag + "the " + GlassDef + " shader is missing, so helmet visors are drawn without their glass.");
-                    return null;
-                }
-                Material m = new Material(def.Shader);
-                m.name = "Marus_Glass";
-                m.color = GlassColour;
-                m.SetFloat("_Glass", 1f);
-                m.SetFloat("_LightMode", R3DMaterials.LightModel);
-                m.SetFloat("_ShadeBands", ShadeBands);
-                glassMaterial = m;
+                Log.Warning(Tag + "the " + GlassDef + " shader is missing, so helmet visors are drawn without their glass.");
+                return null;
             }
+            Material m = new Material(def.Shader);
+            m.name = "Marus_Glass";
+            m.color = GlassColour;
+            m.SetFloat("_Glass", 1f);
+            m.SetFloat("_ShadeBands", ShadeBands);
+            if (!Api.ConfigureFigureMaterial(m, FigureMaterialKind.Unlit))
+            {
+                return null;   // IsoRim's materials aren't made yet: again next time
+            }
+            // The model curve, but no light pass of its own: the head's and the helmet's behind it light it (DrawVisor).
+            m.SetFloat("_LightMode", LightModelCurve);
+            m.SetFloat("_GlowMode", GlowOverlay);
+            glassMaterial = m;
             return glassMaterial;
         }
 
@@ -3524,15 +3516,15 @@ namespace M3AT
             {
                 if (p.hair != null)
                 {
-                    DynamicModels.Retire(p.hair.solid);
-                    DynamicModels.Retire(p.hair.outline);
+                    Api.RetireMesh(p.hair.solid);
+                    Api.RetireMesh(p.hair.outline);
                 }
                 p.hair = NewPieceMeshes(hair);
                 p.hair.tinted = false;
                 if (hair.mark != null)
                 {
                     // The same mesh again in the light pass, drawn with the same matrix by DrawParts.
-                    p.hair.parts.Add(new DynamicModels.Part { mesh = p.hair.solid, material = hair.mark, outline = false });
+                    p.hair.parts.Add(new MeshPart { mesh = p.hair.solid, material = hair.mark, outline = false });
                 }
                 p.hairPiece = hair;
             }
@@ -3560,14 +3552,14 @@ namespace M3AT
             {
                 if (p.beard != null)
                 {
-                    DynamicModels.Retire(p.beard.solid);
-                    DynamicModels.Retire(p.beard.outline);
+                    Api.RetireMesh(p.beard.solid);
+                    Api.RetireMesh(p.beard.outline);
                 }
                 p.beard = NewPieceMeshes(beard);
                 p.beard.tinted = false;
                 if (beard.mark != null)
                 {
-                    p.beard.parts.Add(new DynamicModels.Part { mesh = p.beard.solid, material = beard.mark, outline = false });
+                    p.beard.parts.Add(new MeshPart { mesh = p.beard.solid, material = beard.mark, outline = false });
                 }
                 p.beardPiece = beard;
             }
@@ -3592,6 +3584,28 @@ namespace M3AT
             return t;
         }
 
+        // A colour times shade, as IsoRim shades its models' vertex colours (Api.ModelVertexColour).
+        private static Color32 Shade(Color c, float shade)
+        {
+            return new Color32((byte)Mathf.Clamp(c.r * shade * 255f, 0f, 255f), (byte)Mathf.Clamp(c.g * shade * 255f, 0f, 255f),
+                (byte)Mathf.Clamp(c.b * shade * 255f, 0f, 255f), 255);
+        }
+
+        // IsoRim's outline shade (its models' outlines are their tint times this), read from Api.ModelVertexColour.
+        private static float LineShade
+        {
+            get
+            {
+                if (lineShade < 0f)
+                {
+                    Color32 solidWhite = Api.ModelVertexColour(Color.white, false), lineWhite = Api.ModelVertexColour(Color.white, true);
+                    lineShade = solidWhite.r > 0 ? lineWhite.r / (float)solidWhite.r : 0.25f;
+                }
+                return lineShade;
+            }
+        }
+        private static float lineShade = -1f;
+
         private static bool Same(Color32 a, Color32 b)
         {
             return a.r == b.r && a.g == b.g && a.b == b.b;
@@ -3614,10 +3628,10 @@ namespace M3AT
                 m.scalp = scalp;
                 m.scalpTint = st;
                 m.tinted = true;
-                Color32[] colours = Fill(R3DMaterials.Shaded(t, 1f), n);
+                Color32[] colours = Fill(Shade(t, 1f), n);
                 if (scalp != null)
                 {
-                    Color32 under = R3DMaterials.Shaded(st, ScalpShade);
+                    Color32 under = Shade(st, ScalpShade);
                     for (int i = 0; i < n && i < scalp.Length; i++)
                     {
                         if (scalp[i])
@@ -3627,11 +3641,11 @@ namespace M3AT
                     }
                 }
                 m.solid.colors32 = colours;
-                Color32 line = R3DMaterials.Shaded(lt, ModelBaker.OutlineShade);
+                Color32 line = Shade(lt, LineShade);
                 Color32[] lines = Fill(line, m.hulled.Length);
                 if (shell != null && shell.skinVert != null)
                 {
-                    Color32 skinLine = R3DMaterials.Shaded(sk, ModelBaker.OutlineShade);
+                    Color32 skinLine = Shade(sk, LineShade);
                     for (int i = 0; i < lines.Length; i++)
                     {
                         if (shell.skinVert[i])
@@ -3651,14 +3665,14 @@ namespace M3AT
             {
                 // The outline again in its light pass, drawn with the same matrix by DrawParts.
                 m.outlineMarkAt = m.parts.Count;
-                m.parts.Add(new DynamicModels.Part { mesh = m.outline, material = outlineMark, outline = true });
+                m.parts.Add(new MeshPart { mesh = m.outline, material = outlineMark, outline = true });
             }
             if (m.outlineMarkAt >= 0)
             {
                 // Set each draw, as the option can change: each outline's push has its own light pass, to meet it exactly.
                 m.parts[m.outlineMarkAt].material = Silhouette ? outlineMark : linesMark;
             }
-            List<DynamicModels.Part> parts = m.parts;
+            List<MeshPart> parts = m.parts;
             bool skipAfter = m.afterAt >= 0 && (!OcclusionShows || (ClothesOcclusion && !m.isSkin));
             if (!Outlines || skipAfter)
             {
@@ -3679,31 +3693,7 @@ namespace M3AT
             {
                 return;
             }
-            if (m.gpuShape != null)
-            {
-                DrawSkinned(parts, position, yaw, local, BlockOf(p));
-            }
-            else
-            {
-                // Without IsoRim's cull part by part, which goes by each mesh's own box (FigureOnScreen culled it whole). A
-                // hit flash goes through IsoRim's own (HitFlash.Begin), which its Submit gives every solid part.
-                bool cullWas = Cull.Enabled;
-                Cull.Enabled = false;
-                bool flashWas;
-                bool flashing = HitFlash.Begin(p.flash, out flashWas);
-                try
-                {
-                    DynamicModels.DrawParts(parts, position, yaw, local);
-                }
-                finally
-                {
-                    Cull.Enabled = cullWas;
-                    if (flashing)
-                    {
-                        HitFlash.End(flashWas);
-                    }
-                }
-            }
+            DrawParts(parts, position, yaw, local, m.gpuShape != null ? BlockOf(p) : null, p.flash);
         }
 
         public static bool ClothesOcclusion   // true: IsoRim's ambient occlusion and screen-space shadows show on clothes and hair, never the skin (the mod's options set it)
@@ -3719,104 +3709,105 @@ namespace M3AT
         {
             get { return SettingsMod.Settings == null || SettingsMod.Settings.silhouetteOutlines; }
         }
-        private static readonly List<DynamicModels.Part> solidParts = new List<DynamicModels.Part>();
+        private static readonly List<MeshPart> solidParts = new List<MeshPart>();
 
         private static Material outline, outlineMark;   // the silhouette
         private static Material lines, linesMark;       // and the outline with lines over the body (Silhouette off)
         private static bool outlineTried;
 
-        // The outline's material: ours (MarusOutline, or MarusOutlineLines with Silhouette off) with its light pass
-        // (outlineMark, linesMark), made once IsoRim has made its
-        // own, set up as IsoRim sets up OutlineMoving (unlit: the vertex colour is the line's shade already; pushed away
-        // from the camera by OutlinePush). IsoRim's OutlineMoving if ours can't be made; null until IsoRim's exist.
+        // The outline's material (MarusOutline, or MarusOutlineLines with Silhouette off) with its light pass (outlineMark,
+        // linesMark), made once IsoRim has made its own materials, set up as IsoRim's moving outlines (unlit: the vertex colour
+        // is the line's shade already; pushed away from the camera by OutlinePush, or IsoRim's push for the lines), but lit
+        // at night by its own light pass, a part of its own (DrawMeshes). Null until then, or without the shaders (the
+        // figure is then left to IsoRim, WalkFigures.MaterialsReady).
         private static Material OutlineMaterial()
         {
-            Material theirs = R3DMaterials.OutlineMoving;
-            if (theirs == null)
+            if (!outlineTried && outline == null)
             {
-                return null;
-            }
-            if (!outlineTried)
-            {
-                outlineTried = true;
                 ShaderDef def = DefDatabase<ShaderDef>.GetNamedSilentFail(OutlineDef);
                 ShaderDef linesDef = DefDatabase<ShaderDef>.GetNamedSilentFail(OutlineLinesDef);
                 ShaderDef markDef = DefDatabase<ShaderDef>.GetNamedSilentFail(OutlineMarkDef);
                 if (def == null || def.Shader == null || linesDef == null || linesDef.Shader == null || markDef == null || markDef.Shader == null)
                 {
-                    Log.Warning(Tag + "the " + OutlineDef + " shaders are missing, so the chibi's outlines are IsoRim's (lit by the game's overlay at night).");
+                    outlineTried = true;
+                    Log.Warning(Tag + "the " + OutlineDef + " shaders are missing, so IsoRim draws its own figures.");
+                    return null;
                 }
-                else
+                Material o = OutlineWith(def.Shader, "Marus_Outline", OutlinePush, false);
+                if (o == null)
                 {
-                    outline = OutlineWith(def.Shader, "Marus_Outline", OutlinePush);
-                    outlineMark = OutlineMarkWith(markDef.Shader, "Marus_Outline_Mark", OutlinePush);
-                    // IsoRim's push: it is what hides this outline where one part tucks into another.
-                    lines = OutlineWith(linesDef.Shader, "Marus_Outline_Lines", View3D.OutlinePush);
-                    linesMark = OutlineMarkWith(markDef.Shader, "Marus_Outline_Lines_Mark", View3D.OutlinePush);
+                    return null;   // IsoRim's materials aren't made yet: again next time
                 }
+                outlineMark = OutlineWith(markDef.Shader, "Marus_Outline_Mark", OutlinePush, true);
+                // IsoRim's push: it is what hides this outline where one part tucks into another.
+                lines = OutlineWith(linesDef.Shader, "Marus_Outline_Lines", Api.OutlinePush, false);
+                linesMark = OutlineWith(markDef.Shader, "Marus_Outline_Lines_Mark", Api.OutlinePush, true);
+                outline = o;
+                outlineTried = true;
             }
-            Material ours = Silhouette ? outline : lines;
-            return ours != null ? ours : theirs;
+            return Silhouette ? outline : lines;
         }
 
-        private static Material OutlineWith(Shader shader, string name, float push)
+        // One of the outline's materials, set up by IsoRim as an outline (or a light pass's as unlit), then given the figure
+        // shader contract's settings it needs here: its push, own-cell light (by the light pass drawn as a part of its own)
+        // and, for that pass, _MarkPass. Null until IsoRim's materials exist.
+        private static Material OutlineWith(Shader shader, string name, float push, bool mark)
         {
             Material m = new Material(shader);
             m.name = name;
+            if (!Api.ConfigureFigureMaterial(m, mark ? FigureMaterialKind.Unlit : FigureMaterialKind.Outline))
+            {
+                return null;
+            }
             m.SetFloat("_LightMode", 0f);
             m.SetFloat("_OutlinePush", push);
-            m.SetFloat("_GlowMode", IsoGlow.OwnCell);
+            m.SetFloat("_GlowMode", GlowOwnCell);
+            if (mark)
+            {
+                m.SetFloat("_MarkPass", 1f);
+            }
             return m;
         }
 
-        private static Material OutlineMarkWith(Shader shader, string name, float push)
-        {
-            Material m = OutlineWith(shader, name, push);
-            m.SetFloat("_MarkPass", 1f);
-            return m;
-        }
+        // The figure shader contract's (Docs/Api.md part 43) values: the model light curve, and own-cell light by a light pass.
+        private const float LightModelCurve = 1f, GlowOwnCell = 1f, GlowOverlay = 0f;
 
         private static Material smooth;
         private static bool smoothTried;
 
-        // The solid copy's material: ours (MarusSmooth) with SmoothShading, made once IsoRim has made its own, set up as
-        // IsoRim sets up LitModel (the model curve, and the light of its own cell at night by IsoRim's light pass);
-        // IsoRim's LitModel without SmoothShading or if ours can't be made. Null until IsoRim's materials exist.
+        // The solid copy's material (MarusSmooth), made once IsoRim has made its own and set up as a moving model's (the model
+        // curve, the light of its own cell at night by IsoRim's light pass, given MarusSmooth's own program, SkinMarkShader,
+        // as the graphics card may pose the mesh). Null until then, or without the shader (the figure is then left to IsoRim).
         private static Material SolidMaterial()
         {
-            Material lit = R3DMaterials.LitModel;
-            if (!SmoothShading || lit == null)
+            if (smooth != null || smoothTried)
             {
-                return lit;
+                return smooth;
             }
-            if (!smoothTried)
+            ShaderDef def = DefDatabase<ShaderDef>.GetNamedSilentFail(SmoothDef);
+            Shader shader = def != null ? def.Shader : null;
+            if (shader == null)
             {
                 smoothTried = true;
-                try
-                {
-                    ShaderDef def = DefDatabase<ShaderDef>.GetNamedSilentFail(SmoothDef);
-                    Shader shader = def != null ? def.Shader : null;
-                    if (shader == null)
-                    {
-                        Log.Warning(Tag + "the " + SmoothDef + " shader is missing, so the chibi keeps IsoRim's flat shading.");
-                    }
-                    else
-                    {
-                        Material m = new Material(shader);
-                        m.name = "Marus_Smooth";
-                        m.SetFloat("_LightMode", R3DMaterials.LightModel);
-                        m.SetFloat("_ShadeBands", ShadeBands);
-                        IsoGlow.Use(m, IsoGlow.OwnCell);
-                        SkinMark(m);
-                        smooth = m;
-                    }
-                }
-                catch (Exception e)
-                {
-                    Log.Warning(Tag + "the smooth shading could not be set up, so the chibi keeps IsoRim's flat shading: " + e.Message);
-                }
+                Log.Warning(Tag + "the " + SmoothDef + " shader is missing, so IsoRim draws its own figures.");
+                return null;
             }
-            return smooth != null ? smooth : lit;
+            Material m = new Material(shader);
+            m.name = "Marus_Smooth";
+            m.SetFloat("_ShadeBands", ShadeBands);
+            if (!Api.ConfigureFigureMaterial(m, FigureMaterialKind.Solid, SkinMarkShader()))
+            {
+                return null;   // IsoRim's materials aren't made yet: again next time
+            }
+            smooth = m;
+            return smooth;
+        }
+
+        // Whether the figure's own materials can be had now: IsoRim's are made (after the 3D view first comes up) and ours'
+        // shaders are there. Until then (or for good, a shader missing) IsoRim draws its own figures.
+        public static bool MaterialsReady
+        {
+            get { return SolidMaterial() != null && OutlineMaterial() != null; }
         }
 
         // The name a HairDef's hair goes by: its texPath, less HairTextures when it starts with that.
@@ -3912,7 +3903,7 @@ namespace M3AT
             Material flat = FlatBeardOf(style);
             if (flat != null)
             {
-                FaceLayers.DrawFlat(p.face, flat, R3DMaterials.Shaded(Rounded(tint), 1f), position, yaw, size);
+                FaceLayers.DrawFlat(p.face, flat, Shade(Rounded(tint), 1f), position, yaw, size);
             }
         }
 
@@ -3927,7 +3918,7 @@ namespace M3AT
             Material mat = RidgesMaterial(design);
             if (mat != null)
             {
-                FaceLayers.DrawFlat(p.face, mat, R3DMaterials.Shaded(Rounded(tint), 1f), position, yaw, size);
+                FaceLayers.DrawFlat(p.face, mat, Shade(Rounded(tint), 1f), position, yaw, size);
             }
         }
 
@@ -4277,7 +4268,7 @@ namespace M3AT
         // A textured garment's is made the same way.
         private static Material TexturedMaterial(Piece hair)
         {
-            if (hair.material != null || R3DMaterials.LitModel == null)
+            if (hair.material != null)
             {
                 return hair.material;
             }
@@ -4301,20 +4292,27 @@ namespace M3AT
             {
                 return null;
             }
+            // Set up by IsoRim as unlit (no light pass of IsoRim's: ours is drawn as a part of its own), then given the figure
+            // shader contract's model curve and own-cell light.
             Material m = new Material(hairShader);
             m.name = hair.texture.name;
             m.mainTexture = hair.texture;
-            m.SetFloat("_LightMode", R3DMaterials.LightModel);
             m.SetFloat("_ShadeBands", ShadeBands);
-            m.SetFloat("_GlowMode", hairMarkShader != null ? IsoGlow.OwnCell : IsoGlow.None);
+            if (!Api.ConfigureFigureMaterial(m, FigureMaterialKind.Unlit))
+            {
+                return null;   // IsoRim's materials aren't made yet: again next time
+            }
+            m.SetFloat("_LightMode", LightModelCurve);
+            m.SetFloat("_GlowMode", hairMarkShader != null ? GlowOwnCell : GlowOverlay);
             if (hairMarkShader != null)
             {
                 Material mark = new Material(hairMarkShader);
                 mark.name = m.name + "_Mark";
                 mark.mainTexture = hair.texture;
-                mark.SetFloat("_LightMode", R3DMaterials.LightModel);
                 mark.SetFloat("_ShadeBands", ShadeBands);
-                mark.SetFloat("_GlowMode", IsoGlow.OwnCell);
+                Api.ConfigureFigureMaterial(mark, FigureMaterialKind.Unlit);
+                mark.SetFloat("_LightMode", LightModelCurve);
+                mark.SetFloat("_GlowMode", GlowOwnCell);
                 mark.SetFloat("_MarkPass", 1f);
                 hair.mark = mark;
             }

@@ -333,6 +333,18 @@ vec3 GlowLight(vec4 g)
 // _IsoFadeFrom, wrapping round (floors with overlapping ranges cover each other only there).
 const float FadeBayer[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
 
+// The direction from a fragment at p (true space) toward the camera, as IsoRim's IsoRimSolid.frag.glsl has it (M229).
+// Perspective and first person (_IsoEye.w 1): toward the eye, so it changes across the screen; orthographic: the camera's
+// own direction (_IsoView), the same everywhere. The camera's axis is no use with perspective: at yaws of 90 and 270 degrees
+// it lies exactly in the plane of the axis-aligned side faces, so the face normal's turn flipped from pixel to pixel.
+vec3 ToEye(vec3 p)
+{
+    vec4 eye = uMaterial._IsoEye;
+    if (eye.w > 0.5)
+        return vec3(eye.x, eye.y * uMaterial._IsoView.w, eye.z) - p;
+    return uMaterial._IsoView.xyz;
+}
+
 bool FadeDrop()
 {
     float keep = uMaterial._IsoFade;
@@ -350,7 +362,7 @@ void main()
     vec3 n = cross(dFdx(p), dFdy(p));
     float len = length(n);
     n = len > 1e-20 ? n / len : vec3(0.0, 1.0, 0.0);
-    if (dot(n, uMaterial._IsoView.xyz) < 0.0)
+    if (dot(n, ToEye(p)) < 0.0)
         n = -n;
     vec3 faceNormal = n;   // the exact face normal, turned toward the camera
     // The smooth sun shade, in true space (the squash undone). The face normal stands in if the mesh has no normals.
@@ -373,7 +385,7 @@ void main()
 
     if (uMaterial._Glass > 0.5)
     {
-        vec3 view = normalize(uMaterial._IsoView.xyz);
+        vec3 view = normalize(ToEye(p));
         vec3 gn = snLen > 1e-6 ? sn / snLen : n;
         if (dot(gn, view) < 0.0)
             gn = -gn;

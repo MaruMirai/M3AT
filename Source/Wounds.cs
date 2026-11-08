@@ -121,12 +121,9 @@ namespace M3AT
                 {
                     return;
                 }
-                // The whole map is drawn squashed flat (IsoRim's View3D); the height is divided by the same here.
-                float s = Api.HeightSquash;
-                Matrix4x4 placed = Matrix4x4.Translate(new Vector3(position.x, position.y / s, position.z))
-                    * Matrix4x4.Scale(new Vector3(1f, 1f / s, 1f))
-                    * Matrix4x4.TRS(Vector3.zero, Quaternion.AngleAxis(yaw, Vector3.up), new Vector3(size, size, size));
-                Graphics.DrawMesh(mesh, Floors.DrawnMatrix(placed), material, 0, null, 0, FaceLayers.BlockFor(SkinnedFigure.SmoothShading, 0));
+                // (The block's hit flash, which the wounds' mode leaves off, is the face's, as they share it.)
+                Api.SubmitFigureMesh(mesh, material, FaceLayers.PlacedAt(position, yaw, size), FaceLayers.BlockFor(SkinnedFigure.SmoothShading, 0),
+                    FigureMeshFlags.NoCull, 0, FaceLayers.Flash);
             }
             catch (Exception e)
             {

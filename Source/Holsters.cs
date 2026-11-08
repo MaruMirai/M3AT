@@ -688,7 +688,7 @@ namespace M3AT
         private const float HolsterRush = 0.3f;   // game seconds a whole holster takes at most with the next thing waiting on the hands
 
         private static readonly Dictionary<(ThingDef, bool, bool), string> drawClips = new Dictionary<(ThingDef, bool, bool), string>();
-        private const float SlabHalfDepth = 0.025f;   // cells: half of IsoRim's slab (SpriteSolids.Thickness)
+        private const float SlabHalfDepth = 0.025f;   // cells: half of IsoRim's slab of a sprite
         private const float StackGap = 0.005f;        // model units: left between two weapons lying on each other
 
         private static Thing[] slotWeapon;   // what each slot holds this draw, null for free
@@ -710,7 +710,7 @@ namespace M3AT
         // slots out. With draw false they are only given their slots (slotWeapon, slotExtra), not drawn.
         private static void DrawHolstered(Pawn pawn, bool inHands, GarmentMask mask, SkinnedFigure.Posed fig, Vector3 at, float yaw, float size, bool draw = true)
         {
-            if (!Holsters || skin.Holsters == 0 || !IsoRimMod.Settings.heldWeapons3D)
+            if (!Holsters || skin.Holsters == 0 || !HeldWeapons3D)
             {
                 return;
             }
@@ -756,7 +756,7 @@ namespace M3AT
         private static float ShieldOverWeapons(Pawn pawn, GarmentMask mask, SkinnedFigure.Posed fig, float size)
         {
             float outer = float.NegativeInfinity;
-            if (!Holsters || skin.Holsters == 0 || !IsoRimMod.Settings.heldWeapons3D)
+            if (!Holsters || skin.Holsters == 0 || !HeldWeapons3D)
             {
                 return outer;
             }
@@ -789,7 +789,7 @@ namespace M3AT
             skin.HolsterAt(fig, slot, mask, IsMelee(weapon.def), weapon.def.equippedAngleOffset, out grip, out turn, out aim, out roll, out behind, out spin, slotExtra[slot]);
             SlotLine(turn, aim, roll, spin, out a, out top);
             Vector3 tip;
-            DrawSlab(weapon, ScaleOf(weapon.def), grip, a, top, behind, at, yaw, size, out tip);   // as big as it is held
+            DrawSlab(weapon, ScaleOf(weapon), grip, a, top, behind, at, yaw, size, out tip);   // as big as it is held
         }
 
         // The way a weapon in a slot runs and its top, in the pose (HolsterAt's), spin degrees from the aim toward the top.
@@ -839,40 +839,31 @@ namespace M3AT
         {
             Graphic g = weapon.Graphic;
             Material mat = g != null ? g.MatSingleFor(weapon) : null;
-            if (weaponModels && mat != null)
+            if (mat != null)
             {
-                try
+                float depth = ModelHalfDepth(weapon, g.drawSize, ScaleOf(weapon));
+                if (depth >= 0f)
                 {
-                    float depth = ModelHalfDepth(weapon, mat, g.drawSize, ScaleOf(weapon.def));
-                    if (depth >= 0f)
-                    {
-                        return depth;
-                    }
-                }
-                catch (System.Exception e)
-                {
-                    weaponModels = false;
-                    Log.Warning(Tag + "IsoRim's weapon models failed, weapons are drawn as sprites from now on: " + e.Message);
+                    return depth;
                 }
             }
             return SlabHalfDepth;
         }
 
-        // The same for the weapon's IsoRim model, below 0 if it has none. Not inlined, as DrawModel isn't.
-        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
-        private static float ModelHalfDepth(Thing weapon, Material mat, Vector2 drawSize, float scale)
+        // The same for the weapon's IsoRim model, below 0 if it has none.
+        private static float ModelHalfDepth(Thing weapon, Vector2 drawSize, float scale)
         {
-            Model model = WeaponModels.ModelOf(weapon);
-            WeaponModels.Hold h = model != null ? WeaponFit.HoldOf(model, FitArt(weapon.def, mat), drawSize, weapon.def.equippedAngleOffset) : null;
-            if (h == null)
+            ThingModelInfo info;
+            WeaponFit.Hold h;
+            if (!HeldModel(weapon, out info, out h))
             {
                 return -1f;
             }
             if (Thrown(weapon.def))
             {
-                h = WeaponFit.AtGroundSize(h, model, weapon.def, drawSize);
+                h = WeaponFit.AtGroundSize(h, info.Model, GroundScaleOf(weapon), drawSize);
             }
-            return WeaponFit.HalfDepth(h, model) * scale;
+            return WeaponFit.HalfDepth(h, info.Model) * scale;
         }
 
         // The first free slot of the weapon's size, now taken; -1 for none.
@@ -926,8 +917,7 @@ namespace M3AT
             List<Apparel> worn = pawn.apparel != null ? pawn.apparel.WornApparel : null;
             for (int i = 0; WornGears && worn != null && i < worn.Count; i++)
             {
-                WornGearDef gear = GearDefOf(worn[i].def);
-                if (gear != null && gear.mount == mount)
+                if (GearMountOf(worn[i]) == mount)
                 {
                     return true;
                 }
@@ -1036,7 +1026,7 @@ namespace M3AT
         {
             Pawn_PathFollower pather = pawn.pather;
             if (pather == null || !pather.Moving || pather.curPath == null
-                || Floors.FlatDelta(pather.Destination.Cell.ToVector3Shifted(), work.Cell.ToVector3Shifted()).sqrMagnitude > WorkReach)
+                || Api.DrawnDelta(pather.Destination.Cell.ToVector3Shifted(), work.Cell.ToVector3Shifted()).sqrMagnitude > WorkReach)
             {
                 return false;
             }

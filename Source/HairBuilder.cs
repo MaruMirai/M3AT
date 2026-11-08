@@ -257,7 +257,7 @@ namespace M3AT
             Color32[] px;
             try
             {
-                px = SpritePixels.Sample(tex, Vector2.one, Vector2.zero, Size) ?? SpritePixels.GpuSample(tex, Size);
+                px = Api.ReadSpritePixels(tex, Size);
             }
             catch (Exception e)
             {

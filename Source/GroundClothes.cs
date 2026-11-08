@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Reflection;
-using HarmonyLib;
 using IsoRim;
 using RimWorld;
 using UnityEngine;
@@ -14,8 +12,9 @@ namespace M3AT
     // pawn wearing only that apparel gets (its own, else the one it stands in for), on the standing pose (the idle's first
     // frame) of a grown male, or of a child for apparel only children wear, and laid as GroundGear lays clothes: what goes
     // on the body on its back, front up, collar to the north, squashed to Flatten of its depth; what goes only on the head
-    // standing on its rim, front to the south. It is baked into the map mesh by IsoRim's own writer (ModelBaker.WritePosed),
-    // with the garment's image if it has one, so nothing is drawn per frame. Apparel with no garment keeps IsoRim's look.
+    // standing on its rim, front to the south. It is baked into the map mesh by IsoRim as a ground model (Api.AddGroundModelRule,
+    // with roof clipping, outline and shadow), a model made here (Api.CreateModel) with the garment's image if it has one, so
+    // nothing is drawn per frame. Apparel with no garment keeps IsoRim's look.
     public sealed partial class SkinnedFigure
     {
         private Posed groundPose;   // the standing pose garments are laid from, reused
@@ -23,7 +22,7 @@ namespace M3AT
         // The garment (piece) on the standing pose in this shape as an IsoRim model (cells, the figure facing -z, +y up),
         // laid down and set on the ground at its middle, with each corner white and tinted (a textured garment's its mean
         // colour, its image on a material of its own). headOnly: every vertex rides mostly the head or the neck.
-        internal Model Laid(int piece, Shape shape, out bool headOnly, out float foot)
+        internal ModelHandle Laid(int piece, Shape shape, out bool headOnly, out float foot)
         {
             Piece g = pieces[piece];
             if (groundPose == null)
@@ -81,29 +80,17 @@ namespace M3AT
             // IsoRim's models are triangle soups: three corners a face, in Unity's winding, as the piece's triangles are.
             bool textured = g.texture != null && g.uvs != null;
             int[] tris = g.tris;
-            Model m = new Model();
-            m.positions = new Vector3[tris.Length];
-            m.normals = new Vector3[tris.Length];
-            m.hull = new Vector3[tris.Length];
-            m.colors = new Color[tris.Length];
-            m.tinted = new bool[tris.Length];
-            m.uvs = textured ? new Vector2[tris.Length] : null;
-            m.material = textured ? new int[tris.Length] : null;
-            if (textured)
+            ModelData m = new ModelData
             {
-                m.materials = new[]
-                {
-                    new ModelMaterial
-                    {
-                        name = "stuff_" + g.name,
-                        texture = g.texture.name,   // only a placeholder: the image is runtimeTexture
-                        color = Color.white,
-                        tinted = true,
-                        runtimeTexture = g.texture,
-                        runtimeName = g.texture.name
-                    }
-                };
-            }
+                Positions = new Vector3[tris.Length],
+                Normals = new Vector3[tris.Length],
+                Hull = new Vector3[tris.Length],
+                Colours = new Color[tris.Length],
+                Tinted = new bool[tris.Length],
+                UVs = textured ? new Vector2[tris.Length] : null,
+                Material = textured ? new int[tris.Length] : null,
+                Materials = textured ? new[] { new ModelDataMaterial { Name = "stuff_" + g.name, Texture = g.texture, Tinted = true } } : null
+            };
             Color corner = textured ? g.mean : Color.white;
             for (int i = 0; i + 2 < tris.Length; i += 3)
             {
@@ -112,19 +99,18 @@ namespace M3AT
                 for (int k = 0; k < 3; k++)
                 {
                     int v = tris[i + k];
-                    m.positions[i + k] = k == 0 ? a : k == 1 ? b : c;
-                    m.normals[i + k] = normal;
-                    m.hull[i + k] = t.MultiplyVector(hulled[v]);
-                    m.colors[i + k] = corner;
-                    m.tinted[i + k] = true;
+                    m.Positions[i + k] = k == 0 ? a : k == 1 ? b : c;
+                    m.Normals[i + k] = normal;
+                    m.Hull[i + k] = t.MultiplyVector(hulled[v]);
+                    m.Colours[i + k] = corner;
+                    m.Tinted[i + k] = true;
                     if (textured)
                     {
-                        m.uvs[i + k] = g.uvs[v];
+                        m.UVs[i + k] = g.uvs[v];
                     }
-                    m.maxY = Mathf.Max(m.maxY, m.positions[i + k].y);
                 }
             }
-            return m;
+            return Api.CreateModel(m);
         }
 
         private const float GroundFlatten = 0.5f;   // a laid garment's depth (front to back), as a share of the worn depth (GroundGear's Flatten)
@@ -138,72 +124,47 @@ namespace M3AT
         // A garment laid on the ground, made once per garment, build and head shrink.
         private sealed class LaidGarment
         {
-            public Model model;
+            public ModelHandle model;
             public float fit;   // its scale on the ground: the figure's size, shrunk to fit its cell
         }
 
         private static readonly Dictionary<string, LaidGarment> laid = new Dictionary<string, LaidGarment>();
-        private static Func<SectionLayer, Thing, Model, Vector3, Quaternion, float, float, Color, float, bool> writePosed;
 
-        // Not inlined and called inside its own try, so an IsoRim without GroundGear or WritePosed only loses this.
-        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
-        private static void PatchGroundClothes(Harmony harmony)
+        // Asked by IsoRim (Api.AddGroundModelRule) as it prints an item lying on the ground into the map: apparel IsoRim lays
+        // as worn clothes (WornLook) with a garment of the chibi's is baked as that garment, laid down; anything else is left to
+        // IsoRim (null; IsoRim never asks for damage marks or a blueprint's ghost).
+        private static GroundModel? GroundRule(GroundModelContext c)
         {
-            MethodInfo bake = AccessTools.Method(typeof(GroundGear), nameof(GroundGear.Bake), new[] { typeof(SectionLayer), typeof(Thing), typeof(float) });
-            MethodInfo write = AccessTools.Method(typeof(ModelBaker), "WritePosed");
-            if (bake == null || write == null || write.ReturnType != typeof(bool))
+            Apparel a = c.Thing as Apparel;
+            if (!GroundGarments || a == null || !c.WornLook)
             {
-                Log.Warning(Tag + "apparel on the ground keeps IsoRim's look: its GroundGear.Bake or ModelBaker.WritePosed is missing.");
-                return;
-            }
-            writePosed = (Func<SectionLayer, Thing, Model, Vector3, Quaternion, float, float, Color, float, bool>)Delegate.CreateDelegate(
-                typeof(Func<SectionLayer, Thing, Model, Vector3, Quaternion, float, float, Color, float, bool>), write);
-            harmony.Patch(bake, prefix: new HarmonyMethod(typeof(WalkFigures), nameof(GroundBakePrefix)));
-        }
-
-        // GroundGear.Bake: apparel with a garment of the chibi's is written as that garment, laid down. Anything else, and
-        // what IsoRim prints its own way (damage marks, a blueprint's ghost), is left to IsoRim.
-        public static bool GroundBakePrefix(SectionLayer layer, Thing thing, float baseHeight, ref bool __result)
-        {
-            Apparel a = thing as Apparel;
-            if (!GroundGarments || a == null || !GroundGear.WornLook(thing.def) || ModelBaker.DamageMarks > 0 || ModelBaker.Ghost.a > 0f)
-            {
-                return true;
+                return null;
             }
             try
             {
                 if (!Ready() || skin == null)
                 {
-                    return true;
+                    return null;
                 }
                 int g = GroundGarmentOf(a.def);
-                if (g <= 0)
+                LaidGarment lg = g > 0 ? LaidOf(g, ChildOnly(a.def)) : null;
+                if (lg == null || lg.model == null)
                 {
-                    return true;
+                    return null;
                 }
-                LaidGarment lg = LaidOf(g, ChildOnly(a.def));
-                if (lg == null)
+                Color colour = !skin.Tinted(g, a) ? Color.white : Api.ApparelColour(a);
+                return new GroundModel
                 {
-                    return true;
-                }
-                Color colour = !skin.Tinted(g, a) ? Color.white : apparelColour != null ? apparelColour(a) : a.DrawColor;
-                float scale = lg.fit * (thing.MultipleItemsPerCellDrawn() ? 0.8f : 1f);
-                Quaternion turn = Quaternion.AngleAxis(GroundTurn(thing), Vector3.up);
-                int mark = RoofClip.Mark(layer);
-                try
-                {
-                    __result = writePosed(layer, thing, lg.model, thing.DrawPos, turn, scale, baseHeight, colour, 1f);
-                }
-                finally
-                {
-                    RoofClip.Tag(layer, mark, thing.Position);
-                }
-                return !__result;   // nothing written (the map block is full): IsoRim's own
+                    Model = lg.model,
+                    Scale = lg.fit * (a.MultipleItemsPerCellDrawn() ? 0.8f : 1f),
+                    Yaw = GroundTurn(a),
+                    Tint = colour
+                };
             }
             catch (Exception e)
             {
-                Log.ErrorOnce(Tag + "laying " + thing.def.defName + " on the ground failed, IsoRim's look is kept: " + e, 0x4d334154 ^ thing.def.shortHash);
-                return true;
+                Log.ErrorOnce(Tag + "laying " + a.def.defName + " on the ground failed, IsoRim's look is kept: " + e, 0x4d334154 ^ a.def.shortHash);
+                return null;
             }
         }
 
@@ -262,7 +223,7 @@ namespace M3AT
             return -1;
         }
 
-        // Apparel only children wear (GroundGear.ChildOnly): laid out on a child's body, at a child's size.
+        // Apparel only children wear (as IsoRim's ground clothes tell it): laid out on a child's body, at a child's size.
         private static bool ChildOnly(ThingDef def)
         {
             return def.apparel != null && (def.apparel.developmentalStageFilter & DevelopmentalStage.Adult) == 0
@@ -283,7 +244,7 @@ namespace M3AT
             float size = (child ? Mathf.Lerp(BirthSize, 1f, Growth.Evaluate(ChildClothesAge / 18f)) : 1f) * ScaleUp;
             bool headOnly;
             float foot;
-            Model m = skin.Laid(g, shape, out headOnly, out foot);
+            ModelHandle m = skin.Laid(g, shape, out headOnly, out foot);
             foot *= size;
             lg = new LaidGarment { model = m, fit = size * (foot > GroundFoot ? GroundFoot / foot : 1f) };
             laid[key] = lg;

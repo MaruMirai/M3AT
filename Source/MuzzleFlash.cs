@@ -75,8 +75,7 @@ namespace M3AT
 
                 Vector3 a = aim.normalized;
                 // Toward the camera (true cells), as IsoRim's own camera-facing marks have it.
-                Vector3 toCam = Quaternion.Euler(View3D.Pitch - 90f, View3D.Yaw, 0f) * Vector3.up;
-                Matrix4x4 squash = Matrix4x4.Scale(new Vector3(1f, 1f / View3D.Squash, 1f));
+                Vector3 toCam = Quaternion.Euler(Api.ViewPitch - 90f, Api.ViewYaw, 0f) * Vector3.up;
                 Mesh plane = MeshPool.plane10;
 
                 // The tongue: along the barrel, turned about it to face the camera (MeshPool.plane10 lies in x and z, its
@@ -90,7 +89,7 @@ namespace M3AT
                 Vector3 facing = Vector3.Cross(a, across);
                 float length = FlashLength * big * jitter, width = FlashWidth * big;
                 Vector3 middle = tip + a * (length * (0.5f - FlashBack));
-                Graphics.DrawMesh(plane, Floors.DrawnMatrix(squash * Columns(across * width, facing, a * length, middle)), flashMat, 0);
+                Api.SubmitFigureMesh(plane, flashMat, Columns(across * width, facing, a * length, middle), null, FigureMeshFlags.NoCull);
 
                 // The star at the tip, facing the camera.
                 Vector3 side = Vector3.Cross(toCam, Vector3.up);
@@ -101,7 +100,7 @@ namespace M3AT
                 side = Quaternion.AngleAxis(spin, toCam) * side.normalized;
                 Vector3 up = Vector3.Cross(side, toCam);
                 float star = FlashStar * big;
-                Graphics.DrawMesh(plane, Floors.DrawnMatrix(squash * Columns(side * star, toCam, up * star, tip)), flashMat, 0);
+                Api.SubmitFigureMesh(plane, flashMat, Columns(side * star, toCam, up * star, tip), null, FigureMeshFlags.NoCull);
             }
             catch (System.Exception e)
             {

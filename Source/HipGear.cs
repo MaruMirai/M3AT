@@ -29,8 +29,7 @@ namespace M3AT
             }
             for (int i = 0; i < worn.Count; i++)
             {
-                WornGearDef def = GearDefOf(worn[i].def);
-                if (def != null && def.mount == "hip")
+                if (GearMountOf(worn[i]) == "hip")
                 {
                     return worn[i];
                 }

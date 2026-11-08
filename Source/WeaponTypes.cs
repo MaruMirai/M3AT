@@ -117,8 +117,9 @@ namespace M3AT
         // (for a weapon with an IsoRim model its size on the floor is smaller than its sprite's); else WeaponScale.
         // The figure may not be loaded yet (a weapon still in flight from a saved game, drawn before any pawn is), or
         // ever (the baked frames), so then anim.txt's type_scale lines stand in for its sizes.
-        private static float ScaleOf(ThingDef def)
+        private static float ScaleOf(Thing weapon)
         {
+            ThingDef def = weapon.def;
             string type = TypeOf(def);
             float scale;
             if (SettingsMod.Settings == null || !SettingsMod.Settings.weaponScales.TryGetValue(type, out scale))
@@ -129,7 +130,7 @@ namespace M3AT
                     return skin != null && skin.WeaponScale >= 0f ? skin.WeaponScale : WeaponScale;
                 }
             }
-            return scale / GroundRatio(def);
+            return scale / GroundRatio(weapon);
         }
 
         // A type's size from anim.txt's type_scale lines; -1 if it has none.
@@ -221,7 +222,7 @@ namespace M3AT
         // (WeaponFit.AtGroundSize sizes that as on the ground already). Each weapon's own, as an average over its type let
         // the modelled ones be drawn bigger than on the ground wherever the type also had weapons without a model. Worked
         // out again when IsoRim's weapon models setting changes.
-        public static float GroundRatio(ThingDef def)
+        public static float GroundRatio(Thing weapon)
         {
             bool on = ModelsOn();
             if (groundRatiosOn != on)
@@ -230,52 +231,36 @@ namespace M3AT
                 groundRatios.Clear();
             }
             float ratio;
-            if (!groundRatios.TryGetValue(def, out ratio))
+            if (!groundRatios.TryGetValue(weapon.def, out ratio))
             {
-                ratio = on ? GroundRatioOf(def) : 1f;
-                groundRatios[def] = ratio;
+                ratio = on ? GroundRatioOf(weapon) : 1f;
+                groundRatios[weapon.def] = ratio;
             }
             return ratio;
         }
 
-        // IsoRim's weapon models setting, false for an IsoRim without them. (Held as a slab after DrawModel failed, the
-        // weapon is still the sprite's length, so that doesn't change the ratio.)
+        // IsoRim's weapon models setting ("Weapons as 3D models"), by its field name.
         private static bool ModelsOn()
         {
-            try
-            {
-                return WeaponModelsOn();
-            }
-            catch (Exception)
-            {
-                return false;
-            }
-        }
-
-        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
-        private static bool WeaponModelsOn()
-        {
-            return WeaponModels.On;
+            object on = Api.GetOption("weaponModels3D");
+            return !(on is bool) || (bool)on;
         }
 
         // One weapon's held size over its ground size at a scale of 1: its model's fit to the sprite (drawn cells per model
         // unit, as WeaponFit.AtGroundSize measures it) over its ModelDef's scale (IsoRim's ground size, cells per model unit).
-        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
-        private static float GroundRatioOf(ThingDef def)
+        // By the first of its kind drawn: the same for every one of a def.
+        private static float GroundRatioOf(Thing weapon)
         {
-            ModelEntry entry;
-            if (Thrown(def) || !WeaponModels.Uses(def, out entry) || entry.def.scale <= 0f)
+            ThingModelInfo info;
+            WeaponFit.Hold h;
+            float ground = GroundScaleOf(weapon);
+            if (Thrown(weapon.def) || ground <= 0f || !HeldModel(weapon, out info, out h))
             {
                 return 1f;
             }
-            Graphic g = def.graphic;
-            WeaponModels.Hold h = g != null ? WeaponFit.HoldOf(entry.variants[0], g.MatSingle, g.drawSize, def.equippedAngleOffset) : null;
-            if (h == null)
-            {
-                return 1f;
-            }
+            Graphic g = weapon.Graphic;
             Matrix4x4 drawn = Matrix4x4.Scale(new Vector3(g.drawSize.x, g.drawSize.y, 1f)) * h.slab;
-            return ((Vector3)drawn.GetColumn(0)).magnitude / entry.def.scale;
+            return ((Vector3)drawn.GetColumn(0)).magnitude / ground;
         }
     }
 }

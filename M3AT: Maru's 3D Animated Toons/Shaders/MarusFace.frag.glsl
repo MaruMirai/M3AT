@@ -43,6 +43,7 @@ layout(set = 2, binding = 0) uniform MaterialUniforms
     float _FaceMode;  // @default = 0.0
     vec4 _IsoSun;     // global, no default: xyz = direction toward IsoRim's sun (or moon)
     vec4 _IsoView;    // global, no default: xyz = true-space direction toward the camera, w = Squash
+    vec4 _IsoEye;     // global, no default: xyz = the eye in drawn space, w = 1 with a perspective camera (IsoRim's figure shader contract)
     float _Smooth;    // @default = 0.0   1: shade by vSmoothNormal (the skinned chibi)
     float _ShadeBands; // @default = 0.0  as MarusSmooth.frag.glsl
     float _EyeCut;    // @default = 0.0   set per draw (FaceLayers.EyeCut): 1 leaves out the texture's left half, 2 its right
@@ -110,6 +111,16 @@ float Banded(float shade, float bands)
     return 0.5 + 0.5 * min(1.0, (i + smoothstep(0.5 - w, 0.5 + w, x - i)) / (bands - 1.0));
 }
 
+// The direction from a fragment at p (true space) toward the camera, as MarusSmooth.frag.glsl's (IsoRim's M229): toward
+// the eye with a perspective camera, else the camera's own direction.
+vec3 ToEye(vec3 p)
+{
+    vec4 eye = uMaterial._IsoEye;
+    if (eye.w > 0.5)
+        return vec3(eye.x, eye.y * uMaterial._IsoView.w, eye.z) - p;
+    return uMaterial._IsoView.xyz;
+}
+
 void main()
 {
     // Derivatives first, in uniform control flow (before any discard).
@@ -118,7 +129,7 @@ void main()
     vec3 n = cross(dFdx(p), dFdy(p));
     float len = length(n);
     n = len > 1e-20 ? n / len : vec3(0.0, 1.0, 0.0);
-    if (dot(n, uMaterial._IsoView.xyz) < 0.0)
+    if (dot(n, ToEye(p)) < 0.0)
         n = -n;
     vec3 sn = vec3(vSmoothNormal.x, vSmoothNormal.y * squash, vSmoothNormal.z);
     float snLen = length(sn);

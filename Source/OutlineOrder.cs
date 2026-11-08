@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Reflection;
-using HarmonyLib;
 using UnityEngine;
 using Verse;
 using IsoRim;
@@ -43,8 +41,7 @@ namespace M3AT
             slot = slotsUsed++ % Slots;
         }
 
-        // This slot's copy of one of the chibi's own materials, at its step's queue; anything else (IsoRim's, used when
-        // ours are missing) as it is.
+        // This slot's copy of one of the chibi's own materials, at its step's queue; anything else as it is.
         private static Material Slotted(Material m)
         {
             if (m == null)
@@ -91,12 +88,26 @@ namespace M3AT
                 if (m == smooth)
                 {
                     // Its own light pass: IsoRim keeps one per material. Ours, as it is skinned on the graphics card.
-                    IsoGlow.Use(c, IsoGlow.OwnCell);
-                    SkinMark(c);
+                    Api.ConfigureFigureMaterial(c, FigureMaterialKind.Solid, SkinMarkShader());
+                }
+                else if (m != clear && m != stencilSet)
+                {
+                    Registered(c, m);
                 }
                 copies[slot] = c;
             }
             return c;
+        }
+
+        // A copy of one of our materials set up by Api.ConfigureFigureMaterial as unlit (so IsoRim knows it, for the peek fade on
+        // stacked floors) and then given the figure shader contract's settings of the material it copies, which that resets.
+        private static void Registered(Material copy, Material from)
+        {
+            Api.ConfigureFigureMaterial(copy, FigureMaterialKind.Unlit);
+            copy.SetFloat("_LightMode", from.GetFloat("_LightMode"));
+            copy.SetFloat("_GlowMode", from.GetFloat("_GlowMode"));
+            copy.SetFloat("_OutlinePush", from.GetFloat("_OutlinePush"));
+            copy.SetFloat("_MarkPass", from.GetFloat("_MarkPass"));
         }
 
         // The pass that clears bit 64 again: no colour, no depth, over the whole of each mesh. Null without its def (the
@@ -131,7 +142,7 @@ namespace M3AT
         private static bool afterTried;
         private static readonly Dictionary<Material, Material> afters = new Dictionary<Material, Material>();
 
-        // The solid material's copy for after the occlusion; null for IsoRim's (used when ours are missing) or without the defs.
+        // The solid material's copy for after the occlusion; null without the defs.
         private static Material AfterOcclusion(Material solid)
         {
             if (solid == null)
@@ -163,8 +174,9 @@ namespace M3AT
                 {
                     m.mainTexture = solid.mainTexture;
                 }
-                m.SetFloat("_LightMode", R3DMaterials.LightModel);
                 m.SetFloat("_ShadeBands", ShadeBands);
+                Api.ConfigureFigureMaterial(m, FigureMaterialKind.Unlit);
+                m.SetFloat("_LightMode", LightModelCurve);
                 m.SetFloat("_GlowMode", solid.GetFloat("_GlowMode"));
             }
             afters[solid] = m;
@@ -174,7 +186,7 @@ namespace M3AT
         // Whether IsoRim is drawing its occlusion or screen-space shadows this frame: if not, nothing needs drawing again.
         private static bool OcclusionShows
         {
-            get { return SunShadowsSS.WillDraw || (IsoRimMod.Settings != null && IsoRimMod.Settings.ambientOcclusion && AmbientOcclusion.Available); }
+            get { return Api.ScreenShadingOn; }
         }
 
         // Sets this figure's slot's materials on a piece's parts, adding its two clearing parts (over the solid mesh and
@@ -184,6 +196,7 @@ namespace M3AT
         private static void SetSlot(PieceMeshes m, Material solid, Material line)
         {
             m.parts[0].material = Slotted(solid);
+            m.parts[0].lit = solid == smooth;   // IsoRim's light pass of it (a textured one's is a part of its own)
             m.parts[1].material = Slotted(line);
             Material after = AfterOcclusion(solid);
             if (after != null)
@@ -191,7 +204,7 @@ namespace M3AT
                 if (m.afterAt < 0)
                 {
                     m.afterAt = m.parts.Count;
-                    m.parts.Add(new DynamicModels.Part { mesh = m.solid, material = after, outline = false });
+                    m.parts.Add(new MeshPart { mesh = m.solid, material = after, outline = false });
                 }
                 m.parts[m.afterAt].material = after;
             }
@@ -203,15 +216,15 @@ namespace M3AT
             if (m.clearAt < 0)
             {
                 m.clearAt = m.parts.Count;
-                m.parts.Add(new DynamicModels.Part { mesh = m.solid, material = c, outline = false });
-                m.parts.Add(new DynamicModels.Part { mesh = m.outline, material = c, outline = false });
+                m.parts.Add(new MeshPart { mesh = m.solid, material = c, outline = false });
+                m.parts.Add(new MeshPart { mesh = m.outline, material = c, outline = false });
             }
             m.parts[m.clearAt].material = c;
             m.parts[m.clearAt + 1].material = c;
         }
 
         // IsoRim's models carried on the figure (its held and holstered weapons) share the chibi's one outline. Drawn as IsoRim
-        // draws them, their outline is IsoRim's moving one: a shell pushed View3D.OutlinePush (0.2 cells) away from the camera,
+        // draws them, their outline is IsoRim's moving one: a shell pushed Api.OutlinePush (0.2 cells) away from the camera,
         // so wherever the body was less than that behind a weapon (a pistol held low before the thigh), the body hid its line.
         // So the model's solid faces are drawn by IsoRim's own materials, but each also sets stencil bit 64 in this figure's
         // slot (MarusStencilSet), its shell is drawn with the chibi's outline (OutlinePush, only where the bit is clear) and its
@@ -219,46 +232,44 @@ namespace M3AT
         private const string StencilSetDef = "MarusStencilSet";
         private static Material stencilSet;
         private static bool stencilSetTried;
-        private static Func<Model, Color, string, List<DynamicModels.Part>> partsFor;
-        private static bool partsForTried;
 
         // A model's parts with those added, and where the ones whose material goes by the slot are.
         private sealed class Joined
         {
-            public List<DynamicModels.Part> parts = new List<DynamicModels.Part>();
+            public List<MeshPart> parts = new List<MeshPart>();
             public List<int> lineAt = new List<int>(), markAt = new List<int>(), setAt = new List<int>(), clearAt = new List<int>();
         }
 
-        // By IsoRim's own list of the model's parts (DynamicModels.PartsFor, cached per model and colour): a list it has thrown
-        // away (DynamicModels.Forget) is never asked for again, so its entry only waits for the next clear-out.
-        private static readonly Dictionary<List<DynamicModels.Part>, Joined> joined = new Dictionary<List<DynamicModels.Part>, Joined>();
+        // By IsoRim's ready meshes of the model (Api.ModelParts, cached by IsoRim per model and colour), keyed by the first:
+        // meshes IsoRim has thrown away are never handed out again, so their entry only waits for the next clear-out.
+        private static readonly Dictionary<Mesh, Joined> joined = new Dictionary<Mesh, Joined>();
+        private static readonly List<FigureMeshPart> theirs = new List<FigureMeshPart>();
         private const int JoinedMost = 500;
 
-        // Draws model m (tint and swatch as IsoRim's DynamicModels.DrawMatrix takes them) with drawn (drawn space, before the
-        // floor shift, as DrawMatrix's) as part of the figure being drawn (NextFigure's slot). False, drawing nothing, where
-        // that can't be done (the outlines off or over the body too, a shader missing, an IsoRim without PartsFor): the caller
-        // then draws it as IsoRim does.
-        public static bool DrawJoined(Model m, Color tint, string swatch, Matrix4x4 drawn)
+        // Draws model m (tint and swatch as Api.DrawModel takes them) placed by trueSpace (true space, cells) as part of the
+        // figure being drawn (NextFigure's slot). False, drawing nothing, where that can't be done (the outlines off or over
+        // the body too, a shader missing): the caller then draws it as IsoRim does.
+        public static bool DrawJoined(ModelHandle m, Color tint, string swatch, Matrix4x4 trueSpace)
         {
             if (m == null || !Outlines || !Silhouette || OutlineMaterial() != outline || outline == null || outlineMark == null
-                || ClearMaterial() == null || StencilSetMaterial() == null || !PartsForBound())
+                || ClearMaterial() == null || StencilSetMaterial() == null)
             {
                 return false;
             }
-            List<DynamicModels.Part> theirs = partsFor(m, tint, swatch);
-            if (theirs == null || theirs.Count == 0)
+            Api.ModelParts(m, tint, swatch, theirs);
+            if (theirs.Count == 0 || theirs[0].Mesh == null)
             {
                 return true;
             }
             Joined j;
-            if (!joined.TryGetValue(theirs, out j))
+            if (!joined.TryGetValue(theirs[0].Mesh, out j) || j.parts.Count == 0)
             {
                 if (joined.Count >= JoinedMost)
                 {
                     joined.Clear();
                 }
                 j = JoinedOf(theirs);
-                joined[theirs] = j;
+                joined[theirs[0].Mesh] = j;
             }
             Material line = Slotted(outline), set = Slotted(stencilSet), c = Slotted(clear);
             for (int i = 0; i < j.lineAt.Count; i++)
@@ -277,48 +288,57 @@ namespace M3AT
             {
                 j.parts[j.clearAt[i]].material = c;
             }
-            // DrawParts puts the squash back in front of local; drawn has it already.
-            DynamicModels.DrawParts(j.parts, Vector3.zero, 0f, Matrix4x4.Scale(new Vector3(1f, View3D.Squash, 1f)) * drawn);
-            return true;
-        }
-
-        private static Joined JoinedOf(List<DynamicModels.Part> theirs)
-        {
-            Joined j = new Joined();
-            List<Mesh> cleared = new List<Mesh>();
-            for (int i = 0; i < theirs.Count; i++)
+            for (int i = 0; i < j.parts.Count; i++)
             {
-                DynamicModels.Part p = theirs[i];
-                if (p.mesh == null)
+                MeshPart part = j.parts[i];
+                if (part.material == null)
                 {
                     continue;
                 }
-                if (p.outline)
+                // Culled by each mesh's own box, which for IsoRim's models is right; weapons don't flash.
+                FigureMeshFlags flags = (part.outline ? FigureMeshFlags.Outline : FigureMeshFlags.None) | (part.lit ? FigureMeshFlags.LightPass : FigureMeshFlags.None);
+                Api.SubmitFigureMesh(part.mesh, part.material, trueSpace, null, flags);
+            }
+            return true;
+        }
+
+        private static Joined JoinedOf(List<FigureMeshPart> parts)
+        {
+            Joined j = new Joined();
+            List<Mesh> cleared = new List<Mesh>();
+            for (int i = 0; i < parts.Count; i++)
+            {
+                FigureMeshPart p = parts[i];
+                if (p.Mesh == null)
+                {
+                    continue;
+                }
+                if (p.Outline)
                 {
                     j.lineAt.Add(j.parts.Count);
-                    j.parts.Add(new DynamicModels.Part { mesh = p.mesh, outline = true });
+                    j.parts.Add(new MeshPart { mesh = p.Mesh, outline = true });
                     j.markAt.Add(j.parts.Count);
-                    j.parts.Add(new DynamicModels.Part { mesh = p.mesh, outline = true });
+                    j.parts.Add(new MeshPart { mesh = p.Mesh, outline = true });
                 }
                 else
                 {
-                    j.parts.Add(p);   // IsoRim's own solid, textured or glowing faces, as they are
-                    if (!p.beam)
-                    {
-                        j.setAt.Add(j.parts.Count);
-                        j.parts.Add(new DynamicModels.Part { mesh = p.mesh, outline = false });
-                    }
+                    // IsoRim's own solid, textured or glowing faces, as they are, with IsoRim's light pass (a beam part's
+                    // material has none, so none is drawn). Every solid part sets the bit, a beam part too, as the Api
+                    // doesn't tell them apart: its glow then has no line where it crosses the figure.
+                    j.parts.Add(new MeshPart { mesh = p.Mesh, material = p.Material, outline = false, lit = true });
+                    j.setAt.Add(j.parts.Count);
+                    j.parts.Add(new MeshPart { mesh = p.Mesh, outline = false });
                 }
-                if (!p.beam && !cleared.Contains(p.mesh))
+                if (!cleared.Contains(p.Mesh))
                 {
-                    cleared.Add(p.mesh);
+                    cleared.Add(p.Mesh);
                 }
             }
             // Not outline parts, so they are drawn with the outlines off too (as SetSlot's): the bit mustn't be left set.
             for (int i = 0; i < cleared.Count; i++)
             {
                 j.clearAt.Add(j.parts.Count);
-                j.parts.Add(new DynamicModels.Part { mesh = cleared[i], outline = false });
+                j.parts.Add(new MeshPart { mesh = cleared[i], outline = false });
             }
             return j;
         }
@@ -340,34 +360,6 @@ namespace M3AT
                 }
             }
             return stencilSet;
-        }
-
-        // IsoRim's private DynamicModels.PartsFor, which DrawMatrix draws: the model's ready-made parts in one colour.
-        private static bool PartsForBound()
-        {
-            if (!partsForTried)
-            {
-                partsForTried = true;
-                try
-                {
-                    MethodInfo mi = AccessTools.Method(typeof(DynamicModels), "PartsFor", new Type[] { typeof(Model), typeof(Color), typeof(string) });
-                    if (mi != null && mi.ReturnType == typeof(List<DynamicModels.Part>))
-                    {
-                        partsFor = (Func<Model, Color, string, List<DynamicModels.Part>>)Delegate.CreateDelegate(
-                            typeof(Func<Model, Color, string, List<DynamicModels.Part>>), mi);
-                    }
-                }
-                catch (Exception e)
-                {
-                    partsFor = null;
-                    Log.Warning(Tag + "IsoRim's DynamicModels.PartsFor could not be bound: " + e.Message);
-                }
-                if (partsFor == null)
-                {
-                    Log.Warning(Tag + "IsoRim's DynamicModels.PartsFor is missing, so held weapons keep IsoRim's outline.");
-                }
-            }
-            return partsFor != null;
         }
     }
 }

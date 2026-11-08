@@ -1334,6 +1334,12 @@ if hasattr(walk, 'tame_at'):
     if getattr(walk, 'CROUCH_CLIP', None) is not None:
         pose_worst = max(pose_worst, export_loop('work_tame_kneel', walk.tame_kneel_at, walk.CROUCH_CLIP['frames'],
                                                  walk.CROUCH_SECONDS))
+# Beating out a fire: stomping it out on the floor (work_stomp, and work_stomp~2 with the other foot) and patting it
+# out on a structure or furniture (work_pat), each a loop of one beat a foot or hand, the whole figure in place of the
+# idle; the game plays them by its beats (WalkFigures.BeatPhase), not the clock.
+if hasattr(walk, 'stomp_at'):
+    pose_worst = max(pose_worst, export_loop('work_stomp', walk.stomp_at, walk.STOMP_FRAMES, walk.BEAT_SECONDS),
+                     export_loop('work_pat', walk.pat_at, walk.PAT_FRAMES, walk.BEAT_SECONDS * walk.PAT_HITS))
 # Casting: the left hand raised to the target (or reached out to touch it), over whatever the rest is doing; the right arm
 # keeps its own (a weapon's stance, or the gait's swing).
 pose_worst = max(pose_worst, export_loop('cast', walk.cast_at, walk.loop_frames(walk.CAST_SECONDS), walk.CAST_SECONDS),
@@ -1374,6 +1380,13 @@ pose_worst = max(pose_worst, export_loop('reel', lambda t: walk.reel_at(t * walk
                  export_loop('daze', walk.daze_at, walk.loop_frames(walk.DAZE_SECONDS), walk.DAZE_SECONDS))
 masks['reel'] = upper_mask('LR', walk.REEL_UPPER)
 masks['daze'] = upper_mask('LR', walk.DAZE_UPPER)
+# Tossing a horseshoe or a hoopstone stone: one underhand pitch, once through, its first and last frames the idle's first
+# (the game plays it round the tick it throws the fleck, WalkFigures.TossOf), the whole figure standing, from the waist up
+# seated.
+if hasattr(walk, 'toss_at'):
+    pose_worst = max(pose_worst, export_loop('toss', lambda t: walk.toss_at(t * walk.TOSS_FRAMES / (walk.TOSS_FRAMES - 1)),
+                                             walk.TOSS_FRAMES, walk.TOSS_SECONDS))
+    masks['toss'] = upper_mask('LR', walk.TOSS_UPPER)
 # Jumping: one pass from take-off to landing, its first frame the take-off and its last the landing (the game plays it by
 # how far through the flight the pawn is, never round past the end); and the crouch held before it and after, one still
 # frame the game eases in and out (its length, LAND_SECONDS, is how long coming up out of a landing takes).
@@ -1548,6 +1561,11 @@ for name in ('eat_sit', 'eat_stand'):
 print('CAST cast and cast_touch over %.1f s, laid over the gait with the left arm; FLINCH %s, %d frames each, added on top'
       % (walk.CAST_SECONDS, ', '.join('flinch_' + w for w in walk.FLINCH_WAYS), walk.FLINCH_FRAMES))
 print('REEL over %.1f s, a stumble to one knee, from the waist up on the move; DAZE over %.1f s' % (walk.REEL_SECONDS, walk.DAZE_SECONDS))
+if hasattr(walk, 'toss_at'):
+    print('TOSS over %.1f s, an underhand pitch let go at %.2f of the way, from the waist up seated' % (walk.TOSS_SECONDS, walk.TOSS_RELEASE))
+if hasattr(walk, 'stomp_at'):
+    print('BEAT work_stomp over %.2f s (stamped at %.2f), work_pat over %.2f s (%d slaps from %.2f)'
+          % (walk.BEAT_SECONDS, walk.STOMP_HIT, walk.BEAT_SECONDS * walk.PAT_HITS, walk.PAT_HITS, walk.PAT_HIT))
 print('WORK %s, %d frames a stroke; tools held within %.4f cells of one place in the hand; %.4f model units a leg length (walk.MODEL_LEG %.4f)'
       % (', '.join('%s %.2f s' % (k, walk.work_seconds(k)) for k in walk.WORK), WORK_FRAMES, tool_drift,
          walk.LEG * rig.matrix_world.to_scale().x * scale, walk.MODEL_LEG))

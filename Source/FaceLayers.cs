@@ -447,7 +447,7 @@ namespace M3AT
             for (int i = 0; i < verts.Count; i++)
             {
                 colors.Add(new Color32(255, 255, 255, 255));
-                tags.Add(RoofClip.MovingTag);   // clipped under the roof over where it is drawn, as IsoRim's moving models are
+                tags.Add(Api.MovingMeshTag);   // clipped under the roof over where it is drawn, as IsoRim's moving models are
             }
             Mesh m = new Mesh();
             m.SetVertices(verts);
@@ -772,7 +772,8 @@ namespace M3AT
                 * Matrix4x4.Scale(new Vector3(grow, grow, grow))
                 * Matrix4x4.Translate(-patch.centre);
             Material mat = mode >= 0 ? LitFor(gm, mode, place) : gm;   // a shader not known here: Facial Animation's own, unlit
-            Graphics.DrawMesh(kind == "MouthControllerComp" ? mouth : patch.face, Floors.DrawnMatrix(placed * local), mat, 0, null, 0, mode >= 0 ? BlockFor(patch.smooth, cut) : null);
+            Api.SubmitFigureMesh(kind == "MouthControllerComp" ? mouth : patch.face, mat, placed * local, mode >= 0 ? BlockFor(patch.smooth, cut) : null,
+                FigureMeshFlags.NoCull, 0, mode >= 0 ? Flash : 0f);
             place++;
         }
 
@@ -811,7 +812,7 @@ namespace M3AT
             Matrix4x4 local = Matrix4x4.Translate(patch.centre)
                 * Matrix4x4.Scale(new Vector3(grow, grow, grow))
                 * Matrix4x4.Translate(-patch.centre);
-            Matrix4x4 drawn = Floors.DrawnMatrix(placed * local);
+            Matrix4x4 drawn = placed * local;
             for (int i = 0; i < wounds.Length; i++)
             {
                 ValueTuple<Texture, Texture, int> key = new ValueTuple<Texture, Texture, int>(iris, white, place);
@@ -838,7 +839,7 @@ namespace M3AT
                     block.SetFloat("_Smooth", 1f);
                     block.SetFloat("_ShadeBands", SkinnedFigure.ShadeBands);
                 }
-                Graphics.DrawMesh(patch.face, drawn, m, 0, null, 0, block);
+                Api.SubmitFigureMesh(patch.face, m, drawn, block, FigureMeshFlags.NoCull);
                 place++;
             }
         }
@@ -846,14 +847,15 @@ namespace M3AT
         // How red the game's damage flash draws the face being drawn now, 0 .. 1 in sixteenths (HitFlash.Of): set by the
         // figure's draw (WalkFigures.DrawDressed) for its face layers, ridges and flat beard, and put back to 0 after.
         public static float Flash;
+        private const int FlashSteps = 16;   // the flash in sixteenths, as IsoRim rounds it: one block each
         private static readonly int flashId = Shader.PropertyToID("_IsoFlash");
 
         // The per-draw settings: smooth shading (the skinned chibi), the halves left out and the hit flash (Flash, which
         // MarusFace.frag.glsl leaves off the wounds that share these blocks). Null for none of them.
-        private static readonly MaterialPropertyBlock[] blocks = new MaterialPropertyBlock[8 * (HitFlash.Steps + 1)];
+        private static readonly MaterialPropertyBlock[] blocks = new MaterialPropertyBlock[8 * (FlashSteps + 1)];
         internal static MaterialPropertyBlock BlockFor(bool smooth, int cut)
         {
-            int step = Mathf.RoundToInt(Flash * HitFlash.Steps);
+            int step = Mathf.RoundToInt(Flash * FlashSteps);
             int i = (smooth ? 4 : 0) + cut + 8 * step;
             if (i == 0)
             {
@@ -868,20 +870,17 @@ namespace M3AT
                     b.SetFloat("_ShadeBands", SkinnedFigure.ShadeBands);
                 }
                 b.SetFloat("_EyeCut", cut);
-                b.SetFloat(flashId, step / (float)HitFlash.Steps);
+                b.SetFloat(flashId, step / (float)FlashSteps);
                 blocks[i] = b;
             }
             return blocks[i];
         }
 
-        // The matrix a figure is drawn by: its position (true space, cells), its yaw (degrees about the vertical) and size.
-        private static Matrix4x4 PlacedAt(Vector3 position, float yaw, float size)
+        // The matrix a figure is drawn by, in true space (Api.SubmitFigureMesh squashes it): its position (cells), its yaw
+        // (degrees about the vertical) and size.
+        internal static Matrix4x4 PlacedAt(Vector3 position, float yaw, float size)
         {
-            // The whole map is drawn squashed flat (IsoRim's View3D); the height is divided by the same here.
-            float s = Api.HeightSquash;
-            return Matrix4x4.Translate(new Vector3(position.x, position.y / s, position.z))
-                * Matrix4x4.Scale(new Vector3(1f, 1f / s, 1f))
-                * Matrix4x4.TRS(Vector3.zero, Quaternion.AngleAxis(yaw, Vector3.up), new Vector3(size, size, size));
+            return Matrix4x4.TRS(position, Quaternion.AngleAxis(yaw, Vector3.up), new Vector3(size, size, size));
         }
 
         // ---- A beard laid flat on the patch (SkinnedFigure.DrawFlatBeard). Its texture is in the face's own layout
@@ -952,11 +951,7 @@ namespace M3AT
                 block.SetFloat("_Smooth", 1f);
                 block.SetFloat("_ShadeBands", SkinnedFigure.ShadeBands);
             }
-            if (Flash > 0f)
-            {
-                block.SetFloat(flashId, Flash);
-            }
-            Graphics.DrawMesh(patch.face, Floors.DrawnMatrix(PlacedAt(position, yaw, size) * local), mat, 0, null, 0, block);
+            Api.SubmitFigureMesh(patch.face, mat, PlacedAt(position, yaw, size) * local, block, FigureMeshFlags.NoCull, 0, Flash);
         }
 
         // The halves of the face whose eye part is missing (not a prosthetic: that replaces the part). The eyes are

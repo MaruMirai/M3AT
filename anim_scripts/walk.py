@@ -1753,6 +1753,97 @@ REEL_KEYS = dict(
 REEL_BRACE = (0.0, 0.06, 0.09)   # the bracing wrist from the forward knee joint (x out, y back, z up; leg lengths)
 REEL_UPPER = {'spine.001': 1.0}   # on the move: from the waist up
 
+# Tossing (toss_at): one underhand pitch of a horseshoe or a hoopstone stone (the game's Play_Horseshoes and Play_Hoopstone,
+# which throw a fleck at the pin every 400 ticks), right-handed, once through, its first and last frames the idle's first.
+# The thing is brought up in front of the belly, the arm swung straight back past the hip as the trunk leans and the
+# knees give, then forward with a step onto the left foot, let go out in front a little below the shoulder (TOSS_RELEASE
+# of the way through, the tick the game throws the fleck: WalkFigures.TossOf), followed up, and the foot stepped back.
+# Keyed at TOSS_AT and joined smoothly (toss_key). Standing, the whole figure in place of the idle; seated (a pin played
+# from a seat), from the waist up (TOSS_UPPER).
+#   'arm' / 'other': the right / left wrist from its shoulder in the chest's frame (x out, y back, z up; shares of the
+#     arm's reach), None for where the standing pose hangs it.
+#   'palm' / 'fingers': the right palm's way and its fingers' (the chest's frame, x out), the hand cupped under the thing.
+#   'curl': the right fingers' curl (shares of FIST), opening as it lets go.
+#   'lean' (forward), 'twist' (+ to the left) degrees, the head taking TOSS_LOOK of both back so it watches the pin;
+#   'lunge' (the hips forward) and 'drop' (down, knees bent) leg lengths; 'step' and 'lift' the left foot forward and up,
+#   leg lengths; 'heel' the right heel up off its toes (degrees) as it pushes off.
+TOSS_SECONDS = 1.4   # game seconds, wind-up to the foot back (84 ticks, in the 400 between throws)
+TOSS_FRAMES = 28
+TOSS_AT = (0.0, 0.2, 0.42, 0.6, 0.76, 0.9, 1.0)
+TOSS_RELEASE = 0.6   # TOSS_AT's let-go key
+TOSS_LOOK = 0.7
+TOSS_KEYS = dict(
+    arm=(None, (0.05, -0.5, -0.6), (0.12, 0.6, -0.78), (0.05, -0.8, -0.5), (0.0, -0.9, 0.2), (0.05, -0.5, -0.65), None),
+    palm=((-1.0, 0.0, 0.0), (0.0, -0.2, 1.0), (0.0, -0.78, -0.6), (0.0, -0.6, 0.8), (0.0, 0.2, 1.0), (-0.5, -0.3, 0.5), (-1.0, 0.0, 0.0)),
+    fingers=((0.0, 0.0, -1.0), (0.0, -1.0, -0.2), (0.0, 0.6, -0.8), (0.0, -0.8, -0.6), (0.0, -0.95, 0.2), (0.0, -0.6, -0.8), (0.0, 0.0, -1.0)),
+    curl=(0.0, 0.55, 0.55, 0.3, 0.05, 0.1, 0.0),
+    other=(None, (0.25, -0.35, -0.75), (0.3, -0.6, -0.45), (0.3, 0.1, -0.9), (0.3, 0.25, -0.85), (0.25, 0.05, -0.9), None),
+    lean=(0.0, 6.0, 22.0, 14.0, 8.0, 4.0, 0.0),
+    twist=(0.0, 0.0, -18.0, 8.0, 12.0, 4.0, 0.0),
+    lunge=(0.0, 0.0, -0.03, 0.07, 0.08, 0.03, 0.0),
+    drop=(0.0, 0.01, 0.07, 0.04, 0.02, 0.01, 0.0),
+    step=(0.0, 0.0, 0.06, 0.26, 0.26, 0.13, 0.0),
+    lift=(0.0, 0.0, 0.04, 0.0, 0.0, 0.04, 0.0),
+    heel=(0.0, 0.0, 0.0, 15.0, 20.0, 8.0, 0.0),
+)
+TOSS_UPPER = {'spine.001': 1.0}   # seated: from the waist up
+
+# Beating out a fire (the game's BeatFire job: one beat, Verb_BeatFire, as soon as each 1.1 s cool-down ends, so every
+# BEAT_SECONDS). Two ways, sorted in the game by what is burning (WalkFigures.FireKind): stomping (stomp_at, work_stomp)
+# for a fire on the floor, an item or a plant, and patting (pat_at, work_pat) for one on a structure or furniture drawn
+# BuildHigh or more tall, or on a person standing. Both are loops on the game's beats: the game plays them so a blow
+# lands on the tick the game beats (WalkFigures.BeatPhase), STOMP_HIT and PAT_HIT of the way round (PAT_HITS of them a
+# loop, a hand each). The whole figure, in place of the idle. Keyed at <name>_AT round the loop and joined smoothly
+# round it (loop_key).
+BEAT_SECONDS = 67 / 60.0   # game seconds a beat: the verb's 66-tick cool-down and the tick it is cast on
+# Stomping: one foot (STOMP_FOOT; work_stomp~2 the other) raised knee high and stamped down ahead onto the fire, ground
+# in, then drawn back under the hips, the other foot planted and the weight over it while the stamping foot is up; the
+# arms out for balance and swung down with the stamp, the head bowed to watch the foot.
+#   'step' / 'lift': the stamping ankle forward and up from where the standing pose plants it (leg lengths); 'pitch' its
+#     heel up (degrees; - the toes up); 'grind' its turn about the vertical (degrees, + toes in), the foot screwed in.
+#   'lean' (forward, degrees); 'lunge' (the hips forward), 'drop' (down, knees bent) and 'sway' (sideways over the
+#     planted foot) leg lengths.
+#   'arm' / 'other': the stamping side's / the other side's wrist from its shoulder in the chest's frame (x out, y back,
+#     z up; shares of the arm's reach).
+STOMP_FOOT = 'R'
+STOMP_FRAMES = 20    # one beat
+STOMP_HIT = 0.5      # STOMP_AT's stamp
+STOMP_LOOK = 8.0     # the head bowed further than the trunk leans, to watch the foot (degrees)
+STOMP_AT = (0.0, 0.2, 0.4, 0.5, 0.62, 0.8)
+STOMP_KEYS = dict(
+    step=(0.03, 0.1, 0.16, 0.26, 0.26, 0.14),
+    lift=(0.0, 0.24, 0.36, 0.0, 0.0, 0.06),
+    pitch=(0.0, -10.0, -16.0, 0.0, 0.0, 6.0),
+    grind=(0.0, 0.0, 0.0, 0.0, 10.0, 4.0),
+    lean=(10.0, 12.0, 14.0, 20.0, 18.0, 13.0),
+    lunge=(0.0, 0.0, 0.01, 0.06, 0.05, 0.02),
+    drop=(0.01, 0.0, 0.0, 0.05, 0.04, 0.02),
+    sway=(0.02, 0.06, 0.06, 0.01, 0.0, 0.0),
+    arm=((0.3, -0.25, -0.8), (0.45, -0.25, -0.65), (0.55, -0.25, -0.5), (0.3, -0.2, -0.85), (0.3, -0.2, -0.85), (0.3, -0.25, -0.82)),
+    other=((0.3, -0.3, -0.8), (0.5, -0.35, -0.6), (0.6, -0.35, -0.45), (0.35, -0.3, -0.8), (0.32, -0.28, -0.82), (0.3, -0.3, -0.8)),
+)
+# Patting: leant in at the burning thing, the palms slapped down on it in turn, the right then the left, at about a
+# table's height in front; the trunk turned a little toward the hand that slaps and bobbing with each slap.
+#   PAT_HAND_AT / PAT_WRIST: each hand's wrist through its own beat (its slap at 0, held on, lifted, cocked high and
+#     brought down), from its shoulder in a level frame turned as the chest is (x out, y forward (-), z up; shares of
+#     the arm's reach); PAT_TIP its fingers tipped down from level (degrees; - up, the palm facing ahead as it is
+#     raised); PAT_CURL the fingers' curl (shares of FIST).
+PAT_FRAMES = 40      # two beats, a hand each
+PAT_HITS = 2
+PAT_HIT = 0.25       # the right hand's slap; the left's half a loop on
+PAT_LEAN = 24.0      # the trunk leant forward over the thing (degrees)
+PAT_BOB = 4.0        # and further at each slap
+PAT_TWIST = 6.0      # turned toward the slapping hand (degrees)
+PAT_LOOK = 10.0      # the head bowed further, to watch the hands (degrees)
+PAT_DROP = 0.03      # the hips let down (knees bent), leg lengths, and PAT_DIP more at each slap
+PAT_DIP = 0.015
+PAT_LUNGE = 0.03     # the hips forward over the feet, leg lengths
+PAT_HAND_AT = (0.0, 0.12, 0.42, 0.78)
+PAT_WRIST = ((-0.05, -0.62, -0.72), (-0.05, -0.6, -0.7), (0.1, -0.5, -0.12), (0.06, -0.58, -0.2))
+PAT_TIP = (6.0, 4.0, -35.0, -25.0)
+PAT_CURL = (0.05, 0.05, 0.2, 0.15)
+PAT_ELBOW = (0.7, 0.4, -0.6)   # the elbows out and down (chest's frame, x out)
+
 # Stunned (the game's StunHandler: an EMP, a psychic shock, a stun throw): standing dazed, slumped on soft knees, the
 # arms hanging and the head lolling round, swaying slowly. The whole figure in place of the idle; on the move (pushed),
 # from the waist up (DAZE_UPPER).
@@ -1890,6 +1981,10 @@ VARIANTS = {
     'reel': [
         # Down on the other knee.
         dict(REEL_KNEE='L'),
+    ],
+    'work_stomp': [
+        # Stamped with the other foot.
+        dict(STOMP_FOOT='L'),
     ],
     'land': [
         # Landed heavily, sunk lower with the hands reaching for the ground.
@@ -4123,6 +4218,179 @@ def reel_at(t):
             wrist = wrist.lerp(on, min(brace, 1.0))
         clamp = max(clamp, arm_to(side, sign, wrist, X, pole=Vector((sign * DIVE_ELBOW[0], DIVE_ELBOW[1], DIVE_ELBOW[2]))))
         close_hand(X, side, sign, 0.35)
+    return X, clamp
+
+def toss_key(line, t):
+    """The TOSS_KEYS line at t through the toss (0 .. 1), joined smoothly through its keys (Catmull-Rom, as reel_key)."""
+    at = TOSS_AT
+    t = min(max(t, 0.0), 1.0)
+    i = min(sum(1 for a in at[1:] if a <= t), len(at) - 2)
+    u = (t - at[i]) / (at[i + 1] - at[i])
+    def part(k):
+        p0, p1, p2, p3 = (k[max(i - 1, 0)], k[i], k[i + 1], k[min(i + 2, len(k) - 1)])
+        return 0.5 * (2 * p1 + (p2 - p0) * u + (2 * p0 - 5 * p1 + 4 * p2 - p3) * u * u + (3 * p1 - p0 - 3 * p2 + p3) * u ** 3)
+    if isinstance(line[0], (tuple, Vector)):
+        return Vector([part([k[n] for k in line]) for n in range(len(line[0]))])
+    return part(line)
+
+def toss_at(t):
+    """The underhand toss at t (0 standing .. let go at TOSS_RELEASE .. 1 standing; see TOSS_KEYS), from the idle's first
+    frame. Returns the pose and the worst overreach."""
+    X, _ = stand_at(0.0)
+    hanging = {}
+    for side, sign in (('L', 1), ('R', -1)):
+        # Where the standing pose hangs each wrist, as a key: from its shoulder in the chest's frame, shares of the reach.
+        ua, fa, hn = 'upper_arm.' + side, 'forearm.' + side, 'hand.' + side
+        reach = (tail[ua] - head[ua]).length + (tail[fa] - head[fa]).length
+        v = X[CHEST_BONE].to_3x3().inverted() @ (X[hn] @ head[hn] - X['shoulder.' + side] @ head[ua]) / reach
+        hanging[side] = Vector((v.x * sign, v.y, v.z))
+    k = {n: toss_key(line, t) for n, line in TOSS_KEYS.items() if n not in ('arm', 'other')}
+    for n, side in (('arm', 'R'), ('other', 'L')):
+        k[n] = toss_key([hanging[side] if v is None else Vector(v) for v in TOSS_KEYS[n]], t)
+    ankles = {s: X['foot.' + s] @ head['foot.' + s] for s in ('L', 'R')}
+    toes = {s: X['foot.' + s] @ head['toe.' + s] for s in ('L', 'R')}
+    legs = set()
+    for side in ('L', 'R'):
+        legs.update(b.name for b in [bones['thigh.' + side]] + list(bones['thigh.' + side].children_recursive))
+    M = T(Vector((0, -k['lunge'], -k['drop'])) * LEG)
+    X = {n: (v if n in legs else M @ v) for n, v in X.items()}
+    for bone in (SPINE, CHEST_BONE):
+        pivot = X[bone] @ head[bone]
+        turn_branch(X, bone, about(pivot, (0, 0, 1), k['twist'] * 0.5) @ about(pivot, (1, 0, 0), k['lean'] * 0.5))
+    pivot = X[NECK] @ head[NECK]
+    turn_branch(X, NECK, about(pivot, (1, 0, 0), -k['lean'] * TOSS_LOOK) @ about(pivot, (0, 0, 1), -k['twist'] * TOSS_LOOK))
+    for name, leader in FOLLOW.items():
+        X[name] = X[leader]
+    clamp = 0.0
+    for side, sign in (('L', 1), ('R', -1)):
+        ankle, pitch = ankles[side].copy(), 0.0
+        if side == 'L':
+            ankle += Vector((0, -k['step'], k['lift'])) * LEG
+        elif k['heel'] > 0:
+            # The heel up about the toe joint, as the walk's push off, so the toes stay on the ground.
+            pitch = k['heel']
+            ankle = toes[side] + rot((1, 0, 0), pitch).to_3x3() @ (ankles[side] - toes[side])
+        clamp = max(clamp, leg_to(side, X[HIPS] @ head['thigh.' + side], ankle, FWD + Vector((sign * 0.15, 0, 0)), X, pitch=pitch))
+        if side == 'R' and pitch > 0:
+            X['toe.R'] = place(X['foot.R'] @ head['toe.R'], Matrix.Identity(4), head['toe.R'])   # the toes flat
+    chest = X[CHEST_BONE].to_3x3()
+    for side, sign, n in (('R', -1, 'arm'), ('L', 1, 'other')):
+        ua, fa, hn = 'upper_arm.' + side, 'forearm.' + side, 'hand.' + side
+        reach = (tail[ua] - head[ua]).length + (tail[fa] - head[fa]).length
+        w = k[n]
+        wrist = X['shoulder.' + side] @ head[ua] + chest @ Vector((sign * w.x, w.y, w.z)) * reach
+        if side == 'L':
+            clamp = max(clamp, arm_to(side, sign, wrist, X))
+            continue
+        facing = chest @ Vector((sign * k['palm'].x, k['palm'].y, k['palm'].z))
+        fingers = chest @ Vector((sign * k['fingers'].x, k['fingers'].y, k['fingers'].z))
+        n_ = facing.normalized()
+        f = (fingers - fingers.dot(n_) * n_).normalized()
+        palm = wrist + n_ * HAND_HALF * LEG + f * (tail[hn] - head[hn]).length * 0.5   # so hand_on puts the wrist there
+        clamp = max(clamp, hand_on(side, sign, palm, fingers, facing, X))
+        close_hand(X, side, sign, max(0.0, k['curl']))
+    return X, clamp
+
+def loop_key(at, line, t):
+    """line (one value or tuple a key, at at's places round a loop, the first at 0) at t round it (0 .. 1), joined
+    smoothly through its keys and round from the last to the first (Catmull-Rom, as toss_key, but closed)."""
+    n = len(at)
+    t %= 1.0
+    i = max(j for j in range(n) if at[j] <= t)
+    k = (i + 1) % n
+    span = (at[k] if k else 1.0) - at[i]
+    u = (t - at[i]) / span
+    def part(v):
+        p0, p1, p2, p3 = v[(i - 1) % n], v[i], v[k], v[(k + 1) % n]
+        return 0.5 * (2 * p1 + (p2 - p0) * u + (2 * p0 - 5 * p1 + 4 * p2 - p3) * u * u + (3 * p1 - p0 - 3 * p2 + p3) * u ** 3)
+    if isinstance(line[0], (tuple, Vector)):
+        return Vector([part([v[m] for v in line]) for m in range(len(line[0]))])
+    return part(line)
+
+def wrist_reach(side):
+    """The arm's reach, shoulder joint to wrist at rest (armature units)."""
+    ua, fa = 'upper_arm.' + side, 'forearm.' + side
+    return (tail[ua] - head[ua]).length + (tail[fa] - head[fa]).length
+
+def stomp_at(t):
+    """Stomping out a fire at t (0 .. 1 round one beat; see STOMP_KEYS): STOMP_FOOT raised and stamped down ahead at
+    STOMP_HIT, from the idle's first frame. The whole figure, in place of the idle. Returns the pose and the worst
+    overreach."""
+    X, _ = stand_at(0.0)
+    foot = STOMP_FOOT
+    k = {n: loop_key(STOMP_AT, line, t) for n, line in STOMP_KEYS.items()}
+    k['lift'] = max(0.0, k['lift'])   # (the curve dips under the floor after the stamp)
+    ankles = {s: X['foot.' + s] @ head['foot.' + s] for s in ('L', 'R')}
+    legs = set()
+    for side in ('L', 'R'):
+        legs.update(b.name for b in [bones['thigh.' + side]] + list(bones['thigh.' + side].children_recursive))
+    planted = 1 if foot == 'R' else -1   # the planted foot's side of the middle (+x the left)
+    M = T(Vector((planted * k['sway'], -k['lunge'], -k['drop'])) * LEG)
+    X = {n: (v if n in legs else M @ v) for n, v in X.items()}
+    for bone in (SPINE, CHEST_BONE):
+        pivot = X[bone] @ head[bone]
+        turn_branch(X, bone, about(pivot, (1, 0, 0), k['lean'] * 0.5))
+    turn_branch(X, NECK, about(X[NECK] @ head[NECK], (1, 0, 0), STOMP_LOOK))
+    for name, leader in FOLLOW.items():
+        X[name] = X[leader]
+    clamp = 0.0
+    for side, sign in (('L', 1), ('R', -1)):
+        ankle, pitch, turn = ankles[side].copy(), 0.0, None
+        if side == foot:
+            ankle += Vector((0, -k['step'], k['lift'])) * LEG
+            pitch = k['pitch']
+            turn = rot((0, 0, 1), -k['grind'] * sign)   # (toes in: the left foot's turned clockwise from above)
+        clamp = max(clamp, leg_to(side, X[HIPS] @ head['thigh.' + side], ankle, FWD + Vector((sign * 0.15, 0, 0)), X,
+                                  pitch=pitch, turn=turn))
+    chest = X[CHEST_BONE].to_3x3()
+    for side, sign in (('L', 1), ('R', -1)):
+        w = k['arm' if side == foot else 'other']
+        wrist = X['shoulder.' + side] @ head['upper_arm.' + side] + chest @ Vector((sign * w.x, w.y, w.z)) * wrist_reach(side)
+        clamp = max(clamp, arm_to(side, sign, wrist, X))
+        close_hand(X, side, sign, 0.35)
+    return X, clamp
+
+def pat_at(t):
+    """Patting out a fire at t (0 .. 1 round two beats; see PAT_WRIST): leant in, the right palm slapped down at PAT_HIT
+    and the left half a loop on, from the idle's first frame. The whole figure, in place of the idle. Returns the pose
+    and the worst overreach."""
+    X, _ = stand_at(0.0)
+    hits = [PAT_HIT + n / PAT_HITS for n in range(PAT_HITS)]
+    slap = max(0.5 + 0.5 * math.cos(2 * math.pi * PAT_HITS * (t - PAT_HIT)), 0.0)   # 1 at each slap
+    twist = -PAT_TWIST * math.cos(2 * math.pi * (t - PAT_HIT))   # toward the right at its slap (+ is to the left)
+    ankles = {s: X['foot.' + s] @ head['foot.' + s] for s in ('L', 'R')}
+    legs = set()
+    for side in ('L', 'R'):
+        legs.update(b.name for b in [bones['thigh.' + side]] + list(bones['thigh.' + side].children_recursive))
+    M = T(Vector((0, -PAT_LUNGE, -(PAT_DROP + PAT_DIP * slap))) * LEG)
+    X = {n: (v if n in legs else M @ v) for n, v in X.items()}
+    lean = PAT_LEAN + PAT_BOB * slap
+    for bone in (SPINE, CHEST_BONE):
+        pivot = X[bone] @ head[bone]
+        turn_branch(X, bone, about(pivot, (0, 0, 1), twist * 0.5) @ about(pivot, (1, 0, 0), lean * 0.5))
+    turn_branch(X, NECK, about(X[NECK] @ head[NECK], (X[NECK].to_3x3() @ Vector((1, 0, 0))).normalized(), PAT_LOOK))
+    for name, leader in FOLLOW.items():
+        X[name] = X[leader]
+    clamp = 0.0
+    for side, sign in (('L', 1), ('R', -1)):
+        clamp = max(clamp, leg_to(side, X[HIPS] @ head['thigh.' + side], ankles[side], FWD + Vector((sign * 0.15, 0, 0)), X))
+    # A level frame turned as the chest is about the vertical (as tame_at's).
+    across = X[CHEST_BONE].to_3x3() @ Vector((1, 0, 0))
+    across = Vector((across.x, across.y, 0.0)).normalized()
+    level = Matrix((across, Vector((0, 0, 1)).cross(across), Vector((0, 0, 1)))).transposed()
+    for (side, sign), hit in zip((('R', -1), ('L', 1)), hits):
+        c = (t - hit) % 1.0
+        w = loop_key(PAT_HAND_AT, PAT_WRIST, c)
+        tip = math.radians(loop_key(PAT_HAND_AT, PAT_TIP, c))
+        wrist = X['shoulder.' + side] @ head['upper_arm.' + side] + level @ Vector((sign * w.x, w.y, w.z)) * wrist_reach(side)
+        # The palm down (ahead as it is raised), the fingers forward, tipped by tip, the wrist at its place.
+        fingers = level @ Vector((0, -math.cos(tip), -math.sin(tip)))
+        facing = level @ Vector((0, math.sin(tip), -math.cos(tip)))
+        hn = 'hand.' + side
+        palm = wrist + facing * HAND_HALF * LEG + fingers * (tail[hn] - head[hn]).length * 0.5
+        clamp = max(clamp, hand_on(side, sign, palm, fingers, facing, X,
+                                   pole=Vector((sign * PAT_ELBOW[0], PAT_ELBOW[1], PAT_ELBOW[2]))))
+        close_hand(X, side, sign, max(0.0, loop_key(PAT_HAND_AT, PAT_CURL, c)))
     return X, clamp
 
 def daze_at(t):

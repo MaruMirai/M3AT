@@ -9,20 +9,20 @@ using Verse;
 
 namespace M3AT
 {
-    // The RetexturedWeaponModels option, second half (the first is ArtPostfix). A mod can take a vanilla weapon's model away
+    // The RetexturedWeaponModels option, second half (the first is WeaponRule). A mod can take a vanilla weapon's model away
     // altogether: the IsoRim Waylith Combat Extended pack removes IsoRim's ModelDef for every vanilla gun and grenade CE
     // redraws (its Patches/CE_RetexturedWeapons.xml), so the weapon is bound only by its category, which WeaponModels.Uses
     // never shows, and the art check never comes into it. So just before IsoRim binds its models (ModelLibrary.LoadAll, from
     // its own startup class, which runs before ours: hence patched from the mod's constructor, SettingsMod), each ModelDef
     // in IsoRim's own Defs that names one of the game's own weapons (Core and the DLCs) is put back if no ModelDef names
-    // that weapon any more. Always, whatever the option says, so it still takes at once: ArtPostfix draws a weapon put back
+    // that weapon any more. Always, whatever the option says, so it still takes at once: WeaponRule draws a weapon put back
     // here as its sprite while the option is off, as the mod that removed it meant.
     // A class of its own, not WalkFigures: it runs from the mod's constructor, long before WalkFigures' static constructor may.
     public static class RestoredModels
     {
         private const string Tag = "[M3AT] ";
 
-        // The weapons whose ModelDef was put back (ArtPostfix).
+        // The weapons whose ModelDef was put back (WeaponRule).
         private static readonly HashSet<ThingDef> restored = new HashSet<ThingDef>();
 
         public static bool Has(ThingDef def)

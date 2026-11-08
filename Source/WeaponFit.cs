@@ -23,7 +23,7 @@ namespace M3AT
     public static class WeaponFit
     {
         private const string Tag = "[M3AT] ";
-        private const int N = 64;                 // the sprite's mask, N x N (WeaponModels.N)
+        private const int N = 64;                 // the sprite's mask, N x N (as IsoRim's fit has it)
         private const float FrontBonus = 0.5f;    // the model's front toward the art's front (IsoRim's is 0.08)
         private const float UpBonus = 0.2f;       // the model's top (+y) toward the art's top
         private const float Sparse = 1.6f;        // the model laid along the sprite covers this many times its pixels: sized by area
@@ -31,25 +31,68 @@ namespace M3AT
         private const float UpAlong = 0.87f;      // the art's front at least this close (cosine) to the axis tried for its top to count
         private const float UpTie = 0.01f;        // ... else the top bonus only breaks ties (symmetric models keep their old fit)
 
-        private static readonly Dictionary<long, WeaponModels.Hold> holds = new Dictionary<long, WeaponModels.Hold>();
-
-        // The model laid into the slab's unit square (WeaponModels.Hold: slab and tip used), or null when the sprite can't
-        // be read. Worked out once per model and material.
-        public static WeaponModels.Hold HoldOf(Model m, Material mat, Vector2 drawSize, float angleOffset)
+        // A model laid into the slab's unit square: slab (model space to slab space) and tip (the barrel's end, slab space),
+        // and how well the model's outline covers the sprite's and along which of its axes, for the logs.
+        public sealed class Hold
         {
-            if (m == null || mat == null || mat.mainTexture == null || m.positions == null || m.positions.Length < 3)
+            public Matrix4x4 slab;
+            public Vector3 tip;
+            public float iou;
+            public float axis;
+        }
+
+        private static readonly Dictionary<ValueTuple<ModelHandle, int>, Hold> holds = new Dictionary<ValueTuple<ModelHandle, int>, Hold>();
+        private static readonly Dictionary<ModelHandle, Vector3[]> soups = new Dictionary<ModelHandle, Vector3[]>();
+        private static readonly List<FigureMeshPart> parts = new List<FigureMeshPart>();
+
+        // The model's faces as a triangle soup (three corners a face, model space): the solid ones of IsoRim's ready meshes of
+        // it (Api.ModelParts), whose corners are the model's own. Read once per model; null for one with none.
+        private static Vector3[] SoupOf(ModelHandle m)
+        {
+            Vector3[] soup;
+            if (soups.TryGetValue(m, out soup))
+            {
+                return soup;
+            }
+            List<Vector3> corners = new List<Vector3>();
+            Api.ModelParts(m, Color.white, null, parts);
+            for (int i = 0; i < parts.Count; i++)
+            {
+                if (parts[i].Outline || parts[i].Mesh == null)
+                {
+                    continue;
+                }
+                Vector3[] verts = parts[i].Mesh.vertices;
+                int[] tris = parts[i].Mesh.triangles;
+                for (int k = 0; k < tris.Length; k++)
+                {
+                    corners.Add(verts[tris[k]]);
+                }
+            }
+            parts.Clear();
+            soup = corners.Count >= 3 ? corners.ToArray() : null;
+            soups[m] = soup;
+            return soup;
+        }
+
+        // The model laid into the slab's unit square, or null when the sprite or the model can't be read. barrelEnd: the
+        // model's (ThingModelInfo.BarrelEnd, model space). Worked out once per model and material.
+        public static Hold HoldOf(ModelHandle m, Vector3 barrelEnd, Material mat, Vector2 drawSize, float angleOffset)
+        {
+            if (m == null || mat == null || mat.mainTexture == null)
             {
                 return null;
             }
-            long key = ((long)m.id << 32) ^ (uint)mat.GetInstanceID();
-            WeaponModels.Hold h;
+            ValueTuple<ModelHandle, int> key = new ValueTuple<ModelHandle, int>(m, mat.GetInstanceID());
+            Hold h;
             if (holds.TryGetValue(key, out h))
             {
                 return h;
             }
             try
             {
-                h = Fit(m, mat, drawSize, angleOffset);
+                Vector3[] soup = SoupOf(m);
+                h = soup != null ? Fit(soup, barrelEnd, mat, drawSize, angleOffset) : null;
             }
             catch (Exception e)
             {
@@ -60,41 +103,33 @@ namespace M3AT
             return h;
         }
 
-        private static readonly Dictionary<WeaponModels.Hold, WeaponModels.Hold> groundSized = new Dictionary<WeaponModels.Hold, WeaponModels.Hold>();
+        private static readonly Dictionary<Hold, Hold> groundSized = new Dictionary<Hold, Hold>();
 
         // A thrown weapon (a grenade: its sprite a heap of a few, the model fitted to the biggest): the hold scaled about the
-        // model's middle so the model comes out at its size on the ground (its ModelDef's scale, cells per model unit) rather
-        // than the sprite's, as IsoRim's own figure holds it (WeaponModels.AtGroundSize, which needs the lengths IsoRim's
-        // fit keeps and this one doesn't). Cached per hold.
-        public static WeaponModels.Hold AtGroundSize(WeaponModels.Hold h, Model m, ThingDef def, Vector2 drawSize)
+        // model's middle so the model comes out at its size on the ground (groundScale: its ModelDef's scale, cells per model
+        // unit, ThingModelInfo.Scale on the ground) rather than the sprite's, as IsoRim's own figure holds it. Cached per hold.
+        public static Hold AtGroundSize(Hold h, ModelHandle m, float groundScale, Vector2 drawSize)
         {
-            WeaponModels.Hold g;
+            Hold g;
             if (groundSized.TryGetValue(h, out g))
             {
                 return g;
             }
             g = h;
-            ModelEntry entry;
-            if (ModelLibrary.TryGet(def, out entry) && entry.def != null)
+            if (groundScale > 0f)
             {
                 // Back out of the slab's unit square into drawn cells, where the fit is a turn and an even scale.
                 Matrix4x4 drawn = Matrix4x4.Scale(new Vector3(drawSize.x, drawSize.y, 1f)) * h.slab;
                 float fitted = ((Vector3)drawn.GetColumn(0)).magnitude;   // drawn cells per model unit
                 if (fitted > 1e-6f)
                 {
-                    float k = entry.def.scale / fitted;
-                    Vector3 lo = m.positions[0], hi = m.positions[0];
-                    for (int i = 1; i < m.positions.Length; i++)
-                    {
-                        lo = Vector3.Min(lo, m.positions[i]);
-                        hi = Vector3.Max(hi, m.positions[i]);
-                    }
-                    Vector3 c = h.slab.MultiplyPoint3x4((lo + hi) * 0.5f);
+                    float k = groundScale / fitted;
+                    Vector3 c = h.slab.MultiplyPoint3x4((m.Min + m.Max) * 0.5f);
                     Matrix4x4 unit = Matrix4x4.Scale(new Vector3(1f / drawSize.x, 1f / drawSize.y, 1f));
                     Matrix4x4 back = Matrix4x4.Scale(new Vector3(drawSize.x, drawSize.y, 1f));
                     // Evenly in drawn cells, about the middle, then into the unit square again.
                     Matrix4x4 about = Matrix4x4.Translate(c) * unit * Matrix4x4.Scale(new Vector3(k, k, k)) * back * Matrix4x4.Translate(-c);
-                    g = new WeaponModels.Hold
+                    g = new Hold
                     {
                         slab = about * h.slab,
                         tip = about.MultiplyPoint3x4(h.tip),
@@ -107,19 +142,20 @@ namespace M3AT
             return g;
         }
 
-        private static readonly Dictionary<WeaponModels.Hold, float> halfDepths = new Dictionary<WeaponModels.Hold, float>();
+        private static readonly Dictionary<Hold, float> halfDepths = new Dictionary<Hold, float>();
 
         // How far the model stands off the slab's middle, either way out of its face, in cells at the sprite's drawn size:
         // the fit centres it there. Cached per hold.
-        public static float HalfDepth(WeaponModels.Hold h, Model m)
+        public static float HalfDepth(Hold h, ModelHandle m)
         {
             float depth;
             if (!halfDepths.TryGetValue(h, out depth))
             {
                 depth = 0f;
-                for (int i = 0; i < m.positions.Length; i++)
+                Vector3[] soup = SoupOf(m);
+                for (int i = 0; soup != null && i < soup.Length; i++)
                 {
-                    depth = Mathf.Max(depth, Mathf.Abs(h.slab.MultiplyPoint3x4(m.positions[i]).z));
+                    depth = Mathf.Max(depth, Mathf.Abs(h.slab.MultiplyPoint3x4(soup[i]).z));
                 }
                 halfDepths[h] = depth;
             }
@@ -128,11 +164,7 @@ namespace M3AT
 
         private static bool[] MaskOf(Material mat)
         {
-            Color32[] px = SpritePixels.Sample(mat.mainTexture, Vector2.one, Vector2.zero, N);
-            if (px == null && !SpritePixels.IsSheet(mat.mainTexture))
-            {
-                px = SpritePixels.GpuSample(mat.mainTexture, N);
-            }
+            Color32[] px = Api.ReadSpritePixels(mat.mainTexture, N);
             if (px == null || px.Length < N * N)
             {
                 return null;
@@ -233,7 +265,7 @@ namespace M3AT
             public Vector2 centre;
         }
 
-        private static WeaponModels.Hold Fit(Model m, Material mat, Vector2 drawSize, float angleOffset)
+        private static Hold Fit(Vector3[] m, Vector3 barrelEnd, Material mat, Vector2 drawSize, float angleOffset)
         {
             bool[] sprite = MaskOf(mat);
             if (sprite == null)
@@ -272,11 +304,11 @@ namespace M3AT
                 }
             }
             Vector2 front = ArtFront(drawSize, angleOffset);
-            Vector3 lo3 = m.positions[0], hi3 = m.positions[0];
-            for (int i = 1; i < m.positions.Length; i++)
+            Vector3 lo3 = m[0], hi3 = m[0];
+            for (int i = 1; i < m.Length; i++)
             {
-                lo3 = Vector3.Min(lo3, m.positions[i]);
-                hi3 = Vector3.Max(hi3, m.positions[i]);
+                lo3 = Vector3.Min(lo3, m[i]);
+                hi3 = Vector3.Max(hi3, m[i]);
             }
             Vector3 ext = hi3 - lo3, mid = (lo3 + hi3) * 0.5f;
             float modelLength = Mathf.Max(ext.x, Mathf.Max(ext.y, ext.z));
@@ -305,8 +337,8 @@ namespace M3AT
             Matrix4x4 unit = Matrix4x4.Scale(new Vector3(1f / drawSize.x, 1f / drawSize.y, 1f));
             Vector3 fwd3 = place.MultiplyVector(Vector3.right);
             Vector3 tip = Vector2.Dot(new Vector2(fwd3.x, fwd3.y).normalized, front) > 0.3f
-                ? place.MultiplyPoint3x4(Projectiles.GunEnd(m)) : Extreme(m, place, front);
-            WeaponModels.Hold h = new WeaponModels.Hold();
+                ? place.MultiplyPoint3x4(barrelEnd) : Extreme(m, place, front);
+            Hold h = new Hold();
             h.slab = unit * place;
             h.tip = unit.MultiplyPoint3x4(tip);
             h.iou = best.iou;
@@ -315,7 +347,7 @@ namespace M3AT
         }
 
         // The best of the 24 square turns of the model laid along the sprite axis theta (degrees from +u toward +v).
-        private static bool Along(Model m, bool[] sprite, List<Vector2> pts, float theta, Vector2 drawSize, Vector2 front, Vector3 ext,
+        private static bool Along(Vector3[] m, bool[] sprite, List<Vector2> pts, float theta, Vector2 drawSize, Vector2 front, Vector3 ext,
             Vector3 mid, float modelLength, out Placing best)
         {
             best = new Placing { score = float.MinValue };
@@ -397,19 +429,19 @@ namespace M3AT
         }
 
         // The middle of the model's corners (placed in slab space at the drawn size) furthest along dir.
-        private static Vector3 Extreme(Model m, Matrix4x4 place, Vector2 dir)
+        private static Vector3 Extreme(Vector3[] m, Matrix4x4 place, Vector2 dir)
         {
             float best = float.MinValue;
-            for (int i = 0; i < m.positions.Length; i++)
+            for (int i = 0; i < m.Length; i++)
             {
-                Vector3 q = place.MultiplyPoint3x4(m.positions[i]);
+                Vector3 q = place.MultiplyPoint3x4(m[i]);
                 best = Mathf.Max(best, q.x * dir.x + q.y * dir.y);
             }
             Vector3 sum = Vector3.zero;
             int n = 0;
-            for (int i = 0; i < m.positions.Length; i++)
+            for (int i = 0; i < m.Length; i++)
             {
-                Vector3 q = place.MultiplyPoint3x4(m.positions[i]);
+                Vector3 q = place.MultiplyPoint3x4(m[i]);
                 if (q.x * dir.x + q.y * dir.y >= best - 0.02f)
                 {
                     sum += q;
@@ -420,9 +452,8 @@ namespace M3AT
         }
 
         // The model's triangles (placed in slab space at the drawn size) filled into the N x N grid of the sprite's pixels.
-        private static void Raster(Model m, Matrix4x4 place, Vector2 drawSize, bool[] grid)
+        private static void Raster(Vector3[] p, Matrix4x4 place, Vector2 drawSize, bool[] grid)
         {
-            Vector3[] p = m.positions;
             for (int t = 0; t + 2 < p.Length; t += 3)
             {
                 Vector2 a = Grid(place.MultiplyPoint3x4(p[t]), drawSize);
@@ -458,6 +489,67 @@ namespace M3AT
         private static Vector2 Grid(Vector3 q, Vector2 drawSize)
         {
             return new Vector2((q.x / drawSize.x + 0.5f) * N, (q.y / drawSize.y + 0.5f) * N);
+        }
+
+        private static readonly Dictionary<int, Vector2> barrelEnds = new Dictionary<int, Vector2>();
+
+        // The end of a weapon sprite's barrel in texture coordinates (u, v), as IsoRim finds it for a figure's slab: of its
+        // opaque pixels, the middle of those furthest along the way the game points the sprite (+u turned back by
+        // equippedAngleOffset), measured at the drawn size so a long sprite is not squeezed. Per material; false for none.
+        public static bool SpriteBarrelEnd(Thing weapon, out Vector2 uv)
+        {
+            uv = new Vector2(1f, 0.5f);
+            Graphic g = weapon.Graphic;
+            Material mat = g != null ? g.MatSingleFor(weapon) : null;
+            if (mat == null || mat.mainTexture == null)
+            {
+                return false;
+            }
+            int key = mat.GetInstanceID();
+            if (barrelEnds.TryGetValue(key, out uv))
+            {
+                return uv.x >= 0f;
+            }
+            const int n = 128;
+            Color32[] px = Api.ReadSpritePixels(mat.mainTexture, n);
+            uv = new Vector2(-1f, -1f);
+            if (px != null && px.Length >= n * n)
+            {
+                Vector3 d3 = Quaternion.AngleAxis(-weapon.def.equippedAngleOffset, Vector3.up) * Vector3.right;
+                Vector2 dir = new Vector2(d3.x * g.drawSize.x, d3.z * g.drawSize.y);   // along the art, texture units scaled to cells
+                float best = float.MinValue;
+                for (int j = 0; j < n; j++)
+                {
+                    for (int i = 0; i < n; i++)
+                    {
+                        if (px[j * n + i].a > 128)
+                        {
+                            best = Mathf.Max(best, (i + 0.5f) / n * dir.x + (j + 0.5f) / n * dir.y);
+                        }
+                    }
+                }
+                if (best > float.MinValue)
+                {
+                    // The pixels within a pixel and a half of the furthest: the mouth of the barrel.
+                    float near = best - 1.5f / n * dir.magnitude;
+                    Vector2 sum = Vector2.zero;
+                    int count = 0;
+                    for (int j = 0; j < n; j++)
+                    {
+                        for (int i = 0; i < n; i++)
+                        {
+                            if (px[j * n + i].a > 128 && (i + 0.5f) / n * dir.x + (j + 0.5f) / n * dir.y >= near)
+                            {
+                                sum += new Vector2((i + 0.5f) / n, (j + 0.5f) / n);
+                                count++;
+                            }
+                        }
+                    }
+                    uv = sum / count;
+                }
+            }
+            barrelEnds[key] = uv;
+            return uv.x >= 0f;
         }
     }
 }

@@ -345,8 +345,8 @@ namespace M3AT
         {
             if (p.tail != null)
             {
-                DynamicModels.Retire(p.tail.solid);
-                DynamicModels.Retire(p.tail.outline);
+                Api.RetireMesh(p.tail.solid);
+                Api.RetireMesh(p.tail.outline);
             }
         }
     }
