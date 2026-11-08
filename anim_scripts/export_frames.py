@@ -1119,6 +1119,13 @@ body_tree = BVHTree.FromPolygons(rest, rest_tris)
 write_skin(os.path.join(out, 'skin.txt'))
 for g in garments:
     write_garment(g, os.path.join(out, 'garment_%s.txt' % g.name))
+# What an older export wrote for a garment since renamed or removed: skin.txt no longer lists it, so the game never reads
+# it, but it ships, and a name differing from a kept one only by case is one file on Windows, which may keep either.
+written = {'garment_%s.txt' % g.name for g in garments} | set(written_textures.values())
+for name in sorted(os.listdir(out)):
+    if name.startswith('garment_') and name.endswith(('.txt', '.png')) and name not in written:
+        os.remove(os.path.join(out, name))
+        print('GARMENT removed %s, left by an older export' % name)
 # The cat ears and tail: parts with armatures of their own, not garments (export_cat.py).
 import export_cat
 export_cat.write(out, scale)
