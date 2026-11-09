@@ -42,8 +42,8 @@ namespace M3AT
     internal sealed class HairBuilder
     {
         private const string Tag = "[M3AT] ";
-        public const int Version = 17;   // raise when the build changes, so cached hair is made again
-        public const int BeardVersion = 1;   // and cached beards
+        public const int Version = 28;   // raise when the build changes, so cached hair is made again
+        public const int BeardVersion = 4;   // and cached beards
         private static bool pixelsFailed;   // IsoRim's pixel reading has thrown once (logged once)
         public const int Size = 256;    // pixels: every sprite is read at this size, as hair.py's SIZE
         private const int Voxel = 2;    // sprite pixels per voxel side
@@ -79,12 +79,20 @@ namespace M3AT
                                                       // head where it starts curving in toward the jaw (set by eye in Blender)
         private const byte Solid = 128;           // least alpha that counts as hair (the game's cut-out, 0.5)
         private const float Cut = 0.9f;           // alpha the mesh is cut at, a little inside the art
+        private const float StrandStreak = 0.12f; // how much the strand streaks brighten or darken the hair's colours (Atlas)
+        private const int StreakLength = 12;      // sprite rows over which a thin streak changes
+        private const int WallSmooth = 6;         // smoothing passes over the walls' reach in along each edge loop
+        private const float WallShade = 0.3f;     // the share of an edge loop's colours darker than its walls' one colour,
+                                                  // as the inside of the hair is in shade
         private const int SkirtInset = 4;         // pixels in from an open edge its wall looks for its colour
         private const float SkirtDark = 0.3f;     // grey at or below which a pixel is the art's outline
         private const float Crown = 0.6f;         // least upward share of a triangle's normal for the crown
         private const float UnderChin = 0.4f;     // head heights above the drawn-over head's chin from which the hull in
                                                   // front of the head's middle takes only the front sprite (Hull), as
                                                   // SkirtShortFrom
+        private const int InkReach = 4;           // pixels in from a sprite's edge its outline ink reaches (InkEdges)
+        private const int VetoSlack = 6;          // pixels past its outline a sprite's hair still counts when it has a
+                                                  // say over a triangle another sprite faces, off the head (Vetoes)
         private const int HairReach = 2;          // voxels round a triangle within which the hair's own hull must be
         private const float Sees = 0.4f;          // least share of a triangle's normal towards a sprite for that sprite
                                                   // to see it, so the triangle is kept only where that sprite has hair
@@ -152,6 +160,8 @@ namespace M3AT
         private bool[][] headMask;   // per view, Size x Size, top first: the drawn-over head's outline, grown by HeadGrow
         private int[] frontFrom, frontTo;   // a beard's: each row's first and last solid column in the front sprite (BeardAlpha), of the sprites being built
         private bool headTried;
+        private bool[][] ink;       // the sprites' outline ink (InkEdges)
+        private Color32[][] veto;   // the sprites' alpha as each has a say over a triangle another faces (Vetoes)
 
         private readonly Queue<Job> waiting = new Queue<Job>();
         private readonly List<Job> done = new List<Job>();
@@ -875,7 +885,7 @@ namespace M3AT
             // Hair: the front or the back sprite (each leaves out what the body hides from it, as a braid down the back
             // is not drawn in the front one), and the side one. The head: its outline in the front and side ones.
             bool[] s = new bool[n * n], e = new bool[n * n], hs = new bool[n * n], he = new bool[n * n];
-            bool[] south = new bool[n * n];
+            bool[] south = new bool[n * n], north = new bool[n * n];
             for (int y = 0; y < n; y++)
             {
                 int row = y * Voxel + Voxel / 2;
@@ -883,7 +893,8 @@ namespace M3AT
                 {
                     int col = x * Voxel + Voxel / 2, i = row * Size + col;
                     south[y * n + x] = sp.px[0][i].a >= Solid;
-                    s[y * n + x] = south[y * n + x] || sp.px[2][row * Size + Size - 1 - col].a >= Solid;
+                    north[y * n + x] = sp.px[2][row * Size + Size - 1 - col].a >= Solid;
+                    s[y * n + x] = south[y * n + x] || north[y * n + x];
                     e[y * n + x] = sp.px[1][i].a >= Solid;
                     hs[y * n + x] = headMask[0][i];
                     he[y * n + x] = headMask[1][i];
@@ -912,6 +923,33 @@ namespace M3AT
                             continue;
                         }
                         for (int z = midZ; z < n; z++)
+                        {
+                            hair[(y * n + x) * n + z] = false;
+                        }
+                    }
+                }
+                // Behind the head's middle, at any height, the hair is only where the back sprite has it (if it has any
+                // in that row). The front sprite is often wider than the back one, its locks spread out either side of
+                // the face, and with its width the hull's back corners stood out past where the back sprite has any
+                // hair: they took the side sprite's outline ink, or were cut away as holes (LongB's back right).
+                for (int y = 0; y < n; y++)
+                {
+                    bool any = false;
+                    for (int x = 0; x < n && !any; x++)
+                    {
+                        any = north[y * n + x];
+                    }
+                    if (!any)
+                    {
+                        continue;
+                    }
+                    for (int x = 0; x < n; x++)
+                    {
+                        if (north[y * n + x])
+                        {
+                            continue;
+                        }
+                        for (int z = 0; z < midZ; z++)
                         {
                             hair[(y * n + x) * n + z] = false;
                         }
@@ -1550,6 +1588,23 @@ namespace M3AT
             return seen & ~(1 << view);
         }
 
+        // The sprite other than view that most faces a triangle with normal n and sees it (Sees), or -1.
+        private static int OtherView(Vector3 n, int view)
+        {
+            int best = -1;
+            float most = Sees;
+            float[] share = { n.z, Mathf.Abs(n.x), -n.z };
+            for (int v = 0; v < 3; v++)
+            {
+                if (v != view && share[v] > most)
+                {
+                    most = share[v];
+                    best = v;
+                }
+            }
+            return best;
+        }
+
         // The least alpha at p of the triangle's own sprite and every other sprite that sees it.
         private float AlphaAt(Sprites sp, int[][] edges, int view, bool crown, int seen, Vector3 p)
         {
@@ -1562,10 +1617,93 @@ namespace M3AT
             {
                 if ((seen & 1 << v) != 0)
                 {
-                    a = Mathf.Min(a, Alpha(sp.px[v], Where(edges, v, false, p)));
+                    a = Mathf.Min(a, Alpha(veto[v], Where(edges, v, false, p)));
                 }
             }
             return a;
+        }
+
+        // Each sprite's outline ink: solid dark pixels (SkirtDark) within InkReach of where the sprite is clear.
+        private static bool[][] InkEdges(Sprites sp)
+        {
+            bool[][] all = new bool[3][];
+            for (int v = 0; v < 3; v++)
+            {
+                bool[] clear = new bool[Size * Size], near = new bool[Size * Size], ink = new bool[Size * Size];
+                for (int i = 0; i < clear.Length; i++)
+                {
+                    clear[i] = sp.px[v][i].a < Solid;
+                }
+                for (int r = 0; r < Size; r++)
+                {
+                    for (int c = 0; c < Size; c++)
+                    {
+                        bool any = false;
+                        for (int dr = -InkReach; dr <= InkReach && !any; dr++)
+                        {
+                            for (int dc = -InkReach; dc <= InkReach && !any; dc++)
+                            {
+                                int rr = r + dr, cc = c + dc;
+                                any = rr < 0 || cc < 0 || rr >= Size || cc >= Size || clear[rr * Size + cc];
+                            }
+                        }
+                        near[r * Size + c] = any;
+                    }
+                }
+                for (int i = 0; i < ink.Length; i++)
+                {
+                    Color32 p = sp.px[v][i];
+                    ink[i] = !clear[i] && near[i] && (p.r + p.g + p.b) / (3f * 255f) <= SkirtDark;
+                }
+                all[v] = ink;
+            }
+            return all;
+        }
+
+        // Each sprite's alpha as it has a say over a triangle another sprite faces (AlphaAt): as it is over the head the
+        // sprite is drawn over, where it shows the face or skin, but past it the most within VetoSlack pixels. The
+        // sprites' outlines don't quite agree, and past one's outline it shows nothing at all rather than something
+        // else: LongC's back sprite has a notch under each bow that the others don't, and the back corners there, which
+        // the back sprite sees, were cut out as holes.
+        private Color32[][] Vetoes(Sprites sp)
+        {
+            Color32[][] all = new Color32[3][];
+            for (int v = 0; v < 3; v++)
+            {
+                byte[] a = new byte[Size * Size], b = new byte[Size * Size];
+                for (int i = 0; i < a.Length; i++)
+                {
+                    a[i] = sp.px[v][i].a;
+                }
+                for (int r = 0; r < Size; r++)
+                {
+                    for (int c = 0; c < Size; c++)
+                    {
+                        byte most = 0;
+                        for (int d = Math.Max(0, c - VetoSlack); d <= Math.Min(Size - 1, c + VetoSlack); d++)
+                        {
+                            most = Math.Max(most, a[r * Size + d]);
+                        }
+                        b[r * Size + c] = most;
+                    }
+                }
+                Color32[] px = new Color32[Size * Size];
+                for (int r = 0; r < Size; r++)
+                {
+                    for (int c = 0; c < Size; c++)
+                    {
+                        int i = r * Size + c;
+                        byte most = 0;
+                        for (int d = Math.Max(0, r - VetoSlack); d <= Math.Min(Size - 1, r + VetoSlack); d++)
+                        {
+                            most = Math.Max(most, b[d * Size + c]);
+                        }
+                        px[i].a = headMask[v][i] ? a[i] : most;
+                    }
+                }
+                all[v] = px;
+            }
+            return all;
         }
 
         // A beard's alpha at p: only the sprite that faces it has a say, each being projected on the head from its own
@@ -1631,6 +1769,8 @@ namespace M3AT
         // where the alpha crosses Cut, so the mesh ends where the hair is seen to end.
         private CutMesh Textured(Mesh m, Sprites sp, bool[] nearHair)
         {
+            veto = Vetoes(sp);
+            ink = InkEdges(sp);
             int n = Size / Voxel;
             int[][] edges = TopEdges(sp);
             CutMesh cut = new CutMesh { m = m };
@@ -1655,6 +1795,40 @@ namespace M3AT
                 {
                     on[k] = AlphaAt(sp, edges, view, crown, seen, m.v[t[k]]) >= Cut;
                     count += on[k] ? 1 : 0;
+                }
+                int alt = crown || beard ? -1 : OtherView(m.fn[f], view);
+                if (alt >= 0)
+                {
+                    // Where the triangle's own sprite runs out, another sprite that sees it may take it over:
+                    // - Not wholly on its own sprite's art, and that sprite shows nothing there (past its outline, not
+                    //   the head): the other takes it if more of it is on its art, and the first has no say. A back
+                    //   corner facing a little more back than sideways takes the back sprite, whose outline (narrower
+                    //   there, or notched under LongC's bows) left holes the side sprite has hair over.
+                    // - On its own sprite's outline ink (InkEdges): the other takes it if it is wholly on its art and
+                    //   not on its own ink there, as the ink drawn round each sprite's edge came out as a jagged black
+                    //   line wherever one sprite's part of the hair gives way to another's.
+                    Vector2 at = Where(edges, view, false, centre), altAt = Where(edges, alt, false, centre);
+                    int here = Mathf.Clamp((int)at.y, 0, Size - 1) * Size + Mathf.Clamp((int)at.x, 0, Size - 1);
+                    int there = Mathf.Clamp((int)altAt.y, 0, Size - 1) * Size + Mathf.Clamp((int)altAt.x, 0, Size - 1);
+                    bool bare = count < 3 && !headMask[view][here], inked = count > 0 && ink[view][here] && !ink[alt][there];
+                    if (bare || inked)
+                    {
+                        int altSeen = SeenBy(m.fn[f], alt, false) & (bare ? ~(1 << view) : ~0);
+                        bool[] altOn = new bool[3];
+                        int altCount = 0;
+                        for (int k = 0; k < 3; k++)
+                        {
+                            altOn[k] = AlphaAt(sp, edges, alt, false, altSeen, m.v[t[k]]) >= Cut;
+                            altCount += altOn[k] ? 1 : 0;
+                        }
+                        if (bare ? altCount > count : altCount == 3)
+                        {
+                            view = alt;
+                            seen = altSeen;
+                            on = altOn;
+                            count = altCount;
+                        }
+                    }
                 }
                 int c = crown ? 1 : 0;
                 if (count == 3)
@@ -1715,6 +1889,40 @@ namespace M3AT
             return cut;
         }
 
+        // Fine streaks down the hair, -1 to 1, laid over the sprites' colours by StrandStreak (Atlas): the sprites are mostly
+        // drawn at 128 pixels and read here at 256, so on the 3D hair they came out as smooth blends of colour, which
+        // looked like plastic. Down each sprite is down the hair nearly everywhere, so each column gets brightness of its
+        // own that changes slowly down it: a thin streak a pixel wide changing over StreakLength rows, and a wider one
+        // (three pixels) over twice that, from a hash of the place, so a style always gets the same.
+        private static float Streak(int view, int c, int r)
+        {
+            return 0.6f * Streak1(view, c, r, 1, StreakLength) + 0.4f * Streak1(view + 3, c, r, 3, 2 * StreakLength);
+        }
+
+        private static float Streak1(int seed, int c, int r, int width, int length)
+        {
+            float x = c / (float)width, y = r / (float)length;
+            int x0 = Mathf.FloorToInt(x), y0 = Mathf.FloorToInt(y);
+            float fx = x - x0, fy = y - y0;
+            fx = fx * fx * (3f - 2f * fx);
+            fy = fy * fy * (3f - 2f * fy);
+            float a = Mathf.Lerp(Noise(seed, x0, y0), Noise(seed, x0 + 1, y0), fx);
+            float b = Mathf.Lerp(Noise(seed, x0, y0 + 1), Noise(seed, x0 + 1, y0 + 1), fx);
+            return Mathf.Lerp(a, b, fy);
+        }
+
+        // -1 to 1 from a hash of the three numbers (murmur3's finalizer).
+        private static float Noise(int seed, int x, int y)
+        {
+            uint h = (uint)(x * 73856093) ^ (uint)(y * 19349663) ^ (uint)(seed * 83492791);
+            h ^= h >> 16;
+            h *= 0x85ebca6b;
+            h ^= h >> 13;
+            h *= 0xc2b2ae35;
+            h ^= h >> 16;
+            return h / (float)uint.MaxValue * 2f - 1f;
+        }
+
         // The three sprites side by side, rows bottom first.
         private static Color32[] Atlas(Sprites sp)
         {
@@ -1726,7 +1934,15 @@ namespace M3AT
                 {
                     for (int c = 0; c < Size; c++)
                     {
-                        a[(Size - 1 - r) * w + v * Size + c] = sp.px[v][r * Size + c];
+                        Color32 p = sp.px[v][r * Size + c];
+                        if (p.a > 0 && (p.r + p.g + p.b) / (3f * 255f) > SkirtDark)
+                        {
+                            float f = 1f + StrandStreak * Streak(v, c, r);
+                            p.r = (byte)Mathf.Clamp(p.r * f, 0f, 255f);
+                            p.g = (byte)Mathf.Clamp(p.g * f, 0f, 255f);
+                            p.b = (byte)Mathf.Clamp(p.b * f, 0f, 255f);
+                        }
+                        a[(Size - 1 - r) * w + v * Size + c] = p;
                     }
                 }
             }
@@ -1941,6 +2157,9 @@ namespace M3AT
                 colours.Sort((a, b) => Grey(sp, a).CompareTo(Grey(sp, b)));
                 colours = new List<Vector2> { colours[colours.Count / 2] };
             }
+            // Each open edge a to b (in its triangle's winding) with the colour just inside it.
+            List<int[]> open = new List<int[]>();
+            List<Vector2> edgeColour = new List<Vector2>();
             for (int f = 0; f < cut.kept.Count; f++)
             {
                 int[] t = cut.kept[f];
@@ -1953,15 +2172,115 @@ namespace M3AT
                     {
                         continue;
                     }
+                    open.Add(new[] { a, b });
+                    edgeColour.Add(WallColour(colours, (uvs[k] + uvs[(k + 1) % 3]) / 2f, centre));
+                }
+            }
+            // The open edges as loops round each hole and the hair's edge. Along the art's ragged edge, each wall reaching
+            // to its own nearest point on the head and taking its own pixel's colour came out as a ribbed band of fins
+            // in stripes. So the reach in is worked out at each corner and smoothed along the loop (WallSmooth), the
+            // walls meeting at their corners as one curtain, and all of a loop's walls take one colour, WallShade up from
+            // the darkest of those along it, so they read as the hair's shaded thickness, not stripes (a colour of their
+            // own within a few edges either way still changed in blocks).
+            Dictionary<int, List<int>> outOf = new Dictionary<int, List<int>>();
+            for (int e = 0; e < open.Count; e++)
+            {
+                List<int> list;
+                if (!outOf.TryGetValue(open[e][0], out list))
+                {
+                    outOf[open[e][0]] = list = new List<int>();
+                }
+                list.Add(e);
+            }
+            bool[] walked = new bool[open.Count];
+            List<List<int>> loops = new List<List<int>>();
+            for (int e0 = 0; e0 < open.Count; e0++)
+            {
+                if (walked[e0])
+                {
+                    continue;
+                }
+                List<int> loop = new List<int>();
+                for (int e = e0; e >= 0 && !walked[e];)
+                {
+                    walked[e] = true;
+                    loop.Add(e);
+                    int next = -1;
+                    List<int> list;
+                    if (outOf.TryGetValue(open[e][1], out list))
+                    {
+                        foreach (int c in list)
+                        {
+                            if (!walked[c])
+                            {
+                                next = c;
+                                break;
+                            }
+                        }
+                    }
+                    e = next;
+                }
+                loops.Add(loop);
+            }
+            Dictionary<int, Vector3> reach = new Dictionary<int, Vector3>();
+            foreach (int[] e in open)
+            {
+                foreach (int v in e)
+                {
+                    if (!reach.ContainsKey(v))
+                    {
+                        reach[v] = Inward(head, at[v]) - at[v];
+                    }
+                }
+            }
+            for (int pass = 0; pass < WallSmooth; pass++)
+            {
+                Dictionary<int, Vector3> smoothed = new Dictionary<int, Vector3>(reach);
+                foreach (List<int> loop in loops)
+                {
+                    for (int i = 0; i < loop.Count; i++)
+                    {
+                        // The corner where this edge meets the next: halfway to the mean of its neighbours on the loop.
+                        int[] here = open[loop[i]];
+                        int prev = here[0], v = here[1];
+                        bool closed = loop.Count > 2 && open[loop[loop.Count - 1]][1] == open[loop[0]][0];
+                        int next = i + 1 < loop.Count ? open[loop[i + 1]][1] : closed ? open[loop[0]][1] : -1;
+                        if (next < 0)
+                        {
+                            continue;
+                        }
+                        smoothed[v] = Vector3.Lerp(reach[v], (reach[prev] + reach[next]) / 2f, 0.5f);
+                    }
+                }
+                reach = smoothed;
+            }
+            foreach (List<int> loop in loops)
+            {
+                List<Vector2> along = new List<Vector2>();
+                foreach (int e in loop)
+                {
+                    along.Add(edgeColour[e]);
+                }
+                along.Sort((x, y) => Grey(sp, x).CompareTo(Grey(sp, y)));
+                Vector2 w = along[(int)(along.Count * WallShade)];
+                for (int i = 0; i < loop.Count; i++)
+                {
+                    int[] e = open[loop[i]];
+                    int a = e[0], b = e[1];
+                    if (!beard && at[a].y < chin && at[b].y < chin)
+                    {
+                        // No walls below the chin: the hair there hangs free of the head, with nothing to close the
+                        // gap to, and the short ledges hung under a lock's ragged edges stuck out of it every way.
+                        continue;
+                    }
                     // Continues the shell's winding, so the wall faces out of the space between the hair and the head;
-                    // one colour, the hair's just inside the edge, on its four corners' own copies.
-                    Vector2 w = WallColour(colours, (uvs[k] + uvs[(k + 1) % 3]) / 2f, centre);
+                    // one colour on its four corners' own copies.
                     int oa = from.Count, ob = oa + 1, ka = oa + 2, kb = oa + 3;
                     from.AddRange(new[] { a, b, a, b });
                     place.Add(at[a]);
                     place.Add(at[b]);
-                    place.Add(Inward(head, at[a]));
-                    place.Add(Inward(head, at[b]));
+                    place.Add(at[a] + reach[a]);
+                    place.Add(at[b] + reach[b]);
                     uv.AddRange(new[] { w, w, w, w });
                     faces.AddRange(new[] { ob, oa, ka, ob, ka, kb });
                 }
@@ -1989,6 +2308,10 @@ namespace M3AT
                     sb.Append("# the walls under the open edges from here on\n");
                 }
                 Face(sb, faces[k], faces[k + 1], faces[k + 2]);
+            }
+            if (hairFaces < faces.Count)
+            {
+                sb.Append("walls ").Append(hairFaces / 3).Append('\n');
             }
             Keys(sb, place.ToArray(), head);
             return sb.ToString();

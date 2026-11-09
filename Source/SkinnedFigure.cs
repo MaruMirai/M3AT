@@ -114,6 +114,7 @@ namespace M3AT
             public Matrix4x4? heldGrip; // and its held_grip line: from there to its rest place on hand.L as shield_draw takes it by its edge
             public Color? colour;       // a garment's own colour, in place of the apparel's (the shoes); null: the apparel's
             public int[] hides;       // a garment's: the body triangles (numbered as skin.txt's) under it, left out while it is worn
+            public int wallsFrom = -1;   // built hair's: its first wall triangle (its walls line), which Decimated keeps whole
             public bool[] glass;      // a garment's: which of its triangles are glass (a helmet's visor), drawn see-through (DrawVisor); null: none
             public int[] shellTris;   // and its triangles that aren't glass, which its solid mesh draws
             public Piece visor;       // and the glass as a piece of its own (VisorOf), posed as the hair is
@@ -300,6 +301,7 @@ namespace M3AT
             public int cpuAt = -1;   // and the Posed.posedAt its verts and normals were last worked out here at for what reads them (PosedOnCpu)
             public GarmentMask hidden;   // the garments whose triangles it has left out: the body's (HideUnder), a garment's (HideGarments)
             public Piece hiddenHair;   // and the hair whose shell its outline is left out under
+            public bool tucked;   // and whether what is under the blanket is left out too (BedTuck.cs)
         }
 
         // One pawn's posed meshes.
@@ -349,6 +351,7 @@ namespace M3AT
             public float recline;   // degrees the trunk is bent forward over the hips, the thighs kept as they were (Recline)
             public Vector3[] pos;   // each bone's head as posed, cells
             public bool[] cut;   // the bones cut off at their head, with all below them (Cut): a missing limb
+            public bool tucked;   // under IsoRim's blanket in bed: only the head is drawn (BedTuck.cs); set before HideUnder
             public Matrix4x4[] bones;   // what the meshes are skinned by: a cut bone squashed to the joint it was cut at
             public Matrix4x4[] whole;   // the same uncut, for what rides a bone (BoneOf, JointOf)
             public float[] boneRows;   // bones as 12 numbers each, the top three rows (ReadBones), what the meshes are skinned from
@@ -918,6 +921,9 @@ namespace M3AT
                     case "groups":
                         piece.groups = new string[p.Length - 1];
                         Array.Copy(p, 1, piece.groups, 0, p.Length - 1);
+                        break;
+                    case "walls":
+                        piece.wallsFrom = int.Parse(p[1]);
                         break;
                     case "hide":
                         for (int i = 1; i < p.Length; i++)
@@ -2839,18 +2845,19 @@ namespace M3AT
             {
                 hair = null;
             }
-            if (m.hidden == mask && m.hiddenHair == hair)
+            if (m.hidden == mask && m.hiddenHair == hair && m.tucked == p.tucked)
             {
                 return;
             }
             // Without working out the bounds again: they were set once for culling (NewMesh), roomy enough for any pose.
-            if (m.hidden != mask)
+            if (m.hidden != mask || m.tucked != p.tucked)
             {
-                m.solid.SetTriangles(BodyTris(mask), 0, false);
+                m.solid.SetTriangles(Tucked(p, BodyTris(mask), pieces[0]), 0, false);
             }
             m.hidden = mask;
             m.hiddenHair = hair;
-            m.outline.SetTriangles(OutlineTris(mask, hair), 0, false);
+            m.tucked = p.tucked;
+            m.outline.SetTriangles(Tucked(p, OutlineTris(mask, hair), pieces[0]), 0, false);
         }
 
         private int[] OutlineTris(GarmentMask mask, Piece hair)
@@ -2945,12 +2952,13 @@ namespace M3AT
                     m = NewPieceMeshes(pieces[g]);
                     p.pieces[g] = m;
                 }
-                if (m.hidden != over)
+                if (m.hidden != over || m.tucked != p.tucked)
                 {
-                    int[] tris = GarmentTris(g, over);
-                    m.solid.SetTriangles(GarmentSolidTris(g, over), 0, false);
+                    int[] tris = Tucked(p, GarmentTris(g, over), pieces[g]);
+                    m.solid.SetTriangles(Tucked(p, GarmentSolidTris(g, over), pieces[g]), 0, false);
                     m.outline.SetTriangles(tris, 0, false);
                     m.hidden = over;
+                    m.tucked = p.tucked;
                 }
             }
         }
@@ -2976,7 +2984,7 @@ namespace M3AT
         {
             PieceMeshes m = Pose(p, fur);
             Piece hair = WornHair(Hair(hairStyle), mask, p);
-            if (m.hidden == mask && m.hiddenHair == hair)
+            if (m.hidden == mask && m.hiddenHair == hair && m.tucked == p.tucked)
             {
                 return;
             }
@@ -2999,10 +3007,12 @@ namespace M3AT
                 tris = Kept(pieces[fur].tris, hide);
                 furTris[key] = tris;
             }
+            tris = Tucked(p, tris, pieces[fur]);
             m.solid.SetTriangles(tris, 0, false);
             m.outline.SetTriangles(tris, 0, false);
             m.hidden = mask;
             m.hiddenHair = hair;
+            m.tucked = p.tucked;
         }
 
         private static void Hide(bool[] hide, bool[] under)
@@ -3276,6 +3286,10 @@ namespace M3AT
         // A textured garment is drawn with its image times tint (white: as it is), its outline in its mean colour times tint.
         public void Draw(Posed p, int piece, Vector3 position, float yaw, float size, Color tint, bool isSkin = false)
         {
+            if (TuckedAway(p, piece))
+            {
+                return;   // all of it under the blanket
+            }
             Piece g = pieces[piece];
             PieceMeshes m = Pose(p, piece);
             m.isSkin = isSkin;
@@ -3887,12 +3901,41 @@ namespace M3AT
         // A copy of a piece (hair or its shell) cut down by Decimate to this share of its triangles (built, they come out
         // at up to ten thousand each, and every vertex is posed on the CPU every frame); each vertex left keeps its own
         // weights and keys. Only built hair: hair from a M3AThair folder keeps the triangles its maker gave it.
+
         internal static Piece Decimated(Piece from, Vector2[] uvs, float share)
         {
             int[] kept, tris;
-            Decimate.Run(from.rest, from.tris, uvs, Mathf.RoundToInt(from.tris.Length / 3 * share), out kept, out tris);
+            int hairCut = -1;   // built hair's: its triangles once cut, the walls after them
+            int target = Mathf.RoundToInt(from.tris.Length / 3 * share);
+            int wallsAt = from.wallsFrom * 3;
+            if (from.wallsFrom < 0 || wallsAt >= from.tris.Length)
+            {
+                Decimate.Run(from.rest, from.tris, uvs, target, out kept, out tris);
+            }
+            else
+            {
+                // Only the hair is cut, and its walls are then hung again from the cut hair's open edges. Cut with it,
+                // their corners were merged into the hair's and took its texture places, and the walls came out as
+                // smeared, crossing panels; kept whole, they still followed the edge's old steps where the cut had
+                // straightened it, and the skin showed through the gaps between.
+                int[] hair = new int[wallsAt], walls = new int[from.tris.Length - wallsAt];
+                Array.Copy(from.tris, hair, wallsAt);
+                Array.Copy(from.tris, wallsAt, walls, 0, walls.Length);
+                int[] hairKept, hairTris;
+                Decimate.Run(from.rest, hair, uvs, Mathf.RoundToInt(hair.Length / 3 * share), out hairKept, out hairTris);
+                List<int> keptList = new List<int>(hairKept);
+                List<int> all = new List<int>(hairTris);
+                hairCut = hairTris.Length / 3;
+                Rehang(from, hair, walls, hairKept, keptList, all);
+                kept = keptList.ToArray();
+                tris = all.ToArray();
+            }
             Piece p = new Piece { name = from.name, layer = from.layer, groups = from.groups, defs = from.defs, hides = from.hides };
             p.tris = tris;
+            if (hairCut >= 0 && hairCut * 3 < tris.Length)
+            {
+                p.wallsFrom = hairCut;
+            }
             p.rest = new Vector3[kept.Length];
             List<int> first = new List<int>(), bone = new List<int>();
             List<float> weight = new List<float>();
@@ -3928,6 +3971,101 @@ namespace M3AT
                 p.keys[key.Key] = Array.ConvertAll(kept, o => key.Value[o]);
             }
             return p;
+        }
+
+        // Hangs built hair's walls again from the cut hair's open edges (all, by the file's vertices; kept, the cut hair's
+        // vertices so far, and the triangles over them, both added to). The file has a wall under each of the uncut
+        // edges, every one a quad from a top corner on a hair vertex down to a bottom corner, the same at a vertex
+        // whichever edge it is under. A cut open edge runs between hair vertices the cut kept, so it gets a quad between
+        // the walls the file has at its two ends; one with no wall at an end (below the chin) gets none.
+        private static void Rehang(Piece from, int[] hair, int[] walls, int[] hairKept, List<int> kept, List<int> all)
+        {
+            HashSet<Vector3> hairAt = new HashSet<Vector3>();
+            foreach (int o in hair)
+            {
+                hairAt.Add(from.rest[o]);
+            }
+            // Each place on the edge to its wall's top and bottom corner: a quad's two tops and two bottoms, paired
+            // so the two sides don't cross.
+            Dictionary<Vector3, int[]> wallAt = new Dictionary<Vector3, int[]>();
+            List<int> tops = new List<int>(2), bottoms = new List<int>(2);
+            for (int q = 0; q + 5 < walls.Length; q += 6)
+            {
+                tops.Clear();
+                bottoms.Clear();
+                for (int k = q; k < q + 6; k++)
+                {
+                    int o = walls[k];
+                    List<int> to = hairAt.Contains(from.rest[o]) ? tops : bottoms;
+                    if (!to.Contains(o))
+                    {
+                        to.Add(o);
+                    }
+                }
+                if (tops.Count != 2 || bottoms.Count != 2)
+                {
+                    continue;
+                }
+                Vector3 t0 = from.rest[tops[0]], t1 = from.rest[tops[1]], b0 = from.rest[bottoms[0]], b1 = from.rest[bottoms[1]];
+                bool swap = (t0 - b1).magnitude + (t1 - b0).magnitude < (t0 - b0).magnitude + (t1 - b1).magnitude;
+                wallAt[t0] = new[] { tops[0], bottoms[swap ? 1 : 0] };
+                wallAt[t1] = new[] { tops[1], bottoms[swap ? 0 : 1] };
+            }
+            // The cut hair's open edges, its copies along seams welded by place (they share places exactly), each in
+            // its triangle's winding.
+            Dictionary<long, int> count = new Dictionary<long, int>();
+            Dictionary<long, Vector3[]> ends = new Dictionary<long, Vector3[]>();
+            Dictionary<Vector3, int> weld = new Dictionary<Vector3, int>();
+            int triCount = all.Count;
+            for (int k = 0; k + 2 < triCount; k += 3)
+            {
+                for (int c = 0; c < 3; c++)
+                {
+                    Vector3 pa = from.rest[hairKept[all[k + c]]], pb = from.rest[hairKept[all[k + (c + 1) % 3]]];
+                    int a, b;
+                    if (!weld.TryGetValue(pa, out a))
+                    {
+                        weld[pa] = a = weld.Count;
+                    }
+                    if (!weld.TryGetValue(pb, out b))
+                    {
+                        weld[pb] = b = weld.Count;
+                    }
+                    if (a == b)
+                    {
+                        continue;
+                    }
+                    long e = (long)Math.Min(a, b) << 32 | (uint)Math.Max(a, b);
+                    int n;
+                    count.TryGetValue(e, out n);
+                    count[e] = n + 1;
+                    ends[e] = new[] { pa, pb };
+                }
+            }
+            Dictionary<int, int> index = new Dictionary<int, int>();
+            Func<int, int> indexOf = o =>
+            {
+                int i;
+                if (!index.TryGetValue(o, out i))
+                {
+                    index[o] = i = kept.Count;
+                    kept.Add(o);
+                }
+                return i;
+            };
+            foreach (KeyValuePair<long, int> e in count)
+            {
+                int[] wa, wb;
+                Vector3[] end = ends[e.Key];
+                if (e.Value != 1 || !wallAt.TryGetValue(end[0], out wa) || !wallAt.TryGetValue(end[1], out wb))
+                {
+                    continue;
+                }
+                // As the builder hangs it under an edge a to b: its tops run b to a, so it faces out of the space
+                // between the hair and the head.
+                int ta = indexOf(wa[0]), tb = indexOf(wb[0]), ba = indexOf(wa[1]), bb = indexOf(wb[1]);
+                all.AddRange(new[] { tb, ta, ba, tb, ba, bb });
+            }
         }
 
         // The hair of a style, read the first time it is asked for (see the class comment for where from); null while it

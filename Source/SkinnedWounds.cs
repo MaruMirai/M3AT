@@ -47,6 +47,7 @@ namespace M3AT
             public Vector3[] verts;
             public Vector3[] normals;
             public int sign;   // what they were made for (SetWounds)
+            public bool tucked;   // and whether under the blanket (BedTuck.cs)
             public GarmentMask mask;
             public bool empty;
             public int posedAt = -1;
@@ -71,7 +72,7 @@ namespace M3AT
         // garments worn, HideUnder's), so SetWounds is wanted.
         public bool WoundsChanged(Posed p, int sign, GarmentMask mask)
         {
-            return p.wounds == null || p.wounds.sign != sign || p.wounds.mask != mask;
+            return p.wounds == null || p.wounds.sign != sign || p.wounds.mask != mask || p.wounds.tucked != p.tucked;
         }
 
         // Lays these wounds on the pawn's body in place of the ones it had, the first under the rest, and any marked
@@ -88,6 +89,7 @@ namespace M3AT
             }
             w.sign = sign;
             w.mask = mask;
+            w.tucked = p.tucked;
             w.posedAt = -1;
             FindTriangles();
             // What each piece may carry: the body's triangles not under a garment, and each skin-layer garment's that follow
@@ -96,10 +98,15 @@ namespace M3AT
             bool[][] hidden = new bool[pieces.Length][];
             int[][] under = new int[pieces.Length][];
             hidden[0] = Hidden(mask);
+            if (p.tucked)
+            {
+                hidden[0] = (bool[])hidden[0].Clone();   // (Hidden's list is kept per mask)
+                HideTucked(p, hidden[0]);
+            }
             bool anyOnClothes = false;
             foreach (Decal d in decals)
             {
-                anyOnClothes |= d.onClothes;
+                anyOnClothes |= d.onClothes && !p.tucked;   // tucked in, the clothes under the blanket aren't drawn
             }
             for (int g = 1; anyOnClothes && g < pieces.Length && g <= MaxHiding; g++)
             {

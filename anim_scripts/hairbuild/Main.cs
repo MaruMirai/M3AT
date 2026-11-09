@@ -105,6 +105,10 @@ namespace M3AT
             {
                 sb.Append("f ").Append(p.tris[k]).Append(' ').Append(p.tris[k + 1]).Append(' ').Append(p.tris[k + 2]).Append('\n');
             }
+            if (p.wallsFrom >= 0)
+            {
+                sb.Append("walls ").Append(p.wallsFrom).Append('\n');
+            }
             foreach (KeyValuePair<string, Vector3[]> key in p.keys)
             {
                 sb.Append("key ").Append(key.Key).Append('\n');

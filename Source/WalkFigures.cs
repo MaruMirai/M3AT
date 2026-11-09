@@ -489,6 +489,7 @@ namespace M3AT
             public int layFrame = -99;
             public float lieYaw;   // the yaw, model units along and cells up it was laid at then (the getup starts from there)
             public float lieAlong;
+            public float blanketAlong = float.NaN;   // where the blanket's lump starts along the bed from the placing's head, cells (DrawBlanket)
             public float lieFloor;
             public float risen = 1f;   // how far through getting up, 0 .. 1; 1: done (RiseOf)
             public int risenTick;   // the game tick it was last moved on
@@ -5289,7 +5290,7 @@ namespace M3AT
             {
                 skin.DrawHorns(fig, horns, at, yaw, size);   // through the hair, but not through a hat
             }
-            if (HasCatTail(pawn))
+            if (HasCatTail(pawn) && !fig.tucked)
             {
                 DrawCatTail(pawn, fig, mask, wornBuffer, at, yaw, size, sat, tailFloor, tailOnGround);
             }
@@ -5661,7 +5662,51 @@ namespace M3AT
         private static BlanketDrawer blanketDrawer;
         private static bool blanketLooked;
 
+        // The blanket is IsoRim's lump made for its own figure, whose jaw is RefStart (0.14) of its size from the head's middle and
+        // whose body is shallower. The chibi's head is bigger (0.2 from its middle to the jaw) and the body deeper, so the
+        // lump is drawn BlanketScale bigger (taller and longer; IsoRim keeps it within the bed's width and length) and moved
+        // along the bed so it starts at the chibi's neck (BlanketNeck) rather than under IsoRim's jaw.
+        private const float BlanketScale = 1.25f;
+        private const float BlanketRefStart = 0.14f;   // IsoRim's SleeperBlanket.RefStart: where its lump starts from the head's middle, of its size
+        private const string BlanketNeck = "spine.005";
+        private const float BlanketSnap = 0.03f;   // cells the neck may move along the bed (breathing) before the lump follows it, and is built again
+
+        private static void DrawTuckedIn(Pawn pawn, Building_Bed bed, SkinnedFigure.Posed fig, Ease ease, Vector3 at, float yaw, float size,
+            Vector3 placedAt, float placedYaw, float ground)
+        {
+            float big = size * BlanketScale;
+            Vector3 along = Quaternion.AngleAxis(placedYaw, Vector3.up) * Vector3.forward;   // toward the feet, as IsoRim lays it
+            Vector3 neck;
+            if (skin.JointOf(fig, BlanketNeck, out neck))
+            {
+                Vector3 world = at + Quaternion.AngleAxis(yaw, Vector3.up) * (neck * size);
+                float d = Vector3.Dot(world - placedAt, along);
+                if (float.IsNaN(ease.blanketAlong) || Mathf.Abs(d - ease.blanketAlong) > BlanketSnap)
+                {
+                    ease.blanketAlong = Mathf.Round(d * 100f) / 100f;
+                }
+            }
+            float shift = float.IsNaN(ease.blanketAlong) ? 0f : ease.blanketAlong - BlanketRefStart * big;
+            DrawBlanket(pawn, bed, placedAt + along * shift, placedYaw, big, ground);
+        }
+
+        // Whether this IsoRim has the blanket to draw.
+        private static bool BlanketReady()
+        {
+            LookForBlanket();
+            return blanketDrawer != null;
+        }
+
         private static void DrawBlanket(Pawn pawn, Building_Bed bed, Vector3 at, float yaw, float size, float ground)
+        {
+            LookForBlanket();
+            if (blanketDrawer != null)
+            {
+                blanketDrawer(pawn, bed, at, yaw, size, ground);
+            }
+        }
+
+        private static void LookForBlanket()
         {
             if (!blanketLooked)
             {
@@ -5683,10 +5728,6 @@ namespace M3AT
                 {
                     Log.Warning(Tag + "Could not find IsoRim's sleeper's blanket: " + e.Message);
                 }
-            }
-            if (blanketDrawer != null)
-            {
-                blanketDrawer(pawn, bed, at, yaw, size, ground);
             }
         }
 
@@ -6373,17 +6414,16 @@ namespace M3AT
                 // What the tail stays above: what it lies on, or getting up, the lowest of the body. Under a blanket it is hidden,
                 // and pushed up to the blanket it would show through it.
                 float tailFloor = lying ? (floor - at.y) / size : rise > 0f || proneAt > 0f || duck > 0f ? lowest : float.NegativeInfinity;
+                // A bed that shows only the head: IsoRim's blanket over the body, as over its own figure, and only the head
+                // drawn (fig.tucked, BedTuck.cs), as the chibi's body, arms crossed on the chest, stood up through the lump.
+                Building_Bed blanketBed = lying && !dead && !ctx.ForOtherMod && placed.Situation == FigureSituation.InBed && placed.HeadOnlyInBed
+                    && BedBlankets && BlanketReady() ? pawn.CurrentBed() : null;
+                fig.tucked = blanketBed != null;
                 GarmentMask mask = DrawDressed(pawn, fig, at, yaw, size, sat, tailFloor, onGround);
-                if (lying && !dead && placed.Situation == FigureSituation.InBed && placed.HeadOnlyInBed && BedBlankets)
+                fig.tucked = false;   // (only for this draw: carried out of bed, it is drawn by its carrier, DrawHeld)
+                if (blanketBed != null)
                 {
-                    // A bed that shows only the head: IsoRim's blanket over the body, as over its own figure. The chibi's body
-                    // is smaller than the lump (about 0.18 cells deep at the chest against its 0.25), so lying on the bed as
-                    // it does it is mostly hidden under it by depth. IsoRim's place is the head's middle, as ours is in a bed.
-                    Building_Bed bed = pawn.CurrentBed();
-                    if (bed != null)
-                    {
-                        DrawBlanket(pawn, bed, placed.Position, placed.Yaw, size, lyingFloor);
-                    }
+                    DrawTuckedIn(pawn, blanketBed, fig, ease, at, yaw, size, placed.Position, placed.Yaw, lyingFloor);
                 }
                 Vector3 chest, hips, head;
                 if (lying && skin.JointOf(fig, ChestBone, out chest) && skin.JointOf(fig, "spine", out hips) && skin.JointOf(fig, "spine.006", out head))

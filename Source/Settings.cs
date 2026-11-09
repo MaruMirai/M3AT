@@ -332,7 +332,7 @@ namespace M3AT
                 "Jump packs, shield belts and the other packs, belts and lances a pawn wears are shown on its back or waist, and headsets, masks, crowns, blindfolds and slave collars on its head and neck, with IsoRim's models of them. Off: they are not shown.");
             list.CheckboxLabeled("M3AT apparel on the ground", ref Settings.groundGarments,
                 "Clothes on the map will be drawn as the same 3D garment a pawn wears, squashed flat. Off (default): IsoRim's 3D models are used. Takes effect when this window closes.");
-            list.CheckboxLabeled("Blankets over sleepers", ref Settings.bedBlankets,
+            list.CheckboxLabeled("Sleep under IsoRim's blankets", ref Settings.bedBlankets,
                 "In beds that show only the sleeper's head, IsoRim's blanket is drawn over the body, raised by it. Off (default): the pawn lies on top of the bed.");
 
             list.Gap();
