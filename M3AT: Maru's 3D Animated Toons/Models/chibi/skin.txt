@@ -5455,11 +5455,15 @@ garment BowlerHat garment_BowlerHat.txt
 garment Broadwrap garment_Broadwrap.txt
 garment Burka garment_Burka.txt
 garment Cape garment_Cape.txt
+garment CE_AdvancedNightVision garment_CE_AdvancedNightVision.txt
 garment CE_Backpack garment_CE_Backpack.txt
 garment CE_BallisticShield garment_CE_BallisticShield.txt
 garment CE_CompositeVest garment_CE_CompositeVest.txt
+garment CE_ExoFrame garment_CE_ExoFrame.txt
 garment CE_MeleeShield garment_CE_MeleeShield.txt
 garment CE_PlateHelmet garment_CE_PlateHelmet.txt
+garment CE_RadioPack garment_CE_RadioPack.txt
+garment CE_SimpleNightVision garment_CE_SimpleNightVision.txt
 garment CE_TacVest garment_CE_TacVest.txt
 garment CE_TribalBackpack garment_CE_TribalBackpack.txt
 garment CeremonialCultistMask garment_CeremonialCultistMask.txt

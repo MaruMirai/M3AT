@@ -452423,7 +452423,7 @@ type_scale melee_2h 1.0000 big
 # holster_melee slot x y z ax ay az roll: its melee_ place, aim and roll, for a melee weapon.
 # holster_pack slot yes|no: the slot is used only with, or only without, a pack worn. holster_packs def ...: the
 # apparel that counts as a pack (walk.HOLSTER_PACKS). holster_belt slot yes|no: the same with a belt.
-holster_packs CE_Apparel_Backpack CE_Apparel_TribalBackpack
+holster_packs CE_Apparel_Backpack CE_Apparel_TribalBackpack CE_Apparel_RadioPack
 holster back big spine.002 0.0000 0.6757 -0.0873 -0.5000 0.6560 0.0000 0.0000 0.0000 0.0000 0.0000 -1.0000
 holster_pack back no
 holster back_2 big spine.002 0.0000 0.6757 -0.1343 0.6062 0.7953 0.0000 0.0000 0.0000 0.0000 0.0000 -1.0000

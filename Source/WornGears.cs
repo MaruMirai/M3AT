@@ -212,7 +212,8 @@ namespace M3AT
         private static readonly Dictionary<ThingDef, string> gearMounts = new Dictionary<ThingDef, string>();
 
         // The IsoRim mount an apparel's worn gear model goes on (IsoRim's worn gear: pack, belt or hip, as anim.txt's gear
-        // lines name them), null for none; read from Api.ReadThingModel once per apparel def.
+        // lines name them), null for none; read from Api.ReadThingModel once per apparel def. None for apparel with a garment
+        // of its own (the radio pack), which is drawn in its place.
         private static string GearMountOf(Apparel a)
         {
             string mount;
@@ -226,7 +227,7 @@ namespace M3AT
             }
             ThingModelInfo info;
             mount = null;
-            if (Api.ReadThingModel(a, ThingModelUse.Worn, out info) && info.Model != null)
+            if ((skin == null || skin.GarmentOf(a.def) <= 0) && Api.ReadThingModel(a, ThingModelUse.Worn, out info) && info.Model != null)
             {
                 mount = info.Mount == WornMount.Back ? "pack" : info.Mount == WornMount.Belt ? "belt" : info.Mount == WornMount.Hip ? "hip" : null;
             }

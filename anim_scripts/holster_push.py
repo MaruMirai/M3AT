@@ -12,6 +12,7 @@ HOLSTER_DEPTH = 0.15    # HolsterDepth: and how far along it, in and out from th
 SAME_WAY_OUT = 0.9      # SameWayOut: cosine, two slots' ways out this close count as the same way
 BIG_HALF_LENGTH = 0.25  # BigHalfLength: how far along its aim either way a big slot's weapon reaches
 PACK_LOOK = 0.8         # PackLook: of a backpack's height and width, how far out across its face Clearance looks
+PACK_FACE = 0.5         # PackFace: of a backpack's depth, the inner part its face is measured over
 SIDE_FAR = 0.08         # SideFar: how far out from a slot beside a pack a surface counts
 OVER_PACK_MIDDLE = 0.03 # OverPackMiddle: how far above a pack's middle a weapon lying on it goes
 ALONG_BIG = (0.0, -0.5, 0.5, -1.0, 1.0)   # AlongBig: where Clearance looks along a big slot's weapon, shares of that
@@ -303,7 +304,8 @@ class Figure:
         rest = self.piece(g).rest
         along = rest @ way
         inner, far = along.min(), along.max()
-        low, high = rest.min(axis=0), rest.max(axis=0)
+        face = rest[along <= inner + (far - inner) * PACK_FACE]
+        low, high = face.min(axis=0), face.max(axis=0)
         middle = (low + high) * 0.5
         at = middle + way * (inner - middle @ way)
         half = (high - low) * PACK_LOOK * 0.5

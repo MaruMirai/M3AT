@@ -25,6 +25,7 @@ namespace M3AT
         private const float SameWayOut = 0.9f;      // cosine: two slots' ways out this close count as the same way
         private const float BigHalfLength = 0.25f;  // model units: how far along its aim either way a big slot's weapon reaches, about a rifle's
         private const float PackLook = 0.8f;        // of a backpack's height and width: how far out across its face Clearance looks
+        private const float PackFace = 0.5f;        // of a backpack's depth: the inner part its face is measured over, so what stands up or out from its outer half (the radio pack's antenna and handset) doesn't move where it rests
         private const float SideFar = 0.08f;        // model units: how far out from a slot beside a pack a surface counts
         private const float OverPackMiddle = 0.03f; // model units: how far above a pack's middle a weapon lying on it goes: it lies nearer the camera, which looks down, so level with the middle it looks low on the pack
         private const int SideKey = 100, PackKey = 200;   // holsterPush's keys past the slot numbers (the gear's are 250 on)
@@ -380,14 +381,21 @@ namespace M3AT
             Vector3 way = slot.place.outward;
             Vector3[] rest = pieces[g].rest;
             float inner = float.MaxValue, outer = float.MinValue;
-            Vector3 low = Vector3.one * float.MaxValue, high = Vector3.one * float.MinValue;
             for (int i = 0; i < rest.Length; i++)
             {
                 float along = Vector3.Dot(rest[i], way);
                 inner = Mathf.Min(inner, along);
                 outer = Mathf.Max(outer, along);
-                low = Vector3.Min(low, rest[i]);
-                high = Vector3.Max(high, rest[i]);
+            }
+            float face = inner + (outer - inner) * PackFace;
+            Vector3 low = Vector3.one * float.MaxValue, high = Vector3.one * float.MinValue;
+            for (int i = 0; i < rest.Length; i++)
+            {
+                if (Vector3.Dot(rest[i], way) <= face)
+                {
+                    low = Vector3.Min(low, rest[i]);
+                    high = Vector3.Max(high, rest[i]);
+                }
             }
             Vector3 middle = (low + high) * 0.5f;
             Vector3 at = middle + way * (inner - Vector3.Dot(middle, way));

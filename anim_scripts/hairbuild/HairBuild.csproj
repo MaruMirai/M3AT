@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- HairBuilder.cs run outside the game (anim_scripts/hairbuild/run.sh, ./view_hair.sh). It compiles the mod's own
+       Source/*.cs with Main.cs into an exe named RimWorld.dll, run on the game's own runtime from a folder of links to
+       the install (CLAUDE.md's harness), as UnityStubs' Vector3 and friends need it. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>RimWorld</AssemblyName>
+    <OutputType>Exe</OutputType>
+    <UseAppHost>false</UseAppHost>
+    <GenerateRuntimeConfigurationFiles>false</GenerateRuntimeConfigurationFiles>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <DebugType>none</DebugType>
+    <Optimize>true</Optimize>
+    <Nullable>disable</Nullable>
+    <NoWarn>CS0162;CS0169;CS0414;CS0649;CS0168;CS0219</NoWarn>
+    <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
+    <NoStdLib>true</NoStdLib>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Source/*.cs" />
+    <Compile Include="Main.cs" />
+    <Reference Include="/home/t/.local/share/Steam/steamapps/common/RimWorld/System*.dll;/home/t/.local/share/Steam/steamapps/common/RimWorld/netstandard.dll;/home/t/.local/share/Steam/steamapps/common/RimWorld/Microsoft.*.dll" Private="false" />
+    <Reference Include="Assembly-CSharp"><HintPath>/home/t/.local/share/Steam/steamapps/common/RimWorld/Assembly-CSharp.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityStubs"><HintPath>/home/t/.local/share/Steam/steamapps/common/RimWorld/UnityStubs.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Waylith"><HintPath>/home/t/.local/share/Steam/steamapps/common/RimWorld/Waylith.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="IsoRim"><HintPath>/home/t/.local/share/Steam/steamapps/workshop/content/294100/3819577715/1.7/Assemblies/IsoRim.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="0Harmony"><HintPath>/home/t/.local/share/Steam/steamapps/workshop/content/294100/2009463077/1.7/Assemblies/0Harmony.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+</Project>

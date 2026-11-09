@@ -411,7 +411,7 @@ WEAPONS = {
 # the slot is only used with one on, False, only with none. With the left arm gone they stay at the waist
 # (WalkFigures.OnBeltSlots).
 MELEE_SLOT_OFFSET = -65.0
-HOLSTER_PACKS = ('CE_Apparel_Backpack', 'CE_Apparel_TribalBackpack')   # defNames of the apparel that moves the back's weapons
+HOLSTER_PACKS = ('CE_Apparel_Backpack', 'CE_Apparel_TribalBackpack', 'CE_Apparel_RadioPack')   # defNames of the apparel that moves the back's weapons
 HOLSTERS = {
     'back': dict(size='big', bone='spine.002', at=(0.0, 0.06, 0.17), aim=(0.5, 0.0, 0.656), roll=0.0, behind=0.0, out=(0.0, 1.0, 0.0), pack=False),
     'back_2': dict(size='big', bone='spine.002', at=(-0.0, 0.107, 0.17), aim=(-0.6062, 0.0, 0.7953), roll=-0.0, behind=0.0, out=(-0.0, 1.0, 0.0), pack=False),

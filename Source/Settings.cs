@@ -26,7 +26,7 @@ namespace M3AT
     public class Settings : ModSettings
     {
         public const float DefaultShrink = 0f;   // the head shrink the options start at: the full chibi head
-        public const float DefaultHeightSpread = 0.04f, DefaultBodySpread = 0.3f;   // the variety sliders' defaults
+        public const float DefaultHeightSpread = 0.02f, DefaultBodySpread = 0.3f;   // the variety sliders' defaults
         public const float DefaultHairDetail = 0.5f;   // the share of its triangles a hairstyle keeps
         public float pawnSize = 1f;   // every pawn's size, of the standard (WalkFigures.PawnSize, in SizeOf)
         public float headShrink = DefaultShrink;   // 0 .. 1 of the Shrinkhead key: a smaller, less chibi head (skinned figure only)
@@ -47,6 +47,7 @@ namespace M3AT
         public EarHiding earHiding = EarHiding.AnyHeadgear;   // which headgear leaves the gene ears off (WalkFigures.EarHiding)
         public BeardMode beardMode = BeardMode.Flat;   // how beards are drawn (WalkFigures.Beards, FlatBeards)
         public bool retexturedWeaponModels = true;   // the game's own weapons keep IsoRim's model though another mod redraws their art (WalkFigures.RetexturedWeaponModels)
+        public bool bedBlankets = false;   // in a bed that shows only the sleeper's head, IsoRim's blanket over the body (WalkFigures.BedBlankets); off: lying on top
         public bool groundGarments = false;   // apparel lying on the map is drawn as the chibi's own garment for it (WalkFigures.GroundGarments); off: IsoRim's look
         public bool injuryAnims = true;   // pawns limp on a bad leg and hold where they are hurt (WalkFigures.InjuryAnims); a missing leg hops regardless
         public bool visibleWounds = true;   // injuries, blood, bandages and scars are drawn on the pawn (WalkFigures.VisibleWounds)
@@ -99,6 +100,7 @@ namespace M3AT
             Scribe_Values.Look(ref beardMode, "beardMode", BeardMode.Flat);
             Scribe_Values.Look(ref retexturedWeaponModels, "retexturedWeaponModels", true);
             Scribe_Values.Look(ref groundGarments, "groundGarments", false);
+            Scribe_Values.Look(ref bedBlankets, "bedBlankets", false);
             Scribe_Values.Look(ref injuryAnims, "injuryAnims", true);
             Scribe_Values.Look(ref visibleWounds, "visibleWounds", true);
             Scribe_Values.Look(ref outlines, "outlines", true);
@@ -285,7 +287,7 @@ namespace M3AT
                 "How much smaller the head is drawn than the default chibi. Left: default; right: smaller. No effect on vanilla or CE hit calculations.");
             Settings.headShrink = Mathf.Round(shrink / ShrinkStep) * ShrinkStep;
             float spread = Slider(list, "Height variety: " + Settings.heightSpread.ToStringPercent("0.#"), Settings.heightSpread, 0f, 0.1f,
-                "How much pawns' heights vary (default " + Settings.DefaultHeightSpread.ToStringPercent("0.#") + "). 4% is realistic, with most near the usual size, hardly anyone over 10% off. 0% makes everyone of a gender the same size. Each pawn's height is derived from the pawn's id, so no save data is needed.");
+                "How much pawns' heights vary (default " + Settings.DefaultHeightSpread.ToStringPercent("0.#") + "). A normal distribution is used, with most near the usual size and a few further off. 0% makes everyone of a gender the same size. Each pawn's height is derived from the pawn's id, so no save data is needed.");
             Settings.heightSpread = Mathf.Round(spread * 200f) / 200f;
             list.CheckboxLabeled("Gender size difference", ref Settings.genderSizes,
                 "Renders men and women with a 10% size difference eased in over teenage years. Off: they are the same size.");
@@ -330,6 +332,8 @@ namespace M3AT
                 "Jump packs, shield belts and the other packs, belts and lances a pawn wears are shown on its back or waist, and headsets, masks, crowns, blindfolds and slave collars on its head and neck, with IsoRim's models of them. Off: they are not shown.");
             list.CheckboxLabeled("M3AT apparel on the ground", ref Settings.groundGarments,
                 "Clothes on the map will be drawn as the same 3D garment a pawn wears, squashed flat. Off (default): IsoRim's 3D models are used. Takes effect when this window closes.");
+            list.CheckboxLabeled("Blankets over sleepers", ref Settings.bedBlankets,
+                "In beds that show only the sleeper's head, IsoRim's blanket is drawn over the body, raised by it. Off (default): the pawn lies on top of the bed.");
 
             list.Gap();
             Header(list, "Injuries");

@@ -42,7 +42,7 @@ namespace M3AT
     internal sealed class HairBuilder
     {
         private const string Tag = "[M3AT] ";
-        public const int Version = 4;   // raise when the build changes, so cached hair is made again
+        public const int Version = 17;   // raise when the build changes, so cached hair is made again
         public const int BeardVersion = 1;   // and cached beards
         private static bool pixelsFailed;   // IsoRim's pixel reading has thrown once (logged once)
         public const int Size = 256;    // pixels: every sprite is read at this size, as hair.py's SIZE
@@ -58,13 +58,33 @@ namespace M3AT
         private const float Tight = 0.6f;         // the gap off the head is scaled by this after texturing ...
         private const float TightReachBU = 3.0f;  // ... up to this far out; past it a bun or ponytail keeps its length
         private const int TightSmooth = 3;
+        private const float FaceStretch = 0.2f;   // the hair in front of the head's middle is stretched this much more
+                                                  // forward after it is pulled in (StretchForward)
+        private const float StretchFade = 0.25f;  // head heights below the chin over which the stretch fades out
+        private const float SlideShare = 0.18f;   // how far side hair slides forward round the head, in head depths at the
+                                                  // front, less toward the back, before the slowing near the face
+                                                  // (StretchForward, SlideAlong: 0.85 of it with the face far off)
+        private const float SideFrom = 0.4f;      // sideways share of the head's normal from which hair slides rather
+        private const float SideFull = 0.8f;      // than stretches straight forward, and from which it only slides
+        private const float FaceTurn = 0.7f;      // forward share of the head's normal at which a slide stops: the face
+        private const int MoveSmooth = 8;         // smoothing passes over the moves StretchForward makes
+        private const int SlideSteps = 4;         // steps over the slide's length
+        private const int SlideRoom = 3;          // the room before the face is looked for this many slides' length ahead
         private const float SkirtReachBU = 2.5f;  // the walls under the open edges reach in this deep at most
         private const float SkirtSinkBU = 0.15f;  // and go this far into the head
+        private const float SkirtChinBU = 0.5f;   // from the chin down, this deep at most (Inward) ...
+        private const float SkirtShortBU = 1f;    // ... from this at SkirtShortFrom, about the hair's gap off the head
+                                                  // there once stretched forward, so the walls don't step in length
+        private const float SkirtShortFrom = 0.4f;    // head heights above the chin: just above the eyes, on the side of the
+                                                      // head where it starts curving in toward the jaw (set by eye in Blender)
         private const byte Solid = 128;           // least alpha that counts as hair (the game's cut-out, 0.5)
         private const float Cut = 0.9f;           // alpha the mesh is cut at, a little inside the art
         private const int SkirtInset = 4;         // pixels in from an open edge its wall looks for its colour
         private const float SkirtDark = 0.3f;     // grey at or below which a pixel is the art's outline
         private const float Crown = 0.6f;         // least upward share of a triangle's normal for the crown
+        private const float UnderChin = 0.4f;     // head heights above the drawn-over head's chin from which the hull in
+                                                  // front of the head's middle takes only the front sprite (Hull), as
+                                                  // SkirtShortFrom
         private const int HairReach = 2;          // voxels round a triangle within which the hair's own hull must be
         private const float Sees = 0.4f;          // least share of a triangle's normal towards a sprite for that sprite
                                                   // to see it, so the triangle is kept only where that sprite has hair
@@ -660,6 +680,10 @@ namespace M3AT
                 return built;   // nothing solid enough (Shaved): written as <style>.none
             }
             PullIn(shell, head, bodyNear, clear);
+            if (!beard)
+            {
+                StretchForward(shell, head, bodyNear, clear);
+            }
             if (beard)
             {
                 Puff(shell, cut);
@@ -851,13 +875,15 @@ namespace M3AT
             // Hair: the front or the back sprite (each leaves out what the body hides from it, as a braid down the back
             // is not drawn in the front one), and the side one. The head: its outline in the front and side ones.
             bool[] s = new bool[n * n], e = new bool[n * n], hs = new bool[n * n], he = new bool[n * n];
+            bool[] south = new bool[n * n];
             for (int y = 0; y < n; y++)
             {
                 int row = y * Voxel + Voxel / 2;
                 for (int x = 0; x < n; x++)
                 {
                     int col = x * Voxel + Voxel / 2, i = row * Size + col;
-                    s[y * n + x] = sp.px[0][i].a >= Solid || sp.px[2][row * Size + Size - 1 - col].a >= Solid;
+                    south[y * n + x] = sp.px[0][i].a >= Solid;
+                    s[y * n + x] = south[y * n + x] || sp.px[2][row * Size + Size - 1 - col].a >= Solid;
                     e[y * n + x] = sp.px[1][i].a >= Solid;
                     hs[y * n + x] = headMask[0][i];
                     he[y * n + x] = headMask[1][i];
@@ -867,6 +893,30 @@ namespace M3AT
             {
                 Slice(hair, n, y, s, e);
                 Slice(inside, n, y, hs, he);
+            }
+            // From where the skull curves in toward the jaw down, the hair in front of the head's middle is only where
+            // the front sprite has it. The back sprite's hair down the back spans the whole width, and with the side
+            // sprite's locks hanging in front of the shoulders it filled the slice right across under the chin: a band
+            // joining the two locks in front of the neck, like a beard. So the locks hang apart, with the neck and
+            // chest between them.
+            if (!beard)
+            {
+                int fromY = Mathf.RoundToInt((hy1 - UnderChin * (hy1 - hy0)) / Voxel);
+                int midZ = Mathf.RoundToInt((hz0 + hz1) / 2f / Voxel);
+                for (int y = Math.Max(0, fromY); y < n; y++)
+                {
+                    for (int x = 0; x < n; x++)
+                    {
+                        if (south[y * n + x])
+                        {
+                            continue;
+                        }
+                        for (int z = midZ; z < n; z++)
+                        {
+                            hair[(y * n + x) * n + z] = false;
+                        }
+                    }
+                }
             }
             for (int i = 0; i < inside.Length; i++)
             {
@@ -1199,6 +1249,135 @@ namespace M3AT
                     m.v[i] += m.vn[i] * puff;
                 }
             }
+        }
+
+        // Brings the hair forward toward the face, then keeps it clear of the body again. The sprites' head has a narrower
+        // face than the chibi's, which is broad and flat, so hair pulled in onto the chibi's head follows its corners back
+        // round the side: the fringe and the locks framing the face came to lie round the eyes, and the side locks ended
+        // further back than the side sprite has them. Hair over the front of the head (the fringe) is stretched straight
+        // forward from the head's middle, FaceStretch more the further forward it is, standing it off the forehead. Hair
+        // on the sides is slid forward round the head instead (SlideAlong, slowing as it nears the face), keeping its gap off the skin, as a straight
+        // push there only lifted it off the side to be pushed back out where it was. The two are blended by how much the
+        // head under a vertex faces sideways (SideFrom to SideFull). Both fade out below the chin, as hair hanging there
+        // is clear of the face.
+        private void StretchForward(Mesh m, Tris head, Tris near, float clear)
+        {
+            float mid = (back + front) / 2f, depth = front - back, fade = StretchFade * (top - chin);
+            Vector3[] moved = new Vector3[m.v.Count];
+            for (int i = 0; i < m.v.Count; i++)
+            {
+                Vector3 p = m.v[i];
+                float w = Mathf.Clamp01(1f - (chin - p.y) / fade);
+                Vector3 straight = p;
+                if (p.z > mid)
+                {
+                    straight.z = mid + (p.z - mid) * (1f + FaceStretch * w);
+                }
+                moved[i] = straight;
+                Vector3 q, n;
+                int t;
+                if (w <= 0f || !head.Nearest(p, out q, out n, out t))
+                {
+                    continue;
+                }
+                float side = Mathf.Clamp01((Mathf.Abs(n.x) - SideFrom) / (SideFull - SideFrom));
+                if (side <= 0f)
+                {
+                    continue;
+                }
+                float along = SlideShare * depth * w * Mathf.Clamp01((p.z - back) / depth);
+                moved[i] = Vector3.Lerp(straight, SlideAlong(head, p, q, n, along), side);
+            }
+            // Each vertex's move smoothed over its neighbours' before it is made: the head triangle nearest a vertex, whose
+            // normal sets how much it slides and which way, jumps from one neighbour to the next (onto an ear, under the
+            // jaw), and moved one by one some went several head widths' tenths further than those round them, as spikes
+            // and a ragged edge where the side locks meet the face.
+            Vector3[] move = new Vector3[m.v.Count], smoothed = new Vector3[m.v.Count];
+            for (int i = 0; i < m.v.Count; i++)
+            {
+                move[i] = moved[i] - m.v[i];
+            }
+            for (int pass = 0; pass < MoveSmooth; pass++)
+            {
+                for (int i = 0; i < m.v.Count; i++)
+                {
+                    if (m.next[i].Length == 0)
+                    {
+                        smoothed[i] = move[i];
+                        continue;
+                    }
+                    Vector3 sum = Vector3.zero;
+                    foreach (int k in m.next[i])
+                    {
+                        sum += move[k];
+                    }
+                    smoothed[i] = Vector3.Lerp(move[i], sum / m.next[i].Length, 0.5f);
+                }
+                Vector3[] swap = move;
+                move = smoothed;
+                smoothed = swap;
+            }
+            for (int i = 0; i < m.v.Count; i++)
+            {
+                moved[i] = m.v[i] + move[i];
+            }
+            for (int i = 0; i < m.v.Count; i++)
+            {
+                m.v[i] = moved[i];
+            }
+            ClearOf(m, near, clear);
+            m.Normals();
+        }
+
+        // p slid forward over the head, each step along the forward way laid flat on the head where it has got to and put
+        // back on the surface, keeping p's gap off it, and stopping where the head turns to face forward (FaceTurn), so side
+        // hair comes round to the face's edge but not onto it. Stopping each vertex dead there bunched the hair up against
+        // that line, so the path is walked out first (up to SlideRoom times along) to find how much room a vertex has
+        // before it, and it slides room * (1 - e^(-along / room)): nearly along with room to spare, less as the room runs
+        // out. The distance left to the edge, room * e^(-along / room), grows with the room, so no vertex passes one
+        // that was ahead of it, and the hair is pressed together evenly toward the face instead of piling up.
+        private static Vector3 SlideAlong(Tris head, Vector3 p, Vector3 q, Vector3 n, float along)
+        {
+            float gap = (p - q).magnitude, step = along / SlideSteps;
+            List<Vector3> path = new List<Vector3> { q }, normals = new List<Vector3> { n };
+            float room = SlideSteps * SlideRoom * step;   // no edge within the look ahead: its end counts as one, so the
+                                                          // slide doesn't jump between hair that meets an edge and hair that
+                                                          // doesn't (with no edge the slide is (1 - e^(-1/SlideRoom)) along)
+            for (int k = 0; k < SlideSteps * SlideRoom; k++)
+            {
+                Vector3 at = path[path.Count - 1], normal = normals[normals.Count - 1];
+                Vector3 way = new Vector3(0f, 0f, 1f) - normal * normal.z;
+                Vector3 next, nextNormal;
+                int t;
+                if (way.sqrMagnitude < 1e-8f || !head.Nearest(at + way.normalized * step, out next, out nextNormal, out t))
+                {
+                    room = k * step;
+                    break;
+                }
+                if (nextNormal.z > FaceTurn)
+                {
+                    // The edge part way along this step, where the normal's forward share crosses FaceTurn.
+                    float share = Mathf.Clamp01((FaceTurn - normal.z) / Mathf.Max(nextNormal.z - normal.z, 1e-6f));
+                    path.Add(Vector3.Lerp(at, next, share));
+                    normals.Add(Vector3.Lerp(normal, nextNormal, share).normalized);
+                    room = (k + share) * step;
+                    break;
+                }
+                path.Add(next);
+                normals.Add(nextNormal);
+            }
+            if (normals[0].z > FaceTurn || room <= 0f)
+            {
+                return p;
+            }
+            float move = room * (1f - Mathf.Exp(-along / room));
+            // The place move along the walked path (steps of step, the last one shorter where it met the edge).
+            float into = move / step;
+            int i = Mathf.Min((int)into, path.Count - 2);
+            float last = i == path.Count - 2 ? room / step - i : 1f;
+            float f = last > 1e-6f ? Mathf.Clamp01((into - i) / last) : 1f;
+            Vector3 place = Vector3.Lerp(path[i], path[i + 1], f), up = Vector3.Lerp(normals[i], normals[i + 1], f).normalized;
+            return place + up * gap;
         }
 
         // Brings the hair closer to the head: each vertex's gap off the head scaled by Tight, up to TightReach (hair.py pull_in).
@@ -1556,7 +1735,8 @@ namespace M3AT
 
         // ---- the walls, the keys and the files
 
-        // Where an open edge's wall reaches: just inside the head under p, or SkirtReach in towards it if that is further.
+        // Where an open edge's wall reaches: just inside the head under p, or SkirtReach in towards it if that is further;
+        // from SkirtShortFrom down SkirtShort easing to SkirtChin at most, and below the chin level with p.
         private Vector3 Inward(Tris head, Vector3 p)
         {
             Vector3 q, n;
@@ -1566,8 +1746,21 @@ namespace M3AT
                 return p;
             }
             Vector3 target = q - n * HeadWidths(SkirtSinkBU);
+            // From SkirtShortFrom down a wall is short, SkirtShort deep there easing to SkirtChin at the chin: the locks
+            // hang free beside the head there, and a wall only has to give an edge some thickness; reaching in to the
+            // head it was stretched across the cheek and chin.
+            float from = chin + SkirtShortFrom * (top - chin);
+            bool low = !beard && p.y < from;
+            if (!beard && p.y < chin)
+            {
+                // Below the chin the nearest head is the jaw above it, so a lock's wall would be stretched up into the
+                // face. It goes straight in at its own height instead.
+                target.y = p.y;
+            }
+            float eased = Mathf.Lerp(SkirtChinBU, SkirtShortBU, Mathf.Clamp01((p.y - chin) / (from - chin)));
+            float reach = HeadWidths(low ? eased : SkirtReachBU);
             float d = (target - p).magnitude;
-            return d > 1e-6f ? p + (target - p) * Mathf.Min(1f, HeadWidths(SkirtReachBU) / d) : p;
+            return d > 1e-6f ? p + (target - p) * Mathf.Min(1f, reach / d) : p;
         }
 
         // The atlas pixels a wall may take its colour from: solid all round, and not the outline (hair.py wall_colours).

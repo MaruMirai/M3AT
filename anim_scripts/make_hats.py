@@ -1865,6 +1865,133 @@ def ceremonial_cultist_mask():
     thick_sheet(s, places, faces, WHISPER_THICK, 'mask', inside=False)
     return made(s, 'CeremonialCultistMask')
 
+def beam(s, a, b, wide, deep, colour, up=Vector((0, 0, 1))):
+    """A box from point a to point b, wide head radii across (level, square to it) and deep head radii the other way, as
+    a part of s."""
+    along = (b - a) / 2
+    across = along.cross(up)
+    if across.length < 1e-6:
+        across = Vector((1, 0, 0))
+    across = across.normalized()
+    other = across.cross(along).normalized()
+    slab((a + b) / 2, across * wide / 2 * R, along, other * deep / 2 * R, colour, s)
+
+NV_BAND = band(10, 2, -12)   # the elevation round the head of the head strap's middle: over the brow, the ears' tops, low behind
+NV_BAND_WIDE = 9          # degrees across the head strap
+NV_STRAP_OFF = 0.12       # head radii the straps stand off the skin, over the hair, which they leave on
+NV_STRAP_WIDE = 0.07      # head radii, half the width of the strap over the crown
+NV_PLATE_EL = 6           # degrees up the mount's plate sits on the brow, on the head strap
+NV_PLATE = (0.36, 0.28, 0.1)   # head radii: the plate across, high and thick
+NV_CLEAR = 0.14           # head radii in front of the most skin round the eye a tube's back end stands
+NV_OVER = 8               # degrees each way the skin is looked at round the eye, so a tube clears the nose and brow
+
+def nv_harness(s, colour):
+    """The night vision's harness: a strap round the head over the brow and the ears' tops, low at the back, and one
+    over the crown from the brow to the back of it, as the sprites have them, standing off over the hair. Gives the
+    mount's plate's middle and its way out."""
+    strap(s, 0, NV_BAND, NV_BAND_WIDE, NV_STRAP_OFF, n=16, colour=colour)
+    over = []
+    back_el = 180 - NV_BAND(180)   # past 90, way() points back
+    for i in range(11):
+        el = NV_BAND(0) + (back_el - NV_BAND(0)) * i / 10
+        c = snug(0, el, NV_STRAP_OFF + 0.01)
+        over += [c - Vector((NV_STRAP_WIDE * R, 0, 0)), c + Vector((NV_STRAP_WIDE * R, 0, 0))]
+    s.part(over, [[2 * i, 2 * i + 2, 2 * i + 3, 2 * i + 1] for i in range(10)], colour)
+    out = way(0, NV_PLATE_EL)
+    return CENTRE + out * (over_skin(0, NV_PLATE_EL, 6) + (NV_STRAP_OFF + NV_PLATE[2] / 2) * R), out
+
+def nv_tube_base(az, el):
+    """Where a tube in front of the face that way has its back end: NV_CLEAR in front of the most skin round about."""
+    return CENTRE + way(az, el) * (over_skin(az, el, NV_OVER) + NV_CLEAR * R)
+
+NV_MONO_AT = (-EYE_AZ, EYE_EL + 2)   # the monocular's tube, over the figure's right eye (the right being negative azimuths)
+# Its tube from the back end forward (head radii along, head radii across), and each piece's colour; the end the lens.
+NV_MONO_TUBE = [(0.0, 0.15), (0.02, 0.17), (0.2, 0.17), (0.21, 0.19), (0.28, 0.19), (0.29, 0.17), (0.42, 0.17)]
+NV_MONO_PIECES = ['body', 'body', 'dark', 'dark', 'body', 'body']
+NV_MONO_HOUSING = (0.46, 0.4, 0.2)   # head radii: the housing on the tube's back, across, high and front to back
+NV_MONO_IR_TUBE = [(0.0, 0.06), (0.1, 0.06)]   # the illuminator's little tube out of the housing's front
+NV_MONO_ARM = (0.12, 0.1)  # head radii across and deep, the arm from the housing up to the plate
+NV_MONO_BOX = (78, 0)     # the battery box on the strap over the left temple
+NV_MONO_BOX_SIZE = (0.34, 0.26, 0.14)   # head radii: front to back, high and thick
+
+# Combat Extended's night vision monocular, as its sprite: a brown head strap round the head and one over the crown, a
+# grey mount on the brow, an arm down from it to a housing on one tube in front of the right eye, its lens green, a
+# little illuminator out of the housing beside it toward the nose, and a grey battery box on the strap over the left temple. It leaves the hair and the face
+# on; the tube stands in front of the eye. Coloured, as it is not made from stuff.
+def ce_simple_night_vision():
+    s = Shape()
+    s.palette = {'strap': (0.42, 0.27, 0.1), 'body': (0.4, 0.38, 0.4), 'dark': (0.26, 0.25, 0.27),
+                 'lens': (0.3, 0.62, 0.22)}
+    plate, out = nv_harness(s, 'strap')
+    up = Vector((0, 0, 1))
+    w, h, d = NV_PLATE
+    slab(plate, Vector((1, 0, 0)) * w / 2 * R, out.cross(Vector((1, 0, 0))).normalized() * -h / 2 * R, out * d / 2 * R,
+         'body', s)
+    forward = Vector((0, -1, 0))
+    across = Vector((1, 0, 0))
+    base = nv_tube_base(*NV_MONO_AT)
+    lathe(s, base, forward, NV_MONO_TUBE, NV_MONO_PIECES, 'lens')
+    # The housing on the tube's back half, from its top down its inner side (toward the nose), the illuminator's
+    # little tube coming out of its front at the bottom; and the arm straight up from it to the plate.
+    radius = NV_MONO_TUBE[2][1]
+    hw, hh, hd = NV_MONO_HOUSING
+    housing = base + forward * hd / 2 * R + across * (radius * 0.45) * R + up * (radius * 0.35) * R
+    slab(housing, across * hw / 2 * R, up * hh / 2 * R, forward * hd / 2 * R, 'body', s)
+    ir = housing + across * (hw / 2 - NV_MONO_IR_TUBE[0][1] - 0.02) * R - up * (hh / 2 - NV_MONO_IR_TUBE[0][1] - 0.02) * R \
+        + forward * hd / 2 * R
+    lathe(s, ir, forward, NV_MONO_IR_TUBE, ['dark'], 'body', n=8)
+    arm_foot = housing + up * hh / 2 * R
+    beam(s, arm_foot - up * 0.05 * R, Vector((arm_foot.x, arm_foot.y, plate.z)) + out * 0.0, NV_MONO_ARM[0], NV_MONO_ARM[1],
+         'body', up=forward)
+    beam(s, Vector((arm_foot.x, arm_foot.y, plate.z)) - across * 0.05 * R, plate, NV_MONO_ARM[1], NV_MONO_ARM[0], 'body',
+         up=forward)
+    # The battery box, on the strap over the left temple, faced along the head's side.
+    az, el = NV_MONO_BOX
+    side = way(az, el)
+    w, h, d = NV_MONO_BOX_SIZE
+    box = CENTRE + side * (over_skin(az, el, 4) + (NV_STRAP_OFF + d / 2) * R)
+    along = side.cross(up).normalized()
+    slab(box, along * w / 2 * R, up * h / 2 * R, side * d / 2 * R, 'body', s)
+    return made(s, 'CE_SimpleNightVision')
+
+# The goggles' four tubes, (azimuth, elevation, degrees each splays out): two over each eye, the outer ones turned out.
+NV_QUAD = ((-14, EYE_EL + 2, 0), (14, EYE_EL + 2, 0), (-40, EYE_EL + 2, 16), (40, EYE_EL + 2, 16))
+NV_QUAD_TUBE = [(0.0, 0.12), (0.02, 0.135), (0.3, 0.135), (0.31, 0.15), (0.38, 0.15)]
+NV_QUAD_PIECES = ['tube', 'tube', 'tube', 'housing']
+NV_QUAD_HOUSING = 0.16    # head radii high, the housing over the tubes' backs
+NV_QUAD_MOUNT = (0.18, 0.1)   # head radii across and deep, the mount from the housing up to the plate
+
+# Combat Extended's advanced night vision goggles, as its sprite: a black head strap and one over the crown, a dark
+# mount on the brow, and below it a housing across the eyes carrying four tubes in a row, the outer two turned out, their
+# lenses green. Coloured, as it is not made from stuff.
+def ce_advanced_night_vision():
+    s = Shape()
+    s.palette = {'strap': (0.12, 0.12, 0.13), 'housing': (0.34, 0.34, 0.36), 'tube': (0.22, 0.22, 0.24),
+                 'lens': (0.3, 0.62, 0.22)}
+    plate, out = nv_harness(s, 'strap')
+    up = Vector((0, 0, 1))
+    w, h, d = NV_PLATE
+    slab(plate, Vector((1, 0, 0)) * w / 2 * R, out.cross(Vector((1, 0, 0))).normalized() * -h / 2 * R, out * d / 2 * R,
+         'housing', s)
+    bases = []
+    for az, el, splay in NV_QUAD:
+        base = nv_tube_base(az, el)
+        a = math.radians(math.copysign(splay, az))
+        axis = Vector((math.sin(a), -math.cos(a), 0))
+        lathe(s, base, axis, NV_QUAD_TUBE, NV_QUAD_PIECES, 'lens')
+        bases.append((base, axis))
+    # The housing: a bar across over the tubes' backs, from the outer right tube to the outer left, through the inner two.
+    stations = []
+    for i in (2, 0, 1, 3):
+        base, axis = bases[i]
+        stations.append(base + axis * 0.1 * R + up * (NV_QUAD_TUBE[2][1] + NV_QUAD_HOUSING / 2 - 0.04) * R)
+    for a, b in zip(stations, stations[1:]):
+        beam(s, a - (b - a).normalized() * 0.06 * R, b + (b - a).normalized() * 0.06 * R, 0.24, NV_QUAD_HOUSING, 'housing')
+    # The mount: from the housing's middle up to the plate.
+    middle = (stations[1] + stations[2]) / 2
+    beam(s, middle, plate - up * h * 0.2 * R, NV_QUAD_MOUNT[0], NV_QUAD_MOUNT[1], 'housing')
+    return made(s, 'CE_AdvancedNightVision')
+
 HATS = {'SimpleHelmet': simple_helmet, 'AdvancedHelmet': advanced_helmet, 'Tuque': tuque, 'CowboyHat': cowboy_hat,
         'BowlerHat': bowler_hat, 'HatHood': hat_hood, 'TribalHeaddress': tribal_headdress, 'PsychicFoilHelmet': psychic_foil_helmet,
         'WarMask': war_mask, 'WarVeil': war_veil, 'ClothMask': cloth_mask, 'Blindfold': blindfold,
@@ -1876,7 +2003,8 @@ HATS = {'SimpleHelmet': simple_helmet, 'AdvancedHelmet': advanced_helmet, 'Tuque
         'Tailcap': tailcap, 'TortureCrown': torture_crown, 'AirwireHeadset': airwire_headset,
         'ArrayHeadset': array_headset, 'IntegratorHeadset': integrator_headset,
         'VisageMask': visage_mask, 'GasMask': gas_mask, 'Broadwrap': broadwrap, 'Collar': slave_collar,
-        'CultistMask': cultist_mask, 'CeremonialCultistMask': ceremonial_cultist_mask}
+        'CultistMask': cultist_mask, 'CeremonialCultistMask': ceremonial_cultist_mask,
+        'CE_SimpleNightVision': ce_simple_night_vision, 'CE_AdvancedNightVision': ce_advanced_night_vision}
 
 # Pieces of other garments, made only when named (they are not garments of their own, so not for Models/garments).
 PARTS = {'BurkaHood': burka_hood}
@@ -1893,7 +2021,8 @@ for name in (wanted or list(HATS)):
     for x in bpy.context.view_layer.objects:
         x.select_set(x is o)
     bpy.context.view_layer.objects.active = o
-    path = os.path.join(out_dir, name[:1].lower() + name[1:] + '.glb')
+    # Named as the garment, its first letter small (but for a prefix such as CE_, kept as the game's other CE_ files are).
+    path = os.path.join(out_dir, (name if name[:2].isupper() else name[:1].lower() + name[1:]) + '.glb')
     bpy.ops.export_scene.gltf(filepath=path, use_selection=True, export_format='GLB', export_skins=False,
                               export_animations=False, export_morph=False)
     made_hats.append(o)

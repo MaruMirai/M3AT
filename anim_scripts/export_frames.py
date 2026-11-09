@@ -141,6 +141,10 @@ GARMENT_PROPS['AirwireHeadset'] = {'bone': walk.HEAD, 'hard': True, 'hide_hair':
 # the crown down to the ear and a boom round the jaw to a microphone.
 for _set in ('ArrayHeadset', 'IntegratorHeadset'):
     GARMENT_PROPS[_set] = {'bone': walk.HEAD, 'hard': True, 'hide_hair': False, 'hide_face': False}
+# Combat Extended's night vision monocular and goggles (make_hats.py): a head strap and one over the crown, over the hair,
+# and tubes standing in front of the eyes, so the hair and the face stay.
+for _set in ('CE_SimpleNightVision', 'CE_AdvancedNightVision'):
+    GARMENT_PROPS[_set] = {'bone': walk.HEAD, 'hard': True, 'hide_hair': False, 'hide_face': False}
 # The masks and the veil make_hats.py makes ride the head as the hats do, but the hair and the face stay: the mesh is over
 # the mouth and nose and the eyes show (through the war mask's eye holes). They take the Nose_Pig key from the body (as a
 # hard garment's keys are otherwise only its bones' moves), so the muzzle pushes the mask out as it does the face.
@@ -191,6 +195,10 @@ GARMENT_PROPS['BabyRomper'] = {'baby_romper': True, 'colour': (0.95, 0.88, 0.64)
 # grip is, armature units, as make_shields.py's STANDOFF.
 for _shield, _standoff in (('CE_MeleeShield', 1.25), ('CE_BallisticShield', 1.75)):
     GARMENT_PROPS[_shield] = {'bone': walk.GEAR['pack']['bone'], 'hard': True, 'held': True, 'standoff': _standoff}
+# Combat Extended's powered exoframe (make_exoframe.py): a load-carrying exoskeleton, each vertex on the trunk weighted
+# in the file (the body's less the arms', neck's and head's, as the skin over the shoulder blades is mostly the arms'),
+# the leg struts and joint discs whole on their bones, so "part_weights" keeps them all but the belt's and cuffs'.
+GARMENT_PROPS['CE_ExoFrame'] = {'hard': True, 'part_weights': True}
 # Garments that keep the weights on them: loose ones standing well off the skin, which on the body's weights stretch
 # badly (a long skirt would follow each thigh and tear between the legs). Every other garment's are ignored.
 KEEP_WEIGHTS = ('Duster', 'TribalA', 'Parka', 'Cape', 'Robe', 'RobeRoyal', 'Burka', 'LabCoat')

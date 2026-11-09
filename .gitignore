@@ -44,3 +44,7 @@ generationAssets/
 # Kept only for reference (older or discarded versions) and preview renders: local only.
 Models/unused/
 previews/
+
+# Harness build output (anim_scripts/hairbuild)
+anim_scripts/hairbuild/bin/
+anim_scripts/hairbuild/obj/

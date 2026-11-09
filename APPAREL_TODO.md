@@ -138,7 +138,28 @@ All IsoRim's worn gear models, on our `belt`, `pack` and `hip` slots.
 - [x] Apparel_Blindfold: blindfold (EyeCover; eyes) *Ideology*. Has a garment.
 - [x] Apparel_Collar: slave collar (Overhead; neck) *Ideology*. Has a garment (`make_hats.py`: a band round the neck with riveted side plates and a ring at the throat, on the body's weights, let out over what is worn at the neck), needs an export, check in game
 
-## Combat Extended's shields (Shield; left shoulder)
+## Combat Extended *CE*
+Every wearable in CE's own `Defs/ThingDefs_Misc/Apparel_*.xml` (`CETeam.CombatExtended`, Workshop id 3495749827; its DLC folders add none). CE also adds layers of its own: `Webbing`, `Backpack`, `StrappedHead`, `OnHead` (see `Source/LetOut.cs` for `Webbing`). A garment is drawn for `CE_Apparel_<name>` when named `CE_<name>` (`DEF_PREFIXES`). "IsoRim CE pack" is the IsoRim Waylith CE pack's `IsoRim.ApparelModelDef` (`Defs/CE_Gear.xml`), drawn by `Source/WornGears.cs` only for one with a `mount`.
+
+### Body
+- [x] CE_Apparel_CompositeVest: composite vest (Middle; torso, neck). Has a garment (`make_from_groups.py`, `OWN_OFFSET` 0.25), check in game
+- [x] CE_Apparel_TacVest: tactical vest (Webbing; torso). Has a garment (`make_tac_vest.py`: a chest rig, a belt with magazine pouches and straps over the shoulders), let out over armour (`LetOut.cs`), check in game
+- [x] CE_Apparel_ExoFrame: powered exoframe (Shell; shoulders, torso). Has a garment (`make_exoframe.py`: a load-carrying exoskeleton: padded hip belt with a lumbar plate and battery, a spine of vertebra blocks, pack-frame rails and a yoke on the back, a shoulder harness down to the belt with a sternum strap, and on each leg hip, knee and ankle joint discs with struts down the thigh and shin and cuffs; untinted greys; the `--low` version is the one drawn, the full one in `Models/unused/CE_ExoFrame_full.glb`), exported, check in game
+
+### Packs (Backpack; shoulders)
+- [x] CE_Apparel_Backpack: backpack. Has a garment (`make_backpack.py`), drawn whole on the pack slot (`HOLSTER_PACKS`), check in game
+- [x] CE_Apparel_KidBackpack: kid backpack (no layers of its own, `ApparelBackpackBase`). The CE_Backpack (`AdultOf`, `KidPackSize`)
+- [x] CE_Apparel_TribalBackpack: tribal backpack. Has a garment (`Models/garments/CE_TribalBackpack.glb`, no script of its own), drawn whole on the pack slot (`HOLSTER_PACKS`), check in game
+- [x] CE_Apparel_RadioPack: radio pack. Has a garment (`make_radio_pack.py`: the backpack with no image, olive drab with two dark bands, a radio set on its back, a whip antenna leant out past the head on the left, a handset on the left side on a coiled cord), drawn whole on the pack slot (`HOLSTER_PACKS`) in place of the IsoRim CE pack's model, check in game
+
+### Head
+- [x] CE_Apparel_PlateHelmet: plate helmet (Overhead, OnHead, StrappedHead; full head). Has a garment (`hide_hair` tuck), check in game
+- [x] CE_Apparel_GasMask: gas mask (StrappedHead; eyes, teeth). The GasMask (its `GARMENT_PROPS` `defs`)
+- [x] CE_Apparel_ImprovGasMask: improvised gas mask (StrappedHead; eyes, teeth). The ClothMask (its `GARMENT_PROPS` `defs`); a wrap with a filter of its own would suit it better
+- [x] CE_Apparel_SimpleNightVision: night vision monocular (StrappedHead; eyes). Has a garment (`make_hats.py`: brown straps round the head and over the crown, a mount on the brow, a housing on one tube over the right eye with an illuminator, a battery box over the left temple; keeps the hair and face), export and check in game
+- [x] CE_Apparel_AdvancedNightVision: advanced night vision goggles (StrappedHead; eyes). Has a garment (`make_hats.py`: black straps, a mount on the brow, a housing across the eyes with four tubes, the outer two splayed out), export and check in game
+
+### Shields (Shield; left shoulder)
 Held in the left fist (`walk.shield_at`'s guard, `Source/Shields.cs`), shown only when CE would draw them (drafted, or a job or duty that shows the weapon).
 - [x] CE_Apparel_MeleeShield: melee shield. Has a garment (`make_shields.py`: a dished twelve-sided shield of planks with an iron rim and boss), check in game
 - [x] CE_Apparel_BallisticShield: ballistic shield. Has a garment (`make_shields.py`: a tall curved plate with a glass viewport in a pale frame and four bolts), check in game

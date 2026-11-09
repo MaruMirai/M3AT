@@ -306,6 +306,10 @@ namespace M3AT
         {
             get { return SettingsMod.Settings == null || SettingsMod.Settings.retexturedWeaponModels; }
         }
+        public static bool BedBlankets   // IsoRim's blanket over a sleeper in a head-only bed (DrawBlanket); false: lying on top of the bed
+        {
+            get { return SettingsMod.Settings != null && SettingsMod.Settings.bedBlankets; }
+        }
         public static bool GroundGarments   // apparel on the map is baked as the chibi's garment (GroundClothes); false: IsoRim's look
         {
             get { return SettingsMod.Settings != null && SettingsMod.Settings.groundGarments; }
@@ -1384,6 +1388,8 @@ namespace M3AT
             return size * ScaleUp * PawnSize * GenderSize(pawn) * HeightSize(pawn);
         }
 
+        private const float MostGrownAge = 10000f;   // years: a life stage starting later than this is not one a pawn ages into (GrownAge)
+
         // Of the standard size: the mod options' size for every pawn, on top of ScaleUp.
         private static float PawnSize
         {
@@ -1442,8 +1448,22 @@ namespace M3AT
         // Years: the age the pawn's race is grown at (its last life stage's), or 0 if it has no stages to grow through.
         private static float GrownAge(Pawn pawn)
         {
+            // The last stage of a believable age: Character Editor adds its body-size stages to the end of the race's list at
+            // float.MaxValue, so the game never ages a pawn into them, and taking the last as the grown age drew every pawn of
+            // that race at its newborn size.
             List<LifeStageAge> stages = pawn.ageTracker != null ? pawn.RaceProps.lifeStageAges : null;
-            return stages != null && stages.Count > 1 ? stages[stages.Count - 1].minAge : 0f;
+            if (stages == null || stages.Count < 2)
+            {
+                return 0f;
+            }
+            for (int i = stages.Count - 1; i > 0; i--)
+            {
+                if (stages[i].minAge < MostGrownAge)
+                {
+                    return stages[i].minAge;
+                }
+            }
+            return 0f;
         }
 
         private static bool Baby(Pawn pawn)
@@ -5634,6 +5654,42 @@ namespace M3AT
         }
 
         // The skinned chibi: true when drawn.
+        // IsoRim's blanket over a sleeper whose bed shows only the head (SleeperBlanket.Draw, internal; IsoRim draws it only for
+        // its own figure, so it is called here by reflection). at is the head's middle, as IsoRim places its figure in a bed,
+        // ground the bed's surface (or the sleeper's slot), size the figure's. Nothing if this IsoRim has no blanket.
+        private delegate void BlanketDrawer(Pawn pawn, Building_Bed bed, Vector3 at, float yaw, float size, float ground);
+        private static BlanketDrawer blanketDrawer;
+        private static bool blanketLooked;
+
+        private static void DrawBlanket(Pawn pawn, Building_Bed bed, Vector3 at, float yaw, float size, float ground)
+        {
+            if (!blanketLooked)
+            {
+                blanketLooked = true;
+                try
+                {
+                    MethodInfo draw = AccessTools.Method(typeof(Api).Assembly.GetType("IsoRim.SleeperBlanket"), "Draw",
+                        new[] { typeof(Pawn), typeof(Building_Bed), typeof(Vector3), typeof(float), typeof(float), typeof(float) });
+                    if (draw != null)
+                    {
+                        blanketDrawer = (BlanketDrawer)Delegate.CreateDelegate(typeof(BlanketDrawer), draw);
+                    }
+                    else
+                    {
+                        Log.Warning(Tag + "This IsoRim has no sleeper's blanket (SleeperBlanket.Draw); sleepers lie on top of the bed.");
+                    }
+                }
+                catch (Exception e)
+                {
+                    Log.Warning(Tag + "Could not find IsoRim's sleeper's blanket: " + e.Message);
+                }
+            }
+            if (blanketDrawer != null)
+            {
+                blanketDrawer(pawn, bed, at, yaw, size, ground);
+            }
+        }
+
         private static bool DrawSkinned(FigureDrawContext ctx)
         {
             Pawn pawn = ctx.Pawn;
@@ -6318,6 +6374,17 @@ namespace M3AT
                 // and pushed up to the blanket it would show through it.
                 float tailFloor = lying ? (floor - at.y) / size : rise > 0f || proneAt > 0f || duck > 0f ? lowest : float.NegativeInfinity;
                 GarmentMask mask = DrawDressed(pawn, fig, at, yaw, size, sat, tailFloor, onGround);
+                if (lying && !dead && placed.Situation == FigureSituation.InBed && placed.HeadOnlyInBed && BedBlankets)
+                {
+                    // A bed that shows only the head: IsoRim's blanket over the body, as over its own figure. The chibi's body
+                    // is smaller than the lump (about 0.18 cells deep at the chest against its 0.25), so lying on the bed as
+                    // it does it is mostly hidden under it by depth. IsoRim's place is the head's middle, as ours is in a bed.
+                    Building_Bed bed = pawn.CurrentBed();
+                    if (bed != null)
+                    {
+                        DrawBlanket(pawn, bed, placed.Position, placed.Yaw, size, lyingFloor);
+                    }
+                }
                 Vector3 chest, hips, head;
                 if (lying && skin.JointOf(fig, ChestBone, out chest) && skin.JointOf(fig, "spine", out hips) && skin.JointOf(fig, "spine.006", out head))
                 {
