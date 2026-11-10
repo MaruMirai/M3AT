@@ -116,6 +116,9 @@ GARMENT_PROPS = {
 for _hat in ('SimpleHelmet', 'AdvancedHelmet', 'Tuque', 'CowboyHat', 'BowlerHat', 'HatHood', 'TribalHeaddress', 'PsychicFoilHelmet',
              'Beret', 'HatTop', 'HatLadies', 'AuthorityCap', 'Flophat', 'Headwrap', 'Shadecone', 'Slicecap', 'Tailcap'):
     GARMENT_PROPS[_hat] = {'bone': walk.HEAD, 'hard': True, 'hide_hair': 'tuck'}
+# The slicecap covers only a slice of the scalp, standing off it, so the body triangles it would hide left the inside
+# of the head showing past its edge: it hides none ('hides' False: no hide lines), and the hair is tucked under it.
+GARMENT_PROPS['Slicecap']['hides'] = False
 # The hood's cowl hangs to the shoulders, which a whole hat on the head bone would sink into as the head bows, so it takes
 # the body's weights: the head's over the head, the neck's and chest's round the neck.
 GARMENT_PROPS['HatHood'] = {'hide_hair': 'tuck'}
@@ -790,7 +793,7 @@ def write_garment(g, path):
     for part in [x.strip() for x in props.get('solid_parts', '').split(',') if x.strip()]:
         solid_weights(g.name, part, g_rest, g_weights)
     garment_fits.append({'name': g.name, 'rest': g_rest, 'weights': g_weights, 'over': over, 'gap': gap, 'sink': 0.0})
-    hide = [] if props.get('fur', False) or props.get('held', False) else hidden_under(g_rest, [t for k, t in enumerate(tris) if k not in glass_tris])
+    hide = [] if props.get('fur', False) or props.get('held', False) or not props.get('hides', True) else hidden_under(g_rest, [t for k, t in enumerate(tris) if k not in glass_tris])
     hide_groups = [x.strip() for x in props.get('hide_groups', '').split(',') if x.strip()]
     hide_parts = [x for flag, x in (('hide_body', HIDE_BODY), ('hide_head', HIDE_HEAD)) if props.get(flag, False)]
     hide_groups += [walk.PART_GROUP % x for x in hide_parts if walk.PART_GROUP % x not in hide_groups]

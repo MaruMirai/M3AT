@@ -24,24 +24,24 @@ namespace M3AT
     // it, as in the game. The pointer key and button (Left Ctrl and the middle button by default) also go in and out of
     // pointer mode, whatever is selected.
     //
-    // Only the camera changes. IsoRim works out its camera in View3D.ApplyCamera, from which every pointer ray, the
-    // cell under the mouse, the part of the map drawn, the fog and the sky follow; while flying the freecam, Apply does the
-    // same from this eye and writes the same private fields, as IsoRim's own first person does from a pawn's head.
-    // Its yaw goes in through TurnCamera and its pitch through the Pitch getter (and IsoRim's saved pitch, clamped to
-    // IsoRim's range, for any caller the JIT may have inlined the getter into; put back on leaving).
+    // Only the camera changes. While flying, the eye is a camera pose pushed to IsoRim (Api 66, Api.PushViewPose), from
+    // which IsoRim works out its camera and everything that follows it: every pointer ray, the cell under the mouse, the
+    // part of the map drawn, the fog and the sky. The keys, the flying and the looking run in Api.BeforeViewUpdate, once a
+    // frame before the pose is asked for. IsoRim's own camera keys and look drag wait meanwhile (BlockPlayerCamera), and
+    // its settings are never written, so on leaving its camera is as the player left it, turned to face this one's way
+    // (Api.SetPlayerView). The 3D view switch, the cutscene lock, first person and held keys are Api 68's.
     [StaticConstructorOnStartup]
     public static class Freecam
     {
         private const string Tag = "[M3AT] ";
 
-        // IsoRim's own numbers for the perspective camera (View3D: OverlayPull, DepthPad).
-        private const float OverlayPull = 30f;
-        private const float DepthPad = 45f;
+        // The camera poses (Api 66) and the 3D view switch, first person and held keys (Api 68).
+        private const int MinimumApi = 68;
 
         public const float LeastPitch = -85f, MostPitch = 89f;   // degrees below the horizon (negative: up)
         private const float LeastHeight = 0.30f, MostHeight = 120f;   // the eye over the ground, cells
         private const float MapMargin = 30f;   // how far past the map's edge the eye may go, cells
-        private const float NearDistance = 10f, FarDistance = 150f;   // the stand-in focus distance's range (camDist), cells
+        private const float NearDistance = 10f, FarDistance = 150f;   // IsoRim's focus distance's range for a free eye (camDist), cells
         private const float FocusAhead = 20f;   // the game's camera is kept at most this far ahead of the eye, cells
         private const float Accel = 10f;   // how fast the flying speed follows the keys, per second (exponential)
         private const float MostStep = 0.1f;   // the longest frame counted, real seconds, so a hitch doesn't fling the eye
@@ -60,11 +60,14 @@ namespace M3AT
         private const int JumpWaitFrames = 30;   // a jump to another map is dropped if the freecam isn't back on it by then
 
         public static KeyBindingDef ToggleKey, UpKey, DownKey, PointerKey, BoostKey;
+        private static KeyBindingDef firstPersonKey;   // IsoRim's own (R3D_FirstPerson)
 
         private static bool ready;   // everything below was found
         private static bool on;
         private static Map map;
         private static IDisposable walls;   // IsoRim's complete walls while flying the freecam (Api 17)
+        private static IDisposable posed;   // the eye, pushed as IsoRim's camera pose while flying (Api 66)
+        private static readonly object PoseOwner = new object();
 
         private static Vector3 eye;
         private static Vector3 velocity;   // cells per real second
@@ -104,7 +107,6 @@ namespace M3AT
         private static object lookedFromWindow;
         private static bool haveLookedFrom;
         private static bool freedBack;   // the freed pointer goes back to lookedFrom, not the middle
-        private static float savedPitch, savedIsoPitch;   // IsoRim's saved pitches, put back on leaving
 
         // A menu of orders opened while looking (a right click under the cross with something selected) is kept in
         // looking: pinned to the place it was opened over, it moves on screen as the view turns or flies, so its options
@@ -114,14 +116,6 @@ namespace M3AT
         private static Vector3 pinnedAt;   // the place under the cross when it opened, in the eye's (unsquashed) space
         private static Vector2 pinnedOffset;   // the menu's corner from that place on screen, UI pixels
         private const float PinnedNearest = 0.3f;   // cells in front of the eye; nearer or behind, the menu closes
-
-        // View3D's private fields, as ApplyCamera writes them.
-        private static AccessTools.FieldRef<Vector3> eyeRef, fwdRef, upRef, rightRef;
-        private static AccessTools.FieldRef<float> orthoRef, aspectRef, tanHalfRef, camDistRef, nearRef, yawNowRef;
-        private static AccessTools.FieldRef<bool> perspRef, overriddenRef, haveFrameRef, yawSetRef, lookDraggingRef;
-        private static AccessTools.FieldRef<Camera[]> camsRef;
-        private static MethodInfo setFov, setAltitude;
-        private static readonly int isoEyeId = Shader.PropertyToID("_IsoEye");
 
         // The engine's window and input bridge, by reflection, to warp the pointer while looking (Warp).
         private static object window;
@@ -142,52 +136,27 @@ namespace M3AT
             try
             {
                 ToggleKey = DefDatabase<KeyBindingDef>.GetNamedSilentFail("M3AT_Freecam");
+                firstPersonKey = DefDatabase<KeyBindingDef>.GetNamedSilentFail("R3D_FirstPerson");
                 UpKey = DefDatabase<KeyBindingDef>.GetNamedSilentFail("M3AT_FreecamUp");
                 DownKey = DefDatabase<KeyBindingDef>.GetNamedSilentFail("M3AT_FreecamDown");
                 PointerKey = DefDatabase<KeyBindingDef>.GetNamedSilentFail("M3AT_FreecamPointer");
                 BoostKey = DefDatabase<KeyBindingDef>.GetNamedSilentFail("M3AT_FreecamBoost");
-                Type v = typeof(View3D);
-                eyeRef = Field<Vector3>(v, "eye");
-                fwdRef = Field<Vector3>(v, "fwd");
-                upRef = Field<Vector3>(v, "up");
-                rightRef = Field<Vector3>(v, "right");
-                orthoRef = Field<float>(v, "orthoSize");
-                aspectRef = Field<float>(v, "aspect");
-                tanHalfRef = Field<float>(v, "tanHalf");
-                camDistRef = Field<float>(v, "camDist");
-                nearRef = Field<float>(v, "nearNow");
-                yawNowRef = Field<float>(v, "yawNow");
-                perspRef = Field<bool>(v, "persp");
-                overriddenRef = Field<bool>(v, "camerasOverridden");
-                haveFrameRef = Field<bool>(v, "haveFrame");
-                yawSetRef = Field<bool>(v, "yawSet");
-                lookDraggingRef = Field<bool>(v, "lookDragging");
-                camsRef = Field<Camera[]>(v, "cams");
-                setFov = AccessTools.PropertySetter(v, "FieldOfView");
-                setAltitude = AccessTools.PropertySetter(v, "Altitude");
-                MethodInfo apply = AccessTools.Method(v, "ApplyCamera", new[] { typeof(Camera) });
-                MethodInfo turn = AccessTools.Method(v, "TurnCamera");
-                MethodInfo look = AccessTools.Method(v, "HandleLook");
-                MethodInfo pitchGet = AccessTools.PropertyGetter(v, "Pitch");
                 MethodInfo dolly = AccessTools.Method(typeof(CameraDriver), "CalculateCurInputDollyVect");
                 MethodInfo gui = AccessTools.Method(typeof(UIRoot_Play), nameof(UIRoot_Play.UIRootOnGUI));
                 MethodInfo rootUpdate = AccessTools.Method(typeof(Root), "Update");
-                if (ToggleKey == null || eyeRef == null || fwdRef == null || upRef == null || rightRef == null || orthoRef == null
-                    || aspectRef == null || tanHalfRef == null || camDistRef == null || nearRef == null || yawNowRef == null
-                    || perspRef == null || overriddenRef == null || haveFrameRef == null || yawSetRef == null || camsRef == null
-                    || setFov == null || setAltitude == null || apply == null || turn == null || pitchGet == null)
+                if (ToggleKey == null)
                 {
-                    Log.Warning(Tag + "IsoRim's camera is not as this mod knows it, so the freecam is off.");
+                    Log.Warning(Tag + "The freecam's key is missing, so the freecam is off.");
                     return;
                 }
-                Harmony harmony = new Harmony("MaruMirai.M3AT.Freecam");
-                harmony.Patch(apply, prefix: new HarmonyMethod(typeof(Freecam), nameof(ApplyPrefix)));
-                harmony.Patch(turn, prefix: new HarmonyMethod(typeof(Freecam), nameof(TurnPrefix)));
-                harmony.Patch(pitchGet, prefix: new HarmonyMethod(typeof(Freecam), nameof(PitchPrefix)));
-                if (look != null && lookDraggingRef != null)
+                if (IsoRim.Api.Version < MinimumApi)
                 {
-                    harmony.Patch(look, prefix: new HarmonyMethod(typeof(Freecam), nameof(HandleLookPrefix)));
+                    Log.Warning(Tag + "IsoRim's Api is version " + IsoRim.Api.Version + ", " + MinimumApi
+                        + " or later is needed for the freecam, so it is off.");
+                    return;
                 }
+                Posing.Listen();
+                Harmony harmony = new Harmony("MaruMirai.M3AT.Freecam");
                 if (dolly != null)
                 {
                     harmony.Patch(dolly, postfix: new HarmonyMethod(typeof(Freecam), nameof(DollyPostfix)));
@@ -233,16 +202,6 @@ namespace M3AT
             }
         }
 
-        private static AccessTools.FieldRef<T> Field<T>(Type type, string name)
-        {
-            FieldInfo f = AccessTools.Field(type, name);
-            if (f == null || !f.IsStatic || f.FieldType != typeof(T))
-            {
-                return null;
-            }
-            return AccessTools.StaticFieldRefAccess<T>(f);
-        }
-
         private static Settings Options
         {
             get { return SettingsMod.Settings; }
@@ -282,7 +241,7 @@ namespace M3AT
         // loaded with it wanted has its 3D view turned on first, if it was on when the freecam was last flown.
         private static void Resume()
         {
-            if (!Wanted || Find.CurrentMap == null || FirstPerson.On || View3D.ControlsLocked)
+            if (!Wanted || Find.CurrentMap == null || IsoRim.Api.FirstPersonPawn != null || IsoRim.Api.ControlsLocked)
             {
                 return;
             }
@@ -291,10 +250,10 @@ namespace M3AT
                 seenGame = Current.Game;
                 if (Options.freecam3D)
                 {
-                    View3D.Active = true;
+                    IsoRim.Api.View3DActive = true;
                 }
             }
-            if (View3D.Active)
+            if (IsoRim.Api.View3DActive)
             {
                 Enter(false);
             }
@@ -307,28 +266,23 @@ namespace M3AT
             {
                 return;
             }
-            if (FirstPerson.On)
-            {
-                FirstPerson.Leave(null);
-            }
-            View3D.Active = true;
-            IsoRimSettings st = IsoRimMod.Settings;
-            savedPitch = st.pitch;
-            savedIsoPitch = st.isoPitch;
+            IsoRim.Api.LeaveFirstPerson();
+            IsoRim.Api.View3DActive = true;
 
             // Start where IsoRim's camera is, or for its flat camera where a perspective one would be at the same zoom.
-            yaw = View3D.Yaw;
-            pitch = Mathf.Clamp(View3D.Pitch, LeastPitch, MostPitch);
-            if (View3D.Ready && View3D.Perspective)
+            yaw = IsoRim.Api.ViewYaw;
+            pitch = Mathf.Clamp(IsoRim.Api.ViewPitch, LeastPitch, MostPitch);
+            Vector3 seen;
+            if (IsoRim.Api.ViewPerspective && Posing.EyeNow(out seen))
             {
-                eye = View3D.EyePosition;
+                eye = seen;
             }
             else
             {
                 Vector3 focus = Find.CameraDriver != null ? Find.CameraDriver.MapPosition.ToVector3Shifted() : current.Center.ToVector3Shifted();
                 float size = Find.Camera != null ? Find.Camera.orthographicSize : 20f;
                 Vector3 f = Quaternion.Euler(pitch, yaw, 0f) * Vector3.forward;
-                eye = new Vector3(focus.x, 0f, focus.z) - f * (size / View3D.DefaultTanHalf);
+                eye = new Vector3(focus.x, 0f, focus.z) - f * (size / IsoRim.Api.PerspectiveTanHalf);
             }
             // Where it was last flown on this map, if the game remembers.
             FreecamPlaces places = Current.Game.GetComponent<FreecamPlaces>();
@@ -347,6 +301,10 @@ namespace M3AT
             gliding = false;
             map = current;
             on = true;
+            if (posed == null)
+            {
+                posed = Posing.Push();
+            }
             pointerMode = false;
             rightPending = false;
             leftPending = false;
@@ -415,25 +373,27 @@ namespace M3AT
             {
                 ReleaseWalls();
             }
-            IsoRimSettings st = IsoRimMod.Settings;
-            st.pitch = savedPitch;
-            st.isoPitch = savedIsoPitch;
-            // IsoRim's camera goes on facing the way this one did, over the ground in the middle of the screen.
-            float baseYaw = st.isometric ? View3D.IsoYaw : 0f;
-            st.freeYaw = Mathf.Repeat(yaw - baseYaw - 45f * View3D.Step, 360f);
+            // IsoRim's camera goes on facing the way this one did, over the ground in the middle of the screen (looked
+            // at while the pose still holds the view).
             try
             {
                 if (Find.CameraDriver != null && map != null && map == Find.CurrentMap)
                 {
-                    Vector3 at = View3D.Ready ? View3D.ScreenToGround(new Vector2(Screen.width * 0.5f, Screen.height * 0.5f)) : eye;
+                    Vector3 at = IsoRim.Api.ViewReady ? IsoRim.Api.ScreenToGround(new Vector2(Screen.width * 0.5f, Screen.height * 0.5f)) : eye;
                     at.x = Mathf.Clamp(at.x, 0f, map.Size.x);
                     at.z = Mathf.Clamp(at.z, 0f, map.Size.z);
                     Find.CameraDriver.JumpToCurrentMapLoc(new Vector3(at.x, 0f, at.z));
                 }
+                IsoRim.Api.SetPlayerView(yaw, null);
             }
             catch (Exception e)
             {
                 Log.ErrorOnce(Tag + "Putting the camera back failed: " + e, 0x3A7E5702);
+            }
+            if (posed != null)
+            {
+                posed.Dispose();
+                posed = null;
             }
             map = null;
             if (message)
@@ -458,17 +418,26 @@ namespace M3AT
 
         // ---------------------------------------------------------------- once a frame
 
-        // IsoRim's TurnCamera, once a frame before the camera is set: here the keys, the flying and the looking.
-        public static bool TurnPrefix()
+        // Whether IsoRim's first person key starts first person now: with the one person selected, on the map shown
+        // (as FirstPerson.Toggle has it). Should it ever be wrong, Resume puts the freecam back the frame after.
+        private static bool FirstPersonStarts()
+        {
+            Pawn chosen = Find.Selector != null && Find.Selector.NumSelected == 1 ? Find.Selector.SingleSelectedThing as Pawn : null;
+            return chosen != null && chosen.Spawned && chosen.Map == Find.CurrentMap && chosen.RaceProps != null && chosen.RaceProps.Humanlike;
+        }
+
+        // Api.BeforeViewUpdate, once a frame (3D view or not) before IsoRim asks for the pose and sets its camera: here the
+        // keys, the flying and the looking.
+        private static void Frame()
         {
             if (!ready)
             {
-                return true;
+                return;
             }
             try
             {
                 bool typing = GUIUtility.keyboardControl != 0;
-                if (!typing && ToggleKey.JustPressed && !View3D.ControlsLocked)
+                if (!typing && ToggleKey.JustPressed && !IsoRim.Api.ControlsLocked)
                 {
                     if (on || Wanted)
                     {
@@ -488,37 +457,35 @@ namespace M3AT
                         Enter(true);
                     }
                 }
-                if (on && (Find.CurrentMap != map || FirstPerson.On || !View3D.Active || View3D.ControlsLocked))
+                // IsoRim's first person key while flying: IsoRim has just started first person (its keys are read before this),
+                // but a pose wins over it, so the freecam steps aside for it, as it is set aside for first person anyway.
+                bool toFirstPerson = on && !typing && firstPersonKey != null && firstPersonKey.JustPressed && FirstPersonStarts();
+                if (on && (toFirstPerson || Find.CurrentMap != map || !IsoRim.Api.View3DActive || IsoRim.Api.ControlsLocked))
                 {
                     // Set aside, still wanted: it comes back with the 3D view, on the next map, after first person.
-                    if (!View3D.Active)
+                    if (!IsoRim.Api.View3DActive)
                     {
                         Note3D(false);
                     }
                     Leave(false);
                 }
-                if (!on)
+                // Not this frame after stepping aside for first person: it hides behind the pose until the pose is gone, so
+                // Api.FirstPersonPawn says none yet. If first person didn't start after all, it comes back on the next.
+                if (!on && !toFirstPerson)
                 {
                     Resume();
                 }
                 if (!on)
                 {
-                    return true;
+                    return;
                 }
                 SyncWalls();
                 float dt = Mathf.Min(Time.unscaledDeltaTime, MostStep);
                 TakeJump();
                 Look(typing);
                 Fly(dt, typing);
-                yawNowRef() = yaw;
-                yawSetRef() = true;
-                IsoRimSettings st = IsoRimMod.Settings;
-                float shown = Mathf.Clamp(pitch, View3D.MinPitch, View3D.MaxPitch);
-                st.pitch = shown;
-                st.isoPitch = shown;
                 KeepGameCamera();
                 Remember();
-                return false;
             }
             catch (Exception e)
             {
@@ -533,7 +500,6 @@ namespace M3AT
                     on = false;
                     Unlock();
                 }
-                return true;
             }
         }
 
@@ -547,19 +513,19 @@ namespace M3AT
                 float y = yaw * Mathf.Deg2Rad;
                 Vector3 ahead = new Vector3(Mathf.Sin(y), 0f, Mathf.Cos(y));
                 Vector3 side = new Vector3(Mathf.Cos(y), 0f, -Mathf.Sin(y));
-                if (View3D.BindingHeld(KeyBindingDefOf.MapDolly_Up, false))
+                if (IsoRim.Api.KeyHeld(KeyBindingDefOf.MapDolly_Up, false))
                 {
                     want += ahead;
                 }
-                if (View3D.BindingHeld(KeyBindingDefOf.MapDolly_Down, false))
+                if (IsoRim.Api.KeyHeld(KeyBindingDefOf.MapDolly_Down, false))
                 {
                     want -= ahead;
                 }
-                if (View3D.BindingHeld(KeyBindingDefOf.MapDolly_Right, false))
+                if (IsoRim.Api.KeyHeld(KeyBindingDefOf.MapDolly_Right, false))
                 {
                     want += side;
                 }
-                if (View3D.BindingHeld(KeyBindingDefOf.MapDolly_Left, false))
+                if (IsoRim.Api.KeyHeld(KeyBindingDefOf.MapDolly_Left, false))
                 {
                     want -= side;
                 }
@@ -567,11 +533,11 @@ namespace M3AT
                 {
                     want.Normalize();
                 }
-                if (UpKey != null && View3D.BindingHeld(UpKey, false))
+                if (UpKey != null && IsoRim.Api.KeyHeld(UpKey, false))
                 {
                     want.y += 1f;
                 }
-                if (DownKey != null && View3D.BindingHeld(DownKey, false))
+                if (DownKey != null && IsoRim.Api.KeyHeld(DownKey, false))
                 {
                     want.y -= 1f;
                 }
@@ -748,13 +714,14 @@ namespace M3AT
                     continue;
                 }
                 pinned = menu;
-                pinnedAt = eyeRef() + fwdRef() * camDistRef();
+                Vector3 fwd = Quaternion.Euler(pitch, yaw, 0f) * Vector3.forward;
+                pinnedAt = eye + fwd * FocusDistance(fwd);
                 pinnedOffset = menu.windowRect.position - new Vector2(UI.screenWidth * 0.5f, UI.screenHeight * 0.5f);
                 return;
             }
         }
 
-        // The pinned menu moved to where its place is seen from this frame's eye, at the end of Apply.
+        // The pinned menu moved to where its place is seen from this frame's eye, as the pose is given (Posing.Pose).
         private static void MovePinned(Vector3 fwd, Vector3 right, Vector3 up, float tanHalf, float aspect)
         {
             if (pinned == null)
@@ -1170,112 +1137,55 @@ namespace M3AT
 
         // ---------------------------------------------------------------- IsoRim's camera, from this eye
 
-        public static bool ApplyPrefix(Camera __0)
+        // How far IsoRim's view "looks" from this eye (label fading, how far rays reach, the fog): to the ground at the
+        // middle of the screen, within reason, as IsoRim works it out for a pose with an eye and no focus distance.
+        private static float FocusDistance(Vector3 fwd)
         {
-            if (!on || __0 == null)
-            {
-                return true;
-            }
-            try
-            {
-                Apply(__0);
-                return false;
-            }
-            catch (Exception e)
-            {
-                Log.ErrorOnce(Tag + "Setting the freecam failed: " + e, 0x3A7E5704);
-                return true;
-            }
+            return fwd.y < -0.01f ? Mathf.Clamp(eye.y / -fwd.y, NearDistance, FarDistance) : FarDistance;
         }
 
-        // View3D.ApplyCamera's perspective branch with this eye in place of the one swung round the focus point.
-        private static void Apply(Camera main)
+        // Everything that names the camera Api's types (Api 66, 68), apart, so nothing of it is loaded on an older IsoRim.
+        private static class Posing
         {
-            ref Camera[] cams = ref camsRef();
-            if (cams == null || cams.Length == 0 || cams[0] == null)
+            public static void Listen()
             {
-                cams = main.GetComponentsInChildren<Camera>(true);
+                IsoRim.Api.BeforeViewUpdate += Frame;
             }
-            float s = View3D.Squash;
-            orthoRef() = main.orthographicSize;
-            float aspect = main.aspect;
-            aspectRef() = aspect;
 
-            Quaternion look = Quaternion.Euler(pitch, yaw, 0f);
-            Vector3 fwd = look * Vector3.forward;
-            Vector3 up = look * Vector3.up;
-            Vector3 right = look * Vector3.right;
-            fwdRef() = fwd;
-            upRef() = up;
-            rightRef() = right;
-
-            IsoRimSettings st = IsoRimMod.Settings;
-            float fov = Mathf.Clamp(Options.freecamFov, 30f, 110f);
-            float tanHalf = Mathf.Tan(fov * 0.5f * Mathf.Deg2Rad);
-            // IsoRim's focus distance stands for "how far the view is looking" (label fading, how far rays reach, the fog):
-            // to the ground at the middle of the screen, within reason.
-            float camDist = fwd.y < -0.01f ? Mathf.Clamp(eye.y / -fwd.y, NearDistance, FarDistance) : FarDistance;
-            float near = Mathf.Clamp(0.05f + eye.y * 0.01f, 0.08f, 1f);
-            float far = camDist + View3D.ViewDistance + 2f * DepthPad;
-            perspRef() = true;
-            tanHalfRef() = tanHalf;
-            camDistRef() = camDist;
-            eyeRef() = eye;
-            nearRef() = near;
-            setFov.Invoke(null, new object[] { fov });
-            setAltitude.Invoke(null, new object[] { eye.y });
-
-            Matrix4x4 view = Matrix4x4.Scale(new Vector3(1f, 1f, -1f)) * Matrix4x4.TRS(eye, look, Vector3.one).inverse;
-            Matrix4x4 worldToCamera = view * Matrix4x4.Scale(new Vector3(1f, s, 1f));
-            for (int i = 0; i < cams.Length; i++)
+            public static IDisposable Push()
             {
-                Camera c = cams[i];
-                if (c == null)
+                return IsoRim.Api.PushViewPose(PoseOwner, Pose, new ViewPoseOptions());
+            }
+
+            public static bool EyeNow(out Vector3 at)
+            {
+                ViewPose now = IsoRim.Api.CurrentViewPose;
+                at = now.Eye ?? Vector3.zero;
+                return now.Eye.HasValue;
+            }
+
+            // The eye as IsoRim's camera this frame, while flying on the map shown.
+            private static ViewPose? Pose()
+            {
+                if (!on || map != Find.CurrentMap)
                 {
-                    continue;
+                    return null;
                 }
-                Matrix4x4 proj = Matrix4x4.Perspective(fov, c.aspect, near, far);
-                c.worldToCameraMatrix = worldToCamera;
-                c.projectionMatrix = proj;
-                c.cullingMatrix = proj * worldToCamera;
+                float fov = Mathf.Clamp(Options.freecamFov, 30f, 110f);
+                try
+                {
+                    Quaternion look = Quaternion.Euler(pitch, yaw, 0f);
+                    Camera main = Find.Camera;
+                    float aspect = main != null ? main.aspect : (float)Screen.width / Mathf.Max(1, Screen.height);
+                    MovePinned(look * Vector3.forward, look * Vector3.right, look * Vector3.up, Mathf.Tan(fov * 0.5f * Mathf.Deg2Rad), aspect);
+                }
+                catch (Exception e)
+                {
+                    Log.ErrorOnce(Tag + "Moving the pinned menu failed: " + e, 0x3A7E5704);
+                    pinned = null;
+                }
+                return ViewPose.FromEye(eye, yaw, pitch, fov);
             }
-            overriddenRef() = true;
-            haveFrameRef() = true;
-            Cull.SetCamera(main.projectionMatrix * main.worldToCameraMatrix, s);
-            R3DMaterials.SetView(-fwd, s);
-
-            float k = Mathf.Clamp(1f - OverlayPull / camDist, 0.3f, 0.9f);
-            Vector3 eyeDrawn = new Vector3(eye.x, eye.y / s, eye.z);
-            Shader.SetGlobalVector(isoEyeId, new Vector4(eyeDrawn.x, eyeDrawn.y, eyeDrawn.z, 1f));
-            View3D.LightingMatrix = Matrix4x4.Translate(eyeDrawn) * Matrix4x4.Scale(new Vector3(k, k, k)) * Matrix4x4.Translate(-eyeDrawn);
-            UprightCards.SetCamera(pitch, yaw);
-
-            float reach = camDist + View3D.ViewDistance;
-            float fogEnd = reach * 0.92f;
-            float fogStart = Mathf.Lerp(Mathf.Min(camDist * 0.8f, fogEnd * 0.5f), fogEnd, Mathf.Clamp(st.fogStart, 0f, 0.95f));
-            Sky.Draw(main, fwd, right, up, tanHalf * aspect, tanHalf, near, far, fogStart, fogEnd);
-            MovePinned(fwd, right, up, tanHalf, aspect);
-        }
-
-        public static bool PitchPrefix(ref float __result)
-        {
-            if (!on)
-            {
-                return true;
-            }
-            __result = pitch;
-            return false;
-        }
-
-        // IsoRim's own mouse look (Ctrl and the middle button) would turn its saved camera meanwhile.
-        public static bool HandleLookPrefix()
-        {
-            if (!on)
-            {
-                return true;
-            }
-            lookDraggingRef() = false;
-            return false;
         }
 
         // The game's own panning by the same keys, or by the pointer at the screen's edge, is left out.
@@ -1319,7 +1229,7 @@ namespace M3AT
         // BoostTimes while the boost key is held, else 1.
         private static float Boost()
         {
-            return BoostKey != null && View3D.BindingHeld(BoostKey, false) ? BoostTimes : 1f;
+            return BoostKey != null && IsoRim.Api.KeyHeld(BoostKey, false) ? BoostTimes : 1f;
         }
 
         public static void GuiPostfix()
@@ -1345,9 +1255,7 @@ namespace M3AT
                 on = false;
                 walls = null;   // IsoRim drops its requests on leaving play
                 map = null;
-                IsoRimSettings st = IsoRimMod.Settings;
-                st.pitch = savedPitch;
-                st.isoPitch = savedIsoPitch;
+                posed = null;   // and its poses
             }
             if (lockedLast && (!on || lockedFrame < Time.frameCount - 1))
             {

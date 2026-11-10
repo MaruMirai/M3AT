@@ -39,7 +39,7 @@ Early WIP so expect some missing/jank/generic anims and other scuff, they'll be 
 
 Some features:
 Basic anims for all the main stuff, movement, work, combat etc, more soon
-Wearable 3D apparel for everything in base game and all DLC + some of CE
+Wearable 3D apparel for everything in base game and all DLC + CE
 All hair mods supported via instant sprite-to-3d conversion + hair shows under hats
 Carrying/aiming/firing anims for all IsoRim's 3D weapons or sprite generated slab versions
 Visible holstered weapons, equipped or inventoried, with draw/holster anims
@@ -52,7 +52,7 @@ Injury-reactive idle and movement animations
 Ragdolls with optional physics flinging
 Smooth baby-adult growth and pregnancy for biotech
 Various body settings sliders
-CE support - backpack models, reload and hunker anims, webbing layer over armor support
+CE support - apparel models, reload and hunker anims, webbing layer over armor support
 Optimization - GPU skinning, low poly models
 (Obviously still fairly performance heavy for a mod, I'll keep working on improvements)
 

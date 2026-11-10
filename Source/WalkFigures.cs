@@ -306,7 +306,7 @@ namespace M3AT
         {
             get { return SettingsMod.Settings == null || SettingsMod.Settings.retexturedWeaponModels; }
         }
-        public static bool BedBlankets   // IsoRim's blanket over a sleeper in a head-only bed (DrawBlanket); false: lying on top of the bed
+        public static bool BedBlankets   // IsoRim's blanket over a sleeper in a head-only bed (DrawTuckedIn); false: lying on top of the bed
         {
             get { return SettingsMod.Settings != null && SettingsMod.Settings.bedBlankets; }
         }
@@ -489,7 +489,7 @@ namespace M3AT
             public int layFrame = -99;
             public float lieYaw;   // the yaw, model units along and cells up it was laid at then (the getup starts from there)
             public float lieAlong;
-            public float blanketAlong = float.NaN;   // where the blanket's lump starts along the bed from the placing's head, cells (DrawBlanket)
+            public float blanketAlong = float.NaN;   // where the blanket's lump starts along the bed from the placing's head, cells (DrawTuckedIn)
             public float lieFloor;
             public float risen = 1f;   // how far through getting up, 0 .. 1; 1: done (RiseOf)
             public int risenTick;   // the game tick it was last moved on
@@ -5655,26 +5655,23 @@ namespace M3AT
         }
 
         // The skinned chibi: true when drawn.
-        // IsoRim's blanket over a sleeper whose bed shows only the head (SleeperBlanket.Draw, internal; IsoRim draws it only for
-        // its own figure, so it is called here by reflection). at is the head's middle, as IsoRim places its figure in a bed,
-        // ground the bed's surface (or the sleeper's slot), size the figure's. Nothing if this IsoRim has no blanket.
-        private delegate void BlanketDrawer(Pawn pawn, Building_Bed bed, Vector3 at, float yaw, float size, float ground);
-        private static BlanketDrawer blanketDrawer;
-        private static bool blanketLooked;
-
-        // The blanket is IsoRim's lump made for its own figure, whose jaw is RefStart (0.14) of its size from the head's middle and
-        // whose body is shallower. The chibi's head is bigger (0.2 from its middle to the jaw) and the body deeper, so the
-        // lump is drawn BlanketScale bigger (taller and longer; IsoRim keeps it within the bed's width and length) and moved
-        // along the bed so it starts at the chibi's neck (BlanketNeck) rather than under IsoRim's jaw.
+        // IsoRim's blanket over a sleeper whose bed shows only the head (Api 68, Api.DrawSleeperBlanket at our own placing;
+        // IsoRim draws it only for its own figure). at is the head's middle, as IsoRim places its figure in a bed, ground
+        // the bed's surface (or the sleeper's slot), size the figure's. With an older IsoRim there is none, and sleepers lie
+        // on top of the bed.
+        //
+        // The blanket is IsoRim's lump made for its own figure, whose jaw is 0.14 of its size from the head's middle and whose
+        // body is shallower. The chibi's head is bigger (0.2 from its middle to the jaw) and the body deeper, so the lump is
+        // made BlanketScale bigger (taller and longer; IsoRim keeps it within the bed's width and length) and starts at the
+        // chibi's neck (BlanketNeck) rather than under IsoRim's jaw.
+        private const int BlanketApi = 68;
         private const float BlanketScale = 1.25f;
-        private const float BlanketRefStart = 0.14f;   // IsoRim's SleeperBlanket.RefStart: where its lump starts from the head's middle, of its size
         private const string BlanketNeck = "spine.005";
         private const float BlanketSnap = 0.03f;   // cells the neck may move along the bed (breathing) before the lump follows it, and is built again
 
         private static void DrawTuckedIn(Pawn pawn, Building_Bed bed, SkinnedFigure.Posed fig, Ease ease, Vector3 at, float yaw, float size,
             Vector3 placedAt, float placedYaw, float ground)
         {
-            float big = size * BlanketScale;
             Vector3 along = Quaternion.AngleAxis(placedYaw, Vector3.up) * Vector3.forward;   // toward the feet, as IsoRim lays it
             Vector3 neck;
             if (skin.JointOf(fig, BlanketNeck, out neck))
@@ -5686,49 +5683,15 @@ namespace M3AT
                     ease.blanketAlong = Mathf.Round(d * 100f) / 100f;
                 }
             }
-            float shift = float.IsNaN(ease.blanketAlong) ? 0f : ease.blanketAlong - BlanketRefStart * big;
-            DrawBlanket(pawn, bed, placedAt + along * shift, placedYaw, big, ground);
+            // Where it starts, cells from the head's middle toward the feet (-1: IsoRim's own, under its jaw).
+            float start = float.IsNaN(ease.blanketAlong) ? -1f : ease.blanketAlong;
+            Api.DrawSleeperBlanket(pawn, bed, placedAt, placedYaw, size, ground, start, BlanketScale);
         }
 
         // Whether this IsoRim has the blanket to draw.
         private static bool BlanketReady()
         {
-            LookForBlanket();
-            return blanketDrawer != null;
-        }
-
-        private static void DrawBlanket(Pawn pawn, Building_Bed bed, Vector3 at, float yaw, float size, float ground)
-        {
-            LookForBlanket();
-            if (blanketDrawer != null)
-            {
-                blanketDrawer(pawn, bed, at, yaw, size, ground);
-            }
-        }
-
-        private static void LookForBlanket()
-        {
-            if (!blanketLooked)
-            {
-                blanketLooked = true;
-                try
-                {
-                    MethodInfo draw = AccessTools.Method(typeof(Api).Assembly.GetType("IsoRim.SleeperBlanket"), "Draw",
-                        new[] { typeof(Pawn), typeof(Building_Bed), typeof(Vector3), typeof(float), typeof(float), typeof(float) });
-                    if (draw != null)
-                    {
-                        blanketDrawer = (BlanketDrawer)Delegate.CreateDelegate(typeof(BlanketDrawer), draw);
-                    }
-                    else
-                    {
-                        Log.Warning(Tag + "This IsoRim has no sleeper's blanket (SleeperBlanket.Draw); sleepers lie on top of the bed.");
-                    }
-                }
-                catch (Exception e)
-                {
-                    Log.Warning(Tag + "Could not find IsoRim's sleeper's blanket: " + e.Message);
-                }
-            }
+            return Api.Version >= BlanketApi;
         }
 
         private static bool DrawSkinned(FigureDrawContext ctx)

@@ -6,7 +6,7 @@ export_cat.py calls build() at every export, so it follows the rig's Tail; nothi
 
 which saves a separate file with it beside the smooth tail, at rest and not skinned. The rig's .blend is never saved.
 
-The tail is a tube of rings. Shortening draws the rings' middles and the joints in toward the first ring and leaves each ring its
+The tail is a tube of rings, open at the root and open or closed on one vertex at the tip. Shortening draws the rings' middles and the joints in toward the first ring and leaves each ring its
 width, so it keeps its curve and thickness. A tuft is a low wedge of three triangles as on the body: its base across the tube,
 its point pulled out toward the tail's end and up off the skin, closed behind on a point on the skin. A ring's edge is too short
 to make a triangle, so the base spans two of them. Its vertices are sunk a little into the tube: the game welds normals by place,
@@ -59,7 +59,9 @@ def rings_of(o):
         at = loop.index(min(loop))
         loop = loop[at:] + loop[:at]
         ends.append(loop if loop[1] < loop[-1] else loop[:1] + loop[:0:-1])
-    if len(ends) != 2:
+    # Open at the root and either open at the tip or closed there on one vertex (a fan of triangles), which the ring walk
+    # then takes as a last ring of no width, every vertex that one.
+    if len(ends) not in (1, 2):
         bm.free()
         raise SystemExit('%s: not a tube: %d open ends' % (o.name, len(ends)))
     return bm, ends
@@ -99,6 +101,9 @@ def build(o, joints, weights, scale):
     def middle(ring):
         return sum((rest[i] for i in ring), Vector()) / len(ring)
     ends.sort(key=lambda ring: (middle(ring) - joints[0]).length)
+    if (middle(ends[0]) - joints[0]).length > (middle(ends[0]) - joints[-1]).length:
+        bm.free()
+        raise SystemExit('%s: the open end is at the tip, not the root' % o.name)
     rings = walk_rings(bm, ends[0])
     bm.free()
     middles = [middle(r) for r in rings]

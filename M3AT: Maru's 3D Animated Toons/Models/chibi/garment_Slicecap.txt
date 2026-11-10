@@ -3,8 +3,6 @@
 # its own worn on that layer and covering one of those body part groups.
 defs Apparel_Slicecap
 hide_hair tuck
-# hide k ...: body triangles (skin.txt's f lines, from 0) left out while it is worn.
-hide 1031 1038 1039 1040 1043 1069 1079 1084 1085 1111 1112 1113 1132 1186
 v 0.03014 1.14160 0.18958
 v -0.04332 1.15295 0.18248
 v -0.11377 1.14306 0.15233
