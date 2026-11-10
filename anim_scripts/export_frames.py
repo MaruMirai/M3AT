@@ -25,6 +25,7 @@ WORK_FRAMES = 24   # frames a work stroke is baked with (the blow is a seventh o
 # layer's south texture projected straight from the front. The projection is made once, in the standing pose and in the
 # head bone's own frame, and kept with the vertices, so the face turns and bobs with the head in every frame.
 FACE_GROUP = 'face'      # a vertex group on the body that picks the face by hand; without one, the head's front is used
+SCALP_GROUP = 'Scalp'    # a vertex group on the body: the scalp drawn in the hair colour (any weight counts); without one, the game's own hairline
 FACE_FACING = 0.05       # least share of a triangle's normal that points forward to count as the front of the head
 FACE_SPAN = 3.0         # the face texture's width and height, in head heights (IsoRim's own head: 2.9)
 FACE_EYES = 0.31         # the eye line's height above the chin, in head heights
@@ -450,6 +451,13 @@ def write_skin(path):
             f.write('ff %d %d %d\n' % (a, c, b))
         f.write('centre %.5f %.5f %.5f\n' % tuple(to_game(centre)))
         f.write('head %d\n' % head)
+        scalp_group = body.vertex_groups.get(SCALP_GROUP)
+        if scalp_group is not None:
+            # By membership, not weight: assigning in Edit Mode with the weight at 0 still puts a vertex in it.
+            scalp = [v.index for v in body.data.vertices if any(g.group == scalp_group.index for g in v.groups)]
+            f.write('# scalp i ...: the body vertices drawn in the hair colour under hair (the Scalp group).\n')
+            f.write('scalp %s\n' % ' '.join(map(str, scalp)))
+            print('SKIN scalp: %d vertices from the %s group' % (len(scalp), SCALP_GROUP))
         # Each key: the vertices it moves, the joints (bone heads) moved with them, and the head's middle.
         f.write('# key name: then d i x y z (vertex i moves), db b x y z (bone b\'s head moves), dc x y z (the head\'s middle), cells.\n')
         joint_anchors = [anchor(rig.matrix_world @ rig.data.bones[n].head_local) for n in deform]
@@ -1060,6 +1068,11 @@ def write_anim(path, clips):
                     q = (axes @ Euler([math.radians(v) for v in g.get('turn', (0.0, 0.0, 0.0))], 'XYZ').to_matrix() @ axes.transposed()).to_quaternion()
                     nums = [p.x, p.y, p.z] + list(game_dir(g['out'])) + [g['scale'], g.get('depth', 1.0), q.x, q.y, q.z, q.w]
                     f.write('gear %s %s %s\n' % (mount, g['bone'], ' '.join('%.4f' % (v + 0.0) for v in nums)))
+            if hasattr(walk, 'PET_BACK'):
+                f.write('# cuddle_pet along lift back: a cuddled pet (carry_cuddle) sits with its trunk\'s middle walk.PET_ALONG of the way\n')
+                f.write('# from the left elbow to the wrist, walk.PET_LIFT (model units) over that line; the clips lay the right hand on\n')
+                f.write('# a back walk.PET_BACK (model units) over that again.\n')
+                f.write('cuddle_pet %.4f %.4f %.4f\n' % (walk.PET_ALONG, walk.PET_LIFT * walk.MODEL_LEG, walk.PET_BACK * walk.MODEL_LEG))
             f.write('# draw_timing at: walk.DRAW_AT, where a draw clip\'s hand closes on the handle. draw_slide clip share: the share\n')
             f.write('# of the clip the game swings the weapon to the hand over, ending there (walk.DRAW_SIZES).\n')
             f.write('draw_timing %.4f\n' % walk.DRAW_AT)
@@ -1280,7 +1293,7 @@ for kind in walk.CARRY:
     pose_worst = max(pose_worst, export_loop('carry_' + kind, lambda t, k=kind: walk.carry_at(t, k),
                                              walk.loop_frames(seconds), seconds))
     masks['carry_' + kind] = upper_mask(walk.CARRY[kind].get('hands', walk.CARRY[kind]))
-    if kind != 'item':
+    if kind != 'item' and not walk.CARRY[kind].get('pet'):
         export_loop('carried_' + kind, lambda t, k=kind: (walk.carried_at(k, t), 0.0),
                     walk.loop_frames(seconds), seconds)
 # Hurt: one loop per wounded place and side, from the waist up over whatever the legs do; the arm it leaves free keeps
@@ -1309,6 +1322,10 @@ if getattr(walk, 'RUB_CLIP', None) is not None:
 if getattr(walk, 'TALK_CLIP', None) is not None:
     pose_worst = max(pose_worst, export_loop('talk', walk.talk_at, walk.TALK_CLIP['frames'], walk.TALK_SECONDS))
     masks['talk'] = upper_mask('LR', walk.TALK_UPPER)
+# Teaching a lesson at a school desk: the same, over the idle or the sit (the game turns the head to the pupil).
+if hasattr(walk, 'teach_at'):
+    pose_worst = max(pose_worst, export_loop('teach', walk.teach_at, walk.loop_frames(walk.TEACH_SECONDS), walk.TEACH_SECONDS))
+    masks['teach'] = upper_mask('LR', walk.TEACH_UPPER)
 # Reloading: the same, over the drafted stance (the game stretches it over the reload's time).
 if getattr(walk, 'RELOAD_CLIP', None) is not None:
     pose_worst = max(pose_worst, export_loop('reload', walk.reload_at, walk.RELOAD_CLIP['frames'], walk.RELOAD_SECONDS))
@@ -1321,6 +1338,10 @@ for name, at in (('eat_sit', getattr(walk, 'eat_sit_at', None)), ('eat_stand', g
         pose_worst = max(pose_worst, export_loop(name, at, lambda n=name: getattr(walk, n.upper() + '_CLIP')['frames'],
                                                  lambda n=name: getattr(walk, n.upper() + '_SECONDS')))
         masks[name] = upper_mask('LR', walk.EAT_UPPER)
+# Reading: the same, over the sit or the idle, the open book on the left hand (its tool line, below).
+if hasattr(walk, 'read_at'):
+    pose_worst = max(pose_worst, export_loop('read', walk.read_at, walk.loop_frames(walk.READ_SECONDS), walk.READ_SECONDS))
+    masks['read'] = upper_mask('LR', walk.EAT_UPPER)
 # Researching sat at the bench: both arms and the trunk from the waist up, over the sit.
 if getattr(walk, 'RESEARCH_CLIP', None) is not None:
     pose_worst = max(pose_worst, export_loop('work_research', walk.research_at, walk.RESEARCH_CLIP['frames'], walk.RESEARCH_SECONDS))
@@ -1358,6 +1379,14 @@ if hasattr(walk, 'tame_at'):
 if hasattr(walk, 'stomp_at'):
     pose_worst = max(pose_worst, export_loop('work_stomp', walk.stomp_at, walk.STOMP_FRAMES, walk.BEAT_SECONDS),
                      export_loop('work_pat', walk.pat_at, walk.PAT_FRAMES, walk.BEAT_SECONDS * walk.PAT_HITS))
+# Playing music (walk.MUSIC): the keyboard (the piano and harpsichord), the harp and the drum, stood at it (the whole
+# figure in place of the idle) or sat on a seat at it (from the waist up over the sit, as working sat at a bench is).
+if hasattr(walk, 'MUSIC'):
+    for name in ('piano', 'harp', 'drum'):
+        seconds = walk.MUSIC[name]['seconds']
+        pose_worst = max(pose_worst, export_loop('work_' + name, getattr(walk, name + '_at'), walk.loop_frames(seconds), seconds),
+                         export_loop('work_%s_sit' % name, getattr(walk, name + '_sit_at'), walk.loop_frames(seconds), seconds))
+        masks['work_%s_sit' % name] = upper_mask('LR', walk.EAT_UPPER)
 # Casting: the left hand raised to the target (or reached out to touch it), over whatever the rest is doing; the right arm
 # keeps its own (a weapon's stance, or the gait's swing).
 pose_worst = max(pose_worst, export_loop('cast', walk.cast_at, walk.loop_frames(walk.CAST_SECONDS), walk.CAST_SECONDS),
@@ -1445,6 +1474,9 @@ for kind, w in walk.WORK.items():
 # The hip gear in the left hand, as walk.hip_rest holds it (the model is the gear worn, so the line names none).
 if hasattr(walk, 'hip_rest'):
     tools.append(('hip', 'gear', 'L', Matrix.Scale(scale, 4) @ GAME @ rig.matrix_world @ walk.hip_rest() @ GAME.inverted()))
+# The open book read (walk.read_rest), on the left hand; the game picks IsoRim's open book, map or schematic by the book.
+if hasattr(walk, 'read_rest'):
+    tools.append(('read', 'open_book', 'L', Matrix.Scale(scale, 4) @ GAME @ rig.matrix_world @ walk.read_rest() @ GAME.inverted()))
 # Kneeling at work on the ground (walk.pluck_at), from the mocap clip, with bare hands; a kind of its own for the game.
 if walk.PLUCK_CLIP is not None:
     pose_worst = max(pose_worst, export_loop('work_pluck', walk.pluck_at, walk.PLUCK_CLIP['frames'], walk.PLUCK_SECONDS))
@@ -1457,6 +1489,9 @@ if walk.TEND_CLIP is not None:
         pose_worst = max(pose_worst, export_loop('work_play', walk.play_sit_at, walk.loop_frames(walk.carry_seconds('play')),
                                                  walk.carry_seconds('play')))
     pose_worst = max(pose_worst, export_loop('work_toys', walk.toys_at, walk.TEND_CLIP['frames'], walk.TEND_SECONDS))
+# Sat cross-legged talking by a patient on the ground (walk.visit_sit_at, VisitSickPawn), on the talk's clock.
+if getattr(walk, 'MEDITATE_CLIP', None) is not None and getattr(walk, 'TALK_CLIP', None) is not None and hasattr(walk, 'visit_sit_at'):
+    pose_worst = max(pose_worst, export_loop('work_visit', walk.visit_sit_at, walk.TALK_CLIP['frames'], walk.TALK_SECONDS))
 # Sat cross-legged meditating (walk.meditate_at), the mocap sit as it is; a work kind for the game, as it sits at a spot.
 if getattr(walk, 'MEDITATE_CLIP', None) is not None:
     pose_worst = max(pose_worst, export_loop('work_meditate', walk.meditate_at, walk.MEDITATE_CLIP['frames'], walk.MEDITATE_SECONDS))
@@ -1470,14 +1505,13 @@ if getattr(walk, 'GETUP_CLIP', None) is not None:
         return walk.GETUP_CLIP['frames']
     pose_worst = max(pose_worst, export_loop('getup', lambda t: walk.getup_at(t * getup_frames() / (getup_frames() - 1)),
                                              getup_frames, lambda: walk.GETUP_SECONDS))
-# Diving from a grenade: the dive to the ground, once through (the game plays it backwards to get up), and the loop lying on
-# the front; and crouched low under fire (hunkering). Each by the hand that holds the weapon, posed where they are, not made upright.
+# The dive to the ground that hunkering and the roll go down by, once through (the game plays it backwards to get up);
+# and flat under fire (hunkering). Each by the hand that holds the weapon, posed where they are, not made upright.
 if hasattr(walk, 'dive_at'):
     for side in ('R', 'L'):
         pose_worst = max(pose_worst,
                          export_loop('dive_' + side, lambda t, s=side: walk.dive_at(t * walk.DIVE_FRAMES / (walk.DIVE_FRAMES - 1), s),
                                      walk.DIVE_FRAMES, walk.DIVE_SECONDS),
-                         export_loop('prone_' + side, lambda t, s=side: walk.prone_at(t, s), walk.loop_frames(walk.PRONE_SECONDS), walk.PRONE_SECONDS),
                          export_loop('duck_' + side, lambda t, s=side: walk.duck_at(t, s), walk.duck_frames(), walk.DUCK_SECONDS))
 # Stop, drop and roll (ExtinguishSelf): down by the same dive, then rolled over each way, posed where it lies.
 if hasattr(walk, 'roll_at'):
@@ -1555,7 +1589,7 @@ for clip in draws:
 for _name in sorted(shield_rims):
     print('SHIELD_DRAW %s over %.1f s, the edge taken at %.2f; overreach %.4f'
           % (_name, walk.SHIELD_DRAW_SECONDS, walk.SHIELD_GRAB, draw_worst['shield_draw_' + _name]))
-print('CARRY %s, carried %s' % (', '.join('%s %.1f s' % (k, walk.carry_seconds(k)) for k in walk.CARRY), ', '.join(k for k in walk.CARRY if k != 'item')))
+print('CARRY %s, carried %s' % (', '.join('%s %.1f s' % (k, walk.carry_seconds(k)) for k in walk.CARRY), ', '.join(k for k in walk.CARRY if k != 'item' and not walk.CARRY[k].get('pet'))))
 print('HURT %s over %.1f s each, laid over the gait from the waist up' % (', '.join(walk.hurt_kinds()), walk.HURT_SECONDS))
 print('COWER cower and hunker over %.1f s, cower laid over the gait from the waist up' % walk.CRY_SECONDS)
 if hasattr(walk, 'cover_at'):
@@ -1576,6 +1610,8 @@ for name in ('eat_sit', 'eat_stand'):
         print('%s %d frames over %.2f s from %s (frames %d .. %d), laid over the %s from the waist up'
               % (name.upper(), clip['frames'], clip['frames'] / clip['fps'], clip['source'], clip['first'], clip['last'],
                  'sit' if name == 'eat_sit' else 'idle'))
+if hasattr(walk, 'read_at'):
+    print('READ over %.1f s, the book on the left hand, laid over the sit or the idle from the waist up' % walk.READ_SECONDS)
 print('CAST cast and cast_touch over %.1f s, laid over the gait with the left arm; FLINCH %s, %d frames each, added on top'
       % (walk.CAST_SECONDS, ', '.join('flinch_' + w for w in walk.FLINCH_WAYS), walk.FLINCH_FRAMES))
 print('REEL over %.1f s, a stumble to one knee, from the waist up on the move; DAZE over %.1f s' % (walk.REEL_SECONDS, walk.DAZE_SECONDS))

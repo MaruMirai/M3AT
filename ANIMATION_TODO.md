@@ -46,14 +46,14 @@ IsoRim's `Work.cs` already turns the figure to the work, sorts these jobs by too
   - [ ] Stirring (stoves, drug lab)
   - [ ] Fine work (tailoring, crafting, sculpting, art)
   - [ ] Any other bench, and typing at a terminal: `work_hands` for now (both hands busy at bench height, standing) for **DoBill** at the other benches, **Research** standing (sat at the bench it plays `work_research`, the mocap desk work from `animDLs/research.glb`, over the sit), **UseCommsConsole**, **AnalyzeItem**, **Hack**. Still to do: a real typing motion, and **ControlMech**, **PilotConsole**, **StudyInteract**
-- [ ] Kneel by a patient: **TendPatient**, **FeedPatient**, **TendEntity**, **InstallImplant**, **VisitSickPawn**, **Resurrect**, **PrisonerBloodfeed** — body (first pass in: `work_tend`, `walk.tend_at`, Meshy's mocap kneel as it is, cut before its left hand digs forward, for all of these but **PrisonerBloodfeed**)
+- [ ] Kneel by a patient: **TendPatient**, **FeedPatient**, **TendEntity**, **InstallImplant**, **VisitSickPawn**, **Resurrect**, **PrisonerBloodfeed** — body (first pass in: `work_tend`, `walk.tend_at`, Meshy's mocap kneel as it is, cut before its left hand digs forward, for all of these but **PrisonerBloodfeed** and **VisitSickPawn**, which talks instead: stood or sat on a chair by a bed, `talk` laid on; by a sleeping spot or bedroll sat cross-legged beside them talking, `work_visit`; autotest `visit`)
 - [ ] Crouched animal handling: **Milk**, **Shear**, **Slaughter**, **Tame**, **Train**, **Nuzzle**, **ReleaseAnimalToWild** — body (first pass in for **Milk** and **Shear**: by the animal's drawn back height, `WalkFigures.AnimalKind`, stood at it with `work_bench` from `AnimalHigh` (0.5 cells), else knelt by it with `work_crouch`; and for **Tame** and **Train**: `work_tame`, the right hand held out palm up coaxing, stood at a tall animal, or `work_tame_kneel` on the `work_crouch` kneel by a low one, sorted the same way. Not yet exported or checked in game)
 - [ ] Painting: **PaintBuilding**, **PaintFloor**, **RemovePaintBuilding**, **RemovePaintFloor** — upper
 - [ ] Beating out fire: **BeatFire**, **ExtinguishFiresNearby** — upper; putting out a fire on itself: **ExtinguishSelf** — body (first pass in: `roll`, `walk.roll_at`, stop, drop and roll: down by the grenade dive, then rolled over each way onto the back and back with the arms crossed on the chest, `WalkFigures.Rolling` through the hunker's `DuckOf`. Needs an export)
 - [x] Bend to pick up or set down, for now only when what a pawn carries or its count changes, so topping up a stack too (`bend`, `walk.bend_pose`, a squat; on the move `bend_walk`, a fold at the waist over the stride, played faster: one still pose eased in and out over `BEND_SECONDS` of game time, `WalkFigures.BendOf`; the game takes the thing in one tick, so the bend comes just after, the load rising from the ground in the hands). Still to do for the jobs below that pick up without carrying: **Equip**, **DropEquipment**, **Wear**, **RemoveApparel**, **Strip**, **Refuel**, **RefuelAtomic**, **EjectFuel**, **Reload**, **RearmTurret**, **FillFermentingBarrel**, **TakeBeerOutOfFermentingBarrel**, **EmptyThingContainer**, **EmptyWasteContainer**, **TakeInventory**, **UnloadInventory**, **PickupToHold**, **ExtractBioferrite** — body, short one-shot
 - [ ] Reaching to a switch or lid: **Flick**, **Open**, **TriggerObject**, **InteractThing**, **Seal** — upper, short one-shot
 - [ ] Operating a machine: **OperateDeepDrill**, **OperateScanner**, **ManTurret**, **Maintain**, **InspectGravEngine** — upper
-- [ ] Fishing (cast, then hold the line): **Fish** — upper (first pass in: `work_fish`, a posed `WORK` stroke with this mod's own rod, `make_rod.py`: held out over the water with a slow sway and a jig of the tip once a stroke, the line drawn from the tip to the water cell, `WalkFigures.DrawLine`. Still to do: the cast at the start, reeling in and a catch)
+- [x] Fishing (cast, then hold the line): **Fish** — upper (first pass in: `work_fish`, a posed `WORK` stroke with this mod's own rod, `make_rod.py`: held out over the water with a slow sway and a jig of the tip once a stroke, the line drawn from the tip to the water cell, `WalkFigures.DrawLine`. Still to do: the cast at the start, reeling in and a catch)
 - [ ] Digging and filling: **FillIn**, **ExtractSkull**, **ExtractRelic** — body
 
 ## Combat
@@ -78,21 +78,21 @@ IsoRim's `Poses.cs` decides who is sitting: any `isSittable` building (stools, c
 - [ ] Read: **Reading**, **ReadDatacore**, **StudyItem**, **ApplyTechprint** — upper
 - [x] Board and card games: **Play_Chess**, **Play_Poker**, **Play_GameOfUr** — upper (first pass in: `talk`, `walk.talk_at`, the first six seconds or so of Meshy's angry talk from the waist up, over the sit, the whole game when someone else plays at the same board, `WalkFigures.TalkOf`; also for **GiveSpeech** and **SpeakOnCellNoSpeechBubbles**, and now and then at a party, `WalkFigures.BoutOf`. Not yet: moving pieces or cards)
 - [ ] Watch: **WatchTelevision**, **SpectateCeremony**, **Workwatching** — add (head and small shifts)
-- [ ] Play music, by instrument (harp, harpsichord, piano, drums): **Play_MusicalInstrument** — upper
+- [x] Play music, by instrument (harp, harpsichord, piano, drums): **Play_MusicalInstrument** — upper (first pass in: `work_piano` for the piano and harpsichord, `work_harp`, `work_drum` (the one large tribal drum, beaten with the palms in a pattern with an accent), each `_sit` on a chair put at it, laid over the sit; `walk.MUSIC`, posed by hand to IsoRim's models of them, the figure drawn stepped up to the instrument, `WalkFigures.InstrumentCloser`, `InstrumentKind`. Not yet: checked by eye in the game beyond the autotest's `music` scenario; seated at the harp the hands fall short of the strings, and a child's shorter arms short of all of them; no sound sync)
 - [x] Meditate and pray, cross-legged or kneeling: **Meditate**, **MeditatePray**, **Pray**, **Reign** (throne) — body
-- [ ] Lessons: **Lessongiving**, **Lessontaking** — upper
+- [x] Lessons: **Lessongiving**, **Lessontaking** — upper (first pass in for **Lessongiving**: `teach`, `walk.teach_at`, explaining with the hands (presenting palm up, beating a point, opening out to the pupil, both hands spread, patting the desk), keyed by hand, over the idle or the sit, `WalkFigures.TeachOf`; the head turned part way to the pupil beside it, `LessonLookOf`, `SkinnedFigure.Look`, and the pupil's part way back to the teacher. Not yet: anything for the pupil's hands, or the blackboard)
 
 ## Joy and social
 - [ ] Chat: gestures and nods turned to the other pawn: **SocialRelax**, **StandAndBeSociallyActive**, **GotoAndBeSociallyActive**, and every interaction (chat, deep talk, romance, **TryRomance**, **PrisonerAttemptRecruit**, **PrisonerConvert**, **PrisonerEnslave**, **PrisonerReduceWill**, **SlaveSuppress**, **TalkCreepJoiner**, **PrisonerInterrogateIdentity**) — upper
 - [ ] Insult, pointing: **Insult**, **HateChanting** — upper
 - [ ] Dance: **Dance** — body
-- [ ] Speech with big gestures: **GiveSpeech**, **BestowingCeremony**, ritual leader roles — upper (first pass in for **GiveSpeech** and a ritual's **SpeakOnCellNoSpeechBubbles**: `talk`, the whole speech. Not yet **BestowingCeremony** or the other leader roles)
+- [x] Speech with big gestures: **GiveSpeech**, **BestowingCeremony**, ritual leader roles — upper (first pass in for **GiveSpeech** and a ritual's **SpeakOnCellNoSpeechBubbles**: `talk`, the whole speech. Not yet **BestowingCeremony** or the other leader roles)
 - [ ] Look at the sky: **Skygaze**, **Skydreaming**; bend to an eyepiece: **UseTelescope** — body
 - [ ] Look at something with head bowed: **ViewArt**, **VisitGrave** — add
-- [ ] Throwing games: **Play_Horseshoes**, **Play_Hoopstone** — upper; lean over a cue: **Play_Billiards** — body
+- [x] Throwing games: **Play_Horseshoes**, **Play_Hoopstone** — upper; lean over a cue: **Play_Billiards** — body
 - [ ] Build a snowman: **BuildSnowman**; draw on the floor: **Floordrawing** — body
 - [ ] Children's play: **PlayToys**, **PlayStatic**, **PlayWalking**, **NatureRunning**, **BabyPlay**, **Radiotalking** — body
-- [ ] Go for a walk (a relaxed walk): **GoForWalk** — body
+- [x] Go for a walk (a relaxed walk): **GoForWalk** — body
 - [ ] Marriage and rituals: **MarryAdjacentPawn**, **Sacrifice**, **Scarify**, **Blind**, executions (**PrisonerExecution**, **SlaveExecution**, **GuiltyColonistExecution**, **ExecuteEntity**) — upper
 
 ## Lying down
@@ -102,7 +102,7 @@ IsoRim's `Poses.cs` decides who is sitting: any `isSittable` building (stools, c
 - [ ] Rest awake, lying, turning a little: **LayDownAwake**, **LayDownResting** — body
 - [x] Downed, slow breathing and the odd writhe: **Wait_Downed** — body
 - [ ] Lovin' under a blanket (a subtle bob): **Lovin** — add
-- [ ] Feeding a baby, sitting or standing: **Breastfeed**, **BottleFeedBaby**, **BabySuckle** — upper (for now the `carry_cradle` hold, laid over the sit too: `FeedsBaby`)
+- [p] Feeding a baby, sitting or standing: **Breastfeed**, **BottleFeedBaby**, **BabySuckle** — upper (for now the `carry_cradle` hold, laid over the sit too: `FeedsBaby`)
 - [ ] Getting into a pod or casket: **EnterCryptosleepCasket**, **EnterBiosculpterPod**, **EnterBuilding**, **CreateAndEnterCocoon** — body, one-shot
 
 ## Mental states and conditions

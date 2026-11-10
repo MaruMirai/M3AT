@@ -54,14 +54,14 @@ STRIKE_SECONDS = 0.8   # how long Play takes over a blow or a throw (the game's 
 SECTIONS = [('FRAMES', 'Walk and run'), ('IDLE_SECONDS', 'Idle'), ('DRAFT_SECONDS', 'Drafted'), ('SIT_SECONDS', 'Sitting'),
             ('LIE_SECONDS', 'Lying'), ('RAGDOLL_CURL', 'Ragdoll'), ('CRAWL_FRAMES', 'Crawling'), ('PLUCK_LEAN', 'Kneeling at work'), ('LIMP_GOOD', 'Limping'), ('HOP_GROUND', 'Hopping'), ('WADE_STRIDE', 'Wading'),
             ('SWIM_FRAMES', 'Swimming'), ('TREAD_SECONDS', 'Treading water'), ('CARRY_SECONDS', 'Carrying'),
-            ('HURT_SECONDS', 'Hurt'), ('CRY_SECONDS', 'Cowering'), ('COVER_SECONDS', 'Taking cover'), ('LEAD_SECONDS', 'Leading'), ('RUB_UPPER', 'Rubbing the hands'), ('TALK_UPPER', 'Talking'), ('RELOAD_UPPER', 'Reloading'), ('EAT_UPPER', 'Eating'), ('RESEARCH_CLIP', 'Researching'), ('CROUCH_CLIP', 'Working by place'),
+            ('HURT_SECONDS', 'Hurt'), ('CRY_SECONDS', 'Cowering'), ('COVER_SECONDS', 'Taking cover'), ('LEAD_SECONDS', 'Leading'), ('RUB_UPPER', 'Rubbing the hands'), ('TALK_UPPER', 'Talking'), ('RELOAD_UPPER', 'Reloading'), ('EAT_UPPER', 'Eating'), ('READ_SECONDS', 'Reading'), ('RESEARCH_CLIP', 'Researching'), ('CROUCH_CLIP', 'Working by place'),
             ('CAST_SECONDS', 'Casting'), ('HIP_SECONDS', 'Hip gear'), ('SHIELD_SECONDS', 'Shield'), ('FLINCH_FRAMES', 'Flinching'), ('REEL_SECONDS', 'Staggered'), ('TOSS_SECONDS', 'Tossing'), ('BEAT_SECONDS', 'Beating fires'),
             ('DAZE_SECONDS', 'Stunned'), ('HAND_PALM', 'Placing a palm'),
             ('JUMP_FRAMES', 'Jumping'), ('WORK_GRIP', 'Working'), ('BEND_SECONDS', 'Bending'), ('AIM_PITCH', 'Aiming'),
             ('STRIKE_FRAMES', 'Striking'), ('DRAW_FRAMES', 'Drawing')]
 CLIP_SECTION = {'gait': 'Walk and run', 'still': 'Walk and run', 'idle': 'Idle', 'drafted': 'Drafted',
                 'carry': 'Carrying', 'carried': 'Carrying', 'sit': 'Sitting', 'lie': 'Lying', 'crawl': 'Crawling',
-                'bend': 'Bending', 'hurt': 'Hurt', 'cower': 'Cowering', 'hunker': 'Cowering', 'cover': 'Taking cover', 'lead': 'Leading', 'rub': 'Rubbing the hands', 'talk': 'Talking', 'reload': 'Reloading', 'eat_sit': 'Eating', 'eat_stand': 'Eating', 'research': 'Researching', 'research_stand': 'Researching', 'research_floor': 'Researching', 'crouch': 'Working by place', 'sow': 'Working by place', 'bench': 'Working by place', 'bench_sit': 'Working by place', 'chair': 'Working by place', 'tame': 'Taming', 'tame_kneel': 'Taming', 'stomp': 'Beating fires', 'pat': 'Beating fires', 'cast': 'Casting', 'gear': 'Hip gear', 'shield': 'Shield', 'flinch': 'Flinching', 'reel': 'Staggered', 'toss': 'Tossing', 'daze': 'Stunned', 'jump': 'Jumping', 'land': 'Jumping', 'work': 'Working', 'pluck': 'Kneeling at work', 'tend': 'Kneeling at work', 'toys': 'Kneeling at work', 'play_sit': 'Kneeling at work', 'meditate': 'Meditating', 'vomit': 'Vomiting', 'getup': 'Getting up', 'dive': 'Diving', 'prone': 'Diving', 'duck': 'Hunkering', 'roll': 'Diving', 'sleep': 'Lying', 'baby': 'Lying', 'downed': 'Lying', 'downed_side': 'Lying', 'dead': 'Lying', 'ragdoll': 'Ragdoll', 'fall': 'Lying', 'limp': 'Limping', 'hop': 'Hopping', 'wade': 'Wading', 'swim': 'Swimming', 'tread': 'Treading water', 'aim': 'Aiming', 'strike': 'Striking', 'draw': 'Drawing', 'holster': 'Drawing'}
+                'bend': 'Bending', 'hurt': 'Hurt', 'cower': 'Cowering', 'hunker': 'Cowering', 'cover': 'Taking cover', 'lead': 'Leading', 'rub': 'Rubbing the hands', 'talk': 'Talking', 'teach': 'Teaching', 'reload': 'Reloading', 'eat_sit': 'Eating', 'eat_stand': 'Eating', 'read': 'Reading', 'research': 'Researching', 'research_stand': 'Researching', 'research_floor': 'Researching', 'crouch': 'Working by place', 'sow': 'Working by place', 'bench': 'Working by place', 'bench_sit': 'Working by place', 'chair': 'Working by place', 'tame': 'Taming', 'tame_kneel': 'Taming', 'stomp': 'Beating fires', 'pat': 'Beating fires', 'piano': 'Playing music', 'piano_sit': 'Playing music', 'harp': 'Playing music', 'harp_sit': 'Playing music', 'drum': 'Playing music', 'drum_sit': 'Playing music', 'cast': 'Casting', 'gear': 'Hip gear', 'shield': 'Shield', 'flinch': 'Flinching', 'reel': 'Staggered', 'toss': 'Tossing', 'daze': 'Stunned', 'jump': 'Jumping', 'land': 'Jumping', 'work': 'Working', 'pluck': 'Kneeling at work', 'tend': 'Kneeling at work', 'toys': 'Kneeling at work', 'play_sit': 'Kneeling at work', 'visit_sit': 'Kneeling at work', 'meditate': 'Meditating', 'vomit': 'Vomiting', 'getup': 'Getting up', 'dive': 'Diving', 'duck': 'Hunkering', 'roll': 'Diving', 'sleep': 'Lying', 'baby': 'Lying', 'downed': 'Lying', 'downed_side': 'Lying', 'dead': 'Lying', 'ragdoll': 'Ragdoll', 'fall': 'Lying', 'limp': 'Limping', 'hop': 'Hopping', 'wade': 'Wading', 'swim': 'Swimming', 'tread': 'Treading water', 'aim': 'Aiming', 'strike': 'Striking', 'draw': 'Drawing', 'holster': 'Drawing'}
 # The clips timed by the ground covered, posed by Phase: each one's pose at a phase, with the picked kind.
 CYCLES = {'crawl': lambda p, kind: walk.crawl_at(p), 'limp': lambda p, kind: walk.limp_at(p, kind),
           'hop': lambda p, kind: walk.hop_at(p, kind),
@@ -71,7 +71,7 @@ GROUND = {'crawl': lambda: walk.crawl_ground_per_cycle(), 'limp': lambda: walk.l
           'wade': lambda: walk.wade_ground_per_cycle(), 'swim': lambda: walk.swim_ground_per_cycle()}
 # The stance tables: hands by side ('L', 'R': wrist places in leg lengths) and 'body' (the stance's own numbers).
 STANCES = ('DRAFTED', 'CARRY')
-OVERS = ('drafted', 'carry', 'hurt', 'cower', 'lead', 'shield', 'rub', 'talk', 'reload', 'cast', 'gear', 'flinch', 'reel', 'toss', 'daze', 'aim', 'strike', 'draw', 'holster')   # the clips the game lays over the gait
+OVERS = ('drafted', 'carry', 'hurt', 'cower', 'lead', 'shield', 'rub', 'talk', 'teach', 'reload', 'cast', 'gear', 'flinch', 'reel', 'toss', 'daze', 'aim', 'strike', 'draw', 'holster')   # the clips the game lays over the gait
 BODY_KEYS = ('DROP', 'NARROW', 'STAGGER', 'LEAN', 'HEAD_TILT')   # offered for every entry, with any other key an entry already has
 ANGLE_KEYS = {'HEAD_TILT'}   # body numbers in degrees either way from 0, which soft_range would give 0 .. 1
 ANGLE_RANGE = (-45.0, 45.0)
@@ -239,17 +239,17 @@ def loop_seconds(what, kind=''):
             'tread': getattr(walk, 'TREAD_SECONDS', None), 'hurt': getattr(walk, 'HURT_SECONDS', None),
             'cower': getattr(walk, 'CRY_SECONDS', None), 'hunker': getattr(walk, 'CRY_SECONDS', None),
             'cover': getattr(walk, 'COVER_SECONDS', None),
-            'lead': getattr(walk, 'LEAD_SECONDS', None), 'shield': getattr(walk, 'SHIELD_DRAW_SECONDS' if kind else 'SHIELD_SECONDS', None), 'rub': getattr(walk, 'RUB_SECONDS', None), 'talk': getattr(walk, 'TALK_SECONDS', None),
+            'lead': getattr(walk, 'LEAD_SECONDS', None), 'shield': getattr(walk, 'SHIELD_DRAW_SECONDS' if kind else 'SHIELD_SECONDS', None), 'rub': getattr(walk, 'RUB_SECONDS', None), 'talk': getattr(walk, 'TALK_SECONDS', None), 'teach': getattr(walk, 'TEACH_SECONDS', None),
             'reload': getattr(walk, 'RELOAD_SECONDS', None),
-            'eat_sit': getattr(walk, 'EAT_SIT_SECONDS', None), 'eat_stand': getattr(walk, 'EAT_STAND_SECONDS', None), 'research': getattr(walk, 'RESEARCH_SECONDS', None), 'research_stand': getattr(walk, 'RESEARCH_SECONDS', None), 'research_floor': getattr(walk, 'RESEARCH_SECONDS', None), 'crouch': getattr(walk, 'CROUCH_SECONDS', None), 'sow': getattr(walk, 'SOW_SECONDS', None), 'bench': getattr(walk, 'BENCH_SECONDS', None), 'bench_sit': getattr(walk, 'BENCH_SIT_SECONDS', None), 'chair': getattr(walk, 'CHAIR_SECONDS', None), 'tame': getattr(walk, 'TAME_SECONDS', None), 'tame_kneel': getattr(walk, 'CROUCH_SECONDS', None), 'stomp': getattr(walk, 'BEAT_SECONDS', None), 'pat': getattr(walk, 'BEAT_SECONDS', 0.0) * getattr(walk, 'PAT_HITS', 1), 'cast': getattr(walk, 'CAST_SECONDS', None),
+            'eat_sit': getattr(walk, 'EAT_SIT_SECONDS', None), 'eat_stand': getattr(walk, 'EAT_STAND_SECONDS', None), 'read': getattr(walk, 'READ_SECONDS', None), 'research': getattr(walk, 'RESEARCH_SECONDS', None), 'research_stand': getattr(walk, 'RESEARCH_SECONDS', None), 'research_floor': getattr(walk, 'RESEARCH_SECONDS', None), 'crouch': getattr(walk, 'CROUCH_SECONDS', None), 'sow': getattr(walk, 'SOW_SECONDS', None), 'bench': getattr(walk, 'BENCH_SECONDS', None), 'bench_sit': getattr(walk, 'BENCH_SIT_SECONDS', None), 'chair': getattr(walk, 'CHAIR_SECONDS', None), 'tame': getattr(walk, 'TAME_SECONDS', None), 'tame_kneel': getattr(walk, 'CROUCH_SECONDS', None), 'stomp': getattr(walk, 'BEAT_SECONDS', None), 'pat': getattr(walk, 'BEAT_SECONDS', 0.0) * getattr(walk, 'PAT_HITS', 1), **{w: walk.MUSIC[w.replace('_sit', '')]['seconds'] for w in ('piano', 'piano_sit', 'harp', 'harp_sit', 'drum', 'drum_sit') if hasattr(walk, 'MUSIC')}, 'cast': getattr(walk, 'CAST_SECONDS', None),
             'flinch': FLINCH_SECONDS, 'reel': getattr(walk, 'REEL_SECONDS', None), 'toss': getattr(walk, 'TOSS_SECONDS', None), 'daze': getattr(walk, 'DAZE_SECONDS', None),
             'jump': JUMP_SECONDS, 'aim': AIM_SWEEP_SECONDS,
             'gear': (AIM_SWEEP_SECONDS if kind in ('aim', 'fire') else getattr(walk, 'HIP_DRAW_SECONDS', None) if kind in ('draw', 'put')
                      else getattr(walk, 'HIP_SECONDS', None)),
             'draw': draw_seconds(kind) if what in ('draw', 'holster') else None, 'holster': draw_seconds(kind) if what in ('draw', 'holster') else None,
             'land': getattr(walk, 'LAND_SECONDS', None), 'strike': STRIKE_SECONDS, 'pluck': getattr(walk, 'PLUCK_SECONDS', None),
-            'tend': getattr(walk, 'TEND_SECONDS', None), 'toys': getattr(walk, 'TEND_SECONDS', None), 'play_sit': walk.carry_seconds('play') if hasattr(walk, 'play_sit_at') else None, 'meditate': getattr(walk, 'MEDITATE_SECONDS', None), 'vomit': getattr(walk, 'VOMIT_SECONDS', None),
-            'getup': getattr(walk, 'GETUP_SECONDS', None), 'dive': getattr(walk, 'DIVE_SECONDS', None), 'prone': getattr(walk, 'PRONE_SECONDS', None), 'duck': getattr(walk, 'DUCK_SECONDS', None), 'roll': getattr(walk, 'ROLL_SECONDS', None),
+            'tend': getattr(walk, 'TEND_SECONDS', None), 'toys': getattr(walk, 'TEND_SECONDS', None), 'play_sit': walk.carry_seconds('play') if hasattr(walk, 'play_sit_at') else None, 'visit_sit': getattr(walk, 'TALK_SECONDS', None), 'meditate': getattr(walk, 'MEDITATE_SECONDS', None), 'vomit': getattr(walk, 'VOMIT_SECONDS', None),
+            'getup': getattr(walk, 'GETUP_SECONDS', None), 'dive': getattr(walk, 'DIVE_SECONDS', None), 'duck': getattr(walk, 'DUCK_SECONDS', None), 'roll': getattr(walk, 'ROLL_SECONDS', None),
             'sleep': mocap_seconds('SLEEP_CLIP'), 'baby': getattr(walk, 'BABY_SECONDS', None), 'downed': mocap_seconds('DOWNED_CLIP'),
             'downed_side': mocap_seconds('DOWNED_SIDE_CLIP'),
             'fall': mocap_seconds('KNOCKDOWN_CLIP' if kind == 'knockdown' else 'DIE_CLIP'),
@@ -407,12 +407,16 @@ def loop_pose(what, kind, t):
         return walk.rub_at(t)
     if what == 'talk':
         return walk.talk_at(t)
+    if what == 'teach':
+        return walk.teach_at(t)
     if what == 'reload':
         return walk.reload_at(t)
     if what == 'eat_sit':
         return walk.eat_sit_at(t)
     if what == 'eat_stand':
         return walk.eat_stand_at(t)
+    if what == 'read':
+        return walk.read_at(t)
     if what == 'cast':
         return walk.cast_at(t, touch=kind == 'touch')
     if what == 'gear':
@@ -441,6 +445,8 @@ def loop_pose(what, kind, t):
         return walk.toys_at(t)
     if what == 'play_sit':
         return walk.play_sit_at(t)
+    if what == 'visit_sit':
+        return walk.visit_sit_at(t)
     if what == 'meditate':
         return walk.meditate_at(t)
     if what == 'research':
@@ -455,6 +461,8 @@ def loop_pose(what, kind, t):
         return walk.tame_at(t, kneel=what == 'tame_kneel')
     if what == 'stomp':
         return walk.stomp_at(t)   # one beat: the stamp at walk.STOMP_HIT
+    if what in ('piano', 'piano_sit', 'harp', 'harp_sit', 'drum', 'drum_sit'):
+        return getattr(walk, what + '_at')(t)   # an instrument: keys, strings or drum (walk.MUSIC)
     if what == 'pat':
         return walk.pat_at(t)   # two beats: the right palm's slap at walk.PAT_HIT, the left's half a loop on
     if what == 'vomit':
@@ -475,8 +483,6 @@ def loop_pose(what, kind, t):
         return walk.fall_at(t, kind)   # Time is how far through it: 0 standing .. 1 down (upright, as the lie is)
     if what == 'dive':
         return walk.dive_at(t, kind)   # Time is how far through it: 0 standing .. 1 down
-    if what == 'prone':
-        return walk.prone_at(t, kind)
     if what == 'duck':
         return walk.duck_at(t, kind)
     if what == 'roll':
@@ -1254,8 +1260,8 @@ def draw_tool(kind, t, X=None):
     away for any other clip. A mocap stroke (walk.work_mocap) carries it in the hand of X, the pose shown, held as the
     posed stroke holds it."""
     obj = bpy.data.objects.get(TOOL)
-    w = walk.WORK.get(kind) if kind else None
-    model = w.get('tool') if w else None
+    w = walk.WORK.get(kind) if kind and kind != 'read' else None
+    model = w.get('tool') if w else 'open_book' if kind == 'read' and X is not None else None
     if model is None:
         if obj is not None:
             obj.hide_viewport = True
@@ -1281,6 +1287,9 @@ def draw_tool(kind, t, X=None):
         obj['model'] = model
         bpy.context.scene.collection.objects.link(obj)
     obj.hide_viewport = False
+    if kind == 'read':
+        obj.matrix_world = walk.arm.matrix_world @ X['hand.L'] @ walk.read_rest()   # the open book, as the tool read line
+        return
     if X is not None and getattr(walk, 'work_mocap', lambda k: None)(kind) is not None:
         rest, _ = walk.tool_stroke_at(0.0, kind)
         held = rest['hand.R'].inverted() @ walk.tool_matrix(kind, walk.work_key(w, walk.work_stroke(0.0, w)))
@@ -1288,12 +1297,55 @@ def draw_tool(kind, t, X=None):
     else:
         obj.matrix_world = walk.arm.matrix_world @ walk.tool_matrix(kind, walk.work_key(w, walk.work_stroke(t, w)))
 
+INSTRUMENT = 'MaruInstrument'
+# Each music clip's instrument: IsoRim's model of it and how far its middle is from the middle of the pawn's cell
+# (cells: the game's interaction cell, two from a piano's or harpsichord's middle, one from a harp's or drum's).
+INSTRUMENT_MODELS = {'piano': ('piano', 2.0), 'harp': ('harp', 1.0), 'drum': ('ritual_drum', 1.0)}
+
+def draw_instrument(what):
+    """IsoRim's model of the instrument a music clip plays (walk.MUSIC), where the game draws it from the figure stepped
+    up to it by the clip's 'closer' (seated, the floor MUSIC_SEAT under the sit's own, as the chair's seat lifts it);
+    taken away for any other clip."""
+    obj = bpy.data.objects.get(INSTRUMENT)
+    kind = what[:-4] if what.endswith('_sit') else what
+    if not hasattr(walk, 'MUSIC') or kind not in INSTRUMENT_MODELS:
+        if obj is not None:
+            obj.hide_viewport = True
+        return
+    model, middle = INSTRUMENT_MODELS[kind]
+    if obj is None or obj.get('model') != model:
+        if obj is not None:
+            me = obj.data
+            bpy.data.objects.remove(obj)
+            bpy.data.meshes.remove(me)
+        vs, fs = [], []
+        with open(os.path.join(ISORIM_MODELS, model + '.obj')) as f:
+            for line in f:
+                q = line.split()
+                if q and q[0] == 'v':
+                    x, y, z = map(float, q[1:4])
+                    vs.append((-x, z, y))   # the game's model space (IsoRim's loader flips z) in Blender's axes
+                elif q and q[0] == 'f':
+                    fs.append([int(i.split('/')[0]) - 1 for i in q[1:]])
+        me = bpy.data.meshes.new(INSTRUMENT)
+        me.from_pydata(vs, [], fs)
+        obj = bpy.data.objects.new(INSTRUMENT, me)
+        obj['model'] = model
+        bpy.context.scene.collection.objects.link(obj)
+    obj.hide_viewport = False
+    seated = what.endswith('_sit')
+    cell = walk.LEG / walk.MODEL_LEG / walk.GAME_SCALE   # armature units per cell, for a grown pawn
+    closer = walk.MUSIC[kind]['closer'][1 if seated else 0]
+    at = Vector((0.0, -(middle - closer), -(walk.MUSIC_SEAT if seated else 0.0))) * cell
+    obj.matrix_world = walk.arm.matrix_world @ Matrix.Translation(at) @ Matrix.Scale(cell, 4)
+
 def clear_tool():
-    obj = bpy.data.objects.get(TOOL)
-    if obj is not None:
-        me = obj.data
-        bpy.data.objects.remove(obj)
-        bpy.data.meshes.remove(me)
+    for name in (TOOL, INSTRUMENT):   # (the instrument too: neither is saved with the .blend)
+        obj = bpy.data.objects.get(name)
+        if obj is not None:
+            me = obj.data
+            bpy.data.objects.remove(obj)
+            bpy.data.meshes.remove(me)
 
 LOAD = 'MaruLoad'
 ITEM_SCALE = 0.8   # IsoRim's Carried.ItemScale: a carried thing's share of its drawn size
@@ -1352,8 +1404,9 @@ def draw_load(p, what, kind):
     Carried.Draw lays it flat and square to the map: the figure facing south); a person as the carried loop put on the
     chest as posed (DrawHeld), a baby shrunk about its hips. Hidden for any other clip."""
     shown = p.load and what == 'carry' and kind in walk.CARRY
-    item = shown and kind == 'item'
-    person = shown and kind != 'item'
+    pet = shown and walk.CARRY[kind].get('pet')
+    item = shown and (kind == 'item' or pet)
+    person = shown and kind != 'item' and not pet
     for name, on in ((LOAD + 'Item', item), (LOAD + 'Person', person)):
         obj = bpy.data.objects.get(name)
         if obj is not None and not on:
@@ -1362,6 +1415,23 @@ def draw_load(p, what, kind):
         return
     bpy.context.view_layer.update()   # the bones' new places
     mw = walk.arm.matrix_world
+    if pet:
+        # A cuddled pet (walk.pet_on): a box along the left forearm for its trunk, its top at walk.PET_BACK, where the
+        # right hand is laid (the game draws IsoRim's animal there, its trunk's middle on that point).
+        pose = walk.arm.pose.bones
+        fa = pose['forearm.L']
+        mid = fa.head.lerp(fa.tail, walk.PET_ALONG) + Vector((0, 0, walk.PET_LIFT * walk.LEG))
+        length, width, back = 0.5 * walk.LEG, 0.22 * walk.LEG, walk.PET_BACK * walk.LEG
+        obj = load_object(LOAD + 'Item', False)
+        obj.display_type = 'WIRE'
+        obj.show_in_front = True
+        me = obj.data
+        if not me.vertices:
+            me.from_pydata([(x, y, z) for x in (-0.5, 0.5) for y in (-0.5, 0.5) for z in (0.0, 1.0)], [],
+                           [(0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3)])
+        obj.matrix_world = mw @ Matrix.Translation(mid - Vector((0, 0, back * 0.25))) @ Matrix.Diagonal((length, width, back * 1.25, 1.0))
+        obj.hide_viewport = False
+        return
     if item:
         k = 1.0 / model_scale()   # Blender units per model unit
         pose = walk.arm.pose.bones
@@ -2325,6 +2395,8 @@ def repose(_self=None, _context=None):
                     apply_over(Xg, Xs, 'LR', walk.RUB_UPPER)
                 elif what == 'talk':
                     apply_over(Xg, Xs, 'LR', walk.TALK_UPPER)
+                elif what == 'teach':
+                    apply_over(Xg, Xs, 'LR', walk.TEACH_UPPER)
                 elif what == 'reload':
                     apply_over(Xg, Xs, 'LR', walk.RELOAD_UPPER)
                 elif what == 'cast':
@@ -2364,7 +2436,8 @@ def repose(_self=None, _context=None):
                         else walk.strike_names()[kind][2] if what == 'strike' else 'rifle' if what == 'reload'
                         else walk.draw_keys(kind)['guard'] if what in ('draw', 'holster') else None,
                         drawn=drawn_from(what, kind, p.time % 1.0))
-            draw_tool(kind if what == 'work' else None, p.time % 1.0, X)
+            draw_tool('read' if what == 'read' else kind if what == 'work' else None, p.time % 1.0, X)
+            draw_instrument(what)
             draw_load(p, what, kind)
             place_grip(p, what, kind, write='grip' not in state['quiet'])
             state['mix'] = body_mix()
@@ -2424,8 +2497,8 @@ CATEGORIES = [('move', 'Moving', 'Walking, running, standing, swimming, crawling
               ('gear', 'Hip gear', 'Taking, holding and pointing a psychic lance, orbital targeter or tornado generator'),
               ('hurt', 'Hurt and reactions', 'Holding a wound, cowering, flinching, staggered and stunned')]
 CATEGORY_OF = {'drafted': 'drafted', 'carry': 'carry', 'carried': 'carry', 'bend': 'carry', 'lead': 'carry',
-               'sit': 'rest', 'lie': 'rest', 'getup': 'rest', 'sleep': 'rest', 'baby': 'rest', 'downed': 'hurt', 'downed_side': 'hurt', 'dead': 'hurt', 'ragdoll': 'hurt', 'fall': 'hurt', 'work': 'work', 'pluck': 'work', 'tend': 'work', 'toys': 'work', 'play_sit': 'rest', 'meditate': 'rest', 'research': 'work', 'research_stand': 'work', 'research_floor': 'work', 'crouch': 'work', 'sow': 'work', 'bench': 'work', 'bench_sit': 'work', 'chair': 'work', 'tame': 'work', 'tame_kneel': 'work', 'stomp': 'work', 'pat': 'work', 'eat_sit': 'rest', 'eat_stand': 'rest', 'vomit': 'hurt', 'rub': 'hurt', 'talk': 'rest', 'toss': 'rest', 'reload': 'aim', 'aim': 'aim', 'strike': 'strike', 'cast': 'cast', 'gear': 'gear', 'shield': 'drafted', 'draw': 'draw', 'holster': 'draw',
-               'hurt': 'hurt', 'cower': 'hurt', 'hunker': 'hurt', 'cover': 'drafted', 'dive': 'hurt', 'prone': 'hurt', 'duck': 'hurt', 'roll': 'hurt', 'flinch': 'hurt', 'reel': 'hurt', 'daze': 'hurt'}
+               'sit': 'rest', 'lie': 'rest', 'getup': 'rest', 'sleep': 'rest', 'baby': 'rest', 'downed': 'hurt', 'downed_side': 'hurt', 'dead': 'hurt', 'ragdoll': 'hurt', 'fall': 'hurt', 'work': 'work', 'pluck': 'work', 'tend': 'work', 'toys': 'work', 'play_sit': 'rest', 'visit_sit': 'rest', 'meditate': 'rest', 'research': 'work', 'research_stand': 'work', 'research_floor': 'work', 'crouch': 'work', 'sow': 'work', 'bench': 'work', 'bench_sit': 'work', 'chair': 'work', 'tame': 'work', 'tame_kneel': 'work', 'stomp': 'work', 'pat': 'work', 'piano': 'rest', 'piano_sit': 'rest', 'harp': 'rest', 'harp_sit': 'rest', 'drum': 'rest', 'drum_sit': 'rest', 'eat_sit': 'rest', 'eat_stand': 'rest', 'read': 'rest', 'vomit': 'hurt', 'rub': 'hurt', 'talk': 'rest', 'teach': 'rest', 'toss': 'rest', 'reload': 'aim', 'aim': 'aim', 'strike': 'strike', 'cast': 'cast', 'gear': 'gear', 'shield': 'drafted', 'draw': 'draw', 'holster': 'draw',
+               'hurt': 'hurt', 'cower': 'hurt', 'hunker': 'hurt', 'cover': 'drafted', 'dive': 'hurt', 'duck': 'hurt', 'roll': 'hurt', 'flinch': 'hurt', 'reel': 'hurt', 'daze': 'hurt'}
 
 def category_of(clip):
     """The category a clip's id ('drafted:rifle', 'gait' ...) is listed under; anything not named is Moving."""
@@ -2475,7 +2548,7 @@ def clip_items():
     items += [('drafted:' + k, 'Drafted: ' + k, 'The drafted stance for a %s (walk.DRAFTED)' % k) for k in walk.DRAFTED]
     items += [('carry:' + k, 'Carrying: ' + k, 'Carrying a load: %s (walk.CARRY)' % k) for k in walk.CARRY]
     items += [('carried:' + k, 'Carried: ' + k, 'The person carried %s, where the carrier holds it (walk.carried_at)' % k)
-              for k in walk.CARRY if k != 'item']
+              for k in walk.CARRY if k != 'item' and not walk.CARRY[k].get('pet')]
     items += [('sit', 'Sitting', 'The seated loop (walk.sit_at)'),
               ('lie', 'Lying', 'The lying loop, upright: the game lays it down (walk.lie_at)'),
               ('crawl', 'Crawling', 'The crawl, upright: the game tips it face down (walk.crawl_at)')]
@@ -2544,6 +2617,9 @@ def clip_items():
         if hasattr(walk, 'play_sit_at'):
             items.append(('play_sit', 'Playing with a baby: sat', 'Sat cross-legged rocking a baby in the arms '
                           '(walk.play_sit_at, the play carry on the meditation)'))
+        if hasattr(walk, 'visit_sit_at') and getattr(walk, 'TALK_CLIP', None) is not None:
+            items.append(('visit_sit', 'Visiting the sick: sat', 'Sat cross-legged by a patient on the ground, talking '
+                          'with the hands (walk.visit_sit_at, the talk on the meditation)'))
     if getattr(walk, 'MEDITATE_CLIP', None) is not None:
         items.append(('meditate', 'Meditating', 'Sat cross-legged on the floor, the hands on the knees, breathing '
                       '(walk.meditate_at, from the mocap clip in meditate_clip.json)'))
@@ -2576,6 +2652,15 @@ def clip_items():
                       'stamp a beat (walk.stomp_at), the whole figure'))
         items.append(('pat', 'Beating fires: patting', 'A fire on a structure or furniture slapped out with the palms in '
                       'turn, a slap a beat (walk.pat_at), the whole figure'))
+    if hasattr(walk, 'MUSIC'):
+        for name, label, what in (('piano', 'Music: keyboard, standing', 'The piano or harpsichord played stood at it, the whole figure'),
+                                  ('piano_sit', 'Music: keyboard, seated', 'The piano or harpsichord played sat at it, over the sit from the waist up'),
+                                  ('harp', 'Music: harp, standing', 'The harp\'s strings plucked stood at it, the whole figure'),
+                                  ('harp_sit', 'Music: harp, seated', 'The harp played sat at it, over the sit from the waist up'),
+                                  ('drum', 'Music: drum, standing', 'The tribal drum beaten with the palms stood at it, the whole figure'),
+                                  ('drum_sit', 'Music: drum, seated', 'The drum beaten sat at it, over the sit from the waist up')):
+            if hasattr(walk, name + '_at'):
+                items.append((name, label, '%s (walk.%s_at, IsoRim\'s model of it drawn where the game puts it)' % (what, name)))
     if getattr(walk, 'VOMIT_CLIP', None) is not None:
         items.append(('vomit', 'Vomiting', 'Bent over, hands on the knees, heaving '
                       '(walk.vomit_at, from the mocap clip in vomit_clip.json)'))
@@ -2585,6 +2670,9 @@ def clip_items():
     if getattr(walk, 'TALK_CLIP', None) is not None and hasattr(walk, 'talk_at'):
         items.append(('talk', 'Talking', 'Board games, speeches and parties: talking with the hands, over the gait '
                       'from the waist up (walk.talk_at, from the mocap clip in talk_clip.json)'))
+    if hasattr(walk, 'teach_at'):
+        items.append(('teach', 'Teaching', 'A lesson at a school desk: explaining with the hands, over the gait or the sit '
+                      'from the waist up (walk.teach_at, keyed by hand in TEACH_KEYS); the game turns the head to the pupil'))
     if hasattr(walk, 'toss_at'):
         items.append(('toss', 'Tossing', 'Horseshoes and hoopstone: one underhand pitch, by Time (walk.toss_at); the whole '
                       'figure standing, over the sit from the waist up'))
@@ -2597,6 +2685,9 @@ def clip_items():
     if getattr(walk, 'EAT_STAND_CLIP', None) is not None and hasattr(walk, 'eat_stand_at'):
         items.append(('eat_stand', 'Eating: standing', 'The meal held in the right hand, the left bringing it to the mouth '
                       '(walk.eat_stand_at, from the mocap clip in eat_stand_clip.json)'))
+    if hasattr(walk, 'read_at'):
+        items.append(('read', 'Reading', 'The open book on the left palm, the right hand on its page turning one now and then '
+                      '(walk.read_at), laid over the sit or the idle from the waist up; IsoRim\'s open book drawn on the hand'))
     if getattr(walk, 'SLEEP_CLIP', None) is not None:
         items.append(('sleep', 'Asleep', 'Asleep on the back, upright: the game lays it down (walk.sleep_at, sleep_clip.json)'))
     if hasattr(walk, 'baby_at') and getattr(walk, 'CRAWL_CLIP', None) is not None:
@@ -2618,8 +2709,7 @@ def clip_items():
                       '(walk.getup_at, from the mocap clip in getup_clip.json)'))
     if hasattr(walk, 'dive_at'):
         for side, hand in (('R', 'right'), ('L', 'left')):
-            items += [('dive:' + side, 'Diving from a grenade, weapon in the %s hand' % hand, 'From standing to down on the front, once through, by Time (walk.dive_at)'),
-                      ('prone:' + side, 'Down from a grenade, weapon in the %s hand' % hand, 'Down on the front, the free hand at the neck (walk.prone_at)'),
+            items += [('dive:' + side, 'Diving flat to hunker, weapon in the %s hand' % hand, 'From standing to down on the front, once through, by Time (walk.dive_at)'),
                       ('duck:' + side, 'Hunkering, weapon in the %s hand' % hand, 'Flat on the front under fire, the hands by the head (walk.duck_at)')]
     if hasattr(walk, 'roll_at'):
         items.append(('roll', 'Rolling to put out a fire', 'Stop, drop and roll: over each way onto the back and back, the arms crossed (walk.roll_at)'))

@@ -1282,6 +1282,34 @@ EAT_REACH = True   # whether the eating wrist is brought to the mouth (eat_at); 
 EAT_STAND_CLIP = clip_file('eat_stand')
 EAT_STAND_SECONDS = EAT_STAND_CLIP['frames'] / EAT_STAND_CLIP['fps'] if EAT_STAND_CLIP is not None else None
 
+# Reading (read_at, read: the game's Reading job, once the book is open, sat or standing still with it). Procedural: the
+# open book lies on the left palm under its spine, tipped up toward the face, the right hand resting on the right-hand
+# page, the trunk leant a little and the head bowed to it; once a loop the right hand lifts the page, carries it over to
+# the left and comes back. Laid over the sit or the idle from the waist up, as eating is (EAT_UPPER). The book rides the
+# left hand: its place is written as a `tool read open_book L` line (read_rest), so the game draws IsoRim's open book
+# model (or its map or schematic) there, and the right hand is placed on it in the book's own frame.
+READ_SECONDS = 8.0   # one loop: the breaths and one page turned
+READ_BREATHS = 2     # breaths a loop
+READ_BOOK = (0.02, -0.5, 0.32)   # the middle of the book's underside at the spine: leg lengths from the middle of the
+                                   # hips at rest in a level frame turned as the chest is, x out (- is right), y back (-
+                                   # forward), z up; in front of the belly, under the chin
+READ_TILT = 35.0     # the book tipped up toward the face from flat (degrees), its far edge raised
+READ_SCALE = 0.55    # the book's size: a share of IsoRim's open_book model (0.56 cells across open), at a grown pawn's size
+READ_PALM = 0.03     # the left palm this far under the book's underside (leg lengths), so the fingers don't show through
+READ_FINGERS = (-0.3, -1.0, 0.0)   # the way the left fingers point under the book, palm up: in the book's frame (x
+                                    # across, + toward the left page, y along the spine, + toward the reader, z out of its
+                                    # face), away from the reader and a little in toward the right
+READ_CURL = 0.15     # share of FIST the left fingers curl round the spine
+READ_REST = (-0.62, 0.35, 0.05)   # the right palm on the right page, in the book's frame: shares of half its width across
+                                  # (- the right page), of half its depth along the spine and of half its width up off it
+READ_TURN = (0.55, 0.85)   # the share of the loop the page turn takes, start and end
+READ_OVER = (0.55, 0.25, 0.4)   # where the turning hand goes: across onto the left page, along and up, as READ_REST
+READ_LIFT = 0.45     # how high the hand arcs over the book at the middle of the turn (shares of half its width)
+READ_LEAN = 6.0      # the trunk leant forward over the book (degrees, from the waist)
+READ_LOOK = 22.0     # the head bowed further to look down at it (degrees)
+READ_ELBOW_L = (0.6, 0.4, -0.8)   # the left elbow out and down (chest's frame)
+READ_ELBOW_R = (-0.7, 0.4, -0.6)   # the right elbow out and down
+
 # Researching (research_at, work_research: the Research job, sat at the bench): inspect_clip.json (`import_pluck.py --
 # animDLs/inspect.glb _01a17cae_051d_7585_b81e_0406f2e4310d 8 87 --as inspect`: sat holding something up in both hands
 # and looking it over), laid over the sit from the waist up as eating at a table is (EAT_UPPER), its own arms and lean
@@ -1459,7 +1487,34 @@ CARRY = {
     # Playing with a baby (Biotech's PlayWalking): held as the cradle holds it, but rocked from side to side in the arms
     # (carry_rock), the trunk swaying with it, and the baby awake and waving (carried_at). 'rock' makes it so.
     'play': {'R': (-0.0519, -0.5028, 0.4453), 'R_turn': (-69.338, 30.2702, 206.5912), 'R_elbow': -21.0, 'L': (0.1369, -0.3901, 0.3699), 'L_turn': (-156.2982, -16.3123, -161.5277), 'L_elbow': 10.0, 'hands': 'LR', 'body': dict(LEAN=-2.0, DROP=0.03, NARROW=0.45), 'rock': True},
+    # A small pet cuddled ([DG]Lovly Animal Cuddling's AC_CuddleAnimal): the cradle's left arm, the pet sat along its
+    # forearm (pet_on), and the right hand laid on its back (cuddle_hand), head to the carrier's left. 'pet': no
+    # carried_<kind> clip (IsoRim draws the animal), the right hand placed by cuddle_hand. 'cuddle_stroke' strokes it
+    # from the neck to the rump STROKES times a loop of STROKE_SECONDS, the hand lifted back over it between; the game
+    # eases it in over 'cuddle' while the pawn stands or sits still.
+    'cuddle': {'L': (-0.02, -0.42, 0.36), 'L_turn': (-156.2982, -16.3123, -161.5277), 'L_elbow': 10.0, 'hands': 'LR', 'body': dict(LEAN=-2.0, DROP=0.03, NARROW=0.45), 'pet': True},
+    'cuddle_stroke': {'L': (-0.02, -0.42, 0.36), 'L_turn': (-156.2982, -16.3123, -161.5277), 'L_elbow': 10.0, 'hands': 'LR', 'body': dict(LEAN=-2.0, DROP=0.03, NARROW=0.45), 'pet': True, 'stroke': True},
 }
+# The cuddled pet (a CARRY entry with 'pet'): its trunk's middle PET_ALONG of the way from the left elbow to the wrist and
+# PET_LIFT (leg lengths) over that line, the top of its back PET_BACK over that again (a cat's, at the standard size; the
+# game moves the right hand by how much higher or lower the animal it draws is, anim.txt's cuddle_pet line). The right
+# palm rests on its back STROKE_REST (leg lengths along the carrier's left, toward the head; + forward), its fingers
+# forward and toward the rump (STROKE_FINGERS, as the short arms reach it best so, the carrier's rest space: -x its right, -y forward). Stroking: from STROKE_FROM to
+# STROKE_TO along the back (leg lengths, + toward the head) over STROKE_PRESS of each stroke, pressed STROKE_DIP into the
+# fur at its middle, then lifted STROKE_LIFT over it on the way back. The head bowed CUDDLE_LOOK degrees to look at it.
+PET_ALONG = 0.65
+PET_LIFT = 0.04
+PET_BACK = 0.18
+STROKE_REST = (0.02, -0.02)
+STROKE_FINGERS = (-0.5, -1.0, -0.2)
+STROKE_SECONDS = 6.0
+STROKES = 3
+STROKE_FROM = 0.12
+STROKE_TO = -0.12
+STROKE_PRESS = 0.6
+STROKE_DIP = 0.015
+STROKE_LIFT = 0.10
+CUDDLE_LOOK = 14.0
 # Rocking (a CARRY entry with 'rock'): the baby swung like a pendulum in the arms about a point between the shoulders
 # (PLAY_PIVOT, leg lengths from the middle of the hips at rest, as CARRY's places), PLAY_SWING degrees either way,
 # PLAY_ROCKS times a loop of PLAY_SECONDS, and lifted PLAY_LILT (leg lengths) at each end of the swing; the hands go with
@@ -1636,6 +1691,41 @@ TAME_TIP = 15.0      # the fingers tipped down from level (degrees), the palm st
 TAME_COAX = 2        # the fingers' curls a loop
 TAME_CURL = (0.1, 0.45)   # the fingers' curl between (shares of FIST)
 TAME_ELBOW = (-0.6, 0.3, -0.8)   # the elbow out and down (chest's frame)
+
+# Teaching a lesson at a school desk (teach_at, teach: Biotech's Lessongiving, once at the teacher's spot). The game puts
+# the teacher and the pupil side by side on the near side of the desk, both facing it, the pupil on the teacher's right;
+# the game turns the head round toward the pupil (WalkFigures.LessonLookOf), so the clip keeps it facing ahead. Procedural:
+# explaining with the hands, keyed at TEACH_AT and joined smoothly round the loop (loop_key): the right hand raised palm up
+# to present, beating a point twice with the hand edge on, opened out toward the pupil, both hands spread, then patting
+# down at the desk with the head bowed to it (the game's look eases off there, TeachGlance) and back to rest. The left hand
+# mostly hangs, joining the spread. Laid over the idle or the sit from the waist up (TEACH_UPPER), as talking is. Each
+# wrist from its shoulder in a level frame turned as the chest is, shares of the arm's reach: x out (+ is left), y forward
+# (-), z up; each palm's facing and the fingers' way in the same frame.
+TEACH_SECONDS = 9.0   # one loop
+TEACH_BREATHS = 3     # breaths a loop
+TEACH_AT = (0.0, 0.14, 0.26, 0.36, 0.5, 0.62, 0.74, 0.86)   # the keys round the loop
+TEACH_KEYS = {
+    'wrist_R': ((-0.12, -0.25, -0.85), (-0.3, -0.65, -0.35), (-0.25, -0.72, -0.3), (-0.25, -0.7, -0.5),
+                (-0.5, -0.55, -0.32), (-0.42, -0.6, -0.34), (-0.1, -0.8, -0.58), (-0.15, -0.45, -0.75)),
+    'palm_R': ((1, 0, 0), (0.3, 0, 1), (1, 0, 0.2), (1, 0, 0.1), (0.2, 0, 1), (0.2, 0, 1), (0, -0.2, -1), (1, 0, 0)),
+    'fingers_R': ((0, -0.2, -1), (-0.4, -1, 0.1), (-0.1, -1, 0.2), (-0.1, -1, 0), (-0.8, -0.8, 0), (-0.6, -0.9, 0),
+                  (0, -1, -0.4), (0, -0.5, -1)),
+    'curl_R': (0.35, 0.1, 0.15, 0.15, 0.05, 0.05, 0.2, 0.3),
+    'wrist_L': ((0.12, -0.2, -0.88), (0.12, -0.2, -0.88), (0.15, -0.3, -0.82), (0.15, -0.3, -0.82),
+                (0.2, -0.45, -0.7), (0.42, -0.6, -0.34), (0.2, -0.45, -0.7), (0.12, -0.25, -0.86)),
+    'palm_L': ((-1, 0, 0), (-1, 0, 0), (-1, 0, 0), (-1, 0, 0), (-1, 0, 0.3), (-0.2, 0, 1), (-1, 0, 0.3), (-1, 0, 0)),
+    'fingers_L': ((0, -0.2, -1), (0, -0.2, -1), (0, -0.3, -1), (0, -0.3, -1), (0.2, -0.6, -0.8), (0.6, -0.9, 0),
+                  (0.2, -0.6, -0.8), (0, -0.2, -1)),
+    'curl_L': (0.35, 0.35, 0.3, 0.3, 0.25, 0.05, 0.25, 0.35),
+    'twist': (0.0, -4.0, -4.0, -4.0, -8.0, -3.0, 0.0, 0.0),   # the trunk turned toward the pupil (degrees, + to the left)
+    'lean': (3.0, 4.0, 5.0, 6.0, 4.0, 3.0, 6.0, 4.0),   # leant forward from the waist (degrees)
+    'bow': (0.0, 0.0, 3.0, 3.0, 0.0, -2.0, 9.0, 3.0),   # the head bowed further (degrees): down to the desk at the pat
+}
+TEACH_NODS = 6       # small nods a loop as it talks
+TEACH_NOD = 3.0      # degrees each
+TEACH_ELBOW_R = (-0.7, 0.4, -0.6)   # the right elbow out and down (chest's frame)
+TEACH_ELBOW_L = (0.7, 0.4, -0.6)    # the left
+TEACH_UPPER = {'spine.001': 1.0}   # in place of UPPER: from the waist up
 
 # Hip gear (GEAR's 'hip' mount: IsoRim's psychic lances, orbital targeters and tornado generator, apparel the game uses
 # through a verb of its own, as it does a weapon). The left hand takes it from its slot on the right shoulder (hip_draw;
@@ -1844,6 +1934,85 @@ PAT_TIP = (6.0, 4.0, -35.0, -25.0)
 PAT_CURL = (0.05, 0.05, 0.2, 0.15)
 PAT_ELBOW = (0.7, 0.4, -0.6)   # the elbows out and down (chest's frame, x out)
 
+# Playing a musical instrument (the game's Play_MusicalInstrument: Royalty's piano and harpsichord, played as one
+# keyboard, and harp; Ideology's drum, one large tribal drum), stood at it or sat on a seat put at it. The game keeps
+# the pawn in the middle of the instrument's interaction cell, out of reach of it, so it is drawn stepped up to it
+# (WalkFigures.InstrumentCloser, MUSIC's 'closer': keep the two in step).
+#   MUSIC[kind]: 'seconds' a loop; 'closer' (standing, seated) cells the figure is drawn toward the instrument from its
+#     cell's middle; 'play' where the hands play, cells for a grown pawn (GAME_SCALE) from the middle of the pawn's cell
+#     on the floor (x out to the left, y forward, z up, as IsoRim draws the instrument's model: the keys' tops, the
+#     strings, the drum's head; music_play takes the closer and, seated, MUSIC_SEAT off it); 'lean' (standing, seated)
+#     the trunk leant toward it (degrees); 'look' the head bowed further, to watch the hands (degrees).
+# Seated, the figure is the sit's (sit_at), which IsoRim sets on a chair's seat (0.44 cells) MUSIC_SEAT higher than the
+# sit has its own floor; the game lays it over the sit from the waist up (EAT_UPPER). A chair is drawn in the middle of
+# the cell, so a seated figure can be drawn only a little toward the instrument, and leans further.
+MUSIC_SEAT = 0.12
+MUSIC = {
+    # The keys' tops 0.83 cells up and 0.66 .. 0.93 ahead of the pawn's cell's middle (IsoRim's piano.obj and
+    # harpsichord.obj, the keyboard toward the interaction cell, two cells from the middle); the case 0.6 ahead.
+    'piano': dict(seconds=4.0, closer=(0.4, 0.28), play=(0.0, 0.71, 0.86), lean=(14.0, 28.0), look=14.0),
+    # The strings in a plane square to the pawn 0.98 ahead (harp.obj, a cell from it), from 0.2 to 1.35 up, the
+    # soundbox slanting up from the left to the right as the pawn faces it; the base is 0.24 deep either side and 0.1
+    # high, so the feet can't go much nearer.
+    'harp': dict(seconds=4.0, closer=(0.68, 0.5), play=(0.0, 0.98, 0.9), lean=(12.0, 36.0), look=6.0),
+    # The head 0.79 up, 0.34 round about a middle a cell ahead (ritual_drum.obj); its body 0.4 round.
+    'drum': dict(seconds=2.4, closer=(0.45, 0.33), play=(0.0, 0.81, 0.82), lean=(18.0, 30.0), look=12.0),
+}
+
+def music_play(kind, seated):
+    """MUSIC[kind]'s 'play' from the drawn figure's feet (cells): stepped up by its 'closer', seated on the seat."""
+    m = MUSIC[kind]
+    i = 1 if seated else 0
+    x, y, z = m['play']
+    return Vector((x, y - m['closer'][i], z - (MUSIC_SEAT if seated else 0.0)))
+
+# The keyboard: each hand's palm about 'play' (cells), the left PIANO_SPAN out to the left and the right as far to the
+# right, wandering PIANO_WANDER either way along the keys (the right PIANO_RUNS times a loop, the left PIANO_RUNS - 1,
+# so they move apart and together), pressed down PIANO_PRESS (cells) PIANO_PRESSES times a loop (the left half as
+# often), the fingers curling between PIANO_CURL (shares of FIST) as they play, the thumb out of step; the fingers
+# pointed PIANO_TIP down from level (degrees). The trunk swayed PIANO_SWAY (degrees) after the right hand.
+PIANO_SPAN = 0.12
+PIANO_WANDER = (0.07, 0.05)   # the left's, the right's
+PIANO_RUNS = 2
+PIANO_PRESS = 0.012
+PIANO_PRESSES = 8
+PIANO_CURL = (0.15, 0.45)
+PIANO_TIP = 25.0
+PIANO_SWAY = 4.0
+PIANO_ELBOW = (0.9, 0.3, -0.5)   # the elbows out and down (chest's frame, x out)
+# The harp: each hand's palm toward the strings, on them about 'play' (cells): HARP_HANDS (x out to its own side, z up,
+# cells), drifting HARP_DRIFT along and up the strings (sines, once a loop and out of step); each hand plucking HARP_PLUCKS
+# times a loop (the left's, the right's), its fingers curling from HARP_CURL's first to its second over HARP_PLUCK of
+# a pluck and the hand drawn back off the strings HARP_DRAW (cells) as they catch, then opened and laid back on; the
+# fingers pointing up and in toward the middle by HARP_FINGERS (degrees from straight up). The head tilted toward the
+# soundbox (the right) HARP_TILT degrees, and the trunk swaying HARP_SWAY.
+HARP_HANDS = ((0.06, 0.08), (0.04, -0.08))   # the left's, the right's: (out, up)
+HARP_DRIFT = (0.04, 0.08)
+HARP_PLUCKS = (3, 4)
+HARP_PLUCK = 0.3
+HARP_CURL = (0.1, 0.75)
+HARP_DRAW = 0.03
+HARP_FINGERS = 30.0
+HARP_TILT = 8.0
+HARP_SWAY = 3.0
+HARP_ELBOW = (0.8, 0.2, -0.6)
+# The drum: beaten with the bare palms in turn, DRUM_BEATS eighths of a loop at which each hand strikes (the left's, the
+# right's; both together on the accent, DRUM_ACCENT, which is beaten harder and nearer the middle). Between strikes a hand
+# is raised up to DRUM_LIFT (cells, the most, for a gap of a quarter loop or more; less for a shorter one), slowly at
+# first and brought down fast, the fingers tipped up DRUM_TIP (degrees) at the top; each palm DRUM_SPAN out from the
+# middle of the head. The hips let down DRUM_DIP (cells) and the trunk leant DRUM_BOB (degrees) further at each strike,
+# twice that on the accent, and the head nodding DRUM_NOD (degrees) with them.
+DRUM_BEATS = ((1, 4, 7), (0, 2, 4, 5, 6))
+DRUM_ACCENT = 4
+DRUM_LIFT = 0.12
+DRUM_TIP = 30.0
+DRUM_SPAN = 0.09
+DRUM_DIP = 0.01
+DRUM_BOB = 2.0
+DRUM_NOD = 4.0
+DRUM_CURL = 0.1
+DRUM_ELBOW = (0.8, 0.4, -0.5)
+
 # Stunned (the game's StunHandler: an EMP, a psychic shock, a stun throw): standing dazed, slumped on soft knees, the
 # arms hanging and the head lolling round, swaying slowly. The whole figure in place of the idle; on the move (pushed),
 # from the waist up (DAZE_UPPER).
@@ -1894,12 +2063,12 @@ LAND_HIPS = 22.0     # hips tipped forward (degrees)
 LAND_LOOK = 0.8      # share of that the head takes back, to look ahead
 LAND_HANDS = (0.5, -0.65, -0.25)   # each wrist from its shoulder, as JUMP_HANDS: forward and out for balance
 
-# Diving from a live grenade (the game's own reaction to an explosive about to go off is a sprint away, see
-# WalkFigures.DivesFromBlast): a dive to the ground and a loop lying on the front, the head down and the free hand at the
-# back of the neck, the weapon kept in its hand. The game goes on moving a pawn that is running, so it slides on along its
-# path; one standing still sprawls where it is, the upper body thrown forward and the legs kicked back, the hips staying
-# over the cell. Unlike the lie and the crawl these are posed where they lie (not made upright), so the game plays them as
-# it does the getup, and the dive backwards to get up again. One of each by the hand that holds the weapon. Each DIVE_KEYS
+# The dive to the ground that hunkering (Combat Extended's HunkerDown) and rolling to put out a fire go down by
+# (WalkFigures.DuckOf): the head down and the free hand at the back of the neck by its end, the weapon kept in its hand;
+# the upper body thrown forward and the legs kicked back, the hips staying over the cell. Unlike the lie and the crawl it is
+# posed where it lies (not made upright), so the game plays it as it does the getup, and backwards to get up again. (The
+# game's own reaction to an explosive about to go off is only a sprint away, so nothing dives from one.)
+# One of each by the hand that holds the weapon. Each DIVE_KEYS
 # line is one key, DIVE_AT of the way through: hips is the hips' place (y back of rest, z the
 # hip joint over the toe joint's rest height, leg lengths), pitch the trunk tipped forward, look the head turned back up from that and foot
 # the feet's pitch (degrees); ankle is the left ankle (x out, y back of rest, z over the toe joint's rest height, 0.03 at
@@ -1922,24 +2091,22 @@ DIVE_ELBOW = (1.0, 0.3, -0.6)    # the elbows out and down (chest's frame, x mir
 PRONE_HAND = (0.12, 0.16, 0.0)   # the free wrist over the back of the head: from the head bone's joint in its frame (x to that
                                  # side, y back, z along the head; leg lengths)
 PRONE_COVER = 0.72   # of the dive: from here that hand goes from the ground to the head
-PRONE_SECONDS = 2.4  # game seconds round the loop
-PRONE_BREATHS = 4    # quick breaths a loop
 PRONE_BREATH = 3.0   # the chest heaved on the in-breath (degrees)
 PRONE_DUCK = 4.0     # the head ducked and raised a little (degrees), twice a loop
 # Hunkering under fire (Combat Extended's HunkerDown job; the name hunker is the cower's): flat on the front as the dive
-# from a live explosive leaves it (the game gets it there by the dive, WalkFigures.DuckOf), the arms up with a hand by
-# each side of the head, forearms on the ground, the weapon kept in its hand. Posed where it lies, as the prone loop is.
+# leaves it (the game gets it there by the dive, WalkFigures.DuckOf), the arms up with a hand by
+# each side of the head, forearms on the ground, the weapon kept in its hand. Posed where it lies, as the dive is.
 # (duck_clip.json, Meshy's CrouchLookAroundBow, the crouch it played before, is kept but no longer read.)
 DUCK_SECONDS = 2.4   # game seconds round the loop
 DUCK_BREATHS = 4     # quick breaths a loop
 DUCK_HAND = (0.42, -0.18, 0.25)  # each wrist by the head: from the head bone's joint in its frame (x to that side, y back,
                                  # so up off the ground, z along the head toward its crown; leg lengths)
 DUCK_ELBOW = (1.0, -0.3, -0.5)   # the elbows out, down to the ground and back toward the feet (chest's frame, x mirrored)
-DUCK_LOOK = 4.0      # the head turned back up from the trunk's line (degrees): less than the prone's, the face kept down
+DUCK_LOOK = 4.0      # the head turned back up from the trunk's line (degrees): the face kept down
 # Stop, drop and roll (the game's ExtinguishSelf job, which only stands the pawn there until the fire is out): down flat on
 # the front by the same dive (WalkFigures.DuckOf), then rolled over about the body's long line, from the front over one
 # side onto the back and back again, then over the other side, the arms crossed on the chest and the legs straight
-# together. Posed where it lies, as the prone loop is; the game rests it on its lowest point as it turns.
+# together. Posed where it lies, as the dive is; the game rests it on its lowest point as it turns.
 ROLL_SECONDS = 2.4   # game seconds round the loop: over onto the back and back each way
 ROLL_TURN = 180.0    # degrees rolled over each way from lying on the front (180 the back)
 ROLL_RADIUS = 0.2    # the body's half thickness about its long line (leg lengths): the hips carried sideways that much
@@ -2345,13 +2512,15 @@ FINGERS = [n % s for s in ('L', 'R') for n in ('hand.%s.001', 'hand.%s.002', 'th
 
 def close_hand(X, side, sign, amount=1.0):
     """Curls one hand's fingers and thumb toward the palm by amount of FIST (0 straight, 1 a fist round a handle), in
-    place: each bone turned from rest about its own head, after the hand as X has it."""
+    place: each bone turned from rest about its own head, after the hand as X has it. amount may be four, one per FIST
+    bone (the finger's two, then the thumb's two)."""
+    amounts = tuple(amount) if isinstance(amount, (tuple, list)) else (amount,) * 4
     hn = 'hand.' + side
     d0 = (tail[hn] - head[hn]).normalized()
     n0 = Vector((sign * HAND_PALM[0], HAND_PALM[1], HAND_PALM[2]))
     n0 = (n0 - n0.dot(d0) * d0).normalized()
     for (name, parent), deg in zip((('hand.%s.001', 'hand.%s'), ('hand.%s.002', 'hand.%s.001'), ('thumb.%s', 'hand.%s'),
-                                    ('thumb.%s.001', 'thumb.%s')), FIST):
+                                    ('thumb.%s.001', 'thumb.%s')), [f * a for f, a in zip(FIST, amounts)]):
         name, parent = name % side, parent % side
         if name not in bones:
             continue
@@ -2361,7 +2530,7 @@ def close_hand(X, side, sign, amount=1.0):
             axis = d0 * sign
         else:
             axis = along.cross(n0)   # turns the bone toward the palm
-        X[name] = X[parent] @ about(head[name], axis, deg * amount)
+        X[name] = X[parent] @ about(head[name], axis, deg)
 
 arm_twist = {}   # by side, a turned hand's twist about the forearm from FOREARM_TWIST_MID (degrees) as arm_to last left
                  # it; 0 for a hand left in line
@@ -3058,6 +3227,22 @@ def play_sit_at(t):
     turn_branch(X, SPINE, about(waist, (1, 0, 0), PLAY_SIT_LEAN))
     return X, clamp
 
+VISIT_SIT_LEAN = 16.0   # degrees the trunk is leant forward from the waist (visit_sit_at), the head over the hips
+
+def visit_sit_at(t):
+    """Visiting someone sick on the ground at t (0 .. 1 round the loop, TALK_SECONDS long; work_visit: VisitSickPawn by
+    a patient not in a bed): sat cross-legged beside them talking with the hands, talk_at from the waist up on the
+    meditation's hips and legs, joined at the waist keeping its own upright lean and then leant forward VISIT_SIT_LEAN,
+    as play_sit_at is. The meditation runs a whole number of times round the loop, so it closes. Returns the pose and
+    the worst overreach."""
+    times = max(1, round(TALK_SECONDS / MEDITATE_SECONDS))
+    S, _ = meditate_at((t * times) % 1.0)
+    T, clamp = talk_at(t)
+    X = upper_from(S, T, False, SPINE)
+    waist = X[HIPS] @ head[SPINE]
+    turn_branch(X, SPINE, about(waist, (1, 0, 0), VISIT_SIT_LEAN))
+    return X, clamp
+
 def raise_trunk(X, deg):
     """The trunk in X straightened back deg about the waist, so a stooped chest comes up out of the thighs (the chibi's
     short trunk folds down onto them where the clip's rig's clears), the head turned back down by as much so it still
@@ -3200,6 +3385,70 @@ def eat_stand_at(t):
     clamp = max(clamp, hand_on('L', 1, palm, chest @ Vector(EAT_MEAL_FINGERS), chest @ Vector((0, 0, 1)), X))
     close_hand(X, 'L', 1, EAT_MEAL_CURL)
     return X, clamp
+
+def read_level(X):
+    """A level frame turned as the chest of X is about the vertical (x out to the left, y back, z up)."""
+    side = X[CHEST_BONE].to_3x3() @ Vector((1, 0, 0))
+    side = Vector((side.x, side.y, 0.0)).normalized()
+    return Matrix((side, Vector((0, 0, 1)).cross(side), Vector((0, 0, 1)))).transposed()
+
+def read_book(X):
+    """Where the open book is in the pose X: the matrix from its model's points (Blender's axes, model units, as
+    tool_matrix takes them) to armature space, its underside's middle at READ_BOOK, tipped up READ_TILT."""
+    level = read_level(X)
+    at = X[CHEST_BONE] @ head[HIPS] + level @ Vector(READ_BOOK) * LEG
+    R = level.to_4x4() @ rot((1, 0, 0), -READ_TILT)
+    return T(at) @ R @ Matrix.Scale(READ_SCALE * LEG / MODEL_LEG, 4)
+
+def read_at(t):
+    """Reading at t (0 .. 1 round the loop; see READ_SECONDS): standing, the open book on the left palm, the right hand
+    on its right page and turning one over READ_TURN, to be laid over the sit or the idle from the waist up (EAT_UPPER).
+    Returns the pose and the worst overreach."""
+    breath = 0.5 - 0.5 * math.cos(2 * math.pi * READ_BREATHS * t)
+    X, _ = posed_with(dict(STILL, DROP=0.02), 0.29, breath=breath)
+    for bone in (SPINE, CHEST_BONE):
+        pivot = X[bone] @ head[bone]
+        turn_branch(X, bone, about(pivot, (X[bone].to_3x3() @ Vector((1, 0, 0))).normalized(), READ_LEAN * 0.5))
+    turn_branch(X, NECK, about(X[NECK] @ head[NECK], (X[NECK].to_3x3() @ Vector((1, 0, 0))).normalized(), READ_LOOK))
+    for name, leader in FOLLOW.items():
+        X[name] = X[leader]
+    B = read_book(X)
+    R = B.to_3x3().normalized()
+    ex, ey, ez = R.col[0], R.col[1], R.col[2]
+    origin = B.translation
+    # The left palm under the spine, facing up into the book.
+    palm = origin - ez * READ_PALM * LEG
+    clamp = hand_on('L', 1, palm, R @ Vector(READ_FINGERS), ez, X, pole=Vector(READ_ELBOW_L))
+    close_hand(X, 'L', 1, READ_CURL)
+    # The right palm on the right page, and once a loop over to the left page and back, arcing up over the book.
+    half_w = 0.282 * READ_SCALE * LEG / MODEL_LEG   # IsoRim's open_book: 0.282 model units either side of the spine
+    half_d = 0.195 * READ_SCALE * LEG / MODEL_LEG
+    rest_at, over_at = Vector(READ_REST), Vector(READ_OVER)
+    a, b = READ_TURN
+    s = (t - a) / (b - a) if a <= t < b else -1.0
+    roll = 0.0
+    if s < 0:
+        v, lift = rest_at, 0.0
+    elif s < 0.55:
+        u = s / 0.55
+        v, lift = rest_at.lerp(over_at, smooth(u)), READ_LIFT * math.sin(math.pi * u)
+        roll = 50.0 * math.sin(math.pi * 0.5 * u)
+    else:
+        u = (s - 0.55) / 0.45
+        v, lift = over_at.lerp(rest_at, smooth(u)), 0.6 * READ_LIFT * math.sin(math.pi * u)
+        roll = 50.0 * (1.0 - smooth(u))
+    point = origin + ex * v.x * half_w + ey * v.y * half_d + ez * (v.z + lift) * half_w
+    facing = Matrix.Rotation(math.radians(roll), 3, ey) @ -ez   # turned over toward the left page as it carries it
+    fingers = R @ Vector((0.4, -1.0, 0.0))
+    clamp = max(clamp, hand_on('R', -1, point, fingers, facing, X, pole=Vector(READ_ELBOW_R)))
+    close_hand(X, 'R', -1, 0.1 + 0.3 * math.sin(math.pi * max(0.0, min(1.0, s))) if s >= 0 else 0.1)
+    return X, clamp
+
+def read_rest():
+    """The book on the left hand at rest: the matrix from its model's points (as read_book) to the rest pose (armature
+    space), which the hand's move takes to any pose (the `tool read` line)."""
+    X, _ = read_at(0.0)
+    return X['hand.L'].inverted() @ read_book(X)
 
 def pluck_at(t):
     """Kneeling at work on the ground at t (0 .. 1 round the loop; see PLUCK_LEAN). Returns the pose and the worst
@@ -3518,7 +3767,37 @@ def carried_at(kind, t):
 
 def carry_seconds(kind):
     """How long a CARRY kind's loop (and its carried_<kind>) is, in game seconds."""
+    if CARRY[kind].get('stroke'):
+        return STROKE_SECONDS
     return PLAY_SECONDS if CARRY[kind].get('rock') else CARRY_SECONDS
+
+def pet_on(X):
+    """Where a cuddled pet's trunk middle is (armature space) in the pose X: on the left forearm (PET_ALONG, PET_LIFT)."""
+    fa = 'forearm.L'
+    return (X[fa] @ head[fa]).lerp(X[fa] @ tail[fa], PET_ALONG) + Vector((0, 0, PET_LIFT * LEG))
+
+def stroke_at(t):
+    """The stroking hand at t (0 .. 1 round the loop): (along the back, leg lengths, + toward the head; height over its
+    top, leg lengths), STROKES strokes from STROKE_FROM to STROKE_TO each, pressed in on the way and lifted back."""
+    u = (t * STROKES) % 1.0
+    if u < STROKE_PRESS:
+        s = u / STROKE_PRESS
+        e = s * s * (3 - 2 * s)
+        return STROKE_FROM + (STROKE_TO - STROKE_FROM) * e, -STROKE_DIP * math.sin(math.pi * s)
+    s = (u - STROKE_PRESS) / (1 - STROKE_PRESS)
+    e = s * s * (3 - 2 * s)
+    return STROKE_TO + (STROKE_FROM - STROKE_TO) * e, STROKE_LIFT * math.sin(math.pi * s)
+
+def cuddle_hand(X, kind, t):
+    """Lays the right palm on a cuddled pet's back (see PET_BACK), at rest or stroking (a 'stroke' entry), and bows the
+    head to it, in place. Returns how far the wrist was out of reach."""
+    turn_branch(X, NECK, about(X[NECK] @ head[NECK], (1, 0, 0), CUDDLE_LOOK))
+    for name, leader in FOLLOW.items():
+        X[name] = X[leader]
+    along, high = stroke_at(t) if CARRY[kind].get('stroke') else (STROKE_REST[0], 0.0)
+    palm = pet_on(X) + Vector((along, STROKE_REST[1], PET_BACK + high)) * LEG
+    fingers = Vector(STROKE_FINGERS)
+    return hand_on('R', -1, palm, fingers, Vector((0, 0, -1)), X, pole=Vector((-0.9, 0.3, -0.5)))
 
 def rock_wave(kind, t):
     """Where a rocking carry is in its swing at t (0 .. 1 round the loop): -1 the baby out to the carrier's right .. 1
@@ -3550,6 +3829,10 @@ def carry_at(t, kind):
         waist = X['spine.002'] @ head['spine.002']
         turn_branch(X, 'spine.002', about(waist, (0, 0, 1), PLAY_TWIST * s) @ about(waist, (0, 1, 0), PLAY_ROLL * s))
     chest = X[CHEST_BONE] @ carry_rock(kind, t)
+    if CARRY[kind].get('pet'):
+        clamp = arm_to('L', 1, chest @ (head[HIPS] + Vector(CARRY[kind]['L']) * LEG), X,
+                       turn=CARRY[kind].get('L_turn'), lift=CARRY[kind].get('L_elbow'))
+        return X, max(clamp, cuddle_hand(X, kind, t))
     if kind == 'item':
         for side, sign in (('L', 1), ('R', -1)):
             clamp = max(clamp, arm_to(side, sign, chest @ (head[HIPS] + Vector(CARRY[kind][side]) * LEG), X,
@@ -3564,7 +3847,9 @@ def carry_at(t, kind):
 
 def carry_hands(kind):
     """Where a person carry's hands go when its CARRY entry doesn't place them: {side: (wrist in the carrier's rest
-    space, elbow pole)}, put on the carried person (carried_at), so they meet it."""
+    space, elbow pole)}, put on the carried person (carried_at), so they meet it. None for a pet (IsoRim draws it)."""
+    if CARRY[kind].get('pet'):
+        return {}
     C = carried_at(kind, 0.0)
     under = Vector((0, 0, -CARRY_UNDER * LEG))
     if kind == 'bridal':
@@ -3818,6 +4103,36 @@ def tame_at(t, kneel=False):
 
 def tame_kneel_at(t):
     return tame_at(t, kneel=True)
+
+def teach_at(t):
+    """Teaching at t (0 .. 1 round the loop; see TEACH_KEYS): standing, explaining with the hands, to be laid over the idle
+    or the sit from the waist up (TEACH_UPPER). Returns the pose and the worst overreach."""
+    breath = 0.5 - 0.5 * math.cos(2 * math.pi * TEACH_BREATHS * t)
+    X, _ = posed_with(dict(STILL, DROP=0.02), 0.29, breath=breath)
+    k = {n: loop_key(TEACH_AT, line, t) for n, line in TEACH_KEYS.items()}
+    for bone in (SPINE, CHEST_BONE):
+        pivot = X[bone] @ head[bone]
+        turn_branch(X, bone, about(pivot, (0, 0, 1), k['twist'] * 0.5)
+                    @ about(pivot, (X[bone].to_3x3() @ Vector((1, 0, 0))).normalized(), k['lean'] * 0.5))
+    nod = k['bow'] + TEACH_NOD * (0.5 - 0.5 * math.cos(2 * math.pi * TEACH_NODS * t))
+    turn_branch(X, NECK, about(X[NECK] @ head[NECK], (X[NECK].to_3x3() @ Vector((1, 0, 0))).normalized(), nod))
+    for name, leader in FOLLOW.items():
+        X[name] = X[leader]
+    # A level frame turned as the chest is about the vertical.
+    side = X[CHEST_BONE].to_3x3() @ Vector((1, 0, 0))
+    side = Vector((side.x, side.y, 0.0)).normalized()
+    level = Matrix((side, Vector((0, 0, 1)).cross(side), Vector((0, 0, 1)))).transposed()
+    clamp = 0.0
+    for s, sign, elbow in (('R', -1, TEACH_ELBOW_R), ('L', 1, TEACH_ELBOW_L)):
+        ua, hn = 'upper_arm.' + s, 'hand.' + s
+        wrist = X['shoulder.' + s] @ head[ua] + level @ k['wrist_' + s] * wrist_reach(s)
+        facing = (level @ k['palm_' + s]).normalized()
+        fingers = level @ k['fingers_' + s]
+        fingers = (fingers - fingers.dot(facing) * facing).normalized()
+        palm = wrist + facing * HAND_HALF * LEG + fingers * (tail[hn] - head[hn]).length * 0.5
+        clamp = max(clamp, hand_on(s, sign, palm, fingers, facing, X, pole=Vector(elbow)))
+        close_hand(X, s, sign, max(0.0, k['curl_' + s]))
+    return X, clamp
 
 def cast_touch_at(t):
     return cast_at(t, touch=True)
@@ -4393,6 +4708,140 @@ def pat_at(t):
         close_hand(X, side, sign, max(0.0, loop_key(PAT_HAND_AT, PAT_CURL, c)))
     return X, clamp
 
+def music_cells(v):
+    """A place in MUSIC's cells (x out to the left, y forward, z up, from the figure's feet, for a grown pawn) in
+    armature units."""
+    return Vector((v[0], -v[1], v[2])) * (LEG / MODEL_LEG / GAME_SCALE)
+
+def music_body(kind, t, seated, dip=0.0, bob=0.0, roll=0.0, nod=0.0, tilt=0.0):
+    """The body at an instrument (see MUSIC): the idle's first frame (or the sit at t, seated) leant toward it by its
+    'lean' and bob more, rolled roll (degrees, + toward the left), the head bowed its 'look' and nod more and tilted
+    tilt (+ toward the left), the hips let down dip (cells) over the planted feet standing. Returns the pose."""
+    m = MUSIC[kind]
+    i = 1 if seated else 0
+    if seated:
+        X, _ = sit_at(t)
+    else:
+        X, _ = stand_at(0.0)
+        if dip:
+            ankles = {s: X['foot.' + s] @ head['foot.' + s] for s in ('L', 'R')}
+            legs = set()
+            for side in ('L', 'R'):
+                legs.update(b.name for b in [bones['thigh.' + side]] + list(bones['thigh.' + side].children_recursive))
+            M = T(music_cells((0.0, 0.0, -dip)))
+            X = {n: (v if n in legs else M @ v) for n, v in X.items()}
+            for side, sign in (('L', 1), ('R', -1)):
+                leg_to(side, X[HIPS] @ head['thigh.' + side], ankles[side], FWD + Vector((sign * 0.15, 0, 0)), X)
+    lean = m['lean'][i] + bob
+    for bone in (SPINE, CHEST_BONE):
+        pivot = X[bone] @ head[bone]
+        turn_branch(X, bone, about(pivot, (0, 1, 0), roll * 0.5) @ about(pivot, (1, 0, 0), lean * 0.5))
+    nk = X[NECK] @ head[NECK]
+    turn_branch(X, NECK, about(nk, (X[NECK].to_3x3() @ Vector((0, 1, 0))).normalized(), tilt)
+                @ about(nk, (X[NECK].to_3x3() @ Vector((1, 0, 0))).normalized(), m['look'] + nod))
+    for name, leader in FOLLOW.items():
+        X[name] = X[leader]
+    return X
+
+def music_hand(X, side, sign, palm, fingers, facing, curl, elbow):
+    """One hand laid on an instrument: its palm at palm, the fingers along fingers and the palm facing facing (all in
+    MUSIC's cells and ways), curled curl (a share of FIST, or four), the elbow toward elbow (chest's frame, x out).
+    Returns how far the wrist was out of reach."""
+    way = lambda v: Vector((v[0], -v[1], v[2]))
+    clamp = hand_on(side, sign, music_cells(palm), way(fingers), way(facing), X,
+                    pole=Vector((sign * elbow[0], elbow[1], elbow[2])))
+    close_hand(X, side, sign, curl)
+    return clamp
+
+def piano_at(t, seated=False):
+    """Playing a keyboard (the piano or the harpsichord) at t (0 .. 1 round the loop; see PIANO_SPAN), stood at it or,
+    seated, to be laid over the sit. Returns the pose and the worst overreach."""
+    a = music_play('piano', seated)
+    w = 2 * math.pi * t
+    along = {'L': math.sin((PIANO_RUNS - 1) * w + 1.0), 'R': math.sin(PIANO_RUNS * w)}
+    X = music_body('piano', t, seated, roll=-PIANO_SWAY * along['R'])
+    tip = math.radians(PIANO_TIP)
+    fingers = (0.0, math.cos(tip), -math.sin(tip))
+    facing = (0.0, -math.sin(tip), -math.cos(tip))
+    clamp = 0.0
+    for (side, sign), wander, presses, phase in ((('L', 1), PIANO_WANDER[0], PIANO_PRESSES // 2, 0.3),
+                                                 (('R', -1), PIANO_WANDER[1], PIANO_PRESSES, 0.0)):
+        x = sign * (PIANO_SPAN + wander * along[side])
+        p = 2 * math.pi * (presses * t + phase)
+        press = (0.5 + 0.5 * math.cos(p)) ** 3   # 1 as a key goes down, briefly
+        lo, hi = PIANO_CURL
+        fingers_curl = lo + (hi - lo) * (0.5 + 0.5 * math.cos(p))
+        thumb_curl = lo + (hi - lo) * (0.5 - 0.5 * math.cos(p))
+        palm = (a.x + x, a.y, a.z - PIANO_PRESS * press)
+        clamp = max(clamp, music_hand(X, side, sign, palm, fingers, facing,
+                                      (fingers_curl, fingers_curl, thumb_curl, thumb_curl), PIANO_ELBOW))
+    return X, clamp
+
+def piano_sit_at(t):
+    return piano_at(t, seated=True)
+
+def harp_at(t, seated=False):
+    """Playing the harp at t (0 .. 1 round the loop; see HARP_HANDS), stood at it or, seated, to be laid over the sit.
+    Returns the pose and the worst overreach."""
+    a = music_play('harp', seated)
+    w = 2 * math.pi * t
+    X = music_body('harp', t, seated, roll=HARP_SWAY * math.sin(w), tilt=-HARP_TILT)
+    f = math.radians(HARP_FINGERS)
+    clamp = 0.0
+    for k, (side, sign) in enumerate((('L', 1), ('R', -1))):
+        out, up = HARP_HANDS[k]
+        out += HARP_DRIFT[0] * math.sin(w + 2.0 * k)
+        up += HARP_DRIFT[1] * math.sin(w + 1.0 + 2.5 * k)
+        c = (t * HARP_PLUCKS[k] + 0.37 * k) % 1.0
+        lo, hi = HARP_CURL
+        if c < HARP_PLUCK:
+            u = smooth(c / HARP_PLUCK)
+        else:
+            u = 1.0 - smooth((c - HARP_PLUCK) / (1.0 - HARP_PLUCK))
+        curl = lo + (hi - lo) * u
+        palm = (a.x + sign * out, a.y - HARP_DRAW * u, a.z + up)
+        fingers = (-sign * math.sin(f), 0.0, math.cos(f))   # up and in toward the middle
+        clamp = max(clamp, music_hand(X, side, sign, palm, fingers, (0.0, 1.0, 0.0),
+                                      (curl, curl, curl * 0.6, curl * 0.6), HARP_ELBOW))
+    return X, clamp
+
+def harp_sit_at(t):
+    return harp_at(t, seated=True)
+
+def drum_at(t, seated=False):
+    """Beating the drum with the palms at t (0 .. 1 round the loop; see DRUM_BEATS), stood at it or, seated, to be laid
+    over the sit. Returns the pose and the worst overreach."""
+    a = music_play('drum', seated)
+    t8 = (t % 1.0) * 8
+    pulse = 0.0   # 1 on a strike, falling off over half an eighth either side; 2 on the accent
+    for b in set(DRUM_BEATS[0]) | set(DRUM_BEATS[1]):
+        d = abs((t8 - b + 4) % 8 - 4)
+        pulse = max(pulse, max(0.0, 1.0 - d / 0.5) ** 2 * (2.0 if b == DRUM_ACCENT else 1.0))
+    X = music_body('drum', t, seated, dip=DRUM_DIP * pulse, bob=DRUM_BOB * pulse, nod=DRUM_NOD * pulse)
+    clamp = 0.0
+    for k, (side, sign) in enumerate((('L', 1), ('R', -1))):
+        beats = sorted(DRUM_BEATS[k])
+        prev = max([b for b in beats if b <= t8] or [beats[-1] - 8])
+        nxt = min([b for b in beats if b > t8] or [beats[0] + 8])
+        f = (t8 - prev) / (nxt - prev)
+        g = math.sin(math.pi * f ** 1.6)   # raised slowly after a strike, brought down fast into the next
+        lift = DRUM_LIFT * min(1.0, (nxt - prev) / 2.0) * g
+        span = DRUM_SPAN
+        if nxt % 8 == DRUM_ACCENT:
+            lift *= 1.3
+            span *= 1.0 - 0.3 * smooth(f)
+        elif prev % 8 == DRUM_ACCENT:
+            span *= 0.7 + 0.3 * smooth(f)
+        tip = -math.radians(DRUM_TIP) * g
+        fingers = (0.0, math.cos(tip), -math.sin(tip))
+        facing = (0.0, -math.sin(tip), -math.cos(tip))
+        palm = (a.x + sign * span, a.y, a.z + lift)
+        clamp = max(clamp, music_hand(X, side, sign, palm, fingers, facing, DRUM_CURL, DRUM_ELBOW))
+    return X, clamp
+
+def drum_sit_at(t):
+    return drum_at(t, seated=True)
+
 def daze_at(t):
     """The stunned loop at t (0 .. 1 round it): slumped on soft knees, the arms hanging, the head lolling round, swaying.
     Returns the pose and the worst overreach."""
@@ -4571,12 +5020,6 @@ def roll_at(t, grip='R'):
 def dive_at(t, grip='R'):
     """The dive to the ground at t (0 standing .. 1 down; see DIVE_KEYS). Returns the pose and the worst overreach."""
     return dive_pose(t, grip)
-
-def prone_at(t, grip='R'):
-    """Lying on the front at t (0 .. 1 round the loop; see DIVE_KEYS), from the dive's last frame. Returns the pose and
-    the worst overreach."""
-    breath = 0.5 - 0.5 * math.cos(2 * math.pi * PRONE_BREATHS * t)
-    return dive_pose(1.0, grip, breath, math.sin(4 * math.pi * t))
 
 def bend_pose():
     """Squatting and reaching for the ground (see BEND_SECONDS). Returns the pose and the worst overreach."""

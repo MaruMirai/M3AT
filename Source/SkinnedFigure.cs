@@ -168,6 +168,7 @@ namespace M3AT
         private bool[] trunkBone;     // the trunk below the neck (ReclineOf)
         private bool[] legBone;       // the thighs down (LaidMiddleOf)
         private float[] twistShare;   // each bone's share of a twist of the trunk (Twist): the spine above the hips
+        private float[] lookShare;    // each bone's share of a turn of the head (Look): the neck and the head
         private float[] overMask;     // Over with arms: the clip's shares, each times its weight
         private readonly Dictionary<string, int> boneIndex = new Dictionary<string, int>();   // by name (anim.txt's bone lines)
         private readonly Dictionary<string, Vector3[]> boneKeys = new Dictionary<string, Vector3[]>(StringComparer.OrdinalIgnoreCase);
@@ -201,6 +202,7 @@ namespace M3AT
         private readonly Dictionary<string, Material> flatBeards = new Dictionary<string, Material>();   // by beard style: its flat texture's material (FlatBeardOf)
         private bool[] onHead;   // the body's vertices the head bone moves most
         private bool[] scalp;   // the body's vertices above the hairline (Scalp)
+        private readonly List<int> scalpGiven = new List<int>();   // the body's scalp vertices from skin.txt's scalp line (the rig's Scalp group)
         private readonly Dictionary<bool[], int[]> faceTrisOff = new Dictionary<bool[], int[]>();   // by scalp (FaceTrisOff)
         private List<string> hairRoots;   // where finished hair files are looked for, in order (the cache not among them)
         private int finishedAt = -1;   // the frame the builder's finished styles were last taken in
@@ -339,6 +341,7 @@ namespace M3AT
             public float[] topWeight;
             public Quaternion[] nudge;   // the clips added on top (Nudge), per bone: a turn from each clip's first frame
             public float twist;   // degrees the trunk is turned about the vertical over the hips (Twist)
+            public float look;    // degrees the head is turned about the vertical on the chest (Look)
             public GarmentMask wornMask;       // the garments it has on this draw (Wearing)
             public bool gearPack;      // and whether an equipment pack is drawn on its back
             public float packScale = 1f;   // the size an equipment pack is drawn at, of this figure's: as big on every pawn
@@ -980,6 +983,12 @@ namespace M3AT
                     case "head":
                         headBone = int.Parse(p[1]);
                         break;
+                    case "scalp":
+                        for (int k = 1; k < p.Length; k++)
+                        {
+                            scalpGiven.Add(int.Parse(p[k]));
+                        }
+                        break;
                     case "garment":
                         if (garments != null)
                         {
@@ -1143,6 +1152,12 @@ namespace M3AT
                     HipGrab = Num(p[1]);
                     HipSlide = Num(p[2]);
                 }
+                else if (p[0] == "cuddle_pet" && p.Length > 3)
+                {
+                    PetAlong = Num(p[1]);
+                    PetLift = Num(p[2]);
+                    PetBack = Num(p[3]);
+                }
                 else if (p[0] == "shield_timing" && p.Length > 2)
                 {
                     ShieldGrab = Num(p[1]);
@@ -1210,6 +1225,15 @@ namespace M3AT
                 if (boneIndex.TryGetValue(TwistBones[i], out b))
                 {
                     twistShare[b] = TwistShares[i];
+                }
+            }
+            lookShare = new float[boneHead.Length];
+            for (int i = 0; i < LookBones.Length; i++)
+            {
+                int b;
+                if (boneIndex.TryGetValue(LookBones[i], out b))
+                {
+                    lookShare[b] = LookShares[i];
                 }
             }
             // Parents before children, so each bone's correction can build on its parent's.
@@ -1686,6 +1710,7 @@ namespace M3AT
             }
             p.total = 0f;
             p.twist = 0f;
+            p.look = 0f;
             p.standOn = -1;
             p.balance = 0f;
             p.crouch = 0f;
@@ -1792,6 +1817,14 @@ namespace M3AT
         public void Twist(Posed p, float degrees)
         {
             p.twist = degrees;
+        }
+
+        // Turns the head about the vertical (degrees, as the figure's yaw) on top of whatever the clips and the twist do,
+        // spread down the neck (LookBones): a look aside at someone without turning the body, as a teacher looks round
+        // at the pupil beside it (WalkFigures.LessonLookOf).
+        public void Look(Posed p, float degrees)
+        {
+            p.look = degrees;
         }
 
         // Puts the weight on one leg ("L" or "R") whatever the clips do, for a figure with the other gone: amount (0 .. 1)
@@ -1983,6 +2016,23 @@ namespace M3AT
             p.pos[hand] = to;
         }
 
+        // Reach with the wrist moved by (model units, before the whole move) from where Chain left it.
+        public void ReachBy(Posed p, Matrix4x4 whole, string side, Vector3 by, float w)
+        {
+            int hand;
+            if (boneIndex.TryGetValue("hand." + side, out hand))
+            {
+                Reach(p, whole, side, whole.MultiplyPoint3x4(p.pos[hand] + by), w);
+            }
+        }
+
+        // A cuddled pet (carry_cuddle, anim.txt's cuddle_pet line; walk.PET_ALONG, PET_LIFT, PET_BACK): its trunk's middle
+        // PetAlong of the way from the left elbow to the wrist and its feet PetLift (model units) over that line; the clips
+        // lay the right hand on a back PetBack (model units) over its feet.
+        public float PetAlong = 0.65f;
+        public float PetLift = 0.0199f;
+        public float PetBack = 0.0894f;
+
         // After Reach: the bones placed again from the turns it left (each in model space), as Chain left them otherwise.
         public void Reached(Posed p, Matrix4x4 whole)
         {
@@ -1997,6 +2047,8 @@ namespace M3AT
 
         private static readonly string[] TwistBones = { "spine.001", "spine.002", "spine.003" };   // the belly up to the chest
         private static readonly float[] TwistShares = { 0.3f, 0.35f, 0.35f };   // their shares of it, all together 1
+        private static readonly string[] LookBones = { "spine.004", "spine.005", "spine.006" };   // the neck up to the head
+        private static readonly float[] LookShares = { 0.25f, 0.35f, 0.4f };   // their shares of a look, all together 1
 
         private static void Sample(Clip c, float phase, float w, Quaternion[] turn, Vector3[] head, float[] mask, float[] weight)
         {
@@ -2149,7 +2201,7 @@ namespace M3AT
             {
                 Bend(p, p.recline);
             }
-            Place(p, whole, p.head[root] / p.total + p.shape.boneMove[root], p.twist);
+            Place(p, whole, p.head[root] / p.total + p.shape.boneMove[root], p.twist, p.look);
             if (p.standOn >= 0)
             {
                 OverFoot(p, whole);
@@ -2462,7 +2514,7 @@ namespace M3AT
 
         // Puts the turns (each on top of its parent's) together down the chain from the root's head at root (model units,
         // before whole), and works out each bone's matrix.
-        private void Place(Posed p, Matrix4x4 whole, Vector3 root, float twist)
+        private void Place(Posed p, Matrix4x4 whole, Vector3 root, float twist, float look = 0f)
         {
             Vector3[] shapedHead = p.shape.boneHead;
             for (int i = 0; i < boneOrder.Length; i++)
@@ -2481,6 +2533,10 @@ namespace M3AT
                 {
                     // Its share of the twist, about the vertical through its own head; the bones above take it on from here.
                     p.turn[b] = Quaternion.AngleAxis(twist * twistShare[b], Vector3.up) * p.turn[b];
+                }
+                if (look != 0f && lookShare[b] > 0f)
+                {
+                    p.turn[b] = Quaternion.AngleAxis(look * lookShare[b], Vector3.up) * p.turn[b];
                 }
                 Quaternion q = p.turn[b];
                 p.whole[b] = whole * Matrix4x4.TRS(p.pos[b] - q * shapedHead[b], q, Vector3.one);
@@ -3514,15 +3570,29 @@ namespace M3AT
             return tris;
         }
 
-        // The body's head vertices above the hairline (made once). The same for every hairstyle: one worked out from
-        // each style's hair missed the gaps in it (the hair isn't over the head there), which were what needed hiding.
-        private bool[] Scalp()
+        // The body's scalp vertices (made once): the rig's Scalp group where the export has one (skin.txt's scalp line),
+        // else the head's vertices above the hairline. The same for every hairstyle: one worked out from each style's
+        // hair missed the gaps in it (the hair isn't over the head there), which were what needed hiding.
+        internal bool[] Scalp()
         {
             if (scalp != null)
             {
                 return scalp;
             }
             Vector3[] v = pieces[0].rest;
+            if (scalpGiven.Count > 0)
+            {
+                // Painted on the rig (its Scalp group), so the hairline is wherever it was drawn.
+                scalp = new bool[v.Length];
+                foreach (int i in scalpGiven)
+                {
+                    if (i >= 0 && i < v.Length)
+                    {
+                        scalp[i] = true;
+                    }
+                }
+                return scalp;
+            }
             bool[] head = OnHead();
             Vector3 lo = Vector3.positiveInfinity, hi = Vector3.negativeInfinity;
             for (int i = 0; i < v.Length; i++)
@@ -4309,7 +4379,8 @@ namespace M3AT
             {
                 Piece body = pieces[0];
                 string cache = Path.Combine(GenFilePaths.ConfigFolderPath, "M3AT", "hair", stamp);
-                made = new HairBuilder(body.rest, body.tris, OnHead(), body.keys, turnRound, boneHead[headBone], cache, beard);
+                PruneCaches(Path.GetDirectoryName(cache), stamp);
+                made = new HairBuilder(body.rest, body.tris, OnHead(), body.keys, turnRound, boneHead[headBone], cache, beard, Scalp());
                 Log.Message(Tag + what + " without a file are built from their sprites into " + cache + ".");
             }
             catch (Exception e)
@@ -4325,6 +4396,67 @@ namespace M3AT
                 builder = made;
             }
             return made;
+        }
+
+        // The cache folder is named after skin.txt's hash, so each export that changes the body leaves the last one's folder
+        // unread for good (tens of MB each). Once a session, on a background thread so a large cache doesn't hold up the
+        // game, this deletes every folder beside the current one that is named as Stamp names them (16 hex digits), and
+        // nothing else.
+        private static bool pruned;
+
+        private static void PruneCaches(string root, string keep)
+        {
+            if (pruned)
+            {
+                return;
+            }
+            pruned = true;
+            System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+            {
+                try
+                {
+                    if (!Directory.Exists(root))
+                    {
+                        return;
+                    }
+                    foreach (string dir in Directory.GetDirectories(root))
+                    {
+                        string name = Path.GetFileName(dir);
+                        if (name == keep || !IsStamp(name))
+                        {
+                            continue;
+                        }
+                        try
+                        {
+                            Directory.Delete(dir, true);
+                        }
+                        catch (Exception e)
+                        {
+                            Log.Warning(Tag + "couldn't delete the old hair cache " + dir + ": " + e.Message);
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    Log.Warning(Tag + "couldn't look for old hair caches in " + root + ": " + e.Message);
+                }
+            });
+        }
+
+        private static bool IsStamp(string name)
+        {
+            if (name.Length != 16)
+            {
+                return false;
+            }
+            foreach (char c in name)
+            {
+                if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')))
+                {
+                    return false;
+                }
+            }
+            return true;
         }
 
         // Once a frame: lets the builder save what it has finished, so the next ask reads it from the cache.

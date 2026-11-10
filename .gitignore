@@ -48,3 +48,4 @@ previews/
 # Harness build output (anim_scripts/hairbuild)
 anim_scripts/hairbuild/bin/
 anim_scripts/hairbuild/obj/
+CLAUDE.local.md

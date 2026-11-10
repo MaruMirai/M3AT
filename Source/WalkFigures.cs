@@ -170,6 +170,13 @@ namespace M3AT
         private const float PalmLift = 0.022f;   // model units from the hand's bone up to its palm's face (walk.HAND_HALF), where a meal eaten standing sits
         private const float CarriedItemScale = 0.8f;   // as IsoRim draws a carried item: its share of the game's size
         private const float EatEase = 3f;   // how fast a pawn takes up eating (or leaves it), per real second
+        private const float TeachLook = 0.55f;   // share of the way a teacher turns its head round toward the pupil (LessonLookOf)
+        private const float PupilLook = 0.35f;   // and a pupil toward the teacher
+        private const float LookMost = 70f;   // degrees a look turns the head at most, either way
+        private const float LookSpeed = 120f;   // degrees a second the head turns to a look, or back
+        private const float TeachGlance = 0.74f;   // where in the teach loop it pats the desk and looks down at it (walk.TEACH_AT[6])
+        private const float TeachGlanceWidth = 0.12f;   // the look eases off within this much of the loop either side of it
+        private const float TeachGlanceKeep = 0.25f;   // share of the look kept at the glance
         private const int TossInterval = 400;   // game ticks between throws at horseshoes or hoopstone (JobDriver_PlayHorseshoes' HorseshoeThrowInterval)
         private const float TossRelease = 0.6f;   // walk.TOSS_RELEASE: how far through the toss clip the thing leaves the hand
         private const float TossIn = 0.2f;   // walk.TOSS_AT[1]: the toss is eased in from the idle over this much of it
@@ -229,6 +236,7 @@ namespace M3AT
         private const float KneelLow = 0.3f;   // cells, at size 1: how high a joint of the kneel may be and still be on the ground
         private const float KneelClear = 0.14f;   // cells, at size 1: how near one of its joints may come to one of theirs
         private const float ChestInset = 0.1f;   // cells, at size 1: how far out from their chest's middle its hands go (on its near side)
+        private const float VisitBack = 0.4f;    // cells, at size 1: how much further out a visitor sat beside them puts its hands (on its knees), as it sits back to talk rather than reaching to tend
         private const int KneelWays = 24;   // the ways round the chest it looks at
         private const float KneelOverlap = 100f;   // the cost of a joint (cells into the clearance, squared)
         private const float KneelSquare = 0.3f;   // of kneeling along the body rather than square to it
@@ -237,18 +245,19 @@ namespace M3AT
         private const float KneelCame = 1f;   // off a bed: of kneeling off the side it came from (which beats square to the body)
         private const float KneelCameSpread = 50f;   // degrees: and the furthest round from that side it looks, to keep off the limbs
         private const float BenchCloser = 0.3f;   // cells: how far a pawn stood at a bench (work_bench) is drawn toward it from its cell's middle
+        // Playing music (InstrumentKind): how far a pawn is drawn toward the instrument from the middle of its
+        // interaction cell, stood at it and sat on a seat there (cells; walk.MUSIC's 'closer', keep the two in step). The
+        // keyboards are two cells off and the harp and drum one, out of the chibi's reach; a chair is drawn in the
+        // middle of the cell, so a seated figure is drawn only a little off it.
+        private static readonly Dictionary<string, float> InstrumentCloser = new Dictionary<string, float>
+        {
+            { "piano", 0.4f }, { "piano_sit", 0.28f }, { "harp", 0.68f }, { "harp_sit", 0.5f }, { "drum", 0.45f }, { "drum_sit", 0.33f },
+        };
         private const float LandDown = 0.1f;   // of the landing crouch's length (walk.LAND_SECONDS): sinking into it
         private const float TakeOff = 0.15f;   // of the flight: springing up out of the warm-up's crouch
         private const float RiseHurry = 2.5f;   // how much faster than the export's getup a pawn gets up (the game stands it up at once)
         private const float RiseOut = 0.75f;   // of the getup: from here it is eased into the standing pose
-        private const float ProneRise = 1.2f;   // how much faster than the dive (backwards) a pawn gets up
-        private const float DiveReach = 11f;   // cells: a live explosive further off than this is left alone (the game has it run 9)
-        private const int DiveStays = 30;   // ticks it stays down after the explosive has gone off
-        private const int DiveLongest = 240;   // ticks at most it stays down for one explosive
-        private const int DiveLate = 30;   // ticks after the explosive has gone off that a pawn arriving where it ran to still drops
-        private const float DiveSlide = 1.5f;   // cells: a running pawn drops only this near where it is running to, so it doesn't slide there on its belly
-        private const float DiveSlideMost = 2.5f;   // cells: slid further than this while down (the game kept it running), it gets up
-        private const float ProneRiseMoving = 2f;   // and that much faster again while the game has it on the move
+        private const float DropRise = 1.2f;   // how much faster than the dive (backwards) a pawn gets up
         // Taking cover (CoverOf): crouched low (SkinnedFigure.Crouch) while standing still in one of Combat Extended's crouching jobs
         // (or, without it, waiting or holding fire drafted) with an awake enemy in sight within the weapon's range, as deep as
         // still lets the hands clear the cover beside it as IsoRim draws it.
@@ -257,9 +266,9 @@ namespace M3AT
         private const float CoverClear = 0.08f;   // cells the drafted hands are kept over the top of the cover
         private const float CoverDown = 0.35f, CoverUp = 0.5f;   // game seconds to get all the way down into the crouch, and up out of it
         private const float DuckDown = 0.25f, DuckUp = 0.4f;   // game seconds to get down flat under fire, and up again, on an export without the dive
-        private const float ProneIn = 0.12f;   // of the dive: taken over from what it was doing by here
-        private const float ProneLoop = 0.85f;   // of the dive: from here it is eased into the loop lying there
-        private const float ProneRest = 0.7f;   // of the dive: from here it is let down onto its lowest point (before that, only kept out of the ground)
+        private const float DropIn = 0.12f;   // of the dive: taken over from what it was doing by here
+        private const float DropLoop = 0.85f;   // of the dive: from here it is eased into the loop lying there
+        private const float DropRest = 0.7f;   // of the dive: from here it is let down onto its lowest point (before that, only kept out of the ground)
         private const float WeaponLaidFrom = 0.3f, WeaponLaidTo = 0.75f;   // of the dive: a held weapon goes from its stance's line to lying along the ground
         private const float WeaponLaidOut = 0.12f;   // that line's way out from the figure's front, per cell along it, past the head
         private const float FallHurry = 1.5f;   // how much faster than the export's falls (knockdown, die) a pawn goes down
@@ -439,6 +448,7 @@ namespace M3AT
             public string shieldClip;   // its shield_draw clip while that plays it; null: none
             public float eat;   // 0 .. 1: how far into eating it is (EatOf)
             public string eatClip;   // eat_sit or eat_stand (kept while it eases out of it)
+            public float look;   // degrees the head is turned about the vertical, eased (LessonLookOf: at a lesson)
             public float talk;   // 0 .. 1: how far into talking it is (TalkOf: a board game, a speech)
             public float toss;   // 0 .. 1: how far into pitching horseshoes or hoopstone it is (Tossing)
             public float tossAt = -1f;   // how far through the toss clip it is this frame, 0 .. 1; -1: between throws (TossPhase)
@@ -494,12 +504,6 @@ namespace M3AT
             public float risen = 1f;   // how far through getting up, 0 .. 1; 1: done (RiseOf)
             public int risenTick;   // the game tick it was last moved on
             public int risenRoll;   // picks the getup's variant, new each time it gets up
-            public float proneAt;   // 0 .. 1: how far through the dive to the ground it is (ProneOf); back to 0 getting up
-            public int blastThing;   // the live explosive it reacted to last (DivesFromBlast), by thingIDNumber
-            public int blastSince;   // the game tick it began diving from it
-            public int blastDue = -9999;   // the game tick it was last time to be down for it: its fuse within the dive's length
-            public bool blastDown;   // down for it now
-            public Vector3 blastFrom;   // where it was as it dived (cells), for how far the game has slid it since
             public float duck;   // 0 .. 1: how far down in the crouch under fire it is (DuckOf)
             public float cover;   // 0 .. 1: how far down in the crouch behind cover it is (CoverOf)
             public float coverWant;   // how far down it would be: by the cover beside it, 0 with no enemy in sight
@@ -512,10 +516,6 @@ namespace M3AT
             public string duckHand;   // the hand that holds the weapon as it crouches: which of the duck_ clips
             public float? duckFace;   // the way it crouches, toward the fire (SuppressorOf) if known, kept until it is up again
             public string duckLoop;   // the loop played once down: duck_<hand> hunkering, roll putting out a fire on itself
-            public int proneTick;   // the game tick it was last moved on
-            public int proneFrame = -99;   // when it was last moved on
-            public float proneYaw;   // the way it dives (ProneFacing), kept until it is up again
-            public string proneHand;   // the hand that holds the weapon as it dives: which of the dive_ and prone_ clips
             public int upFrame = -99;   // when it was last drawn standing on its feet (a fall starts from there)
             public float upYaw;   // and the way it faced then
             public float? turnYaw;   // aiming: the way it is drawn facing, ahead of the tracker's (TurnedFor); null: the tracker's
@@ -664,6 +664,30 @@ namespace M3AT
             return kind == "play" && !skin.Has("work_play") ? "work_meditate" : "work_" + kind;
         }
 
+        // Cuddling a small pet held in its arms: [DG]Lovly Animal Cuddling's AC_CuddleAnimal (local.animalcuddling), which
+        // carries the animal about or sits down with it on a chair. By defName, so that mod is not referenced.
+        private static bool Cuddling(Pawn pawn, Thing load)
+        {
+            JobDef job = pawn.CurJobDef;
+            Pawn animal = load as Pawn;
+            return job != null && job.defName == "AC_CuddleAnimal" && animal != null && !animal.Dead && animal.RaceProps != null && animal.RaceProps.Animal;
+        }
+
+        // An animal being cuddled (Cuddling): IsoRim holds its facing (Api.AddFacingHold), so it doesn't walk its legs in
+        // the air as it is carried about; it faces the way DrawLoad turns it.
+        private static bool CuddledAnimal(Pawn animal)
+        {
+            Pawn_CarryTracker hands = animal != null ? animal.ParentHolder as Pawn_CarryTracker : null;
+            return hands != null && hands.pawn != null && Handles(hands.pawn) && Cuddling(hands.pawn, animal);
+        }
+
+        // The loop eased in over a carry loop by Ease.play: a cradled baby rocked (carry_play), a cuddled pet stroked
+        // (carry_cuddle_stroke); null for the other carries.
+        private static string CarryOverOf(string carryClip)
+        {
+            return carryClip == "carry_cradle" ? "carry_play" : carryClip == "carry_cuddle" ? "carry_cuddle_stroke" : null;
+        }
+
         // JobDriver_PlayWalking.ForcedBodyOffset: none for a pawn this mod draws, which rocks the baby itself (carry_play);
         // the game's sway would shake the whole figure about.
         public static bool PlayOffsetPrefix(JobDriver __instance, ref Vector3 __result)
@@ -687,6 +711,10 @@ namespace M3AT
                 return null;
             }
             Pawn held = HeldPawn(load);
+            if (Cuddling(pawn, load) && skin.Has("carry_cuddle"))
+            {
+                return "carry_cuddle";
+            }
             string clip = held != null && Handles(held) ? (Fireman(pawn, held) ? "carry_fireman" : Baby(held) ? "carry_cradle" : "carry_bridal") : "carry_item";
             if (clip == "carry_cradle" && !skin.Has(clip))
             {
@@ -1014,6 +1042,7 @@ namespace M3AT
                     return;
                 }
                 Api.AddFigureDrawer(DrawFigure, FigureKinds.People);
+                Api.AddFacingHold(CuddledAnimal);
                 Harmony harmony = new Harmony("MaruMirai.M3AT");
                 // Hits, for the flinch (the game's own jolt of the sprite is told the same way).
                 MethodInfo damaged = AccessTools.Method(typeof(Pawn_DrawTracker), nameof(Pawn_DrawTracker.Notify_DamageApplied));
@@ -1701,6 +1730,10 @@ namespace M3AT
             string carryClip = skin != null ? CarryClip(pawn) : null;
             float carry = carryClip != null ? 1f : 0f;
             float playing = carryClip == "carry_cradle" && PlaysWithBaby(pawn) && skin.Has("carry_play") ? 1f : 0f;
+            if (carryClip == "carry_cuddle" && skin.Has("carry_cuddle_stroke") && (pawn.pather == null || !pawn.pather.Moving))
+            {
+                playing = 1f;   // a cuddled pet stroked while it stands or sits still
+            }
             // Bare-handed, the fists only come up with an enemy near; otherwise it stands at ease.
             bool armed = pawn.equipment != null && pawn.equipment.Primary != null;
             // Fighting hand to hand or throwing, it takes the stance too (bare-handed in a social fight).
@@ -1719,7 +1752,8 @@ namespace M3AT
             float swim = pawn.Swimming && water > 0f ? 1f : 0f;   // marsh too, as the game swims in it
             float cowering = Cowering(pawn) ? 1f : 0f;
             float leading = Leading(pawn) ? 1f : 0f;
-            string eatClip = skin != null ? EatOf(pawn) : null;
+            // Reading goes the same way as eating: laid over the sit or the idle from the waist up, in place of the carry.
+            string eatClip = skin != null ? EatOf(pawn) ?? ReadOf(pawn) ?? TeachOf(pawn) : null;
             float eating = eatClip != null ? 1f : 0f;
             float talking = skin != null && skin.Has("talk") && TalkOf(pawn) ? 1f : 0f;
             float tossing = skin != null && skin.Has("toss") && Tossing(pawn) ? 1f : 0f;
@@ -2316,8 +2350,8 @@ namespace M3AT
             return job == JobDefOf.ExtinguishSelf;
         }
 
-        // How far down flat under fire the pawn is (0 up .. 1 down): through the dive from a live explosive (dive_), so moved
-        // on as ProneOf moves that, by game time, so it waits while paused. Without the dive, eased over DuckDown and DuckUp.
+        // How far down flat under fire the pawn is (0 up .. 1 down): through the dive to the ground (dive_), by game time, so
+        // it waits while paused. Without the dive, eased over DuckDown and DuckUp.
         private static float DuckOf(Pawn pawn, Ease e, bool hunkering)
         {
             int now = Find.TickManager.TicksGame;
@@ -2329,10 +2363,17 @@ namespace M3AT
                 e.duckFace = rolling ? (float?)null : FaceOf(pawn, SuppressorOf(pawn));
                 e.duckHand = HandOf(pawn);
                 e.duckLoop = rolling ? "roll" : "duck_" + e.duckHand;
+                // Played from its first frame: it wasn't moved on in the frames before (DuckOf is only called while going
+                // down or down), which would otherwise put it straight down.
+                if (!recent)
+                {
+                    recent = true;
+                    e.duckTick = now;
+                }
             }
             float target = hunkering ? 1f : 0f;
             float seconds = skin.Has("dive_R") ? skin.SecondsOf("dive_R") : 0f;
-            float rate = seconds > 0f ? (hunkering ? 1f : ProneRise) / seconds : 1f / (hunkering ? DuckDown : DuckUp);
+            float rate = seconds > 0f ? (hunkering ? 1f : DropRise) / seconds : 1f / (hunkering ? DuckDown : DuckUp);
             e.duck = recent ? Mathf.MoveTowards(e.duck, target, (now - e.duckTick) / 60f * rate) : target;
             e.duckTick = now;
             e.duckFrame = Time.frameCount;
@@ -2503,144 +2544,6 @@ namespace M3AT
             ThingWithComps weapon = HeldWeapon(pawn);
             SkinnedFigure.Hold hold = weapon != null ? HoldOf(weapon) : null;
             return hold != null && hold.hand == "L" ? "L" : "R";
-        }
-
-        // Whether the pawn should be down from a live explosive. The game's reaction is only to run (mindState.knownExploder
-        // and JobGiver_FleePotentialExplosion, a plain Goto at a sprint), and it goes on running the pawn the whole way, so it
-        // drops only when it is time to (the fuse within the dive's length, or gone off no more than DiveLate ago) and it is
-        // standing or nearly where it runs to (DiveSlide); one still far off keeps running. Down, it stays until DiveStays
-        // after the blast, at most DiveLongest, and gets up if the game has slid it further than DiveSlideMost. Once only per
-        // explosive. Not with a load, in a seat or lying already.
-        private static bool DivesFromBlast(Pawn pawn, Ease e)
-        {
-            int now = Find.TickManager.TicksGame;
-            bool can = pawn.Spawned && !pawn.Downed && pawn.GetPosture() == PawnPosture.Standing && pawn.carryTracker.CarriedThing == null
-                && SeatUnder(pawn) == null;
-            Thing live = pawn.mindState != null ? pawn.mindState.knownExploder : null;
-            if (can && live != null && live.Spawned && live.Map == pawn.Map && (pawn.Position - live.Position).LengthHorizontalSquared <= DiveReach * DiveReach)
-            {
-                if (live.thingIDNumber != e.blastThing)
-                {
-                    e.blastThing = live.thingIDNumber;
-                    e.blastSince = -1;
-                    e.blastDue = -9999;
-                }
-                if (FuseOf(live) <= skin.SecondsOf("dive_R") * 60f)
-                {
-                    e.blastDue = now;
-                }
-            }
-            Vector3 at = pawn.DrawPos;
-            if (!e.blastDown && e.blastSince < 0 && can && now - e.blastDue <= DiveLate && RunLeft(pawn) <= DiveSlide)
-            {
-                e.blastDown = true;
-                e.blastSince = now;
-                e.blastFrom = at;
-            }
-            if (e.blastDown)
-            {
-                float slid = new Vector2(at.x - e.blastFrom.x, at.z - e.blastFrom.z).magnitude;
-                e.blastDown = can && now - e.blastDue <= DiveStays && now - e.blastSince <= DiveLongest && slid <= DiveSlideMost;
-            }
-            return e.blastDown;
-        }
-
-        // How far the pawn still has to go to where the game is taking it (cells, straight); 0 when it isn't moving.
-        private static float RunLeft(Pawn pawn)
-        {
-            if (pawn.pather == null || !pawn.pather.Moving)
-            {
-                return 0f;
-            }
-            Vector3 to = pawn.pather.Destination.Cell.ToVector3Shifted();
-            Vector3 at = pawn.DrawPos;
-            return new Vector2(to.x - at.x, to.z - at.z).magnitude;
-        }
-
-        // Ticks until a live explosive goes off: a shell or grenade's ticksToDetonation (the game's and Combat Extended's,
-        // so by name) or a lit fuse's. 0, so at once, for anything else.
-        private static int FuseOf(Thing live)
-        {
-            FieldInfo fuse;
-            System.Type type = live.GetType();
-            if (!fuseFields.TryGetValue(type, out fuse))
-            {
-                fuse = AccessTools.Field(type, "ticksToDetonation");
-                fuseFields[type] = fuse;
-            }
-            if (fuse != null && fuse.GetValue(live) is int ticks)
-            {
-                return ticks;
-            }
-            CompExplosive wick = live.TryGetComp<CompExplosive>();
-            return wick != null && wick.wickStarted ? wick.wickTicksLeft : 0;
-        }
-
-        private static readonly Dictionary<System.Type, FieldInfo> fuseFields = new Dictionary<System.Type, FieldInfo>();
-
-        // How far through the dive to the ground the pawn is (0 up .. 1 down): moved on by game time, so it waits while
-        // paused, down as it dives and back up after, turning round if it has to. As it starts, picks the way it dives and
-        // the hand its weapon stays in.
-        private static float ProneOf(Pawn pawn, Ease e, bool diving)
-        {
-            int now = Find.TickManager.TicksGame;
-            bool recent = Time.frameCount - e.proneFrame <= 2;
-            if (diving && e.proneAt <= 0f)
-            {
-                e.proneYaw = ProneFacing(pawn, e.upYaw);
-                e.proneHand = HandOf(pawn);
-            }
-            float target = diving ? 1f : 0f;
-            float seconds = skin.SecondsOf("dive_R");
-            if (!recent || seconds <= 0f)
-            {
-                e.proneAt = target;
-            }
-            else
-            {
-                e.proneAt = Mathf.MoveTowards(e.proneAt, target, (now - e.proneTick) / 60f / seconds
-                    * (diving ? 1f : ProneRise * (pawn.pather != null && pawn.pather.Moving ? ProneRiseMoving : 1f)));
-            }
-            e.proneTick = now;
-            e.proneFrame = Time.frameCount;
-            return e.proneAt;
-        }
-
-        // The way to dive: on the move, the way it is going (and the game takes it on along its path, so it slides); else
-        // away from the explosive, or if the cell its head would go into is taken, along that or back from it, so it doesn't
-        // lie through it.
-        private static float ProneFacing(Pawn pawn, float standing)
-        {
-            if (pawn.pather != null && pawn.pather.Moving)
-            {
-                return standing;
-            }
-            Thing live = pawn.mindState != null ? pawn.mindState.knownExploder : null;
-            float? toward = live != null ? FaceOf(pawn, live) : null;
-            float want = toward.HasValue ? toward.Value + 180f : standing;
-            for (int i = 0; i < ProneTurns.Length; i++)
-            {
-                float turned = Mathf.Repeat(want + ProneTurns[i], 360f);
-                float way = turned * Mathf.Deg2Rad;
-                IntVec3 ahead = pawn.Position + new IntVec3(Mathf.RoundToInt(Mathf.Sin(way)), 0, Mathf.RoundToInt(Mathf.Cos(way)));
-                if (!Taken(ahead, pawn.Map))
-                {
-                    return turned;
-                }
-            }
-            return want;
-        }
-
-        private static readonly float[] ProneTurns = { 0f, 90f, -90f, 180f };
-
-        private static bool Taken(IntVec3 c, Map map)
-        {
-            if (map == null || !c.InBounds(map))
-            {
-                return true;
-            }
-            Building b = c.GetEdifice(map);
-            return b != null && !(b is Building_Door) && (b.def.passability == Traversability.Impassable || b.def.fillPercent >= BlockFill);
         }
 
         // Where the fire suppressing the pawn comes from: Combat Extended's CompSuppressable.SuppressorLoc, by reflection, so CE
@@ -2958,6 +2861,59 @@ namespace M3AT
             return skin.Has(clip) ? skin.Variant(clip, Gen.HashCombineInt(pawn.thingIDNumber, job.loadID)) : null;
         }
 
+        // The reading clip for a pawn reading (the game's Reading job, or a mod's on the same driver, once the book is open:
+        // Book.IsOpen, set for the reading toil only), standing or sat still with it in hand; null when it is not reading,
+        // or the export has no read clip. Laid over the sit or the idle as eating is (Ease.eat, eatClip "read"), and the
+        // open book is drawn on the left hand (DrawBook).
+        private static string ReadOf(Pawn pawn)
+        {
+            Book book = pawn.carryTracker != null ? pawn.carryTracker.CarriedThing as Book : null;
+            if (book == null || !book.IsOpen || !(pawn.jobs != null && pawn.jobs.curDriver is JobDriver_Reading)
+                || (pawn.pather != null && pawn.pather.Moving) || !skin.Has("read"))
+            {
+                return null;
+            }
+            return "read";
+        }
+
+        // The teaching clip for a pawn giving a lesson at a school desk (Biotech's Lessongiving, once at its spot and the
+        // pupil there: isReadyToTeach), standing or sat; null otherwise, or the export has no teach clip. Laid over the sit
+        // or the idle as eating is (Ease.eat, eatClip "teach"); the head turns to the pupil (LessonLookOf).
+        private static string TeachOf(Pawn pawn)
+        {
+            JobDriver_Lessongiving lesson = pawn.jobs != null ? pawn.jobs.curDriver as JobDriver_Lessongiving : null;
+            if (lesson == null || !lesson.isReadyToTeach || (pawn.pather != null && pawn.pather.Moving) || !skin.Has("teach"))
+            {
+                return null;
+            }
+            return "teach";
+        }
+
+        // Degrees the head turns about the vertical from the figure's yaw at a lesson: the teacher TeachLook of the way
+        // round toward the pupil beside it at the desk (easing off as it looks down to pat the desk, TeachGlance), the
+        // pupil PupilLook of the way toward the teacher; 0 for anyone else. Both face the desk, the game's own facing.
+        private static float LessonLookOf(Pawn pawn, Ease ease, float yaw)
+        {
+            JobDriver driver = pawn.jobs != null ? pawn.jobs.curDriver : null;
+            float share;
+            if (driver is JobDriver_Lessongiving && ease.eatClip == "teach" && ease.eat > 0f)
+            {
+                float off = Mathf.Abs(Mathf.Repeat(LoopPhase(pawn, "teach") - TeachGlance + 0.5f, 1f) - 0.5f);
+                float glance = off < TeachGlanceWidth ? 0.5f + 0.5f * Mathf.Cos(Mathf.PI * off / TeachGlanceWidth) : 0f;
+                share = TeachLook * ease.eat * (1f - glance * (1f - TeachGlanceKeep));
+            }
+            else if (driver is JobDriver_Lessontaking taking && taking.isReadyToLearn)
+            {
+                share = PupilLook;
+            }
+            else
+            {
+                return 0f;
+            }
+            float? face = FaceOf(pawn, pawn.CurJob.targetB);
+            return face.HasValue ? Mathf.Clamp(Mathf.DeltaAngle(yaw, face.Value) * share, -LookMost, LookMost) : 0f;
+        }
+
         // The weapon the pawn is reloading: Combat Extended's ReloadWeapon job (found by name, so CE need not be loaded),
         // its weapon (target B) the equipped one or one in the inventory; null when it is not reloading.
         private static ThingWithComps Reloaded(Pawn pawn)
@@ -3037,7 +2993,8 @@ namespace M3AT
         }
 
         // Talking the whole time: playing a board game (chess, poker, the game of Ur) with someone else at the same board,
-        // or giving a speech (a throne room's, or a ritual's speaker), once there and not on its way.
+        // giving a speech (a throne room's, or a ritual's speaker), or visiting someone sick in bed (VisitSickPawn, stood or
+        // sat by them; the game turns the visitor to face them), once there and not on its way.
         private static bool TalkOf(Pawn pawn)
         {
             JobDef job = pawn.CurJobDef;
@@ -3050,7 +3007,7 @@ namespace M3AT
             {
                 return PlaysWithOthers(pawn, job);
             }
-            return name == "GiveSpeech" || name == "SpeakOnCellNoSpeechBubbles";
+            return name == "GiveSpeech" || name == "SpeakOnCellNoSpeechBubbles" || name == "VisitSickPawn";
         }
 
         // Pitching horseshoes or hoopstone (the game's Play_Horseshoes and Play_Hoopstone: a JobDriver_WatchBuilding that
@@ -3693,7 +3650,8 @@ namespace M3AT
             bool vomit = job != null && job.def == JobDefOf.Vomit;
             bool meditate = job != null && pawn.jobs != null && pawn.jobs.curDriver is JobDriver_Meditate;
             string play = job != null ? PlaysByBaby(pawn) : null;
-            if (job == null || job.def == null || (!vomit && !meditate && play == null && !WorkAnimations) || (!coming && pawn.pather != null && pawn.pather.Moving))
+            bool music = job != null && pawn.jobs != null && pawn.jobs.curDriver is JobDriver_PlayMusicalInstrument;
+            if (job == null || job.def == null || (!vomit && !meditate && play == null && !music && !WorkAnimations) || (!coming && pawn.pather != null && pawn.pather.Moving))
             {
                 return null;
             }
@@ -3718,6 +3676,16 @@ namespace M3AT
             else if (meditate)
             {
                 kind = "meditate";
+            }
+            else if (music)
+            {
+                // (not work, so whatever IsoRim's work setting: stood at the instrument, or sat on a seat put at it, the
+                // figure drawn stepped up to it, InstrumentCloser)
+                kind = InstrumentKind(a.Thing);
+                if (kind != null && SeatUnder(pawn) != null)
+                {
+                    kind += "_sit";
+                }
             }
             else if (play == "PlayStatic")
             {
@@ -3816,9 +3784,21 @@ namespace M3AT
                         kind = PlaceWork(pawn, a, "tend", false);
                         break;
                     case "VisitSickPawn":
-                        // (the same, but a visitor the game sat on a chair by the bed only sits and talks)
-                        kind = SeatUnder(pawn) != null ? null : PlaceWork(pawn, a, "tend", false);
+                    {
+                        // (the game visits only a patient awake in a bed. Sat on a chair, or stood by a bed of any height,
+                        // BenchFill: no work, it talks, TalkOf; by one on the ground, a sleeping spot or bedroll, sat
+                        // cross-legged beside them talking, work_visit, placed as a kneel is, KneelBeside; on an export
+                        // with neither clip knelt by them as the tending jobs are)
+                        if (SeatUnder(pawn) != null || WorkFill(pawn, a) >= BenchFill)
+                        {
+                            kind = skin.Has("talk") ? null : PlaceWork(pawn, a, "tend", false);
+                        }
+                        else
+                        {
+                            kind = skin.Has("work_visit") ? "visit" : skin.Has("talk") ? null : PlaceWork(pawn, a, "tend", false);
+                        }
                         break;
+                    }
                     case "Research":
                         // (the export's own mocap: looking something over, sat at the bench over the sit, or with no seat
                         // sat cross-legged on the floor (stood at it on an export without that); on an older export, by
@@ -3910,7 +3890,7 @@ namespace M3AT
                     // (off a bed or sleeping spot, from the side it came: drawn as if it knelt in the cell it came in from,
                     // though the game has often walked it on into the patient's own)
                     Vector3? came = on.CurrentBed() == null && mine != null ? mine.cameWay : null;
-                    beside = KneelBeside(pawn, "work_" + kind, lying, mine, on.thingIDNumber, came, out face);
+                    beside = KneelBeside(pawn, "work_" + kind, lying, mine, on.thingIDNumber, came, out face, kind == "visit" ? VisitBack : 0f);
                 }
             }
             return kind;
@@ -3934,8 +3914,9 @@ namespace M3AT
         // their arms and legs included, as a body lying on its side or limp has them well off its line. Given came (the
         // way it walked up), only ways within KneelCameSpread of the side it came from, the nearest that side liked
         // best; then square to the body, then the way it kneels already (so it doesn't hop about as the body breathes),
-        // and without came, the side of the body it is on.
-        private static Vector3 KneelBeside(Pawn pawn, string clip, Ease lying, Ease mine, int whom, Vector3? came, out float face)
+        // and without came, the side of the body it is on. back (cells at size 1) puts the hands that much further out, for
+        // a clip whose hands don't reach for the body (a visitor sat with them on its knees, VisitBack).
+        private static Vector3 KneelBeside(Pawn pawn, string clip, Ease lying, Ease mine, int whom, Vector3? came, out float face, float back = 0f)
         {
             float size = SizeOf(pawn);
             Vector3 hands = 0.5f * (skin.HeadOf(clip, "hand.L") + skin.HeadOf(clip, "hand.R")) * size;
@@ -3946,7 +3927,7 @@ namespace M3AT
             from.y = 0f;
             Vector3? kept = mine != null && mine.besideOf == whom ? mine.besideWay : null;
             float clear = KneelClear * Mathf.Max(size, lying.lyingSize);
-            float inset = ChestInset * lying.lyingSize;
+            float inset = (ChestInset + back) * lying.lyingSize;
             float best = float.MaxValue;
             Vector3 bestWay = Vector3.forward, bestAt = chest;
             for (int i = 0; i < KneelWays; i++)
@@ -4147,7 +4128,30 @@ namespace M3AT
         // Whether a work kind is played sat down, from the waist up over the sit, rather than as the whole figure standing.
         private static bool SeatedWork(string kind)
         {
-            return kind == "research" || kind == "bench_sit" || kind == "chair" || kind == "hammer_bench_sit";
+            return kind == "research" || kind == "bench_sit" || kind == "chair" || kind == "hammer_bench_sit"
+                || kind == "piano_sit" || kind == "harp_sit" || kind == "drum_sit";
+        }
+
+        // How a musical instrument (Play_MusicalInstrument's target) is played, as walk.MUSIC poses it: Royalty's piano
+        // and harpsichord at the keys ("piano"), its harp ("harp"), Ideology's drum ("drum"); another mod's by its
+        // defName, else null (left standing as the game has it).
+        private static string InstrumentKind(Thing instrument)
+        {
+            string name = instrument != null && instrument.def != null ? instrument.def.defName ?? "" : "";
+            if (name.IndexOf("Drum", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return "drum";
+            }
+            if (name.IndexOf("Harp", StringComparison.OrdinalIgnoreCase) >= 0 && name.IndexOf("Harpsichord", StringComparison.OrdinalIgnoreCase) < 0)
+            {
+                return "harp";
+            }
+            if (name.IndexOf("Piano", StringComparison.OrdinalIgnoreCase) >= 0 || name.IndexOf("Harpsichord", StringComparison.OrdinalIgnoreCase) >= 0
+                || name.IndexOf("Organ", StringComparison.OrdinalIgnoreCase) >= 0 || name.IndexOf("Keyboard", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return "piano";
+            }
+            return null;
         }
 
         // The tool in a working pawn's hand (the export's tool line for its kind): IsoRim's own model for it, riding the
@@ -4959,9 +4963,9 @@ namespace M3AT
                 a = (along.normalized + Vector3.down * hold.drop).normalized;
                 top = TopOf(a, hold.roll);
             }
-            // Down from a blast or flat under fire: still in the hand, but brought round to lie along the ground the way the
+            // Flat under fire: still in the hand, but brought round to lie along the ground the way the
             // figure faces, past its head. Whatever the hand's turn would make of this weapon's hold.
-            float laid = drawing != null ? Mathf.SmoothStep(0f, 1f, (Mathf.Max(drawing.proneAt, drawing.duck) - WeaponLaidFrom) / (WeaponLaidTo - WeaponLaidFrom)) : 0f;
+            float laid = drawing != null ? Mathf.SmoothStep(0f, 1f, (drawing.duck - WeaponLaidFrom) / (WeaponLaidTo - WeaponLaidFrom)) : 0f;
             if (laid > 0f)
             {
                 Quaternion down = Quaternion.LookRotation(new Vector3(left ? -WeaponLaidOut : WeaponLaidOut, 0f, 1f), Vector3.up);
@@ -5369,6 +5373,17 @@ namespace M3AT
             ease.holding = held != null && Handles(held) && HoldPerson(pawn, held.thingIDNumber, ease, fig, at, yaw, size, false) ? held.thingIDNumber : 0;
             Vector3 hands = (wristR + wristL) * 0.5f;
             hands.z = Mathf.Max(hands.z, LoadReach);
+            // A cuddled pet sits along the left forearm (cuddle_pet), its head to the carrier's left, its trunk's middle
+            // there (IsoRim's backAt, from its base point, as last drawn).
+            Vector3 elbowL = Vector3.zero;
+            bool pet = ease.carryClip == "carry_cuddle" && ease.carry >= 0.5f && held != null && !Handles(held) && Cuddling(pawn, load)
+                && skin.JointOf(fig, "forearm.L", out elbowL);
+            if (pet)
+            {
+                hands = Vector3.Lerp(elbowL, wristL, skin.PetAlong);
+                hands.y += skin.PetLift;
+                held.Rotation = Rot4.FromAngleFlat(yaw - 90f);
+            }
             // Eating standing, the meal sits on the left palm (between the wrist and the fingers' joint, lifted from the
             // hand's bone to the palm's face, which eat_stand turns up) rather than where the game would hold it out (its
             // ingestHoldOffsetStanding), which IsoRim would otherwise put it at; turned with the hand about the vertical.
@@ -5396,8 +5411,16 @@ namespace M3AT
             try
             {
                 Vector3 hold = at + Quaternion.AngleAxis(yaw, Vector3.up) * (hands * size);
+                if (pet)
+                {
+                    hold.y -= PetBackOf(held) * PetBelly;   // the forearm under its belly, not its feet on it
+                }
                 Hold person;
-                if (held == null && ease.eatClip != null && ease.eat >= 0.5f)
+                if (held == null && ease.eatClip == "read" && ease.eat >= 0.5f && DrawBook(pawn, load, fig, at, yaw, size))
+                {
+                    // (the open book, on the left hand)
+                }
+                else if (held == null && ease.eatClip != null && ease.eat >= 0.5f)
                 {
                     DrawMeal(pawn, load, hold, yaw, eatenInHand ? handTurn : 0f);
                 }
@@ -5447,6 +5470,35 @@ namespace M3AT
             {
                 Log.ErrorOnce(Tag + "Drawing a meal being eaten failed: " + e, 0x4d3a7e01);
             }
+        }
+
+        // The open book being read, on the left hand as the read clip holds it (its `tool read` line, walk.read_rest): IsoRim's
+        // open book, map or schematic model (as its own figures hold one, Models/open_*.obj), in the book sprite's colour,
+        // sized with the pawn as the hand is. False (drawn the usual way) for a closed book or without the line or model.
+        private static bool DrawBook(Pawn pawn, Thing load, SkinnedFigure.Posed fig, Vector3 at, float yaw, float size)
+        {
+            Book book = load as Book;
+            SkinnedFigure.Tool tool = book != null && book.IsOpen ? skin.ToolOf("read") : null;
+            Matrix4x4 hand;
+            if (tool == null || !skin.BoneOf(fig, tool.bone, out hand))
+            {
+                return false;
+            }
+            string name = book.def.defName == "Map" ? "open_map" : book.def.defName == "Schematic" ? "open_schematic" : tool.model;
+            ModelHandle model = ToolModel(name);
+            if (model == null)
+            {
+                return false;
+            }
+            try
+            {
+                Api.DrawModel(model, at, yaw, Matrix4x4.Scale(new Vector3(size, size, size)) * hand * tool.place, Api.SpriteColour(book));
+            }
+            catch (Exception e)
+            {
+                Log.ErrorOnce(Tag + "Drawing a book being read failed: " + e, 0x4d3a7e02);
+            }
+            return true;
         }
 
         private static bool eatenInHand;   // DrawLoad is drawing a meal in the hand: JobDriver_Ingest is not to move it (HeldPrefix)
@@ -5580,6 +5632,40 @@ namespace M3AT
             {
                 skin.Reached(fig, whole);
             }
+        }
+
+        // A cuddled pet's back is where IsoRim draws it (PetBackOf), not where the clips laid the right hand (anim.txt's
+        // cuddle_pet): the hand raised or let down by the difference, at most PetBackMost (model units), between Chain and
+        // Finish.
+        private const float PetBackMost = 0.3f;
+        private const float PetBelly = 0.5f;   // of the height of its back, how far a cuddled pet is sunk below the forearm (DrawLoad)
+        private const float PetBackShare = 0.45f;   // of the height of its model (to its ears), the top of its back (a cat's, from the autotest's pictures)
+
+        // How high a carried animal's back is drawn over its feet, cells: IsoRim's model height (Api.ModelHeight, grown)
+        // at the size IsoRim draws it for its life stage (Animals.SizeOf), PetBackShare of it. Api.ReadHost would give it,
+        // but only for a spawned thing, and a carried animal isn't. 0 without a model.
+        private static float PetBackOf(Pawn animal)
+        {
+            float top = Api.ModelHeight(animal.def);
+            float factor = animal.ageTracker != null && animal.ageTracker.CurLifeStage != null ? animal.ageTracker.CurLifeStage.bodySizeFactor : 1f;
+            return top * Mathf.Lerp(0.5f, 1f, Mathf.Clamp01(factor)) * PetBackShare;
+        }
+
+        private static void StrokePet(Pawn pawn, Ease ease, SkinnedFigure.Posed fig, Matrix4x4 whole, float size)
+        {
+            Thing load = pawn.carryTracker != null ? pawn.carryTracker.CarriedThing : null;
+            if (ease.carryClip != "carry_cuddle" || ease.carry <= 0f || load == null || !Cuddling(pawn, load) || size <= 0f)
+            {
+                return;
+            }
+            float back = PetBackOf((Pawn)load);
+            if (back <= 0f)
+            {
+                return;
+            }
+            float by = Mathf.Clamp(back * (1f - PetBelly) / size - skin.PetBack, -PetBackMost, PetBackMost);
+            skin.ReachBy(fig, whole, "R", new Vector3(0f, by, 0f), ease.carry);
+            skin.Reached(fig, whole);
         }
 
         // The figure drawer (Api.AddFigureDrawer): asked for each person IsoRim would draw as a figure, after IsoRim's own
@@ -5723,14 +5809,12 @@ namespace M3AT
             // The stride's shares: the gait, the limp in place of it, the wade in place of both (by how deep the water is,
             // up to shallow), and swimming in place of them all; the stride handed to the tracker follows them.
             float swim = !lying && skin.Has("swim") && skin.Has("tread") ? ease.swim : 0f;
-            // How far down in the crouch under fire, and in the dive from a live explosive. Gone down for good from the dive
-            // (shot, or downed), it goes limp from where it lay if it can (below), and stays lying the way it dived.
+            // How far down flat under fire (CE's hunker, or rolling to put out a fire). Gone down for good from there (shot,
+            // or downed), it goes limp from where it lay if it can (below), and stays lying the way it went down.
             bool canDrop = !lying && flight < 0f && swim <= 0f;
             float wasDucked = ease.duck;
             float duck = canDrop && (hunkering || ease.duck > 0f) ? DuckOf(pawn, ease, hunkering) : 0f;
             ease.duck = duck;
-            bool diving = canDrop && !hunkering && skin.Has("dive_R") && skin.Has("prone_R") && DivesFromBlast(pawn, ease);
-            float proneAt = canDrop && (diving || ease.proneAt > 0f) ? ProneOf(pawn, ease, diving) : 0f;
             float wade = skin.Has("wade") ? Mathf.Clamp01(ease.depth / Shallow) : 0f;
             float limp = ease.limpClip != null && skin.Has(ease.limpClip) ? ease.limp : 0f;
             float ground = Mathf.Lerp(groundPerCycle[below], groundPerCycle[above], level - below);
@@ -5744,7 +5828,7 @@ namespace M3AT
             int now = Find.TickManager.TicksGame;
             float aimedGame, aimedDrawn;
             bool aimedBefore = !dead && !lying && !ease.hipUsing && AimOf(pawn, out aimedGame, out aimedDrawn);
-            float? face = dead ? null : proneAt > 0f ? ease.proneYaw : duck > 0f && ease.duckFace.HasValue ? ease.duckFace : aimedBefore ? (float?)null
+            float? face = dead ? null : duck > 0f && ease.duckFace.HasValue ? ease.duckFace : aimedBefore ? (float?)null
                 : !lying && ease.strikeClip != null && ease.strikeFace.HasValue ? ease.strikeFace
                 : !lying && ease.cast > 0f && ease.castFace.HasValue ? ease.castFace
                 : !lying && ease.hipUsing && ease.hipFace.HasValue ? ease.hipFace
@@ -5778,14 +5862,13 @@ namespace M3AT
             float lyingFloor = lying ? placed.Position.y - lift : 0f;
             bool limpFromProne = false;
             string limpPose = null;   // the clip it goes limp from, lying there
-            if (lying && (ease.proneAt > 0f || wasDucked > 0f))
+            if (lying && wasDucked > 0f)
             {
                 limpFromProne = !crawling && Ragdolls && skin.CanRagdoll && lift <= 0f && pawn.CurrentBed() == null && !(pawn.ParentHolder is IThingHolderWithDrawnPawn);
-                limpPose = ease.proneAt > 0f ? (ease.proneHand != null ? "prone_" + ease.proneHand : null) : (ease.duckLoop ?? (ease.duckHand != null ? "duck_" + ease.duckHand : null));
-                ease.fellYaw = ease.proneAt > 0f ? ease.proneYaw : ease.duckFace ?? ease.upYaw;
+                limpPose = ease.duckLoop ?? (ease.duckHand != null ? "duck_" + ease.duckHand : null);
+                ease.fellYaw = ease.duckFace ?? ease.upYaw;
                 ease.fallClip = null;
                 ease.fallen = 1f;
-                ease.proneAt = 0f;
             }
             // Up from lying on its back (woken, or no longer downed): the getup, from where it lay.
             bool laid = lying && !crawling && !dead;
@@ -5865,7 +5948,7 @@ namespace M3AT
                     ease.aimTick = now;
                     face = face ?? aimDrawn;
                 }
-                bool upright = !lying && !crawling && !seated && flight < 0f && swim <= 0f && rise <= 0f && proneAt <= 0f && duck <= 0f;
+                bool upright = !lying && !crawling && !seated && flight < 0f && swim <= 0f && rise <= 0f && duck <= 0f;
                 yaw = TurnedFor(pawn, ease, yaw, face, aiming, upright);
                 yaw = StepOf(ease, yaw, upright, gait, out twist);
                 // Seated, talking to someone: the trunk (and the head with it) turned toward them, the seat's way kept.
@@ -5882,6 +5965,9 @@ namespace M3AT
             {
                 SkinnedFigure.Shape shape = ShapeFor(pawn);
                 SkinnedFigure.Posed fig = skin.For(pawn.thingIDNumber, shape);
+                // At a lesson, the head turned toward the other (not lying or on the move), eased on real time.
+                float looked = !lying && !crawling && flight < 0f ? LessonLookOf(pawn, ease, yaw) : 0f;
+                ease.look = Mathf.MoveTowards(ease.look, looked, LookSpeed * Time.deltaTime);
                 float headHeight = skin.HeadHeight(shape);
                 float floor = 0f;   // cells: what it lies on
                 float sat = seated && skin.Has("sit") ? seatAmount : 0f;   // without the clip: standing on the seat
@@ -5891,9 +5977,10 @@ namespace M3AT
                 skin.Begin(fig);
                 CutLimbs(pawn, fig);
                 skin.Twist(fig, twist);
+                skin.Look(fig, ease.look);
                 // A leg gone: the weight over the other foot in whatever it is doing on its feet (the hop has it already).
                 string standOn = ease.limpBy <= 0f ? null : ease.limpClip == "hop_L" ? "R" : ease.limpClip == "hop_R" ? "L" : null;
-                bool sitsDown = seated || rise > 0f || proneAt > 0f || duck > 0f || ease.workKind == "meditate" || ease.workKind == "play" || ease.workKind == "research_floor";
+                bool sitsDown = seated || rise > 0f || duck > 0f || ease.workKind == "meditate" || ease.workKind == "play" || ease.workKind == "research_floor" || ease.workKind == "visit";
                 if (standOn == null || lying || crawling || flight >= 0f || swim > 0f)
                 {
                     ease.balance = 0f;
@@ -5995,34 +6082,23 @@ namespace M3AT
                     float onTheMove = skin.Has("bend_walk") && !person ? moving : 0f;
                     // Swimming takes the place of all of it: the front crawl on the move, laid down below, and treading
                     // water upright when still. So does getting up, the whole figure, which then eases into the rest.
-                    float dive = Mathf.SmoothStep(0f, 1f, proneAt / ProneIn);
                     string duckDive = "dive_" + ease.duckHand;
                     bool duckDives = skin.Has(duckDive);
-                    float ducked = duckDives ? Mathf.SmoothStep(0f, 1f, duck / ProneIn) : duck;
-                    float land = (1f - swim) * (1f - rise) * (1f - dive) * (1f - ducked);
-                    if (duck > 0f && dive < 1f)
+                    float ducked = duckDives ? Mathf.SmoothStep(0f, 1f, duck / DropIn) : duck;
+                    float land = (1f - swim) * (1f - rise) * (1f - ducked);
+                    if (duck > 0f)
                     {
-                        // Hunkered under fire: down flat on its front by the dive from a live explosive, then lying there with
+                        // Hunkered under fire: down flat on its front by the dive (dive_), then lying there with
                         // the hands by the head (or rolling over, putting out a fire), the whole figure in place of the rest;
                         // the same way back up.
                         string duckClip = ease.duckLoop ?? "duck_" + ease.duckHand;
-                        float settled = duckDives ? Mathf.SmoothStep(0f, 1f, (duck - ProneLoop) / (1f - ProneLoop)) : 1f;
+                        float settled = duckDives ? Mathf.SmoothStep(0f, 1f, (duck - DropLoop) / (1f - DropLoop)) : 1f;
                         if (duckDives)
                         {
                             int frames = skin.FramesOf(duckDive);
-                            skin.Add(fig, duckDive, duck * (frames - 1) / frames, ducked * (1f - settled) * (1f - dive));
+                            skin.Add(fig, duckDive, duck * (frames - 1) / frames, ducked * (1f - settled));
                         }
-                        skin.Add(fig, duckClip, LoopPhase(pawn, duckClip), ducked * settled * (1f - dive));
-                    }
-                    if (dive > 0f)
-                    {
-                        // Diving from a live explosive: the dive to the ground, then the loop lying there, the whole figure in place of the
-                        // rest, by how far down it is; the same way back up.
-                        string diveClip = "dive_" + ease.proneHand, proneClip = "prone_" + ease.proneHand;
-                        int frames = skin.FramesOf(diveClip);
-                        float settled = Mathf.SmoothStep(0f, 1f, (proneAt - ProneLoop) / (1f - ProneLoop));
-                        skin.Add(fig, diveClip, proneAt * (frames - 1) / frames, dive * (1f - settled));
-                        skin.Add(fig, proneClip, LoopPhase(pawn, proneClip), dive * settled);
+                        skin.Add(fig, duckClip, LoopPhase(pawn, duckClip), ducked * settled);
                     }
                     if (rise > 0f)
                     {
@@ -6145,11 +6221,16 @@ namespace M3AT
                         // A cradled baby rocked as it is played with: carry_play eased in over the cradle (Ease.play).
                         // Seated, the carry gives way to the sit, but for a baby being fed, which the game sits down with
                         // in its arms (FeedsBaby): for now the cradle laid over the sit.
-                        float seatedCarry = ease.carryClip == "carry_cradle" && FeedsBaby(pawn) ? 1f : 1f - sat;
+                        // A cuddled pet is held sat on a chair too (Cuddling), and stroked while still (carry_cuddle_stroke).
+                        float seatedCarry = (ease.carryClip == "carry_cradle" && FeedsBaby(pawn)) || ease.carryClip == "carry_cuddle" ? 1f : 1f - sat;
                         float carried = ease.carry * seatedCarry * (person ? 1f : 1f - bend) * land * (1f - eat);
-                        float play = ease.carryClip == "carry_cradle" ? ease.play : 0f;
+                        string carryOver = CarryOverOf(ease.carryClip);
+                        float play = carryOver != null && skin.Has(carryOver) ? ease.play : 0f;
                         skin.Over(fig, ease.carryClip, LoopPhase(pawn, ease.carryClip), carried * (1f - play));
-                        skin.Over(fig, "carry_play", LoopPhase(pawn, "carry_play"), carried * play);
+                        if (play > 0f)
+                        {
+                            skin.Over(fig, carryOver, LoopPhase(pawn, carryOver), carried * play);
+                        }
                     }
                     if (eat > 0f)
                     {
@@ -6298,6 +6379,7 @@ namespace M3AT
                             skin.Reached(fig, whole);
                         }
                         GripCarried(pawn, ease, fig, whole, size);
+                        StrokePet(pawn, ease, fig, whole, size);
                     }
                     skin.Finish(fig);
                 }
@@ -6323,11 +6405,11 @@ namespace M3AT
                 {
                     y = floor - lowest * size + Lift * size;
                 }
-                else if (proneAt > 0f || duck > 0f)
+                else if (duck > 0f)
                 {
                     // Diving: only kept out of the ground while it is in the air, then let down on its lowest point.
-                    float down = Mathf.Max(proneAt, duck);
-                    y = Mathf.Lerp(y - Mathf.Min(lowest, 0f) * size, (Lift - lowest) * size, Mathf.SmoothStep(0f, 1f, (down - ProneRest) / (1f - ProneRest)));
+                    float down = duck;
+                    y = Mathf.Lerp(y - Mathf.Min(lowest, 0f) * size, (Lift - lowest) * size, Mathf.SmoothStep(0f, 1f, (down - DropRest) / (1f - DropRest)));
                 }
                 else if (rise > 0f)
                 {
@@ -6361,6 +6443,11 @@ namespace M3AT
                     // it is drawn stepped up to it, as far as it has taken up the stance.
                     at += Quaternion.Euler(0f, ease.workFace, 0f) * Vector3.forward * (BenchCloser * ease.shownWork);
                 }
+                else if (ease.workKind != null && InstrumentCloser.TryGetValue(ease.workKind, out float closer))
+                {
+                    // Playing an instrument: drawn stepped up to it in the same way (seated, scooted forward on the seat).
+                    at += Quaternion.Euler(0f, ease.workFace, 0f) * Vector3.forward * (closer * ease.shownWork);
+                }
                 else if (ease.workBeside.HasValue && ease.shownWork > 0f)
                 {
                     // Working on someone lying on the ground: drawn kneeling beside them, its hands on their chest, as the
@@ -6369,14 +6456,14 @@ namespace M3AT
                     at.x = Mathf.Lerp(at.x, beside.x, ease.shownWork);
                     at.z = Mathf.Lerp(at.z, beside.z, ease.shownWork);
                 }
-                if (!lying && !seated && flight < 0f && swim <= 0f && lift <= 0f && proneAt <= 0f && duck <= 0f)
+                if (!lying && !seated && flight < 0f && swim <= 0f && lift <= 0f && duck <= 0f)
                 {
                     ease.upFrame = Time.frameCount;   // on its feet: it can fall from here
                     ease.upYaw = yaw;
                 }
                 // What the tail stays above: what it lies on, or getting up, the lowest of the body. Under a blanket it is hidden,
                 // and pushed up to the blanket it would show through it.
-                float tailFloor = lying ? (floor - at.y) / size : rise > 0f || proneAt > 0f || duck > 0f ? lowest : float.NegativeInfinity;
+                float tailFloor = lying ? (floor - at.y) / size : rise > 0f || duck > 0f ? lowest : float.NegativeInfinity;
                 // A bed that shows only the head: IsoRim's blanket over the body, as over its own figure, and only the head
                 // drawn (fig.tucked, BedTuck.cs), as the chibi's body, arms crossed on the chest, stood up through the lump.
                 Building_Bed blanketBed = lying && !dead && !ctx.ForOtherMod && placed.Situation == FigureSituation.InBed && placed.HeadOnlyInBed

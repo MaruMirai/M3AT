@@ -39,7 +39,7 @@ namespace M3AT
             s.pieces = new[] { body };
             s.ReadAnim(Path.Combine(folder, "anim.txt"));
             figure = s;
-            return new HairBuilder(body.rest, body.tris, s.OnHead(), body.keys, turn, s.boneHead[s.headBone], "", beard);
+            return new HairBuilder(body.rest, body.tris, s.OnHead(), body.keys, turn, s.boneHead[s.headBone], "", beard, s.Scalp());
         }
 
         // Cuts a written hair file (and its shell) down as LoadHair does, writing them back in the same format.
@@ -249,7 +249,7 @@ namespace M3AT
                     Console.WriteLine("BUILD " + style + ": nothing solid enough (" + path + ".none)");
                     continue;
                 }
-                File.WriteAllBytes(path + ".png", Png(built.atlas, 3 * HairBuilder.Size, HairBuilder.Size));
+                File.WriteAllBytes(path + ".png", Png(built.atlas, HairBuilder.Panels * HairBuilder.Size, HairBuilder.Size));
                 if (built.shell != null)
                 {
                     File.WriteAllText(path + ".shell.txt", built.shell);
