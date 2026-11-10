@@ -465,6 +465,16 @@ namespace M3AT
                 "How far one notch of the scroll wheel raises or lowers the camera, on top of the flying speed (default " + Settings.DefaultFreecamScrollSpeed.ToString("0.00") + "x).") * 20f) / 20f;
             Settings.freecamFov = Mathf.Round(Slider(list, "Field of view: " + Settings.freecamFov.ToString("0") + "°", Settings.freecamFov, 40f, 110f,
                 "How wide the camera sees, in degrees from the top of the screen to the bottom (default " + Settings.DefaultFreecamFov.ToString("0") + "°)."));
+
+            // A report for the Workshop's bug thread (BugReport.cs): copied, and saved in case it is too long to paste.
+            Header(list, "Problems");
+            if (list.ButtonText("Copy bug report"))
+            {
+                string saved = BugReport.CopyAndSave();
+                Messages.Message("Bug report copied to the clipboard" + (saved != null ? " and saved to " + saved : "") + ". Paste it into the mod's bug report thread with a few words on what went wrong.",
+                    RimWorld.MessageTypeDefOf.NeutralEvent, false);
+            }
+            list.Label("Copies this mod's settings, errors and your mod list for a bug report, and the state of any pawns selected in the game: select the one that looks wrong first. Nothing is sent anywhere.");
 #if FACE_TUNING
             // The face tuning window (FaceTuning.cs), opened over the map with the options closed so the face can be seen.
             if (Current.ProgramState == ProgramState.Playing && list.ButtonText("Face tuning window (temporary)"))

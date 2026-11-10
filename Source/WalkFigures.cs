@@ -251,7 +251,7 @@ namespace M3AT
         // middle of the cell, so a seated figure is drawn only a little off it.
         private static readonly Dictionary<string, float> InstrumentCloser = new Dictionary<string, float>
         {
-            { "piano", 0.4f }, { "piano_sit", 0.28f }, { "harp", 0.68f }, { "harp_sit", 0.5f }, { "drum", 0.45f }, { "drum_sit", 0.33f },
+            { "piano", 0.35f }, { "piano_sit", 0.3f }, { "harp", 0.62f }, { "harp_sit", 0.33f }, { "drum", 0.45f }, { "drum_sit", 0.33f },
         };
         private const float LandDown = 0.1f;   // of the landing crouch's length (walk.LAND_SECONDS): sinking into it
         private const float TakeOff = 0.15f;   // of the flight: springing up out of the warm-up's crouch
@@ -500,6 +500,13 @@ namespace M3AT
             public float lieYaw;   // the yaw, model units along and cells up it was laid at then (the getup starts from there)
             public float lieAlong;
             public float blanketAlong = float.NaN;   // where the blanket's lump starts along the bed from the placing's head, cells (DrawTuckedIn)
+            public float blanketScale = float.NaN;   // the lump's size for this sleeper's body (BlanketScaleOf), IsoRim's scale
+            public float blanketDepth, blanketWidth;   // and the body measured for it, model units (for AutoTest)
+            public SkinnedFigure.Shape blanketShape;   // the shape it was measured in
+            public float tuckNeck = float.NaN;   // under the blanket: the neck's distance down the bed from its head end before TuckedDown moves it, cells
+            public float tuckShift;   // and how far TuckedDown moved the figure toward the feet, cells
+            public int blanketFrame = -1;   // the frame IsoRim last drew (or queued) the blanket over this sleeper (DrawTuckedIn; for AutoTest)
+            public float lovinShift;   // under the blanket at lovin: cells the head and lump are drawn across the bed toward the partner, eased (LovinOf)
             public float lieFloor;
             public float risen = 1f;   // how far through getting up, 0 .. 1; 1: done (RiseOf)
             public int risenTick;   // the game tick it was last moved on
@@ -5746,13 +5753,20 @@ namespace M3AT
         // the bed's surface (or the sleeper's slot), size the figure's. With an older IsoRim there is none, and sleepers lie
         // on top of the bed.
         //
-        // The blanket is IsoRim's lump made for its own figure, whose jaw is 0.14 of its size from the head's middle and whose
-        // body is shallower. The chibi's head is bigger (0.2 from its middle to the jaw) and the body deeper, so the lump is
-        // made BlanketScale bigger (taller and longer; IsoRim keeps it within the bed's width and length) and starts at the
-        // chibi's neck (BlanketNeck) rather than under IsoRim's jaw.
+        // The blanket is IsoRim's lump made for its own figure, whose jaw is 0.14 of its size from the head's middle. The
+        // chibi's head is bigger (0.2 from its middle to the jaw), so the lump starts at the base of the chibi's neck (BlanketNeck,
+        // as the neck is drawn, SkinnedFigure.TuckFrom) rather than under IsoRim's jaw. Its size (IsoRim's scale: the lump made as for a body that many times bigger, taller, longer
+        // and wider, the width kept within the bed's) is the sleeper's own (BlanketScaleOf): the body as it lies under it,
+        // measured in its shape (SkinnedFigure.UnderBlanket), so a fat, hulking or pregnant sleeper has a bigger lump than a
+        // thin one, a child's its own size.
         private const int BlanketApi = 68;
-        private const float BlanketScale = 1.25f;
-        private const string BlanketNeck = "spine.005";
+        private const float BlanketPeak = 0.255f;   // IsoRim's lump at scale 1: its height over the bed at the chest, cells (0.15 x its Height 1.7)
+        private const float BlanketHalf = 0.34f;    // and its widest half width, cells, before the dip at its sides
+        private const float BlanketRoom = 0.03f;    // the lump this much over the body's highest (model units: cells at a grown pawn's size)
+        private const float BlanketSides = 1.5f;    // its half width this many times the body's, as the lump's sides slope down to the bed
+        private const float BlanketLeast = 0.6f, BlanketMost = 2.5f;
+        private const float BlanketStep = 0.05f;    // the scale rounded to this, so IsoRim builds few lumps
+        private const string BlanketNeck = "spine.004";   // its joint is the neck's base
         private const float BlanketSnap = 0.03f;   // cells the neck may move along the bed (breathing) before the lump follows it, and is built again
 
         private static void DrawTuckedIn(Pawn pawn, Building_Bed bed, SkinnedFigure.Posed fig, Ease ease, Vector3 at, float yaw, float size,
@@ -5771,7 +5785,87 @@ namespace M3AT
             }
             // Where it starts, cells from the head's middle toward the feet (-1: IsoRim's own, under its jaw).
             float start = float.IsNaN(ease.blanketAlong) ? -1f : ease.blanketAlong;
-            Api.DrawSleeperBlanket(pawn, bed, placedAt, placedYaw, size, ground, start, BlanketScale);
+            if (ease.blanketShape != fig.shape || float.IsNaN(ease.blanketScale))
+            {
+                ease.blanketShape = fig.shape;
+                ease.blanketScale = BlanketScaleOf(fig, along, yaw, out ease.blanketDepth, out ease.blanketWidth);
+            }
+            if (Api.DrawSleeperBlanket(pawn, bed, placedAt, placedYaw, size, ground, start, ease.blanketScale))
+            {
+                ease.blanketFrame = Time.frameCount;
+            }
+        }
+
+        // A small sleeper (a baby, a toddler) moved down the bed under the blanket. The game lays every sleeper's head at the
+        // same place on the pillow, and a small body's neck is then still on it: the blanket, which starts at the neck, lies
+        // under the pillow and the bed's own turned-down sheet there, and the head looks cut off from the lump by a strip of
+        // bare bed. Only the head is drawn (BedTuck.cs), so the whole figure is moved toward the feet until its neck is no
+        // higher up the bed than TuckNeckFrom, about where a grown sleeper's is; grown sleepers are not moved. Cells along
+        // the bed toward the feet; ease.tuckNeck keeps the neck's place before the move (for AutoTest), with TuckSnap of slack
+        // so breathing doesn't rock the head.
+        private const float TuckNeckFrom = 0.6f;   // cells from the bed's head end (IsoRim's bed: the pillow ends at 0.48, its turned-down sheet from 0.62)
+        private const float TuckSnap = 0.02f;
+
+        private static Vector3 TuckedDown(Building_Bed bed, SkinnedFigure.Posed fig, Ease ease, Vector3 at, float yaw, float size, float placedYaw)
+        {
+            Vector3 neck;
+            if (!skin.JointOf(fig, BlanketNeck, out neck))
+            {
+                return Vector3.zero;
+            }
+            Vector3 toHead = Quaternion.AngleAxis(placedYaw, Vector3.up) * Vector3.back;   // IsoRim's bed yaw runs from the head toward the feet
+            Vector3 headEnd = bed.TrueCenter() + toHead * (bed.def.size.z * 0.5f);
+            Vector3 world = at + Quaternion.AngleAxis(yaw, Vector3.up) * (neck * size);
+            float from = Vector3.Dot(headEnd - world, toHead);   // the neck's distance down the bed from its head end
+            if (float.IsNaN(ease.tuckNeck) || Mathf.Abs(from - ease.tuckNeck) > TuckSnap)
+            {
+                ease.tuckNeck = Mathf.Round(from * 100f) / 100f;
+            }
+            ease.tuckShift = Mathf.Max(0f, TuckNeckFrom - ease.tuckNeck);
+            return -toHead * ease.tuckShift;
+        }
+
+        // The blanket's scale for this sleeper's body as it lies (model units, so the pawn's size, which scales both the body
+        // and IsoRim's lump, drops out): tall enough to be BlanketRoom over its highest and wide enough to cover it with its
+        // sloping sides, whichever wants more. Measured once per shape (the body keys: build, pregnancy, age), not per breath.
+        private static float BlanketScaleOf(SkinnedFigure.Posed fig, Vector3 along, float yaw, out float depth, out float halfWidth)
+        {
+            Vector3 across = Quaternion.Inverse(Quaternion.AngleAxis(yaw, Vector3.up)) * Vector3.Cross(Vector3.up, along);
+            if (!skin.UnderBlanket(fig, across.normalized, out depth, out halfWidth))
+            {
+                return -1f;   // IsoRim's own
+            }
+            float tall = (depth + BlanketRoom) / BlanketPeak;
+            float wide = halfWidth * BlanketSides / BlanketHalf;
+            float scale = Mathf.Clamp(Mathf.Max(tall, wide), BlanketLeast, BlanketMost);
+            return Mathf.Round(scale / BlanketStep) * BlanketStep;
+        }
+
+        // Lovin under the blanket (the bedBlankets option): the two lie side by side in a double bed, a cell apart, staring up.
+        // Each is drawn LovinCloser across the bed toward the other, head and lump together, its head turned LovinLook
+        // toward them, so they lie close facing each other. LovinOf: which side of the figure the partner is (+1 its +x,
+        // which a look of + degrees turns the face toward, as the lying clips are laid down about x), scaled by how far
+        // they have settled in (both lying in the same bed); 0 for anyone else.
+        private const float LovinCloser = 0.17f;   // cells each head moves toward the other's (the slots are a cell apart)
+        private const float LovinLook = 65f;   // degrees the head turns toward the partner, within LookMost
+        private const float LovinEase = 0.4f;   // cells a second the shift comes in or goes out
+        private const float LovinSnap = 0.02f;   // cells: the shift taken up in these steps, so IsoRim rebuilds the lump only a few times
+
+        private static float LovinOf(Pawn pawn, FigurePlacement placed, float yaw)
+        {
+            if (!BedBlankets || !BlanketReady() || placed.Situation != FigureSituation.InBed || !placed.HeadOnlyInBed)
+            {
+                return 0f;
+            }
+            Job job = pawn.CurJob;
+            Pawn partner = job != null && job.def == JobDefOf.Lovin ? job.targetA.Pawn : null;
+            Building_Bed bed = pawn.CurrentBed();
+            if (partner == null || bed == null || partner.CurrentBed() != bed || partner.GetPosture() == PawnPosture.Standing)
+            {
+                return 0f;
+            }
+            Vector3 local = Quaternion.Inverse(Quaternion.AngleAxis(yaw, Vector3.up)) * (partner.DrawPos - pawn.DrawPos);
+            return Mathf.Abs(local.x) < 0.05f ? 0f : Mathf.Sign(local.x);
         }
 
         // Whether this IsoRim has the blanket to draw.
@@ -5966,7 +6060,9 @@ namespace M3AT
                 SkinnedFigure.Shape shape = ShapeFor(pawn);
                 SkinnedFigure.Posed fig = skin.For(pawn.thingIDNumber, shape);
                 // At a lesson, the head turned toward the other (not lying or on the move), eased on real time.
-                float looked = !lying && !crawling && flight < 0f ? LessonLookOf(pawn, ease, yaw) : 0f;
+                // Under the blanket at lovin, toward the partner beside it (LovinOf).
+                float lovinSide = lying && !dead ? LovinOf(pawn, placed, yaw) : 0f;
+                float looked = !lying && !crawling && flight < 0f ? LessonLookOf(pawn, ease, yaw) : lovinSide * LovinLook;
                 ease.look = Mathf.MoveTowards(ease.look, looked, LookSpeed * Time.deltaTime);
                 float headHeight = skin.HeadHeight(shape);
                 float floor = 0f;   // cells: what it lies on
@@ -6469,11 +6565,31 @@ namespace M3AT
                 Building_Bed blanketBed = lying && !dead && !ctx.ForOtherMod && placed.Situation == FigureSituation.InBed && placed.HeadOnlyInBed
                     && BedBlankets && BlanketReady() ? pawn.CurrentBed() : null;
                 fig.tucked = blanketBed != null;
+                Vector3 blanketAt = placed.Position;
+                if (blanketBed != null)
+                {
+                    at += TuckedDown(blanketBed, fig, ease, at, yaw, size, placed.Yaw);
+                    // At lovin, the head and its lump drawn across the bed toward the partner's, eased in snapped steps
+                    // (IsoRim builds the lump again whenever it moves).
+                    float shiftTo = Mathf.Abs(lovinSide) * LovinCloser;
+                    ease.lovinShift = Mathf.MoveTowards(ease.lovinShift, shiftTo, LovinEase * Time.deltaTime);
+                    float snapped = ease.lovinShift >= shiftTo - 1e-4f && shiftTo > 0f ? shiftTo : Mathf.Round(ease.lovinShift / LovinSnap) * LovinSnap;
+                    if (snapped > 0f && lovinSide != 0f)
+                    {
+                        Vector3 toward = Quaternion.AngleAxis(yaw, Vector3.up) * Vector3.right * (Mathf.Sign(lovinSide) * snapped);
+                        at += toward;
+                        blanketAt += toward;
+                    }
+                }
+                else
+                {
+                    ease.lovinShift = 0f;
+                }
                 GarmentMask mask = DrawDressed(pawn, fig, at, yaw, size, sat, tailFloor, onGround);
                 fig.tucked = false;   // (only for this draw: carried out of bed, it is drawn by its carrier, DrawHeld)
                 if (blanketBed != null)
                 {
-                    DrawTuckedIn(pawn, blanketBed, fig, ease, at, yaw, size, placed.Position, placed.Yaw, lyingFloor);
+                    DrawTuckedIn(pawn, blanketBed, fig, ease, at, yaw, size, blanketAt, placed.Yaw, lyingFloor);
                 }
                 Vector3 chest, hips, head;
                 if (lying && skin.JointOf(fig, ChestBone, out chest) && skin.JointOf(fig, "spine", out hips) && skin.JointOf(fig, "spine.006", out head))

@@ -101,7 +101,7 @@ IsoRim's `Poses.cs` decides who is sitting: any `isSittable` building (stools, c
 - [x] Get up from lying (woken, no longer downed) — body, one-shot (`getup`, `walk.getup_at`, Meshy's Arise cut before its step back; `RiseOf`, played `RiseHurry` times faster)
 - [ ] Rest awake, lying, turning a little: **LayDownAwake**, **LayDownResting** — body
 - [x] Downed, slow breathing and the odd writhe: **Wait_Downed** — body
-- [ ] Lovin' under a blanket (a subtle bob): **Lovin** — add
+- [x] Lovin' under a blanket (a subtle bob): **Lovin** — add
 - [p] Feeding a baby, sitting or standing: **Breastfeed**, **BottleFeedBaby**, **BabySuckle** — upper (for now the `carry_cradle` hold, laid over the sit too: `FeedsBaby`)
 - [ ] Getting into a pod or casket: **EnterCryptosleepCasket**, **EnterBiosculpterPod**, **EnterBuilding**, **CreateAndEnterCocoon** — body, one-shot
 

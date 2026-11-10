@@ -165,3 +165,6 @@ for path in argv:
     if os.path.exists(shell):
         build(style + ' shell', shell, scale, shell=True)
     print('HAIR %s: %d vertices on %s' % (style, len(hair.data.vertices), walk.HEAD))
+# At rest, so the hair and its walls sit where the rig's Hairline (not parented to the head) and the rest of the rig
+# were drawn; the armature's Pose Position (Object Data properties) shows the preview's clips.
+walk.arm.data.pose_position = 'REST'

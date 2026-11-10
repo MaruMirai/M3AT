@@ -39,7 +39,7 @@ namespace M3AT
             s.pieces = new[] { body };
             s.ReadAnim(Path.Combine(folder, "anim.txt"));
             figure = s;
-            return new HairBuilder(body.rest, body.tris, s.OnHead(), body.keys, turn, s.boneHead[s.headBone], "", beard, s.Scalp());
+            return new HairBuilder(body.rest, body.tris, s.OnHead(), body.keys, turn, s.boneHead[s.headBone], "", beard, s.Scalp(), s.OnArm());
         }
 
         // Cuts a written hair file (and its shell) down as LoadHair does, writing them back in the same format.
@@ -50,17 +50,22 @@ namespace M3AT
             {
                 share = Mathf.Max(share, (float)BeardTriangles / Mathf.Max(h.tris.Length / 3, 1));
             }
-            if (share >= 1f)
-            {
-                return;
-            }
             string full = path.Substring(0, path.Length - ".txt".Length) + ".full.txt";
             File.Copy(path, full, true);
-            Piece cut = Decimated(h, h.uvs, share);
+            // Cut and walled as LoadHair does (HairlineWalls.cs); M3AT_EDGE_WALLS set keeps the builder's walls.
+            HairlineWallsOn = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("M3AT_EDGE_WALLS"));
+            float cover;
+            System.Diagnostics.Stopwatch took = System.Diagnostics.Stopwatch.StartNew();
+            Piece cut = CutWithWalls(h, share, beard, out cover);
+            if (cover >= 0f)
+            {
+                Console.WriteLine("WALLS " + Path.GetFileName(path) + " cut and walled in " + took.ElapsedMilliseconds + " ms: hairline covered "
+                    + cover.ToString("0.00") + (cover >= HairlineCover ? ", hung from the hairline" : ", too little: the builder's walls kept"));
+            }
             File.WriteAllText(path, Written(cut, File.ReadAllLines(path)));
             Console.WriteLine("CUT " + Path.GetFileName(path) + ": " + h.tris.Length / 3 + " to " + cut.tris.Length / 3 + " triangles");
             string shellPath = path.Substring(0, path.Length - ".txt".Length) + ".shell.txt";
-            if (File.Exists(shellPath))
+            if (File.Exists(shellPath) && share < 1f)
             {
                 Piece shell = ReadMesh(shellPath, false, null);
                 File.Copy(shellPath, shellPath.Replace(".shell.txt", ".full.shell.txt"), true);
@@ -227,7 +232,7 @@ namespace M3AT
             {
                 string style = args[k], path = Path.Combine(outDir, style);
                 Directory.CreateDirectory(Path.GetDirectoryName(path));
-                foreach (string old in new[] { ".txt", ".shell.txt", ".full.txt", ".full.shell.txt", ".png", ".none" })
+                foreach (string old in new[] { ".txt", ".shell.txt", ".full.txt", ".full.shell.txt", ".png", ".flat.png", ".none" })
                 {
                     File.Delete(path + old);
                 }
@@ -236,6 +241,16 @@ namespace M3AT
                 try
                 {
                     built = builder.Build(style, Sprites(args[k + 1], beard));
+                    if (beard)
+                    {
+                        // The beard laid flat on the face patch, as the 2D option draws it (SkinnedFigure.FlatBeardOf).
+                        const int flatSize = 512;
+                        Color32[] flat = builder.FlatFace(Sprites(args[k + 1], beard), flatSize);
+                        if (flat != null)
+                        {
+                            File.WriteAllBytes(path + ".flat.png", Png(flat, flatSize, flatSize));
+                        }
+                    }
                 }
                 catch (Exception e)
                 {

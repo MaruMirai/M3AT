@@ -42,7 +42,7 @@ namespace M3AT
     internal sealed class HairBuilder
     {
         private const string Tag = "[M3AT] ";
-        public const int Version = 32;   // raise when the build changes, so cached hair is made again
+        public const int Version = 34;   // raise when the build changes, so cached hair is made again
         public const int BeardVersion = 4;   // and cached beards
         private static bool pixelsFailed;   // IsoRim's pixel reading has thrown once (logged once)
         public const int Size = 256;    // pixels: every sprite is read at this size, as hair.py's SIZE
@@ -85,8 +85,8 @@ namespace M3AT
                                                   // at its own height, and hair off the head counts as hanging free
         private const byte Solid = 128;           // least alpha that counts as hair (the game's cut-out, 0.5)
         private const float Cut = 0.9f;           // alpha the mesh is cut at, a little inside the art
-        private const float StrandStreak = 0.12f; // how much the strand streaks brighten or darken the hair's colours (Atlas)
-        private const int StreakLength = 12;      // sprite rows over which a thin streak changes
+        internal const float StrandStreak = 0.12f; // how much the strand streaks brighten or darken the hair's colours (Atlas)
+        internal const int StreakLength = 12;      // sprite rows over which a thin streak changes
         private const int WallSmooth = 6;         // smoothing passes over the walls' reach in along each edge loop
         private const float WallShade = 0.3f;     // the share of an edge loop's colours darker than its walls' one colour,
                                                   // as the inside of the hair is in shade
@@ -123,6 +123,9 @@ namespace M3AT
         private const int WidthRows = 3;          // rows either side the front sprite's width is taken over (FrontWidths)
         private const float FaceSpan = 3f;        // the face texture's width and height, in head heights (export_frames.py's FACE_SPAN)
         private const float FaceEyeV = 1f - 70.6f / 128f;   // the eye line's v in it (export_frames.py's EYE_V)
+        private const string NoEarsKey = "No_Human_Ears";   // the head's key that takes the ears off: what it moves is the ears (ClearEars)
+        private const float EarMove = 0.005f;   // cells: a vertex that key moves this far or more is on an ear
+        private const int EarClearGrow = 2;     // texels: a flat beard's ear mask grown this far, past the bilinear filter
 
         // The heads modded hair is drawn over, the first found used: their outlines are filled into the hair's, and their
         // place in the sprite sets where the chibi's head goes.
@@ -162,6 +165,7 @@ namespace M3AT
         private readonly Vector3[] body;
         private readonly int[] bodyTris;
         private readonly bool[] onHead;
+        private readonly bool[] onArm;    // vertices an arm bone moves most, left out of the body near the hair (null: none)
         private readonly Dictionary<string, Vector3[]> keys;
         private readonly bool reversed;   // the reader turns hair round (SkinnedFigure.turnRound), so it is written the other way
         private readonly string cache;
@@ -186,8 +190,9 @@ namespace M3AT
         private Thread worker;
 
         public HairBuilder(Vector3[] body, int[] bodyTris, bool[] onHead, Dictionary<string, Vector3[]> keys, bool reversed,
-            Vector3 headBone, string cache, bool beard = false, bool[] scalp = null)
+            Vector3 headBone, string cache, bool beard = false, bool[] scalp = null, bool[] onArm = null)
         {
+            this.onArm = onArm;
             this.body = body;
             this.bodyTris = bodyTris;
             this.onHead = onHead;
@@ -729,6 +734,7 @@ namespace M3AT
             float span = FaceSpan * (topAll - chinAll);
             float eyeY = chinAll + FaceEyes * (topAll - chinAll);
             Color32[] px = new Color32[texSize * texSize];
+            Color32[] south = Streaked(sp)[0];   // with the 3D beard's strand streaks
             for (int r = 0; r < texSize; r++)
             {
                 float y = eyeY + ((r + 0.5f) / texSize - FaceEyeV) * span;
@@ -741,10 +747,103 @@ namespace M3AT
                     float x = (0.5f - (i + 0.5f) / texSize) * span;
                     int col = Mathf.RoundToInt(midX + (cx - x) / sx);
                     bool inside = col >= 0 && col < Size && row >= 0 && row < Size;
-                    px[r * texSize + i] = inside ? sp.px[0][row * Size + col] : new Color32(0, 0, 0, 0);
+                    px[r * texSize + i] = inside ? south[row * Size + col] : new Color32(0, 0, 0, 0);
                 }
             }
+            ClearEars(px, texSize, span, eyeY);
             return px;
+        }
+
+        // The ears are part of the face patch, and stick out past the cheeks where the sprite's beard reaches on either side
+        // of the face, so a flat beard came out painted over them. Every texel where the front-most head triangle in the
+        // patch's front projection is an ear's is cleared, grown EarClearGrow texels for the bilinear filter. An ear is what
+        // the head's No_Human_Ears key moves (by EarMove or more, at two corners or more, so not the skull round its root);
+        // without that key nothing is cleared.
+        private void ClearEars(Color32[] px, int texSize, float span, float eyeY)
+        {
+            Vector3[] moves;
+            if (keys == null || !keys.TryGetValue(NoEarsKey, out moves) || moves == null || moves.Length != body.Length)
+            {
+                return;
+            }
+            float[] depth = new float[texSize * texSize];
+            bool[] ear = new bool[texSize * texSize];
+            for (int i = 0; i < depth.Length; i++)
+            {
+                depth[i] = float.MinValue;
+            }
+            for (int k = 0; k + 2 < bodyTris.Length; k += 3)
+            {
+                int a = bodyTris[k], b = bodyTris[k + 1], c = bodyTris[k + 2];
+                if (!onHead[a] || !onHead[b] || !onHead[c])
+                {
+                    continue;
+                }
+                int moved = (moves[a].sqrMagnitude >= EarMove * EarMove ? 1 : 0) + (moves[b].sqrMagnitude >= EarMove * EarMove ? 1 : 0)
+                    + (moves[c].sqrMagnitude >= EarMove * EarMove ? 1 : 0);
+                bool isEar = moved >= 2;
+                // Texel places (column i, row r), as FlatFace lays them out, and the depth toward the front (+z).
+                Vector3 pa = Texel(body[a], texSize, span, eyeY), pb = Texel(body[b], texSize, span, eyeY), pc = Texel(body[c], texSize, span, eyeY);
+                float area = (pb.x - pa.x) * (pc.y - pa.y) - (pc.x - pa.x) * (pb.y - pa.y);
+                if (Mathf.Abs(area) < 1e-6f)
+                {
+                    continue;
+                }
+                int i0 = Mathf.Max(0, Mathf.FloorToInt(Mathf.Min(pa.x, Mathf.Min(pb.x, pc.x))));
+                int i1 = Mathf.Min(texSize - 1, Mathf.CeilToInt(Mathf.Max(pa.x, Mathf.Max(pb.x, pc.x))));
+                int r0 = Mathf.Max(0, Mathf.FloorToInt(Mathf.Min(pa.y, Mathf.Min(pb.y, pc.y))));
+                int r1 = Mathf.Min(texSize - 1, Mathf.CeilToInt(Mathf.Max(pa.y, Mathf.Max(pb.y, pc.y))));
+                for (int r = r0; r <= r1; r++)
+                {
+                    for (int i = i0; i <= i1; i++)
+                    {
+                        float x = i + 0.5f, y = r + 0.5f;
+                        float wa = ((pb.x - x) * (pc.y - y) - (pc.x - x) * (pb.y - y)) / area;
+                        float wb = ((pc.x - x) * (pa.y - y) - (pa.x - x) * (pc.y - y)) / area;
+                        float wc = 1f - wa - wb;
+                        if (wa < 0f || wb < 0f || wc < 0f)
+                        {
+                            continue;
+                        }
+                        float z = wa * pa.z + wb * pb.z + wc * pc.z;
+                        int at = r * texSize + i;
+                        if (z > depth[at])
+                        {
+                            depth[at] = z;
+                            ear[at] = isEar;
+                        }
+                    }
+                }
+            }
+            Color32 clear = new Color32(0, 0, 0, 0);
+            for (int r = 0; r < texSize; r++)
+            {
+                for (int i = 0; i < texSize; i++)
+                {
+                    if (!ear[r * texSize + i])
+                    {
+                        continue;
+                    }
+                    for (int dr = -EarClearGrow; dr <= EarClearGrow; dr++)
+                    {
+                        for (int di = -EarClearGrow; di <= EarClearGrow; di++)
+                        {
+                            int rr = r + dr, ii = i + di;
+                            if (rr >= 0 && rr < texSize && ii >= 0 && ii < texSize)
+                            {
+                                px[rr * texSize + ii] = clear;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // A head vertex's place on the flat beard's texture (FlatFace's layout inverted): x the column, y the row (bottom
+        // first), z its depth toward the front.
+        private static Vector3 Texel(Vector3 p, int texSize, float span, float eyeY)
+        {
+            return new Vector3((0.5f - p.x / span) * texSize, ((p.y - eyeY) / span + FaceEyeV) * texSize, p.z);
         }
 
         // Builds a style (any thread, once UseHead has been given the head).
@@ -779,7 +878,9 @@ namespace M3AT
                 {
                     headTris.Add(k / 3);
                 }
-                if (Inside(body[a], lo, hi) || Inside(body[b], lo, hi) || Inside(body[c], lo, hi))
+                // Not the arms (OnArm): the hair rides the head, and they are held out from the sides only at rest.
+                bool arm = onArm != null && onArm[a] && onArm[b] && onArm[c];
+                if (!arm && (Inside(body[a], lo, hi) || Inside(body[b], lo, hi) || Inside(body[c], lo, hi)))
                 {
                     near.Add(k / 3);
                     if (beard && !onHead[a] && !onHead[b] && !onHead[c] && body[a].y < chin && body[b].y < chin && body[c].y < chin)
@@ -2085,7 +2186,7 @@ namespace M3AT
         }
 
         // -1 to 1 from a hash of the three numbers (murmur3's finalizer).
-        private static float Noise(int seed, int x, int y)
+        internal static float Noise(int seed, int x, int y)
         {
             uint h = (uint)(x * 73856093) ^ (uint)(y * 19349663) ^ (uint)(seed * 83492791);
             h ^= h >> 16;
@@ -2683,6 +2784,17 @@ namespace M3AT
             if (hairFaces < faces.Count)
             {
                 sb.Append("walls ").Append(hairFaces / 3).Append('\n');
+            }
+            if (!beard && edgeColour.Count > 0)
+            {
+                // One place for every wall the game hangs from the hairline (SkinnedFigure.HairlineWalled): of the
+                // solid pixels just inside the open edges, WallShade up from the darkest, as each loop's walls here.
+                // Each wall taking the hair's place where it met it, its texture slid across the atlas between
+                // neighbouring walls, through the gaps between the sprites' art, and was cut out in stripes.
+                List<Vector2> all = new List<Vector2>(edgeColour);
+                all.Sort((x, y) => Grey(sp, x).CompareTo(Grey(sp, y)));
+                Vector2 w = all[(int)(all.Count * WallShade)];
+                sb.Append("wall_uv ").Append(Num(w.x)).Append(' ').Append(Num(w.y)).Append('\n');
             }
             Keys(sb, place.ToArray(), head);
             return sb.ToString();

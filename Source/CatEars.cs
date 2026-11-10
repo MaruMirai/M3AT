@@ -216,6 +216,23 @@ namespace M3AT
                 }
             }
             e.baseShape = plain;
+            // The hair's strand grain (StrandGrain.cs): each ear's places along its own chain, the right shifted off the left's.
+            // Not on a pig's, which are bare skin.
+            List<int>[] sideVerts = { new List<int>(), new List<int>() };
+            for (int v = 0; v < n; v++)
+            {
+                sideVerts[e.weightBone[e.firstWeight[v]] < EarMostBones ? 0 : 1].Add(v);
+            }
+            Vector2[] uvs = new Vector2[n];
+            for (int side = 0; side < 2; side++)
+            {
+                StrandUvsSheet(e.piece.rest, e.joints[side], sideVerts[side], uvs, side * 0.5f);
+            }
+            e.piece.uvs = uvs;
+            if (Path.GetFileName(path) != PigEarFile)
+            {
+                Grain(e.piece);
+            }
             Shape b = BaseShape();
             MeasureHead(b);
             e.anchor = new Vector3(0f, b.headHigh.y, (b.headLow.z + b.headHigh.z) / 2f);
@@ -412,8 +429,7 @@ namespace M3AT
                 return;
             }
             Piece piece = e.piece;
-            Material solid = SolidMaterial();
-            if (solid == null)
+            if (SolidMaterial() == null)
             {
                 return;
             }
@@ -423,6 +439,7 @@ namespace M3AT
                 p.ears = NewPieceMeshes(piece);
                 p.earsMadeOf = file;
             }
+            Material solid = GrainedMaterial(piece, p.ears);
             PoseEars(p, e, s, goneL, goneR);
             // The lining goes in the scalp's place: DrawMeshes shades that ScalpShade, which is taken back out here.
             Color inner = Color.Lerp(skin, EarLining, EarPink) / ScalpShade;

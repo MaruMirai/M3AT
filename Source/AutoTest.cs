@@ -11,6 +11,7 @@ using RimWorld;
 using UnityEngine;
 using Verse;
 using Verse.AI;
+using Verse.AI.Group;
 
 namespace M3AT
 {
@@ -46,6 +47,8 @@ namespace M3AT
         private static IDisposable pose;
         private static Vector3 lookAt;
         private static float lookYaw;
+        private static float lookPitch = LookPitch;   // degrees down (a scenario may look down more steeply, and puts it back)
+        private static float lookDistance = LookDistance, lookHeight = LookHeight;   // (a scenario may come closer, and puts them back)
         private static bool imageDone;
         private static StreamWriter probe;
         private static readonly StringBuilder report = new StringBuilder();
@@ -204,11 +207,333 @@ namespace M3AT
                 case "visit": return VisitTest();
                 case "music": return MusicTest();
                 case "teach": return TeachTest();
+                case "romance": return RomanceTest(null);
+                case "sharedbed": return SharedBedTest();
+                case "lovin": return LovinTest();
+                case "kidbed": return KidBedTest();
+            }
+            if (name.StartsWith("romance_"))
+            {
+                return RomanceTest(name.Substring("romance_".Length).Split('+'));
             }
             return null;
         }
 
         // ---- the scenarios ----
+
+        // Asleep under IsoRim's blanket (the bedBlankets option, turned on for the test): two in a double bed, each in its
+        // own half (its own lump, IsoRim's width kept to that half), and one alone in a single bed beside it to compare.
+        // Each sleeper's figure tucked in (only the head drawn, BedTuck.cs) and IsoRim drawing its blanket (DrawTuckedIn).
+        private static IEnumerator SharedBedTest()
+        {
+            bool was = SettingsMod.Settings.bedBlankets;
+            SettingsMod.Settings.bedBlankets = true;
+            try
+            {
+                Building_Bed MakeBed(string def, IntVec3 at)
+                {
+                    Thing made = ThingMaker.MakeThing(ThingDef.Named(def), ThingDefOf.WoodLog);
+                    made.SetFaction(Faction.OfPlayer);
+                    return (Building_Bed)Spawn(made, at, Rot4.North);
+                }
+                Building_Bed shared = MakeBed("DoubleBed", middle);
+                Building_Bed single = MakeBed("Bed", middle + new IntVec3(3, 0, 0));
+                Pawn a = NewPawn(middle + new IntVec3(-2, 0, -2), null);
+                Pawn b = NewPawn(middle + new IntVec3(-1, 0, -2), null);
+                Pawn c = NewPawn(middle + new IntVec3(4, 0, -2), null);
+                // Three builds, so each lump's size can be seen to follow its sleeper's body (WalkFigures.BlanketScaleOf).
+                BodyTypeDef[] builds = { BodyTypeDefOf.Hulk, BodyTypeDefOf.Thin, BodyTypeDefOf.Fat };
+                Pawn[] built = { a, b, c };
+                for (int k = 0; k < 3; k++)
+                {
+                    if (built[k].story != null && built[k].DevelopmentalStage.Adult())
+                    {
+                        built[k].story.bodyType = builds[k];
+                        built[k].Drawer.renderer.SetAllGraphicsDirty();
+                    }
+                }
+                a.relations.AddDirectRelation(PawnRelationDefOf.Spouse, b);   // (else the game won't have them share it, by their ideo)
+                CompAssignableToPawn assign = shared.TryGetComp<CompAssignableToPawn>();
+                assign.TryAssignPawn(a);
+                assign.TryAssignPawn(b);
+                single.TryGetComp<CompAssignableToPawn>().TryAssignPawn(c);
+                Pawn[] sleepers = { a, b, c };
+                Building_Bed[] beds = { shared, shared, single };
+                void Tuck()
+                {
+                    for (int k = 0; k < sleepers.Length; k++)
+                    {
+                        Pawn p = sleepers[k];
+                        if (p.needs.rest != null)
+                        {
+                            p.needs.rest.CurLevel = 0.05f;   // (tired, so it sleeps and stays)
+                        }
+                        if (!p.InBed() || p.CurrentBed() != beds[k])
+                        {
+                            p.jobs.Notify_TuckedIntoBed(beds[k]);
+                        }
+                    }
+                }
+                Tuck();
+                lookAt = shared.TrueCenter() + new Vector3(1.5f, 0f, 0f);
+                lookYaw = 0f;
+                yield return WaitReal(3f);
+                int[] tuckedFrames = new int[3];
+                int[] blanketFrames = new int[3];
+                float[] starts = { float.NaN, float.NaN, float.NaN };
+                for (int i = 0; i < 24; i++)
+                {
+                    Tuck();
+                    yield return Ticks(10, "sharedbed", a);
+                    lookAt = shared.TrueCenter() + new Vector3(1.5f, 0f, 0f);
+                    for (int k = 0; k < 3; k++)
+                    {
+                        if (Field<int>(sleepers[k], "blanketFrame") >= Time.frameCount - 2)
+                        {
+                            blanketFrames[k]++;
+                        }
+                        starts[k] = Field<float>(sleepers[k], "blanketAlong");
+                    }
+                    if (i % 8 == 7)
+                    {
+                        yield return Shot("beds_t" + (i + 1) * 10);
+                    }
+                }
+                string[] names = { "shared left", "shared right", "single" };
+                for (int k = 0; k < 3; k++)
+                {
+                    Pawn p = sleepers[k];
+                    Check(names[k] + ": in its bed, asleep", p.InBed() && p.CurrentBed() == beds[k] && !p.Awake(),
+                        "at " + p.Position + ", bed " + (p.CurrentBed() != null ? p.CurrentBed().def.defName : "none") + ", awake " + p.Awake()
+                        + ", posture " + p.GetPosture() + ", job " + (p.CurJobDef != null ? p.CurJobDef.defName : "none"));
+                    Check(names[k] + ": blanket drawn", blanketFrames[k] >= 20, blanketFrames[k] + " of 24 looks, start " + starts[k].ToString("F2") + " cells from the head");
+                }
+                for (int k = 0; k < 3; k++)
+                {
+                    Pawn p = sleepers[k];
+                    float scale = Field<float>(p, "blanketScale");
+                    Check(names[k] + " (" + (p.story != null && p.story.bodyType != null ? p.story.bodyType.defName : "?") + "): blanket sized to the body",
+                        !float.IsNaN(scale) && scale > 0f,
+                        "scale " + scale.ToString("F2") + ", body " + Field<float>(p, "blanketDepth").ToString("F3") + " deep, "
+                        + Field<float>(p, "blanketWidth").ToString("F3") + " half wide (model units)");
+                }
+                Check("shared: each in its own half", a.Position != b.Position, "slots " + a.Position + " and " + b.Position);
+                Check("shared: both lumps start alike", !float.IsNaN(starts[0]) && !float.IsNaN(starts[1]) && Mathf.Abs(starts[0] - starts[1]) < 0.06f,
+                    "starts " + starts[0].ToString("F2") + " and " + starts[1].ToString("F2") + " cells from the head");
+                // A closer picture of the double bed from straight above its foot.
+                lookAt = shared.TrueCenter();
+                lookYaw = 0f;
+                yield return Shot("double_close");
+                lookYaw = 180f;
+                yield return Shot("double_head");
+                // From the side and higher, where the lumps' height and width over the beds show (the second picture from the foot).
+                lookAt = shared.TrueCenter() + new Vector3(1.5f, 0f, 0f);
+                lookYaw = 90f;
+                lookPitch = 45f;
+                yield return Shot("side_high");
+                // Close on the single bed's sleeper's head and neck, from its side and then from over the bed's head end, where
+                // the blanket's edge meets the drawn neck (SkinnedFigure.TuckFrom, WalkFigures.BlanketNeck).
+                lookAt = c.DrawPos;
+                lookYaw = 90f;
+                lookPitch = 12f;
+                lookDistance = 1.4f;
+                lookHeight = 0.35f;
+                yield return Shot("neck_close");
+                lookDistance = LookDistance;
+                lookHeight = LookHeight;
+                lookPitch = LookPitch;
+                Note("Look: two sleepers in the double bed, each head on its own pillow, each body under its own lump of blanket kept to its half (no lump across the middle, none overlapping the other, no body or arms poking through); the single bed's sleeper the same.");
+            }
+            finally
+            {
+                lookPitch = LookPitch;
+                lookDistance = LookDistance;
+                lookHeight = LookHeight;
+                SettingsMod.Settings.bedBlankets = was;
+            }
+        }
+
+        // Lovin under IsoRim's blanket (the bedBlankets option, on for the test): two spouses in a double bed, each head and
+        // lump drawn across toward the other and the heads turned to face each other (WalkFigures.LovinOf).
+        private static IEnumerator LovinTest()
+        {
+            bool was = SettingsMod.Settings.bedBlankets;
+            SettingsMod.Settings.bedBlankets = true;
+            try
+            {
+                Thing made = ThingMaker.MakeThing(ThingDef.Named("DoubleBed"), ThingDefOf.WoodLog);
+                made.SetFaction(Faction.OfPlayer);
+                Building_Bed bed = (Building_Bed)Spawn(made, middle, Rot4.North);
+                Pawn a = NewPawn(middle + new IntVec3(-2, 0, -2), null);
+                Pawn b = NewPawn(middle + new IntVec3(-1, 0, -2), null);
+                a.relations.AddDirectRelation(PawnRelationDefOf.Spouse, b);
+                CompAssignableToPawn assign = bed.TryGetComp<CompAssignableToPawn>();
+                assign.TryAssignPawn(a);
+                assign.TryAssignPawn(b);
+                Pawn[] two = { a, b };
+                void Start()
+                {
+                    for (int k = 0; k < 2; k++)
+                    {
+                        Pawn p = two[k], other = two[1 - k];
+                        if (p.needs.rest != null)
+                        {
+                            p.needs.rest.CurLevel = 1f;   // (awake throughout)
+                        }
+                        if (p.CurJobDef != JobDefOf.Lovin)
+                        {
+                            p.jobs.StartJob(JobMaker.MakeJob(JobDefOf.Lovin, other, bed), JobCondition.InterruptForced);
+                        }
+                    }
+                }
+                Start();
+                lookAt = bed.TrueCenter();
+                lookYaw = 0f;
+                float[] shifts = new float[2], looks = new float[2];
+                for (int i = 0; i < 40; i++)
+                {
+                    Start();
+                    yield return Ticks(10, "lovin", a);
+                    lookAt = bed.TrueCenter();
+                    for (int k = 0; k < 2; k++)
+                    {
+                        shifts[k] = Field<float>(two[k], "lovinShift");
+                        looks[k] = Field<float>(two[k], "look");
+                    }
+                    if (i % 10 == 9)
+                    {
+                        yield return Shot("lovin_t" + (i + 1) * 10);
+                    }
+                }
+                for (int k = 0; k < 2; k++)
+                {
+                    Pawn p = two[k];
+                    Check("lover " + k + ": in the bed at lovin", p.InBed() && p.CurrentBed() == bed && p.CurJobDef == JobDefOf.Lovin,
+                        "at " + p.Position + ", job " + (p.CurJobDef != null ? p.CurJobDef.defName : "none") + ", posture " + p.GetPosture());
+                    Check("lover " + k + ": drawn toward the other", shifts[k] > 0.1f, "shift " + shifts[k].ToString("F2") + " cells");
+                    Check("lover " + k + ": head turned", Mathf.Abs(looks[k]) > 40f, "look " + looks[k].ToString("F0") + " degrees");
+                }
+                Check("lovers: heads turned opposite ways", looks[0] * looks[1] < 0f, looks[0].ToString("F0") + " and " + looks[1].ToString("F0"));
+                lookYaw = 180f;
+                yield return Shot("lovin_head");
+                lookAt = bed.TrueCenter() + new Vector3(0f, 0f, 0.5f);
+                lookYaw = 0f;
+                lookPitch = 30f;
+                lookDistance = 1.8f;
+                lookHeight = 0.4f;
+                yield return Shot("lovin_close");
+                Note("Look: the two heads close together on the pillows, turned to face each other, each lump of blanket moved with its head, no body poking through.");
+            }
+            finally
+            {
+                lookPitch = LookPitch;
+                lookDistance = LookDistance;
+                lookHeight = LookHeight;
+                SettingsMod.Settings.bedBlankets = was;
+            }
+        }
+
+        // Children and a baby asleep under IsoRim's blanket (the bedBlankets option, on for the test), each alone in a single
+        // bed, beside a grown sleeper to compare: the lump's size (BlanketScaleOf, measured from the body in its shape) and where it starts
+        // (the neck, BlanketNeck), and where the head lies against the pillow.
+        private static IEnumerator KidBedTest()
+        {
+            bool was = SettingsMod.Settings.bedBlankets;
+            SettingsMod.Settings.bedBlankets = true;
+            try
+            {
+                float[] ages = { 25f, 13f, 8f, 4f, 1f };
+                string[] names = { "grown 25", "teen 13", "child 8", "child 4", "baby 1" };
+                int n = ages.Length;
+                Pawn[] sleepers = new Pawn[n];
+                Building_Bed[] beds = new Building_Bed[n];
+                for (int k = 0; k < n; k++)
+                {
+                    Thing made = ThingMaker.MakeThing(ThingDef.Named("Bed"), ThingDefOf.WoodLog);
+                    made.SetFaction(Faction.OfPlayer);
+                    beds[k] = (Building_Bed)Spawn(made, middle + new IntVec3(2 * k - 4, 0, 0), Rot4.North);
+                    DevelopmentalStage stage = ages[k] < 3f ? DevelopmentalStage.Baby : ages[k] < 13f ? DevelopmentalStage.Child : DevelopmentalStage.Adult;
+                    PawnGenerationRequest request = new PawnGenerationRequest(PawnKindDefOf.Colonist, Faction.OfPlayer,
+                        fixedBiologicalAge: ages[k], fixedChronologicalAge: ages[k], developmentalStages: stage);
+                    Pawn pawn = PawnGenerator.GeneratePawn(request);
+                    pawn.equipment.DestroyAllEquipment();
+                    Spawn(pawn, middle + new IntVec3(2 * k - 4, 0, -3));
+                    beds[k].TryGetComp<CompAssignableToPawn>().TryAssignPawn(pawn);
+                    sleepers[k] = pawn;
+                }
+                void Tuck()
+                {
+                    for (int k = 0; k < n; k++)
+                    {
+                        Pawn p = sleepers[k];
+                        if (p.needs.rest != null)
+                        {
+                            p.needs.rest.CurLevel = 0.05f;
+                        }
+                        if (!p.InBed() || p.CurrentBed() != beds[k])
+                        {
+                            p.jobs.Notify_TuckedIntoBed(beds[k]);
+                        }
+                    }
+                }
+                Tuck();
+                lookAt = middle.ToVector3Shifted();
+                lookYaw = 0f;
+                yield return WaitReal(3f);
+                int[] blanketFrames = new int[n];
+                for (int i = 0; i < 16; i++)
+                {
+                    Tuck();
+                    yield return Ticks(10, "kidbed", sleepers[2]);
+                    lookAt = middle.ToVector3Shifted();
+                    for (int k = 0; k < n; k++)
+                    {
+                        if (Field<int>(sleepers[k], "blanketFrame") >= Time.frameCount - 2)
+                        {
+                            blanketFrames[k]++;
+                        }
+                    }
+                }
+                yield return Shot("row_foot");
+                lookYaw = 180f;
+                yield return Shot("row_head");
+                for (int k = 0; k < n; k++)
+                {
+                    Pawn p = sleepers[k];
+                    Building_Bed bed = beds[k];
+                    IntVec3 slot = BedUtility.GetSleepingSlotPos(0, bed.Position, bed.Rotation, bed.def.size);
+                    Vector3 toFeet = -Field<Vector3>(p, "lyingAlong");   // (from the head toward the hips, as drawn)
+                    Vector3 headEdge = bed.TrueCenter() - toFeet * (bed.def.size.z * 0.5f);
+                    Vector3[] joints = Field<Vector3[]>(p, "lyingJoints");
+                    float size = Field<float>(p, "lyingSize");
+                    float start = Field<float>(p, "blanketAlong");
+                    string head = "none";
+                    if (joints != null && joints.Length > 3)
+                    {
+                        Vector3 h = joints[3];   // spine.006, the head bone's joint (LyingBones)
+                        Vector3 hips = joints[0];
+                        head = "head joint " + Vector3.Dot(h - headEdge, toFeet).ToString("F2") + " cells from the bed's head end, "
+                            + (h.x - slot.ToVector3Shifted().x).ToString("F2") + " across, hips " + Vector3.Dot(hips - headEdge, toFeet).ToString("F2")
+                            + ", height " + h.y.ToString("F2");
+                    }
+                    Check(names[k] + ": in its bed, asleep", p.InBed() && p.CurrentBed() == bed && !p.Awake(),
+                        "posture " + p.GetPosture() + ", job " + (p.CurJobDef != null ? p.CurJobDef.defName : "none") + ", awake " + p.Awake());
+                    Check(names[k] + ": blanket drawn", blanketFrames[k] >= 12,
+                        blanketFrames[k] + " of 16 looks; size " + size.ToString("F3") + ", blanket scale " + Field<float>(p, "blanketScale").ToString("F2") + ", neck " + Field<float>(p, "tuckNeck").ToString("F2") + " cells down the bed, moved " + Field<float>(p, "tuckShift").ToString("F2") + ", lump start " + start.ToString("F2")
+                        + " cells from the head's middle; " + head);
+                    lookAt = bed.TrueCenter();
+                    lookYaw = 90f;
+                    yield return Shot("side_" + k);
+                    lookYaw = 0f;
+                    yield return Shot("foot_" + k);
+                }
+                Note("Look: each sleeper's head on its pillow (not floating over it, sunk into it or down the bed), the lump starting at its neck with no gap and no body poking through, the lump's size in step with the sleeper (a baby's small, not a grown body's), and the bed's foot flat past the feet.");
+            }
+            finally
+            {
+                SettingsMod.Settings.bedBlankets = was;
+            }
+        }
 
         // A lesson at a school desk (Biotech's Lessongiving and Lessontaking), the teacher and a child pupil side by side
         // at its two spots, standing and then each on a dining chair: the teacher gesturing (teach, through the eating
@@ -782,6 +1107,225 @@ namespace M3AT
             Note("Look: hunkered flat on the front, face down, facing the suppressing fire (north); the roll over each side.");
         }
 
+        // Romance on the Rim's dates (Workshop 2654432921, telardo.RomanceOnTheRim), each started through its own lord
+        // job by reflection, so the mod is not referenced, and with none of the conditions its workers wait for (the
+        // weather, the romance need, idle partners): a kiss, skygazing, a musical performance, pillow talk, a snowball
+        // fight and shared reading. A survey of how each is drawn now; it checks only that the date got going.
+        private static IEnumerator RomanceTest(string[] only)
+        {
+            if (GenTypes.GetTypeInAnyAssembly("RomanceOnTheRim.LordJob_Kiss") == null)
+            {
+                Check("romance: the mod loaded", false, "no RomanceOnTheRim.LordJob_Kiss");
+                yield break;
+            }
+            foreach (string date in only ?? new[] { "kiss", "skygaze", "music", "pillow", "snowball", "shareread" })
+            {
+                ClearPatch();
+                IEnumerator run = RomanceDate(date);
+                while (true)
+                {
+                    bool more;
+                    try
+                    {
+                        more = run.MoveNext();
+                    }
+                    catch (Exception e)
+                    {
+                        Log.Error(Tag + "romance " + date + " failed: " + e);
+                        Check(date + ": ran", false, e.GetType().Name + ": " + e.Message);
+                        break;
+                    }
+                    if (!more)
+                    {
+                        break;
+                    }
+                    yield return run.Current;
+                }
+                foreach (Lord lord in new List<Lord>(map.lordManager.lords))
+                {
+                    if (lord.LordJob != null && lord.LordJob.GetType().Namespace == "RomanceOnTheRim")
+                    {
+                        map.lordManager.RemoveLord(lord);
+                    }
+                }
+                CleanUp();
+            }
+            Note("Look: what each figure does in each date; the romance mod moves only the sprite's head and body (AnimationDefs), which the chibi doesn't take.");
+        }
+
+        private static IEnumerator RomanceDate(string date)
+        {
+            Pawn a = NewPawn(middle + new IntVec3(-1, 0, 0), null);
+            Pawn b = NewPawn(middle + new IntVec3(1, 0, 0), null);
+            foreach (Pawn p in new[] { a, b })
+            {
+                if (p.needs.joy != null)
+                {
+                    p.needs.joy.CurLevel = 0.2f;
+                }
+                if (p.needs.rest != null)
+                {
+                    p.needs.rest.CurLevel = 0.9f;
+                }
+            }
+            if (!a.relations.DirectRelationExists(PawnRelationDefOf.Lover, b))
+            {
+                a.relations.AddDirectRelation(PawnRelationDefOf.Lover, b);
+            }
+            Hold(a);
+            Hold(b);
+            object lordJob = null;
+            Pawn watch = a;
+            float yaw = 0f;
+            Thing book = null;
+            switch (date)
+            {
+                case "kiss":
+                    b.Position = middle + new IntVec3(2, 0, 0);
+                    b.Notify_Teleported();
+                    lordJob = MakeLordJob("LordJob_Kiss", a, b, Enum.ToObject(GenTypes.GetTypeInAnyAssembly("RomanceOnTheRim.KissUtility").GetNestedType("KissType"), 1), 3f);
+                    break;
+                case "skygaze":
+                    lordJob = MakeLordJob("LordJob_SkygazeTogether", a, b, middle, middle + new IntVec3(1, 0, 0));
+                    yaw = 330f;
+                    break;
+                case "music":
+                {
+                    Thing piano = ThingMaker.MakeThing(ThingDef.Named("Piano"), GenStuff.DefaultStuffFor(ThingDef.Named("Piano")));
+                    piano.SetFaction(Faction.OfPlayer);
+                    piano = Spawn(piano, middle + new IntVec3(0, 0, 2), Rot4.South);
+                    lordJob = MakeLordJob("LordJob_MusicalPerformance", a, b, piano);
+                    yaw = 150f;
+                    break;
+                }
+                case "pillow":
+                {
+                    ThingDef bedDef = ThingDef.Named("DoubleBed");
+                    Thing bed = ThingMaker.MakeThing(bedDef, ThingDefOf.WoodLog);
+                    bed.SetFaction(Faction.OfPlayer);
+                    bed = Spawn(bed, middle + new IntVec3(0, 0, 1), Rot4.South);
+                    CompAssignableToPawn assign = bed.TryGetComp<CompAssignableToPawn>();
+                    assign.TryAssignPawn(a);
+                    assign.TryAssignPawn(b);
+                    lordJob = MakeLordJob("LordJob_PillowTalk", a, b, bed);
+                    yaw = 330f;
+                    break;
+                }
+                case "snowball":
+                    a.Position = middle + new IntVec3(-2, 0, 0);
+                    a.Notify_Teleported();
+                    b.Position = middle + new IntVec3(2, 0, 0);
+                    b.Notify_Teleported();
+                    lordJob = MakeLordJob("LordJob_SnowballFight", a, b, middle + new IntVec3(-2, 0, 0), middle + new IntVec3(2, 0, 0));
+                    yaw = 0f;
+                    break;
+                case "shareread":
+                {
+                    // b reads seated at a table; a comes to stare at it, then sits on the chair beside it.
+                    ThingDef chairDef = ThingDef.Named("DiningChair");
+                    Thing table = ThingMaker.MakeThing(ThingDef.Named("Table2x2c"), ThingDefOf.WoodLog);
+                    table.SetFaction(Faction.OfPlayer);
+                    Spawn(table, middle + new IntVec3(0, 0, 1), Rot4.North);
+                    foreach (int x in new[] { 0, 1 })
+                    {
+                        Thing chair = ThingMaker.MakeThing(chairDef, ThingDefOf.WoodLog);
+                        chair.SetFaction(Faction.OfPlayer);
+                        Spawn(chair, middle + new IntVec3(x, 0, 0), Rot4.North);
+                    }
+                    b.Position = middle;
+                    b.Notify_Teleported();
+                    a.Position = middle + new IntVec3(-3, 0, -1);
+                    a.Notify_Teleported();
+                    book = Spawn(BookUtility.MakeBook(ThingDefOf.Novel, ArtGenerationContext.Colony), middle + new IntVec3(-1, 0, -1));
+                    Job read = JobMaker.MakeJob(JobDefOf.Reading, book, middle);
+                    read.playerForced = true;
+                    b.jobs.StartJob(read, JobCondition.InterruptForced);
+                    for (int i = 0; i < 40 && !(b.jobs.curDriver is JobDriver_Reading r && r.IsReading); i++)
+                    {
+                        yield return Ticks(10, "romance_shareread_setup", b);
+                    }
+                    read.playerForced = false;   // (the romance mod calls off a date with a pawn on a forced job)
+                    lordJob = MakeLordJob("LordJob_SharedReading", a, b, middle + new IntVec3(1, 0, 0), middle);
+                    if (lordJob == null)
+                    {
+                        Note("shareread: no LordJob_SharedReading(initiator, recipient, cell, cell); tried the worker");
+                    }
+                    yaw = 330f;
+                    break;
+                }
+            }
+            if (lordJob == null)
+            {
+                Check(date + ": lord job made", false, "constructor not found");
+                yield break;
+            }
+            LordMaker.MakeNewLord(Faction.OfPlayer, (LordJob)lordJob, map, new[] { a, b });
+            Note(date + ": outdoors " + map.mapTemperature.OutdoorTemp.ToString("F0") + " C, enjoyable outside " + JoyUtility.EnjoyableOutsideNow(map)
+                + ", comfortable " + GenTemperature.ComfortableTemperatureRange(a) + " / " + GenTemperature.ComfortableTemperatureRange(b)
+                + ", weather " + map.weatherManager.curWeather.defName);
+            foreach (Pawn p in date == "kiss" ? new[] { a } : new[] { a, b })
+            {
+                if (p.CurJobDef == JobDefOf.Wait)
+                {
+                    p.jobs.EndCurrentJob(JobCondition.InterruptForced);
+                }
+            }
+            Look(watch, yaw);
+            yield return WaitReal(2f);
+            var seenA = new HashSet<string>();
+            var seenB = new HashSet<string>();
+            bool interacted = false;
+            int steps = date == "kiss" ? 40 : 60;
+            for (int i = 0; i < steps; i++)
+            {
+                yield return Ticks(15, "romance_" + date, a);
+                Probe("romance_" + date, b);
+                seenA.Add((a.CurJobDef != null ? a.CurJobDef.defName : "none") + "/" + a.GetPosture());
+                seenB.Add((b.CurJobDef != null ? b.CurJobDef.defName : "none") + "/" + b.GetPosture());
+                interacted |= Traverse.Create(lordJob).Field("Interacted").GetValue<bool>();
+                lookAt = Vector3.Lerp(a.DrawPos, b.DrawPos, 0.5f);
+                if (i % 10 == 9)
+                {
+                    yield return Shot(date + "_t" + (i + 1) * 15);
+                }
+            }
+            Check(date + ": the date got going", interacted, "A " + string.Join(", ", seenA) + "; B " + string.Join(", ", seenB));
+            foreach (Pawn p in new[] { a, b })
+            {
+                if (p.jobs != null && p.Spawned)
+                {
+                    p.jobs.EndCurrentJob(JobCondition.InterruptForced);
+                }
+            }
+        }
+
+        private static object MakeLordJob(string name, params object[] args)
+        {
+            Type type = GenTypes.GetTypeInAnyAssembly("RomanceOnTheRim." + name);
+            if (type == null)
+            {
+                return null;
+            }
+            foreach (ConstructorInfo ctor in type.GetConstructors())
+            {
+                ParameterInfo[] ps = ctor.GetParameters();
+                if (ps.Length != args.Length)
+                {
+                    continue;
+                }
+                bool fits = true;
+                for (int i = 0; i < ps.Length && fits; i++)
+                {
+                    fits = args[i] == null || ps[i].ParameterType.IsInstanceOfType(args[i]);
+                }
+                if (fits)
+                {
+                    return ctor.Invoke(args);
+                }
+            }
+            return null;
+        }
+
         // Cuddling a pet ([DG]Lovly Animal Cuddling's AC_CuddleAnimal): picked up into carry_cuddle, the pet on the left
         // forearm, and stroked (carry_cuddle_stroke, Ease.play) while still, standing (the job ambles about with it between
         // strokes) and sat on a chair.
@@ -1005,12 +1549,12 @@ namespace M3AT
 
         private static IsoRim.ViewPose? Pose()
         {
-            float pitch = LookPitch * Mathf.Deg2Rad;
+            float pitch = lookPitch * Mathf.Deg2Rad;
             float yaw = lookYaw * Mathf.Deg2Rad;
             Vector3 forward = new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw));
-            Vector3 target = new Vector3(lookAt.x, LookHeight, lookAt.z);
-            Vector3 eye = target - forward * (LookDistance * Mathf.Cos(pitch)) + Vector3.up * (LookDistance * Mathf.Sin(pitch));
-            return IsoRim.ViewPose.FromEye(eye, lookYaw, LookPitch, LookFov);
+            Vector3 target = new Vector3(lookAt.x, lookHeight, lookAt.z);
+            Vector3 eye = target - forward * (lookDistance * Mathf.Cos(pitch)) + Vector3.up * (lookDistance * Mathf.Sin(pitch));
+            return IsoRim.ViewPose.FromEye(eye, lookYaw, lookPitch, LookFov);
         }
 
         // A picture from the scenario's side (its yaw) and one from 90 degrees round, so a move seen end-on in one shows in

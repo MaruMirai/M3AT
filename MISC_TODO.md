@@ -15,4 +15,4 @@ Ideas that don't fit the apparel, gene or animation lists. Add to it freely.
 ## Other mods
 - [ ] Romance on the Rim: animations for its dates, hangouts and other romance jobs. Find its `JobDef` names and fit them into the motion groups in [ANIMATION_TODO.md](ANIMATION_TODO.md) where they can share a motion.
 - [x] CE: Reloads, apparel
-animal cuddling
+- [x] animal cuddling

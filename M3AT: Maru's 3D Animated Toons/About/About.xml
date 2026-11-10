@@ -34,34 +34,21 @@
     <li>Nals.FacialAnimation</li>
     <li>Nals.FacialAnimationExperimentals</li>
   </loadAfter>
-  <description>Animated 3D pawns for IsoRim Waylith!
-Early WIP so expect some missing/jank/generic anims and other scuff, they'll be improved over time.
+  <description>
+Animated 3D pawns for IsoRim Waylith
 
-Some features:
-Basic anims for all the main stuff, movement, work, combat etc, more soon
-Wearable 3D apparel for everything in base game and all DLC + CE
-All hair mods supported via instant sprite-to-3d conversion + hair shows under hats
-Carrying/aiming/firing anims for all IsoRim's 3D weapons or sprite generated slab versions
-Visible holstered weapons, equipped or inventoried, with draw/holster anims
-Bodies for each of rimworld's body types, + gender differences + optional variation 
-Visible worn equipment packs using IsoRim's models
-New camera mode designed for play with the more detailed pawns
-Visible injuries, bandages, scars, and missing limbs, matching the type and location, and severity
-Modeled and animated gene parts
-Injury-reactive idle and movement animations
-Ragdolls with optional physics flinging
-Smooth baby-adult growth and pregnancy for biotech
-Various body settings sliders
-CE support - apparel models, reload and hunker anims, webbing layer over armor support
-Optimization - GPU skinning, low poly models
-(Obviously still fairly performance heavy for a mod, I'll keep working on improvements)
+WIP, current features include:
+Anims for most actions (some currenly basic)
+Wearable 3D apparel, Sprite-to-3D hairs
+Handling animations for IsoRim's weapons
+Visible holstered weapons and IsoRim equipment
+Body types, Gene parts, Biotech growth
+Visible injuries, Injury-reactive animations
+Ragdolls and flinging
+Freecam mode
+CE support
+Optimization where possible
 
 Chibi Base by monymensss @ sketchfab
-
-Serving suggestions:
-CE + IsoRimWaylith-CEPack
-Facial animation Retexture
-(Both used in screenshots)
-
-I'll be adding support for more mods after improving on vanilla anims so check back here for updates</description>
+</description>
 </ModMetaData>

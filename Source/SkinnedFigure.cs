@@ -115,6 +115,7 @@ namespace M3AT
             public Color? colour;       // a garment's own colour, in place of the apparel's (the shoes); null: the apparel's
             public int[] hides;       // a garment's: the body triangles (numbered as skin.txt's) under it, left out while it is worn
             public int wallsFrom = -1;   // built hair's: its first wall triangle (its walls line), which Decimated keeps whole
+            public Vector2? wallUv;      // built hair's: the texture place every hairline wall takes (its wall_uv line, HairlineWalled)
             public bool[] glass;      // a garment's: which of its triangles are glass (a helmet's visor), drawn see-through (DrawVisor); null: none
             public int[] shellTris;   // and its triangles that aren't glass, which its solid mesh draws
             public Piece visor;       // and the glass as a piece of its own (VisorOf), posed as the hair is
@@ -201,8 +202,10 @@ namespace M3AT
         private readonly Dictionary<string, Material> ridges = new Dictionary<string, Material>();   // by design: its material (RidgesMaterial)
         private readonly Dictionary<string, Material> flatBeards = new Dictionary<string, Material>();   // by beard style: its flat texture's material (FlatBeardOf)
         private bool[] onHead;   // the body's vertices the head bone moves most
+        private bool[] onArm;    // the body's vertices an arm bone below the shoulder moves most (OnArm)
         private bool[] scalp;   // the body's vertices above the hairline (Scalp)
-        private readonly List<int> scalpGiven = new List<int>();   // the body's scalp vertices from skin.txt's scalp line (the rig's Scalp group)
+        private readonly List<int> scalpGiven = new List<int>();
+        private readonly List<Vector3> hairlineGiven = new List<Vector3>();   // skin.txt's hairline line (the rig's Hairline curve), in order round it   // the body's scalp vertices from skin.txt's scalp line (the rig's Scalp group)
         private readonly Dictionary<bool[], int[]> faceTrisOff = new Dictionary<bool[], int[]>();   // by scalp (FaceTrisOff)
         private List<string> hairRoots;   // where finished hair files are looked for, in order (the cache not among them)
         private int finishedAt = -1;   // the frame the builder's finished styles were last taken in
@@ -751,6 +754,7 @@ namespace M3AT
                 }
                 s.FindHeadHiders();
                 s.ReadAnim(animPath);
+                s.GrainFur();
                 return body.rest.Length > 0 && s.clips.Count > 0 ? s : null;
             }
             catch (Exception e)
@@ -928,6 +932,9 @@ namespace M3AT
                     case "walls":
                         piece.wallsFrom = int.Parse(p[1]);
                         break;
+                    case "wall_uv":
+                        piece.wallUv = new Vector2(float.Parse(p[1], CultureInfo.InvariantCulture), float.Parse(p[2], CultureInfo.InvariantCulture));
+                        break;
                     case "hide":
                         for (int i = 1; i < p.Length; i++)
                         {
@@ -987,6 +994,12 @@ namespace M3AT
                         for (int k = 1; k < p.Length; k++)
                         {
                             scalpGiven.Add(int.Parse(p[k]));
+                        }
+                        break;
+                    case "hairline":
+                        for (int k = 1; k + 2 < p.Length; k += 3)
+                        {
+                            hairlineGiven.Add(Vec(p, k));
                         }
                         break;
                     case "garment":
@@ -2989,6 +3002,10 @@ namespace M3AT
         private const float GarmentInside = 0.04f;
         private const float GarmentLook = 0.2f;
         private const float GarmentSame = 0.001f;   // cells: a corner this near a vertex of the garment over it is on it
+        // The least share of a corner's weights on the bone a garment rides whole (a hat, a mask), or on the bones below it,
+        // for the corner to count as under that garment, or as over it. A mask over the face reaches down to the collar of
+        // a shirt, which moves with the neck and chest, not the head: hidden at rest, it opened as a hole when the head turned.
+        private const float RidesWith = 0.5f;
 
         // Leaves out of each worn garment in mask (bit g: garment g, worn as worn[g]) the triangles under the worn garments
         // that go over it (GoesOver), as HideUnder does for the body, so a shirt can't poke through a duster's back as the
@@ -3125,10 +3142,22 @@ namespace M3AT
                 way[island[i]] += normal[i];
                 corners[island[i]]++;
             }
+            // A tuft goes under a garment riding one bone whole (a hat, a mask) only if it moves with that bone (RidesWith):
+            // its root's weights, by its vertices' mean.
+            int outerBone = RiddenBone(outer);
+            float[] with = new float[island.Length];
+            if (outerBone >= 0)
+            {
+                for (int i = 0; i < island.Length; i++)
+                {
+                    with[island[i]] += WeightBelow(inner, i, outerBone);
+                }
+            }
             bool[] under = new bool[island.Length];
             for (int i = 0; i < island.Length; i++)
             {
-                under[i] = corners[i] > 0 && Meets(outer, low, high, middle[i] / corners[i], way[i].normalized);
+                under[i] = corners[i] > 0 && (outerBone < 0 || with[i] / corners[i] >= RidesWith)
+                    && Meets(outer, low, high, middle[i] / corners[i], way[i].normalized);
             }
             hide = new bool[inner.tris.Length / 3];
             for (int k = 0; k < hide.Length; k++)
@@ -3256,10 +3285,28 @@ namespace M3AT
                 low[k] = Vector3.Min(a, Vector3.Min(b, c));
                 high[k] = Vector3.Max(a, Vector3.Max(b, c));
             }
+            // A garment riding one bone whole moves apart from what moves with other bones, so only what moves with it can
+            // stay under it, or over it (RidesWith).
+            int outerBone = RiddenBone(pieces[h]), innerBone = RiddenBone(inner);
             bool[] covered = new bool[inner.rest.Length];
             for (int i = 0; i < covered.Length; i++)
             {
-                covered[i] = Meets(outerRest, outerTris, low, high, inner.rest[i], normal[i]) || OnVertex(outerRest, inner.rest[i]);
+                if (outerBone >= 0 && WeightBelow(inner, i, outerBone) < RidesWith)
+                {
+                    continue;
+                }
+                int hit = Hit(outerRest, outerTris, low, high, inner.rest[i], normal[i]);
+                if (hit >= 0 && innerBone >= 0 && outerBone < 0)
+                {
+                    Piece outer = pieces[h];
+                    float share = (WeightBelow(outer, outerTris[3 * hit], innerBone) + WeightBelow(outer, outerTris[3 * hit + 1], innerBone)
+                        + WeightBelow(outer, outerTris[3 * hit + 2], innerBone)) / 3f;
+                    covered[i] = share >= RidesWith;
+                }
+                else
+                {
+                    covered[i] = hit >= 0 || OnVertex(outerRest, inner.rest[i]);
+                }
             }
             hide = new bool[inner.tris.Length / 3];
             for (int k = 0; k < hide.Length; k++)
@@ -3273,6 +3320,42 @@ namespace M3AT
             }
             garmentUnder[key] = hide;
             return hide;
+        }
+
+        // The bone every vertex of the piece rides whole (a hat or a mask on the head bone), -1 if it isn't one piece on one bone.
+        private static int RiddenBone(Piece piece)
+        {
+            if (piece.firstWeight == null || piece.weightBone.Length == 0)
+            {
+                return -1;
+            }
+            int bone = piece.weightBone[0];
+            for (int k = 0; k < piece.weightBone.Length; k++)
+            {
+                if (piece.weightBone[k] != bone && piece.weight[k] > 1e-3f)
+                {
+                    return -1;
+                }
+            }
+            return bone;
+        }
+
+        // The share of vertex i's weights on bone or the bones below it.
+        private float WeightBelow(Piece piece, int i, int bone)
+        {
+            float share = 0f;
+            for (int k = piece.firstWeight[i]; k < piece.firstWeight[i + 1]; k++)
+            {
+                for (int b = piece.weightBone[k]; b >= 0; b = boneParent[b])
+                {
+                    if (b == bone)
+                    {
+                        share += piece.weight[k];
+                        break;
+                    }
+                }
+            }
+            return share;
         }
 
         // True if point is on one of the piece's vertices. A corner on a garment's open edge, as where trousers cut from the
@@ -3297,6 +3380,12 @@ namespace M3AT
         }
 
         private static bool Meets(Vector3[] rest, int[] tris, Vector3[] low, Vector3[] high, Vector3 point, Vector3 n)
+        {
+            return Hit(rest, tris, low, high, point, n) >= 0;
+        }
+
+        // The first of the piece's triangles the line Meets tests meets, -1 for none.
+        private static int Hit(Vector3[] rest, int[] tris, Vector3[] low, Vector3[] high, Vector3 point, Vector3 n)
         {
             Vector3 from = point - n * GarmentInside, to = point + n * GarmentLook;
             Vector3 lo = Vector3.Min(from, to), hi = Vector3.Max(from, to), d = to - from;
@@ -3331,10 +3420,10 @@ namespace M3AT
                 float t = Vector3.Dot(e2, r) * inv;
                 if (t >= 0f && t <= 1f)
                 {
-                    return true;
+                    return k;
                 }
             }
-            return false;
+            return -1;
         }
 
         // Draws one piece (0 the body, else a garment) posed as End left it, as Api.DrawModel would draw a model: position
@@ -4000,7 +4089,7 @@ namespace M3AT
                 kept = keptList.ToArray();
                 tris = all.ToArray();
             }
-            Piece p = new Piece { name = from.name, layer = from.layer, groups = from.groups, defs = from.defs, hides = from.hides };
+            Piece p = new Piece { name = from.name, layer = from.layer, groups = from.groups, defs = from.defs, hides = from.hides, wallUv = from.wallUv };
             p.tris = tris;
             if (hairCut >= 0 && hairCut * 3 < tris.Length)
             {
@@ -4367,6 +4456,41 @@ namespace M3AT
             return onHead;
         }
 
+        // The body's vertices moved most by an arm bone from the upper arm down. Hair rides the head bone, and the arms
+        // are never where they are at rest (held out from the sides), so the hair builder leaves them out of the body it
+        // keeps the hair off: a lock hanging over the rest pose's upper arm was pushed out through the arm onto its far
+        // side, its vertices all on the one corner (AFUf003's flared tuft), a spike standing out from the shoulder.
+        private bool[] OnArm()
+        {
+            if (onArm != null)
+            {
+                return onArm;
+            }
+            Piece body = pieces[0];
+            bool[] limb = new bool[boneHead.Length];
+            foreach (KeyValuePair<string, int> pair in boneIndex)
+            {
+                string name = pair.Key.Split('.')[0];
+                limb[pair.Value] = name == "upper_arm" || name == "forearm" || name == "hand" || name == "thumb";
+            }
+            onArm = new bool[body.rest.Length];
+            for (int i = 0; i < onArm.Length; i++)
+            {
+                int best = -1;
+                float most = 0f;
+                for (int k = body.firstWeight[i]; k < body.firstWeight[i + 1]; k++)
+                {
+                    if (body.weight[k] > most)
+                    {
+                        most = body.weight[k];
+                        best = body.weightBone[k];
+                    }
+                }
+                onArm[i] = best >= 0 && limb[best];
+            }
+            return onArm;
+        }
+
         private HairBuilder Builder(bool beard)
         {
             HairBuilder made = beard ? beardBuilder : builder;
@@ -4380,7 +4504,7 @@ namespace M3AT
                 Piece body = pieces[0];
                 string cache = Path.Combine(GenFilePaths.ConfigFolderPath, "M3AT", "hair", stamp);
                 PruneCaches(Path.GetDirectoryName(cache), stamp);
-                made = new HairBuilder(body.rest, body.tris, OnHead(), body.keys, turnRound, boneHead[headBone], cache, beard, Scalp());
+                made = new HairBuilder(body.rest, body.tris, OnHead(), body.keys, turnRound, boneHead[headBone], cache, beard, Scalp(), OnArm());
                 Log.Message(Tag + what + " without a file are built from their sprites into " + cache + ".");
             }
             catch (Exception e)
@@ -4514,10 +4638,10 @@ namespace M3AT
                 h = ReadMesh(mesh, false, null);
                 // A beard is small and its edge is most of it, so it keeps at least BeardTriangles.
                 float share = beard ? Mathf.Max(SettingsMod.HairDetail, (float)BeardTriangles / Mathf.Max(h.tris.Length / 3, 1)) : SettingsMod.HairDetail;
-                if (cut && share < 1f)
-                {
-                    h = Decimated(h, h.uvs, share);
-                }
+                // Cut down (a M3AThair style keeps all its triangles), with walls from the hairline up to the cut hair
+                // in place of those under its edges (HairlineWalls.cs).
+                float cover;
+                h = CutWithWalls(h, cut ? share : 1f, beard, out cover);
                 if (turnRound)
                 {
                     TurnRound(h.tris);

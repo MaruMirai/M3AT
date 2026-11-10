@@ -1942,21 +1942,27 @@ PAT_ELBOW = (0.7, 0.4, -0.6)   # the elbows out and down (chest's frame, x out)
 #     cell's middle; 'play' where the hands play, cells for a grown pawn (GAME_SCALE) from the middle of the pawn's cell
 #     on the floor (x out to the left, y forward, z up, as IsoRim draws the instrument's model: the keys' tops, the
 #     strings, the drum's head; music_play takes the closer and, seated, MUSIC_SEAT off it); 'lean' (standing, seated)
-#     the trunk leant toward it (degrees); 'look' the head bowed further, to watch the hands (degrees).
+#     the trunk leant toward it (degrees); 'look' (standing, seated) how far the head is bowed from upright to watch
+#     the hands (degrees): the neck turned back against the trunk's lean by as much as that is more, so the chibi's big
+#     head stays over its shoulders rather than going forward with the lean into the instrument.
 # Seated, the figure is the sit's (sit_at), which IsoRim sets on a chair's seat (0.44 cells) MUSIC_SEAT higher than the
 # sit has its own floor; the game lays it over the sit from the waist up (EAT_UPPER). A chair is drawn in the middle of
 # the cell, so a seated figure can be drawn only a little toward the instrument, and leans further.
+# The lean, look and closer are set so the head (and its hair, which stands about 0.05 cells off it) keeps 0.07 cells or
+# more off the instrument, the hands falling a little short of it where both can't be had (seated, and at the harp).
+# Seated, the figure is perched on the chair's front edge (0.33 cells on), which at the harp is well short of the
+# strings (HARP_SIT_REACH).
 MUSIC_SEAT = 0.12
 MUSIC = {
     # The keys' tops 0.83 cells up and 0.66 .. 0.93 ahead of the pawn's cell's middle (IsoRim's piano.obj and
     # harpsichord.obj, the keyboard toward the interaction cell, two cells from the middle); the case 0.6 ahead.
-    'piano': dict(seconds=4.0, closer=(0.4, 0.28), play=(0.0, 0.71, 0.86), lean=(14.0, 28.0), look=14.0),
+    'piano': dict(seconds=4.0, closer=(0.35, 0.3), play=(0.0, 0.71, 0.86), lean=(14.0, 24.0), look=(12.0, 10.0)),
     # The strings in a plane square to the pawn 0.98 ahead (harp.obj, a cell from it), from 0.2 to 1.35 up, the
     # soundbox slanting up from the left to the right as the pawn faces it; the base is 0.24 deep either side and 0.1
     # high, so the feet can't go much nearer.
-    'harp': dict(seconds=4.0, closer=(0.68, 0.5), play=(0.0, 0.98, 0.9), lean=(12.0, 36.0), look=6.0),
+    'harp': dict(seconds=4.0, closer=(0.62, 0.33), play=(0.0, 0.98, 0.9), lean=(6.0, 30.0), look=(-8.0, 0.0)),
     # The head 0.79 up, 0.34 round about a middle a cell ahead (ritual_drum.obj); its body 0.4 round.
-    'drum': dict(seconds=2.4, closer=(0.45, 0.33), play=(0.0, 0.81, 0.82), lean=(18.0, 30.0), look=12.0),
+    'drum': dict(seconds=2.4, closer=(0.45, 0.33), play=(0.0, 0.81, 0.82), lean=(18.0, 20.0), look=(15.0, 10.0)),
 }
 
 def music_play(kind, seated):
@@ -1996,6 +2002,8 @@ HARP_FINGERS = 30.0
 HARP_TILT = 8.0
 HARP_SWAY = 3.0
 HARP_ELBOW = (0.8, 0.2, -0.6)
+HARP_SIT_REACH = 0.92   # seated, perched on the chair's front edge out of reach of the strings: the hands as far out as
+                        # this share of the arm's reach goes (music_hand), the elbows not locked straight
 # The drum: beaten with the bare palms in turn, DRUM_BEATS eighths of a loop at which each hand strikes (the left's, the
 # right's; both together on the accent, DRUM_ACCENT, which is beaten harder and nearer the middle). Between strikes a hand
 # is raised up to DRUM_LIFT (cells, the most, for a gap of a quarter loop or more; less for a shorter one), slowly at
@@ -4715,7 +4723,8 @@ def music_cells(v):
 
 def music_body(kind, t, seated, dip=0.0, bob=0.0, roll=0.0, nod=0.0, tilt=0.0):
     """The body at an instrument (see MUSIC): the idle's first frame (or the sit at t, seated) leant toward it by its
-    'lean' and bob more, rolled roll (degrees, + toward the left), the head bowed its 'look' and nod more and tilted
+    'lean' and bob more, rolled roll (degrees, + toward the left), the head bowed its 'look' from upright (the neck
+    turned back against the lean) and nod more and tilted
     tilt (+ toward the left), the hips let down dip (cells) over the planted feet standing. Returns the pose."""
     m = MUSIC[kind]
     i = 1 if seated else 0
@@ -4738,17 +4747,26 @@ def music_body(kind, t, seated, dip=0.0, bob=0.0, roll=0.0, nod=0.0, tilt=0.0):
         turn_branch(X, bone, about(pivot, (0, 1, 0), roll * 0.5) @ about(pivot, (1, 0, 0), lean * 0.5))
     nk = X[NECK] @ head[NECK]
     turn_branch(X, NECK, about(nk, (X[NECK].to_3x3() @ Vector((0, 1, 0))).normalized(), tilt)
-                @ about(nk, (X[NECK].to_3x3() @ Vector((1, 0, 0))).normalized(), m['look'] + nod))
+                @ about(nk, (X[NECK].to_3x3() @ Vector((1, 0, 0))).normalized(), m['look'][i] - m['lean'][i] + nod))
     for name, leader in FOLLOW.items():
         X[name] = X[leader]
     return X
 
-def music_hand(X, side, sign, palm, fingers, facing, curl, elbow):
+def music_hand(X, side, sign, palm, fingers, facing, curl, elbow, reach=None):
     """One hand laid on an instrument: its palm at palm, the fingers along fingers and the palm facing facing (all in
     MUSIC's cells and ways), curled curl (a share of FIST, or four), the elbow toward elbow (chest's frame, x out).
-    Returns how far the wrist was out of reach."""
+    Given reach (a share of the arm's), a palm further than that from its shoulder is brought back toward it until it
+    is that far, so a hand that can't get there plays as far out as it goes with the elbow still a little bent, rather
+    than the arm locked straight. Returns how far the wrist was out of reach."""
     way = lambda v: Vector((v[0], -v[1], v[2]))
-    clamp = hand_on(side, sign, music_cells(palm), way(fingers), way(facing), X,
+    at = music_cells(palm)
+    if reach is not None:
+        shoulder = X['shoulder.' + side] @ head['upper_arm.' + side]
+        hn = 'hand.' + side
+        most = reach * wrist_reach(side) + HAND_HALF * LEG + (tail[hn] - head[hn]).length * 0.5
+        if (at - shoulder).length > most:
+            at = shoulder + (at - shoulder).normalized() * most
+    clamp = hand_on(side, sign, at, way(fingers), way(facing), X,
                     pole=Vector((sign * elbow[0], elbow[1], elbow[2])))
     close_hand(X, side, sign, curl)
     return clamp
@@ -4802,7 +4820,8 @@ def harp_at(t, seated=False):
         palm = (a.x + sign * out, a.y - HARP_DRAW * u, a.z + up)
         fingers = (-sign * math.sin(f), 0.0, math.cos(f))   # up and in toward the middle
         clamp = max(clamp, music_hand(X, side, sign, palm, fingers, (0.0, 1.0, 0.0),
-                                      (curl, curl, curl * 0.6, curl * 0.6), HARP_ELBOW))
+                                      (curl, curl, curl * 0.6, curl * 0.6), HARP_ELBOW,
+                                      reach=HARP_SIT_REACH if seated else None))
     return X, clamp
 
 def harp_sit_at(t):

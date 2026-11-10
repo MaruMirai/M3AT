@@ -13,6 +13,7 @@ ROOT=$(cd "$HERE/../.." && pwd)
 GAME="$HOME/.local/share/Steam/steamapps/common/RimWorld"
 WORK="$HOME/.cache/m3at-hairbuild"
 CHIBI="$ROOT/M3AT: Maru's 3D Animated Toons/Models/chibi"
+if [[ -n "${M3AT_CHIBI:-}" ]]; then CHIBI="$M3AT_CHIBI"; fi   # another chibi folder (skin.txt and anim.txt) to build on
 
 if [[ $# -lt 2 ]]; then
     sed -n 2,7p "$0" >&2

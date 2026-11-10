@@ -25,6 +25,7 @@ WORK_FRAMES = 24   # frames a work stroke is baked with (the blow is a seventh o
 # layer's south texture projected straight from the front. The projection is made once, in the standing pose and in the
 # head bone's own frame, and kept with the vertices, so the face turns and bobs with the head in every frame.
 FACE_GROUP = 'face'      # a vertex group on the body that picks the face by hand; without one, the head's front is used
+HAIRLINE = 'Hairline'   # a curve on the head (anim_scripts/make_hairline.py): the line the hair's walls hang from, skin.txt's hairline line
 SCALP_GROUP = 'Scalp'    # a vertex group on the body: the scalp drawn in the hair colour (any weight counts); without one, the game's own hairline
 FACE_FACING = 0.05       # least share of a triangle's normal that points forward to count as the front of the head
 FACE_SPAN = 3.0         # the face texture's width and height, in head heights (IsoRim's own head: 2.9)
@@ -427,6 +428,35 @@ def skin_error(ks, verts):
         worst = max(worst, (p - verts[i]).length)
     return worst * scale
 
+def hairline_points():
+    """The Hairline curve's points in order, world space (its first spline: poly, NURBS or Bézier control points), or
+    a mesh's loop of edges walked from its first vertex; [] without one."""
+    ob = bpy.data.objects.get(HAIRLINE)
+    if ob is None:
+        return []
+    m = ob.matrix_world
+    if ob.type == 'CURVE' and ob.data.splines:
+        sp = ob.data.splines[0]
+        if sp.type == 'BEZIER':
+            return [m @ p.co for p in sp.bezier_points]
+        return [m @ Vector(p.co[:3]) for p in sp.points]
+    if ob.type == 'MESH' and ob.data.edges:
+        nxt = {}
+        for e in ob.data.edges:
+            a, b = e.vertices
+            nxt.setdefault(a, []).append(b)
+            nxt.setdefault(b, []).append(a)
+        order, prev, at = [], None, ob.data.edges[0].vertices[0]
+        while at not in order:
+            order.append(at)
+            ways = [w for w in nxt[at] if w != prev]
+            if not ways:
+                break
+            prev, at = at, ways[0]
+        return [m @ ob.data.vertices[i].co for i in order]
+    print('WARNING: %s is neither a curve nor a mesh of edges; no hairline written' % HAIRLINE)
+    return []
+
 def write_skin(path):
     lift = FACE_LIFT / scale
     head = bone_index[walk.HEAD]
@@ -458,6 +488,11 @@ def write_skin(path):
             f.write('# scalp i ...: the body vertices drawn in the hair colour under hair (the Scalp group).\n')
             f.write('scalp %s\n' % ' '.join(map(str, scalp)))
             print('SKIN scalp: %d vertices from the %s group' % (len(scalp), SCALP_GROUP))
+        line = hairline_points()
+        if line:
+            f.write('# hairline x y z ...: the line the hair\'s walls hang from (the Hairline curve), in order round it.\n')
+            f.write('hairline %s\n' % ' '.join('%.5f %.5f %.5f' % tuple(to_game(p)) for p in line))
+            print('SKIN hairline: %d points from the %s curve' % (len(line), HAIRLINE))
         # Each key: the vertices it moves, the joints (bone heads) moved with them, and the head's middle.
         f.write('# key name: then d i x y z (vertex i moves), db b x y z (bone b\'s head moves), dc x y z (the head\'s middle), cells.\n')
         joint_anchors = [anchor(rig.matrix_world @ rig.data.bones[n].head_local) for n in deform]
@@ -613,22 +648,31 @@ def anchor(p):
 def moved(a, deltas):
     return sum((deltas[i] * w for i, w in a), Vector())
 
-def hidden_under(g_rest, tris):
+HIDE_RIDES_WITH = 0.5    # a garment riding one bone whole hides only skin with this share of its weights on that bone or below
+
+def hidden_under(g_rest, tris, bone=None):
     """The body triangles (numbered as in skin.txt) under the garment, which the game leaves out while it is worn so the
     skin can't show through it. Tested once, at rest: the garment follows the skin, so what it covers stays covered.
     A body vertex is under it if the nearest point of the garment is within HIDE_REACH (outside the skin, or inside
     where the skin already pokes through) and the garment also lies straight out from the skin there: a line along the
     skin's normal, from HIDE_REACH inside it to HIDE_LOOK out, meets it. Nearness alone hid the skin in an opening (an
     open coat's chest, a collar, past a hem), which the folded lapel or hem beside it is near but nothing is in front of.
-    A triangle is hidden if its corners and middle are all under it."""
+    A triangle is hidden if its corners and middle are all under it.
+    A garment riding one bone whole (bone: a hat or a mask on the head) moves apart from skin that moves with other bones,
+    so it hides only skin with HIDE_RIDES_WITH of its weights on that bone or below (the game's UnderOf has the same rule
+    for a garment under it): a mask reaching down over the neck would otherwise open a hole there when the head turned."""
     tree = BVHTree.FromPolygons(g_rest, tris)
+    riding = None
+    if bone:
+        riding = {bone_index[n] for n in [bone] + [b.name for b in rig.data.bones[bone].children_recursive] if n in bone_index}
     reach = HIDE_REACH / scale
     look = HIDE_LOOK / scale
     def covered(p, n):
         if tree.find_nearest(p, reach)[0] is None:
             return False
         return tree.ray_cast(p - n * reach, n, reach + look)[0] is not None
-    under = [covered(p, n) for p, n in zip(rest, rest_normals)]
+    under = [(riding is None or sum(w for b, w in weights[i] if b in riding) >= HIDE_RIDES_WITH) and covered(p, n)
+             for i, (p, n) in enumerate(zip(rest, rest_normals))]
     hide = []
     for k, t in enumerate(rest_tris):
         if all(under[i] for i in t):
@@ -801,7 +845,7 @@ def write_garment(g, path):
     for part in [x.strip() for x in props.get('solid_parts', '').split(',') if x.strip()]:
         solid_weights(g.name, part, g_rest, g_weights)
     garment_fits.append({'name': g.name, 'rest': g_rest, 'weights': g_weights, 'over': over, 'gap': gap, 'sink': 0.0})
-    hide = [] if props.get('fur', False) or props.get('held', False) or not props.get('hides', True) else hidden_under(g_rest, [t for k, t in enumerate(tris) if k not in glass_tris])
+    hide = [] if props.get('fur', False) or props.get('held', False) or not props.get('hides', True) else hidden_under(g_rest, [t for k, t in enumerate(tris) if k not in glass_tris], props.get('bone'))
     hide_groups = [x.strip() for x in props.get('hide_groups', '').split(',') if x.strip()]
     hide_parts = [x for flag, x in (('hide_body', HIDE_BODY), ('hide_head', HIDE_HEAD)) if props.get(flag, False)]
     hide_groups += [walk.PART_GROUP % x for x in hide_parts if walk.PART_GROUP % x not in hide_groups]

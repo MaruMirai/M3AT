@@ -182,6 +182,8 @@ namespace M3AT
             t.weightBone = allBones.ToArray();
             t.weight = allWeights.ToArray();
             t.baseShape = ShapePiece(t.piece, new List<KeyValuePair<string, float>>());
+            t.piece.uvs = StrandUvsTube(t.piece.rest, t.joints);   // the hair's strand grain (StrandGrain.cs)
+            Grain(t.piece);
             t.bones = new Matrix4x4[t.joints.Length - 1];
             return t;
         }
@@ -244,8 +246,7 @@ namespace M3AT
             {
                 return;
             }
-            Material solid = SolidMaterial();
-            if (solid == null)
+            if (SolidMaterial() == null)
             {
                 return;
             }
@@ -255,6 +256,7 @@ namespace M3AT
                 p.tail = NewPieceMeshes(t.piece);
                 p.tailMadeFur = p.furTail;
             }
+            Material solid = GrainedMaterial(t.piece, p.tail);
             PoseTail(p, t, s, floor);
             DrawMeshes(p, p.tail, t.piece.rest.Length, solid, position, yaw, size, tint);
         }
