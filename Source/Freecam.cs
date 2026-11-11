@@ -313,7 +313,7 @@ namespace M3AT
             Note3D(true);
             if (announce)
             {
-                Messages.Message("Flying freecam on: " + ToggleKey.MainKeyLabel + " to leave.", MessageTypeDefOf.SilentInput, false);
+                Messages.Message("Freecam on: " + ToggleKey.MainKeyLabel + " to leave.", MessageTypeDefOf.SilentInput, false);
             }
         }
 
@@ -398,7 +398,7 @@ namespace M3AT
             map = null;
             if (message)
             {
-                Messages.Message("Flying freecam off.", MessageTypeDefOf.SilentInput, false);
+                Messages.Message("Freecam off.", MessageTypeDefOf.SilentInput, false);
             }
         }
 
@@ -463,7 +463,7 @@ namespace M3AT
                         }
                         else
                         {
-                            Messages.Message("Flying freecam off.", MessageTypeDefOf.SilentInput, false);
+                            Messages.Message("Freecam off.", MessageTypeDefOf.SilentInput, false);
                         }
                     }
                     else

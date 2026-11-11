@@ -18,6 +18,9 @@ OVER_PACK_MIDDLE = 0.03 # OverPackMiddle: how far above a pack's middle a weapon
 ALONG_BIG = (0.0, -0.5, 0.5, -1.0, 1.0)   # AlongBig: where Clearance looks along a big slot's weapon, shares of that
 GEAR_BELT_WIDTH = 0.19  # GearBeltWidth: IsoRim's belt ring's half width
 GEAR_GAP = 0.006        # GearGap: left between a pack or belt and what is under it
+BELT_ARM_MOST = 0.5     # BeltArmMost: a vertex weighted more than this to the arms is an arm's, not the waist's
+BELT_REACH = 0.4        # BeltReach: how far out the belt looks for a surface
+ARM_BONES = ('shoulder.', 'upper_arm.', 'forearm.', 'hand.', 'thumb.')   # ArmBones
 ISORIM_WAIST = 0.30     # IsoRimWaist: the height of the reference point in IsoRim's models
 ISORIM_PACK_WIDE = 0.13    # IsoRimPackWide, and the rest: IsoRim's packs measured, as WornGears.cs has them
 ISORIM_PACK_SIDE = 0.18
@@ -56,13 +59,16 @@ def unit(v):
     n = np.linalg.norm(v)
     return v / n if n > 0.0 else v
 
-def outer(verts, tris, point, way, far=HOLSTER_DEPTH):
+def outer(verts, tris, point, way, far=HOLSTER_DEPTH, only=None):
     """SkinnedFigure.Outer: the furthest out along way that a surface stands on the line through point, measured from
-    point: any vertex within HOLSTER_REACH of the line, or a triangle it passes through. Minus infinity for none."""
+    point: any vertex within HOLSTER_REACH of the line (of those only keeps, if given), or a triangle it passes through.
+    Minus infinity for none."""
     best = -np.inf
     d = verts - point
     along = d @ way
     near = (along >= -HOLSTER_DEPTH) & (along <= far)
+    if only is not None:
+        near &= only
     if near.any():
         side = d[near] - np.outer(along[near], way)
         hit = (side * side).sum(axis=1) <= HOLSTER_REACH * HOLSTER_REACH
@@ -288,6 +294,48 @@ class Figure:
                 push = max(push, most - bare)
         self.cache[key] = push
         return push
+
+    # ---- The belt (BeltPushes)
+
+    def waist_of(self, name):
+        """SkinnedFigure.WaistOf: (keep, tris): a piece's vertices not weighted more than BELT_ARM_MOST to the arms, and its
+        triangles with all three corners among them. name None: the body."""
+        key = ('waist', name)
+        out = self.cache.get(key)
+        if out is None:
+            piece = self.body if name is None else self.piece(name)
+            arm = np.array([n.startswith(ARM_BONES) for n in self.bone_names] + [False])
+            on_arm = np.zeros(len(piece.rest))
+            if len(piece.weight_vert):
+                np.add.at(on_arm, piece.weight_vert, piece.weight * arm[piece.weight_bone])
+            keep = on_arm <= BELT_ARM_MOST
+            tris = piece.tris[keep[piece.tris].all(axis=1)] if len(piece.tris) else piece.tris
+            out = self.cache[key] = (keep, tris)
+        return out
+
+    def belt_pushes(self, mix, mask, h):
+        """SkinnedFigure.BeltPushes: how much further out than the bare base body's the waist stands at the belt's height:
+        out of the slot's side, the other side, along +z and along -z."""
+        mask = tuple(g for g in mask if not self.unclear(g))
+        key = ('belt', mix, mask, h.bone, tuple(h.at), tuple(h.outward))
+        out = self.cache.get(key)
+        if out is not None:
+            return out
+        middle = np.array((0.0, h.at[1], h.at[2]))
+        starts = (h.at, np.array((-h.at[0], h.at[1], h.at[2])), middle, middle)
+        ways = (h.outward, np.array((-h.outward[0], h.outward[1], h.outward[2])), np.array((0.0, 0.0, 1.0)), np.array((0.0, 0.0, -1.0)))
+        moved = self.bone_move(h.bone, mix)
+        keep, tris = self.waist_of(None)
+        pushes = []
+        for at, way in zip(starts, ways):
+            bare = outer(self.body.rest, tris, at, way, BELT_REACH, keep)
+            most = outer(self.body_shaped(mix), tris, at + moved, way, BELT_REACH, keep)
+            for g in mask:
+                gk, gt = self.waist_of(g)
+                most = max(most, outer(self.shaped(g, mix), gt, at + moved, way, BELT_REACH, gk))
+            pushes.append(max(most - bare, 0.0) if not np.isneginf(most) and not np.isneginf(bare) else 0.0)
+        out = self.cache[key] = tuple(pushes)
+        return out
 
     # ---- A backpack (PackRig)
 
@@ -533,15 +581,19 @@ class Figure:
         if h is None:
             return None
         k = self.gear_scale[mount]
-        push = self.clearance(worn.mix, worn.mask, h) + GEAR_GAP
-        if mount == 'pack':
-            k *= worn.pack_scale
-            push = self.gear_pack_place(worn)[2]
-        at = h.at + h.outward * push
         if mount == 'belt':
-            sx = max(at[0], 0.01) / GEAR_BELT_WIDTH
-            scale, pivot, reference = (sx, k, sx * self.gear_depth[mount]), np.array((0.0, at[1], 0.0)), np.array((0.0, ISORIM_WAIST, 0.0))
+            side, other, ahead, behind = self.belt_pushes(worn.mix, worn.mask, h)
+            half = max(h.at[0] + GEAR_GAP, 0.01)
+            sx = (half + max(side, other)) / GEAR_BELT_WIDTH
+            sz = (half * self.gear_depth[mount] + (ahead + behind) / 2) / GEAR_BELT_WIDTH
+            at = h.at + h.outward * (max(side, other) + GEAR_GAP)
+            scale, pivot, reference = (sx, k, sz), np.array((0.0, h.at[1], (ahead - behind) / 2)), np.array((0.0, ISORIM_WAIST, 0.0))
         else:
+            push = self.clearance(worn.mix, worn.mask, h) + GEAR_GAP
+            if mount == 'pack':
+                k *= worn.pack_scale
+                push = self.gear_pack_place(worn)[2]
+            at = h.at + h.outward * push
             scale, pivot, reference = (k, k, k), at, np.array((0.0 if mount == 'pack' else GEAR_BELT_WIDTH, ISORIM_WAIST, 0.0))
         move = self.bone_move(h.bone, worn.mix)
         m = np.identity(4)

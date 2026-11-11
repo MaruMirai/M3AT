@@ -104,6 +104,7 @@ namespace M3AT
             public int tint = -1;        // a textured garment's: 1 tinted by the apparel's colour, 0 not, -1 as the apparel is (Tinted)
             public Color mean = Color.white;   // a textured garment's mean colour, which its outline is drawn in (times the tint)
             public int hideHair = -1, hideFace = -1;   // a garment's: 1 the hair (the face layers) left off while it is worn, 0 not, -1 if it hides most of the scalp (face); the hair's also 2, cut at its rim (HairUnderHat)
+            public bool overHair;       // a garment's: worn over the hair, pushed out past it rather than tucking it (HatOverHair.cs)
             public bool hidesClothes;   // a garment's: the garments worn under it are left off (body armour, HidesClothes)
             public bool withLegwear;    // a garment's: also worn once the torso and legs are covered (the shoes, WalkFigures.WornGarments)
             public bool forBaby;        // a garment's: worn by a baby a few hours old (the baby romper, WalkFigures.BabyRomperOf)
@@ -116,6 +117,7 @@ namespace M3AT
             public int[] hides;       // a garment's: the body triangles (numbered as skin.txt's) under it, left out while it is worn
             public int wallsFrom = -1;   // built hair's: its first wall triangle (its walls line), which Decimated keeps whole
             public Vector2? wallUv;      // built hair's: the texture place every hairline wall takes (its wall_uv line, HairlineWalled)
+            public WallAtlas wallAtlas;  // hair: its image's art, which its hairline walls keep their texture places on; null: not read
             public bool[] glass;      // a garment's: which of its triangles are glass (a helmet's visor), drawn see-through (DrawVisor); null: none
             public int[] shellTris;   // and its triangles that aren't glass, which its solid mesh draws
             public Piece visor;       // and the glass as a piece of its own (VisorOf), posed as the hair is
@@ -154,6 +156,7 @@ namespace M3AT
             internal Vector3 faceCentre;
             internal List<KeyValuePair<string, float>> mix;   // the keys and amounts it is made of
             internal readonly Dictionary<Piece, PieceShape> hairs = new Dictionary<Piece, PieceShape>();   // made when first drawn
+            internal readonly Dictionary<(int, Piece, PieceShape), PieceShape> overHair = new Dictionary<(int, Piece, PieceShape), PieceShape>();   // a hat over the hair, by garment, hair and its shape under (HatOverHair.cs)
             internal readonly Dictionary<(GarmentMask, int), float> holsterPush = new Dictionary<(GarmentMask, int), float>();   // Clearance's, by slot and garments
             internal bool headMeasured;       // the box round the head (MeasureHead)
             internal List<string> geneKeys;   // the gene keys it has whole (null: none), which MeasureHead leaves out too
@@ -315,6 +318,7 @@ namespace M3AT
             public Shape shape;
             internal PieceMeshes[] pieces;   // made when first drawn
             internal Piece hairPiece;   // the hair its hair meshes are for
+            internal Piece hairOver;    // the hair a hat worn over it is pushed out past (HairUnderHats)
             internal PieceMeshes hair;
             internal readonly Dictionary<Piece, PieceMeshes> visors = new Dictionary<Piece, PieceMeshes>();   // the glass of each worn garment with a visor (DrawVisor)
             internal Piece beardPiece;   // and the beard its beard meshes are for
@@ -345,6 +349,7 @@ namespace M3AT
             public Quaternion[] nudge;   // the clips added on top (Nudge), per bone: a turn from each clip's first frame
             public float twist;   // degrees the trunk is turned about the vertical over the hips (Twist)
             public float look;    // degrees the head is turned about the vertical on the chest (Look)
+            public float lean;    // degrees the trunk is leant sideways over the hips, + to the figure's left (Lean)
             public GarmentMask wornMask;       // the garments it has on this draw (Wearing)
             public bool gearPack;      // and whether an equipment pack is drawn on its back
             public float packScale = 1f;   // the size an equipment pack is drawn at, of this figure's: as big on every pawn
@@ -883,6 +888,13 @@ namespace M3AT
                         break;
                     case "hide_face":
                         piece.hideFace = p[1] == "yes" ? 1 : 0;
+                        break;
+                    case "over_hair":
+                        piece.overHair = p[1] == "yes" && !Legacy;
+                        if (p[1] == "yes" && Legacy)
+                        {
+                            piece.hideHair = 2;   // (the autotest's comparison with the rules before: tucked)
+                        }
                         break;
                     case "hide_clothes":
                         piece.hidesClothes = p[1] == "yes";
@@ -1724,6 +1736,7 @@ namespace M3AT
             p.total = 0f;
             p.twist = 0f;
             p.look = 0f;
+            p.lean = 0f;
             p.standOn = -1;
             p.balance = 0f;
             p.crouch = 0f;
@@ -1830,6 +1843,13 @@ namespace M3AT
         public void Twist(Posed p, float degrees)
         {
             p.twist = degrees;
+        }
+
+        // Leans the trunk sideways (degrees, + to the figure's left) over the hips, spread up the spine as the twist is
+        // (TwistBones), the arms, head and what they hold going with it: two sat side by side leaning together over a book.
+        public void Lean(Posed p, float degrees)
+        {
+            p.lean = degrees;
         }
 
         // Turns the head about the vertical (degrees, as the figure's yaw) on top of whatever the clips and the twist do,
@@ -2214,7 +2234,7 @@ namespace M3AT
             {
                 Bend(p, p.recline);
             }
-            Place(p, whole, p.head[root] / p.total + p.shape.boneMove[root], p.twist, p.look);
+            Place(p, whole, p.head[root] / p.total + p.shape.boneMove[root], p.twist, p.look, p.lean);
             if (p.standOn >= 0)
             {
                 OverFoot(p, whole);
@@ -2527,7 +2547,7 @@ namespace M3AT
 
         // Puts the turns (each on top of its parent's) together down the chain from the root's head at root (model units,
         // before whole), and works out each bone's matrix.
-        private void Place(Posed p, Matrix4x4 whole, Vector3 root, float twist, float look = 0f)
+        private void Place(Posed p, Matrix4x4 whole, Vector3 root, float twist, float look = 0f, float lean = 0f)
         {
             Vector3[] shapedHead = p.shape.boneHead;
             for (int i = 0; i < boneOrder.Length; i++)
@@ -2546,6 +2566,12 @@ namespace M3AT
                 {
                     // Its share of the twist, about the vertical through its own head; the bones above take it on from here.
                     p.turn[b] = Quaternion.AngleAxis(twist * twistShare[b], Vector3.up) * p.turn[b];
+                }
+                if (lean != 0f && twistShare[b] > 0f)
+                {
+                    // Its share of the lean, about the way the figure faces (model space's +z): a turn about it by +
+                    // degrees takes up toward -x, the figure's left.
+                    p.turn[b] = Quaternion.AngleAxis(lean * twistShare[b], Vector3.forward) * p.turn[b];
                 }
                 if (look != 0f && lookShare[b] > 0f)
                 {
@@ -2812,7 +2838,7 @@ namespace M3AT
                 Shield(p, index, m);
                 return m;
             }
-            Pose(p, pieces[index], GarmentShape(p.shape, index, p.wornMask), m);
+            Pose(p, pieces[index], OverHairShape(p.shape, index, GarmentShape(p.shape, index, p.wornMask), p.hairOver), m);
             return m;
         }
 
@@ -4635,23 +4661,17 @@ namespace M3AT
             }
             try
             {
-                h = ReadMesh(mesh, false, null);
-                // A beard is small and its edge is most of it, so it keeps at least BeardTriangles.
-                float share = beard ? Mathf.Max(SettingsMod.HairDetail, (float)BeardTriangles / Mathf.Max(h.tris.Length / 3, 1)) : SettingsMod.HairDetail;
-                // Cut down (a M3AThair style keeps all its triangles), with walls from the hairline up to the cut hair
-                // in place of those under its edges (HairlineWalls.cs).
-                float cover;
-                h = CutWithWalls(h, cut ? share : 1f, beard, out cover);
-                if (turnRound)
-                {
-                    TurnRound(h.tris);
-                }
+                // The image first, as the hairline walls keep their texture places on its art (HairlineWalls.cs).
+                Texture2D texture;
+                Material material = null, mark = null;
+                WallAtlas atlas;
                 Piece was;
                 if (hairImages.TryGetValue(style, out was))
                 {
-                    h.texture = was.texture;
-                    h.material = was.material;
-                    h.mark = was.mark;
+                    texture = was.texture;
+                    material = was.material;
+                    mark = was.mark;
+                    atlas = was.wallAtlas;
                 }
                 else
                 {
@@ -4660,8 +4680,24 @@ namespace M3AT
                     t.wrapMode = TextureWrapMode.Clamp;
                     t.filterMode = FilterMode.Bilinear;
                     t.name = "Marus_Hair_" + style;
-                    h.texture = t;
+                    texture = t;
+                    atlas = AtlasOf(t, style);
                 }
+                h = ReadMesh(mesh, false, null);
+                // A beard is small and its edge is most of it, so it keeps at least BeardTriangles.
+                float share = beard ? Mathf.Max(SettingsMod.HairDetail, (float)BeardTriangles / Mathf.Max(h.tris.Length / 3, 1)) : SettingsMod.HairDetail;
+                // Cut down (a M3AThair style keeps all its triangles), with walls from the hairline up to the cut hair
+                // in place of those under its edges (HairlineWalls.cs).
+                float cover;
+                h = CutWithWalls(h, cut ? share : 1f, beard, atlas, out cover);
+                if (turnRound)
+                {
+                    TurnRound(h.tris);
+                }
+                h.texture = texture;
+                h.material = material;
+                h.mark = mark;
+                h.wallAtlas = atlas;
                 if (h.uvs == null || h.rest.Length == 0)
                 {
                     throw new InvalidDataException(mesh + ": no texture places or no vertices");
@@ -4695,6 +4731,21 @@ namespace M3AT
                 h = null;
             }
             return h;
+        }
+
+        // A hair image's art for the hairline walls (WallAtlas); null, and the walls take their texture places where they
+        // meet the hair, if its pixels can't be read.
+        private static WallAtlas AtlasOf(Texture2D t, string style)
+        {
+            try
+            {
+                return WallAtlas.Of(t.GetPixels32(), t.width, t.height);
+            }
+            catch (Exception e)
+            {
+                Log.Warning(Tag + "couldn't read the pixels of the hair " + style + " for its walls: " + e.Message);
+                return null;
+            }
         }
 
         private static Shader hairShader, hairMarkShader;

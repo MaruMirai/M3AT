@@ -295,7 +295,7 @@ TYPE_SCALE = {
     'bow': 1.2,
     'grenade': 0.66,
     'melee_1h': 1.0,
-    'melee_2h': 1.0,
+    'melee_2h': 1.3,
 }
 # The holster slots (HOLSTERS' 'size') each type takes.
 TYPE_HOLSTER = {
@@ -1269,7 +1269,7 @@ EAT_MOUTH = (0.04, -0.33, -0.1)   # where the eating wrist is brought to: leg le
                                   # and in front of the mouth
 EAT_TABLE = (-0.1, -0.34, 0.34)  # where the right wrist rests seated, at the meal on the table: leg lengths from the
                                   # middle of the hips at rest in the chest's frame, x out (- is right), y back, z up
-EAT_MEAL = (0.03, -0.26, 0.5)   # standing, the left palm holding the meal, the same way
+EAT_MEAL = (0.03, -0.26, 0.42)  # standing, the left palm holding the meal, the same way
 EAT_MEAL_FINGERS = (-0.6, -1.0, 0.0)   # the way the left fingers point under the meal (chest's frame), palm up
 EAT_MEAL_CURL = 0.0   # share of FIST the left fingers curl under it: flat, as more pokes them up through the tray
 EAT_SIT_CLIP = clip_file('eat_sit')
@@ -1309,6 +1309,13 @@ READ_LEAN = 6.0      # the trunk leant forward over the book (degrees, from the 
 READ_LOOK = 22.0     # the head bowed further to look down at it (degrees)
 READ_ELBOW_L = (0.6, 0.4, -0.8)   # the left elbow out and down (chest's frame)
 READ_ELBOW_R = (-0.7, 0.4, -0.6)   # the right elbow out and down
+# Showing the book to someone sat beside (read_show_L and read_show_R, read_at's show: Romance on the Rim's shared
+# reading, WalkFigures.ReadOf): the book moved out toward that side and turned to face between the two, the trunk and
+# head turned a little after it, so both can read it.
+READ_SHOW_OUT = 0.26    # leg lengths the book moves toward the watcher
+READ_SHOW_TURN = 30.0   # degrees the book turns about the vertical, to face between the two (who are also turned and leant together, WalkFigures.ShareTurn, ShareLean)
+READ_SHOW_TWIST = 16.0  # degrees the trunk turns toward the watcher
+READ_SHOW_LOOK = 10.0    # degrees the head turns further toward the book
 
 # Researching (research_at, work_research: the Research job, sat at the bench): inspect_clip.json (`import_pluck.py --
 # animDLs/inspect.glb _01a17cae_051d_7585_b81e_0406f2e4310d 8 87 --as inspect`: sat holding something up in both hands
@@ -1492,25 +1499,28 @@ CARRY = {
     # carried_<kind> clip (IsoRim draws the animal), the right hand placed by cuddle_hand. 'cuddle_stroke' strokes it
     # from the neck to the rump STROKES times a loop of STROKE_SECONDS, the hand lifted back over it between; the game
     # eases it in over 'cuddle' while the pawn stands or sits still.
-    'cuddle': {'L': (-0.02, -0.42, 0.36), 'L_turn': (-156.2982, -16.3123, -161.5277), 'L_elbow': 10.0, 'hands': 'LR', 'body': dict(LEAN=-2.0, DROP=0.03, NARROW=0.45), 'pet': True},
-    'cuddle_stroke': {'L': (-0.02, -0.42, 0.36), 'L_turn': (-156.2982, -16.3123, -161.5277), 'L_elbow': 10.0, 'hands': 'LR', 'body': dict(LEAN=-2.0, DROP=0.03, NARROW=0.45), 'pet': True, 'stroke': True},
+    'cuddle': {'L': (0.0994, -0.4228, 0.1993), 'L_turn': (-165.5394, -34.528, -155.3791), 'hands': 'LR', 'pet': True, 'body': dict(LEAN=-2.0, DROP=0.03, NARROW=0.45)},
+    'cuddle_stroke': {'L': (0.1129, -0.4169, 0.2037), 'L_turn': (-166.366, -39.5846, -155.8013), 'L_elbow': 10.0, 'hands': 'LR', 'body': dict(LEAN=-2.0, DROP=0.03, NARROW=0.45), 'pet': True, 'stroke': True},
 }
 # The cuddled pet (a CARRY entry with 'pet'): its trunk's middle PET_ALONG of the way from the left elbow to the wrist and
 # PET_LIFT (leg lengths) over that line, the top of its back PET_BACK over that again (a cat's, at the standard size; the
 # game moves the right hand by how much higher or lower the animal it draws is, anim.txt's cuddle_pet line). The right
 # palm rests on its back STROKE_REST (leg lengths along the carrier's left, toward the head; + forward), its fingers
-# forward and toward the rump (STROKE_FINGERS, as the short arms reach it best so, the carrier's rest space: -x its right, -y forward). Stroking: from STROKE_FROM to
+# forward and toward the rump (STROKE_FINGERS, as the short arms reach it best so, the carrier's rest space: -x its right, -y forward), the palm facing
+# STROKE_PALM (straight down: on its back) and STROKE_REST's third number (leg lengths) over the back (the game moves the
+# hand up or down to the back of the animal it draws, keeping that). Stroking: from STROKE_FROM to
 # STROKE_TO along the back (leg lengths, + toward the head) over STROKE_PRESS of each stroke, pressed STROKE_DIP into the
 # fur at its middle, then lifted STROKE_LIFT over it on the way back. The head bowed CUDDLE_LOOK degrees to look at it.
 PET_ALONG = 0.65
 PET_LIFT = 0.04
 PET_BACK = 0.18
-STROKE_REST = (0.02, -0.02)
-STROKE_FINGERS = (-0.5, -1.0, -0.2)
+STROKE_REST = (0.0616, 0.0305, 0.103)
+STROKE_FINGERS = (0.7936, -0.5702, -0.2124)
+STROKE_PALM = (-0.4393, -0.2955, -0.8483)
 STROKE_SECONDS = 6.0
 STROKES = 3
-STROKE_FROM = 0.12
-STROKE_TO = -0.12
+STROKE_FROM = 0.0308
+STROKE_TO = -0.2092
 STROKE_PRESS = 0.6
 STROKE_DIP = 0.015
 STROKE_LIFT = 0.10
@@ -1877,6 +1887,53 @@ TOSS_KEYS = dict(
     heel=(0.0, 0.0, 0.0, 15.0, 20.0, 8.0, 0.0),
 )
 TOSS_UPPER = {'spine.001': 1.0}   # seated: from the waist up
+
+# Throwing a snowball (snowball_at: Romance on the Rim's snowball fight, RotR_Job_SnowballFight, which throws a snowball
+# fleck at the partner every SNOW_INTERVAL ticks while it stands at its spot): one quick overhand throw, right-handed, once
+# through, its first and last frames the idle's first, by toss_at with these keys (as TOSS_KEYS). The ball is brought up
+# and back by the ear as the trunk turns away and the left hand points at the partner, then whipped forward over the
+# shoulder with a short step onto the left foot, let go at SNOW_RELEASE (the tick the game throws the fleck:
+# WalkFigures.TossPhase) and followed through across the body. Short enough to fit between throws.
+SNOW_INTERVAL = 40   # game ticks between throws (JobDriver_SnowballFight's ThrowInterval)
+SNOW_SECONDS = 0.6   # game seconds, wind-up to the foot back (36 ticks)
+SNOW_FRAMES = 18
+SNOW_AT = (0.0, 0.32, 0.55, 0.78, 1.0)
+SNOW_RELEASE = 0.55   # SNOW_AT's let-go key
+SNOW_LOOK = 0.8
+SNOW_KEYS = dict(
+    arm=(None, (0.3, 0.35, 0.45), (0.08, -0.8, 0.4), (-0.15, -0.65, -0.45), None),
+    palm=((-1.0, 0.0, 0.0), (0.0, -1.0, 0.2), (0.0, -1.0, -0.2), (0.3, 0.0, -1.0), (-1.0, 0.0, 0.0)),
+    fingers=((0.0, 0.0, -1.0), (0.0, 0.2, 1.0), (0.0, -0.4, 0.9), (0.0, -0.8, -0.6), (0.0, 0.0, -1.0)),
+    curl=(0.0, 0.6, 0.15, 0.1, 0.0),
+    other=(None, (0.3, -0.8, 0.15), (0.35, 0.15, -0.75), (0.3, 0.1, -0.85), None),
+    lean=(0.0, -4.0, 12.0, 9.0, 0.0),
+    twist=(0.0, -24.0, 14.0, 10.0, 0.0),
+    lunge=(0.0, -0.02, 0.05, 0.03, 0.0),
+    drop=(0.0, 0.02, 0.03, 0.02, 0.0),
+    step=(0.0, 0.03, 0.12, 0.1, 0.0),
+    lift=(0.0, 0.04, 0.0, 0.0, 0.0),
+    heel=(0.0, 0.0, 12.0, 10.0, 0.0),
+)
+SNOW_UPPER = {'spine.001': 1.0}   # seated: from the waist up
+
+# Kissing (kiss_at: Romance on the Rim's kiss, RomanceOnTheRim_InitiateKiss and _ReceiveKiss, the two a cell apart east
+# and west, facing each other; the game draws each KissCloser toward the other, WalkFigures.KissOf). Both play it: leant
+# in from the waist, the head tilted to its right (so the two tilt opposite ways) and tipped up a little, both hands at
+# the partner's waist, swaying slowly. A loop, laid over the idle from the waist up (KISS_UPPER). Each wrist from its
+# shoulder in a level frame turned as the chest is, shares of the arm's reach: x out (+ is left), y forward (-), z up;
+# each palm's facing and the fingers' way in the same frame.
+KISS_SECONDS = 4.0   # one loop (a common kiss is 250 ticks, a romantic one 500)
+KISS_BREATHS = 2
+KISS_LEAN = 12.0     # degrees leant in from the waist
+KISS_TILT = 16.0     # degrees the head is tilted to its right (rolled about the way it faces)
+KISS_CHIN = -4.0     # degrees the head is tipped up (- up)
+KISS_SWAY = 2.5      # degrees the trunk sways side to side, once a loop
+KISS_WRIST = (0.32, -0.72, -0.4)    # the left wrist (the right mirrored): forward and in, about the partner's waist
+KISS_PALM = (-0.8, -0.2, 0.1)       # the left palm faces in, onto the partner's side
+KISS_FINGERS = (-0.3, -1.0, -0.1)   # the left fingers forward round it
+KISS_CURL = 0.25
+KISS_ELBOW = (0.7, 0.3, -0.6)       # the left elbow out and down (the right mirrored)
+KISS_UPPER = {'spine.001': 1.0}   # from the waist up
 
 # Beating out a fire (the game's BeatFire job: one beat, Verb_BeatFire, as soon as each 1.1 s cool-down ends, so every
 # BEAT_SECONDS). Two ways, sorted in the game by what is burning (WalkFigures.FireKind): stomping (stomp_at, work_stomp)
@@ -2310,15 +2367,22 @@ WORK = {
                                      shift=-0.03, hips=-14.0, tilt=7.5, other=0.05))],
                     raised=dict(fist=(-0.4, -0.04, 0.84), pitch=-70.0, yaw=12.0, roll=0.0, lean=-12.0, twist=-32.0, drop=0.02,
                                 shift=-0.07, hips=-16.0, tilt=9.0, other=0.0)),
-    # Building, repairing, taking down: swung level into a wall's face in front (the frame stands in the next cell, its
-    # face about half a cell ahead, as the pickaxe's), the handle nearly upright at the blow so the face meets it square,
-    # cocked back past the shoulder between blows; the left hand steadying the work beside it.
+    # Building, repairing, taking down: hammered into a wall's face in front (the frame stands in the next cell, its face
+    # half a cell ahead, as the pickaxe's), the handle tipped a little forward at the blow so the face meets it square.
+    # Between blows the forearm comes up and back and the wrist cocks, so the head goes back past the right ear; on the
+    # way down the fist leads and the head lags behind it (the 'path' key), then the wrist snaps it through. The wrist goes
+    # from tipped toward the thumb when cocked to toward the little finger at the blow, as a real hammer's does. All of it
+    # stays below the chin, out past the shoulder, as the chibi's head is wider than its shoulders (the head is kept at
+    # least 0.06 leg lengths off the body all through). The face lands 0.50 cells ahead at the standard grown size. The
+    # wall is out of the left hand's reach, so it hangs loose by the hip, swaying a little against the swing. Found by
+    # searching these numbers for the least wrist and forearm strain (work_holds' costs) with the face on the wall.
     'hammer': dict(tool='tool_hammer', ticks=34, motion='chop', scale=0.7, grip=0.05, other=None,
                    body=dict(NARROW=0.35, STAGGER=0.2),
-                   struck=dict(fist=(-0.15, -0.52, 0.12), pitch=25.0, yaw=0.0, roll=0.0, lean=8.0, twist=8.0, drop=0.06,
-                               shift=0.04, L=(0.15, -0.45, 0.3)),
-                   raised=dict(fist=(-0.28, -0.42, 0.15), pitch=-30.0, yaw=40.0, roll=0.0, lean=4.0, twist=-12.0, drop=0.04,
-                               shift=0.0, L=(0.15, -0.42, 0.3))),
+                   struck=dict(fist=(-0.2, -0.54, 0.24), pitch=20.0, yaw=0.0, roll=20.0, lean=9.0, twist=10.0, drop=0.05,
+                               shift=0.06, L=(0.2, -0.26, 0.14)),
+                   path=[(0.4, dict(fist=(-0.36, -0.52, 0.34), pitch=-15.0))],
+                   raised=dict(fist=(-0.28, -0.35, 0.52), pitch=-60.0, yaw=30.0, roll=-15.0, lean=5.0, twist=-15.0,
+                               drop=0.03, shift=0.02, L=(0.2, -0.2, 0.12))),
     # At a stonecutter's or sculptor's table, standing: short raps down at the work on the table, the hammer held
     # choked up for control, the thumb toward the head (so the handle comes out of the top of the fist, not from under
     # it), the face coming down onto the work with the wrist tipped toward the little finger, and the left hand holding
@@ -2366,13 +2430,14 @@ WORK = {
                   raised=dict(fist=(-0.1, -0.25, 0.35), pitch=150.0, yaw=25.0, roll=0.0, lean=10.0, twist=10.0, drop=0.04)),
     # Fishing (Odyssey's Fish, stood on the bank facing the water): the rod (this mod's own model, make_rod.py: 1.7 cells,
     # the reel hanging under it 0.2 up from the butt) held out over the water, the right hand round the reel's stem and
-    # the left on the butt in front of the belly; held still but for a slow sway, then once a stroke the tip jigged up
-    # and let down again ('jig': struck is the rod low, raised the jig's top). The game draws the line from its tip to
-    # the water (WalkFigures.DrawLine).
-    'fish': dict(tool='tool_rod', ticks=420, motion='jig', scale=0.8, grip=0.24, other=0.05,
+    # the left on the handle behind it, out in front of the belly; held still but for a slow sway, then once a stroke the
+    # tip jigged up and let down again ('jig': struck is the rod low, raised the jig's top). The game draws the line from
+    # its tip to the water (WalkFigures.DrawLine). Held lower and closer (the fist at 0.3, the left hand on the butt,
+    # other 0.05), the left hand sat at the crotch with the arm against the side, hidden by the belly from the front.
+    'fish': dict(tool='tool_rod', ticks=420, motion='jig', scale=0.8, grip=0.24, other=0.12,
                  body=dict(NARROW=0.4, STAGGER=0.2),
-                 struck=dict(fist=(-0.12, -0.46, 0.3), pitch=62.0, yaw=4.0, roll=0.0, lean=4.0, twist=-4.0, drop=0.02),
-                 raised=dict(fist=(-0.12, -0.42, 0.42), pitch=32.0, yaw=4.0, roll=0.0, lean=0.0, twist=-6.0, drop=0.02)),
+                 struck=dict(fist=(-0.06, -0.52, 0.38), pitch=70.0, yaw=10.0, roll=0.0, lean=4.0, twist=-4.0, drop=0.02),
+                 raised=dict(fist=(-0.06, -0.48, 0.5), pitch=40.0, yaw=10.0, roll=0.0, lean=0.0, twist=-6.0, drop=0.02)),
     # Any other bench or desk (research, crafting by hand): both hands busy on the work in front, no tool.
     'hands': dict(tool=None, ticks=90, motion='tap', taps=3,
                   body=dict(NARROW=0.5),
@@ -3400,27 +3465,37 @@ def read_level(X):
     side = Vector((side.x, side.y, 0.0)).normalized()
     return Matrix((side, Vector((0, 0, 1)).cross(side), Vector((0, 0, 1)))).transposed()
 
-def read_book(X):
+def read_book(X, show=0):
     """Where the open book is in the pose X: the matrix from its model's points (Blender's axes, model units, as
-    tool_matrix takes them) to armature space, its underside's middle at READ_BOOK, tipped up READ_TILT."""
+    tool_matrix takes them) to armature space, its underside's middle at READ_BOOK, tipped up READ_TILT; shown to the
+    left (show 1) or right (-1), moved READ_SHOW_OUT that way and turned READ_SHOW_TURN to face it."""
     level = read_level(X)
-    at = X[CHEST_BONE] @ head[HIPS] + level @ Vector(READ_BOOK) * LEG
-    R = level.to_4x4() @ rot((1, 0, 0), -READ_TILT)
+    at = X[CHEST_BONE] @ head[HIPS] + level @ (Vector(READ_BOOK) + Vector((show * READ_SHOW_OUT, 0, 0))) * LEG
+    R = level.to_4x4() @ rot((0, 0, 1), -show * READ_SHOW_TURN) @ rot((1, 0, 0), -READ_TILT)
     return T(at) @ R @ Matrix.Scale(READ_SCALE * LEG / MODEL_LEG, 4)
 
-def read_at(t):
+def read_show_L_at(t):
+    return read_at(t, 1)
+
+def read_show_R_at(t):
+    return read_at(t, -1)
+
+def read_at(t, show=0):
     """Reading at t (0 .. 1 round the loop; see READ_SECONDS): standing, the open book on the left palm, the right hand
-    on its right page and turning one over READ_TURN, to be laid over the sit or the idle from the waist up (EAT_UPPER).
-    Returns the pose and the worst overreach."""
+    on its right page and turning one over READ_TURN, to be laid over the sit or the idle from the waist up (EAT_UPPER);
+    with show 1 or -1 the book held out to someone sat on the left or right (READ_SHOW_OUT). Returns the pose and the
+    worst overreach."""
     breath = 0.5 - 0.5 * math.cos(2 * math.pi * READ_BREATHS * t)
     X, _ = posed_with(dict(STILL, DROP=0.02), 0.29, breath=breath)
     for bone in (SPINE, CHEST_BONE):
         pivot = X[bone] @ head[bone]
-        turn_branch(X, bone, about(pivot, (X[bone].to_3x3() @ Vector((1, 0, 0))).normalized(), READ_LEAN * 0.5))
-    turn_branch(X, NECK, about(X[NECK] @ head[NECK], (X[NECK].to_3x3() @ Vector((1, 0, 0))).normalized(), READ_LOOK))
+        turn_branch(X, bone, about(pivot, (0, 0, 1), show * READ_SHOW_TWIST * 0.5)
+                    @ about(pivot, (X[bone].to_3x3() @ Vector((1, 0, 0))).normalized(), READ_LEAN * 0.5))
+    turn_branch(X, NECK, about(X[NECK] @ head[NECK], (0, 0, 1), show * READ_SHOW_LOOK)
+                @ about(X[NECK] @ head[NECK], (X[NECK].to_3x3() @ Vector((1, 0, 0))).normalized(), READ_LOOK))
     for name, leader in FOLLOW.items():
         X[name] = X[leader]
-    B = read_book(X)
+    B = read_book(X, show)
     R = B.to_3x3().normalized()
     ex, ey, ez = R.col[0], R.col[1], R.col[2]
     origin = B.translation
@@ -3796,6 +3871,8 @@ def stroke_at(t):
     e = s * s * (3 - 2 * s)
     return STROKE_TO + (STROKE_FROM - STROKE_TO) * e, STROKE_LIFT * math.sin(math.pi * s)
 
+pet_last = {}   # where cuddle_hand last put the right hand, for preview.py's handle to set STROKE_* from
+
 def cuddle_hand(X, kind, t):
     """Lays the right palm on a cuddled pet's back (see PET_BACK), at rest or stroking (a 'stroke' entry), and bows the
     head to it, in place. Returns how far the wrist was out of reach."""
@@ -3803,9 +3880,15 @@ def cuddle_hand(X, kind, t):
     for name, leader in FOLLOW.items():
         X[name] = X[leader]
     along, high = stroke_at(t) if CARRY[kind].get('stroke') else (STROKE_REST[0], 0.0)
-    palm = pet_on(X) + Vector((along, STROKE_REST[1], PET_BACK + high)) * LEG
-    fingers = Vector(STROKE_FINGERS)
-    return hand_on('R', -1, palm, fingers, Vector((0, 0, -1)), X, pole=Vector((-0.9, 0.3, -0.5)))
+    up = STROKE_REST[2] if len(STROKE_REST) > 2 else 0.0
+    pet = pet_on(X)
+    palm = pet + Vector((along, STROKE_REST[1], PET_BACK + high + up)) * LEG
+    facing = Vector(STROKE_PALM)
+    fingers, n = palm_axes(Vector(STROKE_FINGERS), facing)
+    pet_last.clear()
+    pet_last.update(kind=kind, pet=pet, along=along, high=high, fingers=fingers, facing=n,
+                    wrist=palm - n * HAND_HALF * LEG - fingers * (tail['hand.R'] - head['hand.R']).length * 0.5)
+    return hand_on('R', -1, palm, fingers, facing, X, pole=Vector((-0.9, 0.3, -0.5)))
 
 def rock_wave(kind, t):
     """Where a rocking carry is in its swing at t (0 .. 1 round the loop): -1 the baby out to the carrier's right .. 1
@@ -3925,15 +4008,25 @@ def hurt_at(t, kind):
     # The turn as given is the left hand's: mirrored for the right (y and z turns the other way).
     return X, arm_to(side, s, wrist, X, pole=pole, turn=(turn.x, s * turn.y, s * turn.z))
 
+def hand_rest_axes(side, sign):
+    """A hand bone's fingers' way and its palm's facing at rest (armature space), square to each other."""
+    hn = 'hand.' + side
+    d0 = (tail[hn] - head[hn]).normalized()
+    n0 = Vector((sign * HAND_PALM[0], HAND_PALM[1], HAND_PALM[2]))
+    return d0, (n0 - n0.dot(d0) * d0).normalized()
+
+def palm_axes(fingers, facing):
+    """The fingers' way and the palm's facing hand_on lays a hand at: the facing as given, the fingers made square to it."""
+    n = Vector(facing).normalized()
+    f = Vector(fingers)
+    return (f - f.dot(n) * n).normalized(), n
+
 def hand_on(side, sign, palm, fingers, facing, X, pole=None):
     """Places one arm by IK so its palm lies at palm (armature space), facing facing, the fingers pointing along fingers
     (made square to facing). Returns how far the wrist was out of reach."""
     hn = 'hand.' + side
-    d0 = (tail[hn] - head[hn]).normalized()
-    n0 = Vector((sign * HAND_PALM[0], HAND_PALM[1], HAND_PALM[2]))
-    n0 = (n0 - n0.dot(d0) * d0).normalized()
-    n = facing.normalized()
-    f = (fingers - fingers.dot(n) * n).normalized()
+    d0, n0 = hand_rest_axes(side, sign)
+    f, n = palm_axes(fingers, facing)
     # The turn from rest taking the rest fingers and palm onto these, as arm_to takes it: in the chest's frame.
     R = Matrix((f, n, f.cross(n))).transposed() @ Matrix((d0, n0, d0.cross(n0)))
     turn = (X[CHEST_BONE].to_quaternion().to_matrix().inverted() @ R).to_euler('XYZ')
@@ -4543,9 +4636,10 @@ def reel_at(t):
         close_hand(X, side, sign, 0.35)
     return X, clamp
 
-def toss_key(line, t):
-    """The TOSS_KEYS line at t through the toss (0 .. 1), joined smoothly through its keys (Catmull-Rom, as reel_key)."""
-    at = TOSS_AT
+def toss_key(line, t, at=None):
+    """The TOSS_KEYS line at t through the toss (0 .. 1), joined smoothly through its keys (Catmull-Rom, as reel_key);
+    at the keys' places (TOSS_AT by default)."""
+    at = at or TOSS_AT
     t = min(max(t, 0.0), 1.0)
     i = min(sum(1 for a in at[1:] if a <= t), len(at) - 2)
     u = (t - at[i]) / (at[i + 1] - at[i])
@@ -4556,9 +4650,49 @@ def toss_key(line, t):
         return Vector([part([k[n] for k in line]) for n in range(len(line[0]))])
     return part(line)
 
-def toss_at(t):
+def snowball_at(t):
+    """The overhand snowball throw at t (0 standing .. let go at SNOW_RELEASE .. 1 standing; see SNOW_KEYS)."""
+    return toss_at(t, SNOW_KEYS, SNOW_AT, SNOW_LOOK)
+
+def kiss_at(t):
+    """Kissing at t (0 .. 1 round the loop; see KISS_LEAN): leant in, the head tilted, the hands at the partner's waist,
+    to be laid over the idle from the waist up (KISS_UPPER). Returns the pose and the worst overreach."""
+    breath = 0.5 - 0.5 * math.cos(2 * math.pi * KISS_BREATHS * t)
+    X, _ = posed_with(dict(STILL, DROP=0.02), 0.29, breath=breath)
+    sway = KISS_SWAY * math.sin(2 * math.pi * t)
+    for bone in (SPINE, CHEST_BONE):
+        pivot = X[bone] @ head[bone]
+        across = (X[bone].to_3x3() @ Vector((1, 0, 0))).normalized()
+        turn_branch(X, bone, about(pivot, across.cross(Vector((0, 0, 1))), sway * 0.5) @ about(pivot, across, KISS_LEAN * 0.5))
+    pivot = X[NECK] @ head[NECK]
+    # (forward: the bone's own y runs along it, up the neck)
+    fwd = (X[NECK].to_3x3() @ Vector((1, 0, 0))).normalized().cross(Vector((0, 0, 1)))
+    # (most of the lean taken back off the head, so it looks at the partner rather than down, then tilted and tipped)
+    turn_branch(X, NECK, about(pivot, fwd, -KISS_TILT - sway)
+                @ about(pivot, (X[NECK].to_3x3() @ Vector((1, 0, 0))).normalized(), KISS_CHIN - KISS_LEAN * 0.6))
+    for name, leader in FOLLOW.items():
+        X[name] = X[leader]
+    side = X[CHEST_BONE].to_3x3() @ Vector((1, 0, 0))
+    side = Vector((side.x, side.y, 0.0)).normalized()
+    level = Matrix((side, Vector((0, 0, 1)).cross(side), Vector((0, 0, 1)))).transposed()
+    clamp = 0.0
+    for s, sign in (('R', -1), ('L', 1)):
+        m = lambda v: Vector((sign * v[0], v[1], v[2]))
+        hn = 'hand.' + s
+        wrist = X['shoulder.' + s] @ head['upper_arm.' + s] + level @ m(KISS_WRIST) * wrist_reach(s)
+        facing = (level @ m(KISS_PALM)).normalized()
+        fingers = level @ m(KISS_FINGERS)
+        fingers = (fingers - fingers.dot(facing) * facing).normalized()
+        palm = wrist + facing * HAND_HALF * LEG + fingers * (tail[hn] - head[hn]).length * 0.5
+        clamp = max(clamp, hand_on(s, sign, palm, fingers, facing, X, pole=m(KISS_ELBOW)))
+        close_hand(X, s, sign, KISS_CURL)
+    return X, clamp
+
+def toss_at(t, keys=None, at=None, look=None):
     """The underhand toss at t (0 standing .. let go at TOSS_RELEASE .. 1 standing; see TOSS_KEYS), from the idle's first
-    frame. Returns the pose and the worst overreach."""
+    frame; or another throw by its own keys, their places and its look (snowball_at). Returns the pose and the worst
+    overreach."""
+    keys, at, look = keys or TOSS_KEYS, at or TOSS_AT, TOSS_LOOK if look is None else look
     X, _ = stand_at(0.0)
     hanging = {}
     for side, sign in (('L', 1), ('R', -1)):
@@ -4567,9 +4701,9 @@ def toss_at(t):
         reach = (tail[ua] - head[ua]).length + (tail[fa] - head[fa]).length
         v = X[CHEST_BONE].to_3x3().inverted() @ (X[hn] @ head[hn] - X['shoulder.' + side] @ head[ua]) / reach
         hanging[side] = Vector((v.x * sign, v.y, v.z))
-    k = {n: toss_key(line, t) for n, line in TOSS_KEYS.items() if n not in ('arm', 'other')}
+    k = {n: toss_key(line, t, at) for n, line in keys.items() if n not in ('arm', 'other')}
     for n, side in (('arm', 'R'), ('other', 'L')):
-        k[n] = toss_key([hanging[side] if v is None else Vector(v) for v in TOSS_KEYS[n]], t)
+        k[n] = toss_key([hanging[side] if v is None else Vector(v) for v in keys[n]], t, at)
     ankles = {s: X['foot.' + s] @ head['foot.' + s] for s in ('L', 'R')}
     toes = {s: X['foot.' + s] @ head['toe.' + s] for s in ('L', 'R')}
     legs = set()
@@ -4581,7 +4715,7 @@ def toss_at(t):
         pivot = X[bone] @ head[bone]
         turn_branch(X, bone, about(pivot, (0, 0, 1), k['twist'] * 0.5) @ about(pivot, (1, 0, 0), k['lean'] * 0.5))
     pivot = X[NECK] @ head[NECK]
-    turn_branch(X, NECK, about(pivot, (1, 0, 0), -k['lean'] * TOSS_LOOK) @ about(pivot, (0, 0, 1), -k['twist'] * TOSS_LOOK))
+    turn_branch(X, NECK, about(pivot, (1, 0, 0), -k['lean'] * look) @ about(pivot, (0, 0, 1), -k['twist'] * look))
     for name, leader in FOLLOW.items():
         X[name] = X[leader]
     clamp = 0.0
@@ -5118,13 +5252,11 @@ def work_key(w, u):
     before, after = knots[max(i - 1, 0)], knots[min(i + 2, len(knots) - 1)]
     h00, h10, h01, h11 = 2 * s ** 3 - 3 * s * s + 1, s ** 3 - 2 * s * s + s, -2 * s ** 3 + 3 * s * s, s ** 3 - s * s
     out = {}
+    # (a place a path key leaves out comes eased from struck and raised as a Vector, beside the keys' own tuples)
+    vec = lambda v: Vector(v) if isinstance(v, tuple) else v
     for n in k0:
-        p0, p1 = k0[n], k1[n]
-        if isinstance(p0, tuple):
-            p0, p1 = Vector(p0), Vector(p1)
-        q0, q1 = before[1].get(n, k0[n]), after[1].get(n, k1[n])
-        if isinstance(q0, tuple):
-            q0, q1 = Vector(q0), Vector(q1)
+        p0, p1 = vec(k0[n]), vec(k1[n])
+        q0, q1 = vec(before[1].get(n, k0[n])), vec(after[1].get(n, k1[n]))
         # Each key's slope from its neighbours, over this span's length of u.
         m0 = (p1 - q0) * ((u1 - u0) / (u1 - before[0])) if before[0] < u0 else (p1 - p0)
         m1 = (q1 - p0) * ((u1 - u0) / (after[0] - u0)) if after[0] > u1 else (p1 - p0)
@@ -5874,7 +6006,13 @@ def holster_frame(slot, X, melee=False):
     aim = Vector(aim).normalized()
     a = (B.to_3x3() @ aim).normalized()
     top = B.to_3x3() @ weapon_top(aim, roll)
-    return B @ (head[HIPS] + Vector(at) * LEG / MODEL_LEG), a, (top - top.dot(a) * a).normalized()
+    top = (top - top.dot(a) * a).normalized()
+    if melee and 'melee_aim' not in HOLSTERS[slot]:
+        # No melee place: the weapon (taken to have MELEE_SLOT_OFFSET) turned by its offset so its blade runs along the
+        # aim's line, hilt first, as SkinnedFigure.HolsterAt's spin has it.
+        spin = math.radians(MELEE_SLOT_OFFSET + 180.0)
+        a, top = a * math.cos(spin) + top * math.sin(spin), top * math.cos(spin) - a * math.sin(spin)
+    return B @ (head[HIPS] + Vector(at) * LEG / MODEL_LEG), a, top
 
 def handle_of(slot, name, X):
     """The wrist's place and the hand's turn from rest (armature space) that take hold of the weapon name (a WEAPONS entry

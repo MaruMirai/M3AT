@@ -42,8 +42,10 @@ namespace M3AT
     internal sealed class HairBuilder
     {
         private const string Tag = "[M3AT] ";
-        public const int Version = 34;   // raise when the build changes, so cached hair is made again
+        public const int Version = 35;   // raise when the build changes, so cached hair is made again
         public const int BeardVersion = 4;   // and cached beards
+        internal static bool Tapered = true;    // the hull's flanks narrowing behind the head's middle (Hull; M3AT_NO_TAPER off)
+        internal static bool LineUpOn = true;   // LinedUp (the harness turns it off with M3AT_NO_LINEUP, to compare)
         private static bool pixelsFailed;   // IsoRim's pixel reading has thrown once (logged once)
         public const int Size = 256;    // pixels: every sprite is read at this size, as hair.py's SIZE
         private const int Voxel = 2;    // sprite pixels per voxel side
@@ -99,6 +101,20 @@ namespace M3AT
         private const float UnderChin = 0.4f;     // head heights above the drawn-over head's chin from which the hull in
                                                   // front of the head's middle takes only the front sprite (Hull), as
                                                   // SkirtShortFrom
+        // The back sprite lined up with the front one (LinedUp): many mods draw their hair a few pixels off the middle of
+        // the image, the same way in both, so read from behind it is off the other way by twice that, and the hull's side
+        // wall behind the head's middle was cut away as a hole (Gloomy Hair's LongA, 5 px apart at 256).
+        private const float LineUpRows = 0.6f;    // head heights down from the head's top over which they are compared
+        private const int LineUpHug = 24;         // pixels: a row counts only where each sprite's hair edge is this near the head's outline
+        private const int LineUpAgree = 3;        // pixels: ... and both edges are off by about the same, so it is moved, not reshaped
+        private const int LineUpLeast = 6;        // rows that must count for it to be moved at all
+        private const int LineUpFrom = 3;         // pixels apart from which it is moved: less is noise or the art's own lean
+        private const int LineUpMost = 8;         // pixels it is moved at most
+        // The side sprite moved back where its hair stops short of the back of the head the back sprite covers right across
+        // (Gloomy Hair's LongF, middlB and WavelongB, drawn 2 or 3 px toward the face): the back of the head came out
+        // through the hair. Only so far: a short cut that leaves the back of the head bare is drawn so.
+        private const int SideBackFrom = 2;       // pixels short of the head's back from which it is moved
+        private const int SideBackMost = 4;       // pixels short of it past which it is left as drawn
         private const int InkReach = 4;           // pixels in from a sprite's edge its outline ink reaches (InkEdges)
         private const int VetoSlack = 6;          // pixels past its outline a sprite's hair still counts when it has a
                                                   // say over a triangle another sprite faces, off the head (Vetoes)
@@ -183,6 +199,7 @@ namespace M3AT
         private bool[][] ink;       // the sprites' outline ink (InkEdges)
         private Color32[] crownPanel;   // the crown seen from above, rows top first (Crowned)
         private Color32[][] veto;   // the sprites' alpha as each has a say over a triangle another faces (Vetoes)
+        private bool[] flank;       // the voxels the hull keeps behind the head's middle only by its taper (Hull), grown by one
 
         private readonly Queue<Job> waiting = new Queue<Job>();
         private readonly List<Job> done = new List<Job>();
@@ -847,9 +864,164 @@ namespace M3AT
         }
 
         // Builds a style (any thread, once UseHead has been given the head).
+        internal int lastLineUp;   // pixels the last style's back sprite was moved by (LinedUp), for the harness
+        internal int lastSideBack;   // and its side sprite
+
+        // The sprites with the back one moved sideways onto the front one, if every row across the skull says they are
+        // a whole number of pixels apart: each edge of the front sprite's hair against the same edge of the back one's,
+        // seen from the front (mirrored), only where both hug the head (not a bun or a tail out to one side) and both
+        // edges agree (not a fringe swept one way). Anything built from the back sprite, its texture too, takes the moved
+        // one. A copy: the caller's sprites are left as they are.
+        private Sprites LinedUp(Sprites sp)
+        {
+            lastLineUp = 0;
+            lastSideBack = SideBack(sp);
+            List<float> apart = new List<float>();
+            int last = Mathf.RoundToInt(hy0 + LineUpRows * (hy1 - hy0));
+            for (int r = Math.Max(0, hy0); r <= Math.Min(Size - 1, last); r++)
+            {
+                int h0 = -1, h1 = -1, a0 = -1, a1 = -1, b0 = -1, b1 = -1;
+                for (int c = 0; c < Size; c++)
+                {
+                    int i = r * Size + c, m = Size - 1 - c;
+                    if (headMask[0][i])
+                    {
+                        if (h0 < 0)
+                        {
+                            h0 = c;
+                        }
+                        h1 = c;
+                    }
+                    if (sp.px[0][i].a >= Solid)
+                    {
+                        if (a0 < 0)
+                        {
+                            a0 = c;
+                        }
+                        a1 = c;
+                    }
+                    if (sp.px[2][i].a >= Solid)
+                    {
+                        if (b1 < 0)
+                        {
+                            b1 = m;
+                        }
+                        b0 = m;
+                    }
+                }
+                if (h0 < 0 || a0 < 0 || b0 < 0 || Math.Abs(a0 - h0) > LineUpHug || Math.Abs(a1 - h1) > LineUpHug
+                    || Math.Abs(b0 - h0) > LineUpHug || Math.Abs(b1 - h1) > LineUpHug)
+                {
+                    continue;
+                }
+                int left = a0 - b0, right = a1 - b1;
+                if (Math.Abs(left - right) <= LineUpAgree)
+                {
+                    apart.Add((left + right) / 2f);
+                }
+            }
+            int d = 0;
+            if (apart.Count >= LineUpLeast)
+            {
+                apart.Sort();
+                d = Mathf.Clamp(Mathf.RoundToInt(apart[apart.Count / 2]), -LineUpMost, LineUpMost);
+            }
+            if (Math.Abs(d) < LineUpFrom)
+            {
+                d = 0;
+            }
+            if (d == 0 && lastSideBack == 0)
+            {
+                return sp;
+            }
+            lastLineUp = d;
+            // Each sprite is off the middle by half of that, the same way in its own pixels (the back one is mirrored to
+            // be read from the front): so each is moved back by its half, centring both on the head they are drawn over,
+            // not the back onto the front, which left the head standing out past the hair on one side (LongE's left).
+            // Its column c then takes what was at c + half.
+            int half = d / 2;
+            Sprites lined = new Sprites { hash = sp.hash };
+            lined.px[0] = Moved(sp.px[0], half);
+            lined.px[1] = Moved(sp.px[1], lastSideBack);
+            lined.px[2] = Moved(sp.px[2], d - half);
+            return lined;
+        }
+
+        // How far back to move the side sprite (SideBackFrom, SideBackMost), 0 to leave it: the median over the rows across
+        // the skull where the back sprite has hair right across the head of how far the side sprite's hair stops short of
+        // the head's back (its outline before HeadGrow). The side sprite faces east, so the back is its first columns.
+        private int SideBack(Sprites sp)
+        {
+            List<int> short_ = new List<int>();
+            int last = Mathf.RoundToInt(hy0 + LineUpRows * (hy1 - hy0));
+            for (int r = Math.Max(0, hy0); r <= Math.Min(Size - 1, last); r++)
+            {
+                int head = 0, covered = 0, headBack = -1, hairBack = -1;
+                for (int c = 0; c < Size; c++)
+                {
+                    int i = r * Size + c;
+                    if (headMask[2][i])
+                    {
+                        head++;
+                        if (sp.px[2][i].a >= Solid)
+                        {
+                            covered++;
+                        }
+                    }
+                    if (headBack < 0 && headMask[1][i])
+                    {
+                        headBack = c + HeadGrow;
+                    }
+                    if (hairBack < 0 && sp.px[1][i].a >= Solid)
+                    {
+                        hairBack = c;
+                    }
+                }
+                if (head >= 10 && covered >= 0.95f * head && headBack >= 0 && hairBack >= 0)
+                {
+                    short_.Add(hairBack - headBack);
+                }
+            }
+            if (short_.Count < LineUpLeast)
+            {
+                return 0;
+            }
+            short_.Sort();
+            int d = short_[short_.Count / 2];
+            return d >= SideBackFrom && d <= SideBackMost ? d : 0;
+        }
+
+        // A sprite moved sideways: its column c takes what was at c + by.
+        private static Color32[] Moved(Color32[] was, int by)
+        {
+            if (by == 0)
+            {
+                return was;
+            }
+            Color32[] moved = new Color32[was.Length];
+            for (int r = 0; r < Size; r++)
+            {
+                for (int c = 0; c < Size; c++)
+                {
+                    int from = c + by;
+                    if (from >= 0 && from < Size)
+                    {
+                        moved[r * Size + c] = was[r * Size + from];
+                    }
+                }
+            }
+            return moved;
+        }
+
         internal Built Build(string style, Sprites sp)
         {
             Built built = new Built();
+            lastLineUp = 0;
+            lastSideBack = 0;
+            if (!beard && LineUpOn)
+            {
+                sp = LinedUp(sp);
+            }
             bool[] nearHair;
             if (beard)
             {
@@ -1093,6 +1265,7 @@ namespace M3AT
         {
             int n = Size / Voxel;
             bool[] inside = new bool[n * n * n];   // [y, x, z]
+            bool[] tapered = null;
             bool[] hair = new bool[n * n * n];
             // Hair: the front or the back sprite (each leaves out what the body hides from it, as a braid down the back
             // is not drawn in the front one), and the side one. The head: its outline in the front and side ones.
@@ -1177,20 +1350,52 @@ namespace M3AT
                         }
                     }
                 }
+                tapered = new bool[n * n * n];
                 // Behind the head's middle, at any height, the hair is only where the back sprite has it (if it has any
                 // in that row). The front sprite is often wider than the back one, its locks spread out either side of
                 // the face, and with its width the hull's back corners stood out past where the back sprite has any
-                // hair: they took the side sprite's outline ink, or were cut away as holes (LongB's back right).
+                // hair: they took the side sprite's outline ink, or were cut away as holes (LongB's back right). Past
+                // either end of the back sprite's hair, though, the hull narrows from the front's width at the middle to
+                // the back's at the back of the hair (Tapered): cut to the back's width at once, the step at the middle
+                // faced backward, past the back sprite's outline, and was cut away as a hole in the side of the head
+                // (Gloomy Hair's LongA and LongE, over the ear).
                 for (int y = 0; y < n; y++)
                 {
-                    bool any = false;
-                    for (int x = 0; x < n && !any; x++)
+                    int n0 = -1, n1 = -1, u0 = -1, u1 = -1;
+                    for (int x = 0; x < n; x++)
                     {
-                        any = north[y * n + x];
+                        if (north[y * n + x])
+                        {
+                            if (n0 < 0)
+                            {
+                                n0 = x;
+                            }
+                            n1 = x;
+                        }
+                        if (s[y * n + x])
+                        {
+                            if (u0 < 0)
+                            {
+                                u0 = x;
+                            }
+                            u1 = x;
+                        }
                     }
-                    if (!any)
+                    if (n0 < 0)
                     {
                         continue;
+                    }
+                    int zBack = midZ;
+                    for (int x = 0; x < n; x++)
+                    {
+                        for (int z = 0; z < zBack; z++)
+                        {
+                            if (hair[(y * n + x) * n + z])
+                            {
+                                zBack = z;
+                                break;
+                            }
+                        }
                     }
                     for (int x = 0; x < n; x++)
                     {
@@ -1198,8 +1403,21 @@ namespace M3AT
                         {
                             continue;
                         }
+                        bool sides = Tapered && (x < n0 || x > n1);
                         for (int z = 0; z < midZ; z++)
                         {
+                            if (sides)
+                            {
+                                float t = Mathf.Clamp01((midZ - z) / (float)Math.Max(1, midZ - zBack));
+                                if (x >= Mathf.Lerp(u0, n0, t) - 0.5f && x <= Mathf.Lerp(u1, n1, t) + 0.5f)
+                                {
+                                    if (hair[(y * n + x) * n + z])
+                                    {
+                                        tapered[(y * n + x) * n + z] = true;
+                                    }
+                                    continue;
+                                }
+                            }
                             hair[(y * n + x) * n + z] = false;
                         }
                     }
@@ -1210,6 +1428,7 @@ namespace M3AT
                 inside[i] |= hair[i];
             }
             nearHair = Grown(beard ? Prisms(s, e, n) : hair, n, HairReach);
+            flank = tapered != null ? Grown(tapered, n, 1) : null;
             // Each block's share inside, with an empty block all round.
             int b = (n + Block - 1) / Block, g = b + 2;
             float[] share = new float[g * g * g];
@@ -2044,6 +2263,17 @@ namespace M3AT
                 int view = ViewOf(m.fn[f], centre);
                 bool crown = m.fn[f].y > Crown && !beard;
                 int seen = SeenBy(m.fn[f], view, crown);
+                if (flank != null && NearHair(flank, n, centre))
+                {
+                    // The taper's flank (Hull) stands out past the back sprite's outline by design: the back sprite has
+                    // no say over it, and a crown there takes the front sprite, which has hair that far out.
+                    seen &= ~4;
+                    if (view == 2)
+                    {
+                        view = crown ? 0 : 1;
+                        seen = SeenBy(m.fn[f], view, crown) & ~4;
+                    }
+                }
                 bool[] on = new bool[3];
                 int count = 0;
                 for (int k = 0; k < 3; k++)

@@ -4,12 +4,12 @@
   <KeyBindingCategoryDef>
     <defName>M3AT</defName>
     <label>M3AT</label>
-    <description>Keys for M3AT's flying freecam.</description>
+    <description>Keys for M3AT's freecam.</description>
   </KeyBindingCategoryDef>
 
   <KeyBindingDef>
     <defName>M3AT_Freecam</defName>
-    <label>flying freecam on/off</label>
+    <label>freecam on/off</label>
     <category>M3AT</category>
     <defaultKeyCodeA>F6</defaultKeyCodeA>
   </KeyBindingDef>

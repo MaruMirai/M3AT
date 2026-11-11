@@ -2,7 +2,9 @@
 # defs: the apparel it is drawn for. layer and groups (if any): it also stands in for apparel with no garment of
 # its own worn on that layer and covering one of those body part groups.
 defs Apparel_Slicecap
-hide_hair tuck
+hide_hair no
+# over_hair: worn over the hair, pushed out past the style worn rather than cutting it.
+over_hair yes
 # hide k ...: body triangles (skin.txt's f lines, from 0) left out while it is worn.
 v 0.03014 1.14160 0.18958
 v -0.04332 1.15295 0.18248

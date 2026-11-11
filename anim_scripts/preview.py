@@ -55,13 +55,13 @@ SECTIONS = [('FRAMES', 'Walk and run'), ('IDLE_SECONDS', 'Idle'), ('DRAFT_SECOND
             ('LIE_SECONDS', 'Lying'), ('RAGDOLL_CURL', 'Ragdoll'), ('CRAWL_FRAMES', 'Crawling'), ('PLUCK_LEAN', 'Kneeling at work'), ('LIMP_GOOD', 'Limping'), ('HOP_GROUND', 'Hopping'), ('WADE_STRIDE', 'Wading'),
             ('SWIM_FRAMES', 'Swimming'), ('TREAD_SECONDS', 'Treading water'), ('CARRY_SECONDS', 'Carrying'),
             ('HURT_SECONDS', 'Hurt'), ('CRY_SECONDS', 'Cowering'), ('COVER_SECONDS', 'Taking cover'), ('LEAD_SECONDS', 'Leading'), ('RUB_UPPER', 'Rubbing the hands'), ('TALK_UPPER', 'Talking'), ('RELOAD_UPPER', 'Reloading'), ('EAT_UPPER', 'Eating'), ('READ_SECONDS', 'Reading'), ('RESEARCH_CLIP', 'Researching'), ('CROUCH_CLIP', 'Working by place'),
-            ('CAST_SECONDS', 'Casting'), ('HIP_SECONDS', 'Hip gear'), ('SHIELD_SECONDS', 'Shield'), ('FLINCH_FRAMES', 'Flinching'), ('REEL_SECONDS', 'Staggered'), ('TOSS_SECONDS', 'Tossing'), ('BEAT_SECONDS', 'Beating fires'),
+            ('CAST_SECONDS', 'Casting'), ('HIP_SECONDS', 'Hip gear'), ('SHIELD_SECONDS', 'Shield'), ('FLINCH_FRAMES', 'Flinching'), ('REEL_SECONDS', 'Staggered'), ('TOSS_SECONDS', 'Tossing'), ('KISS_SECONDS', 'Kissing'), ('BEAT_SECONDS', 'Beating fires'),
             ('DAZE_SECONDS', 'Stunned'), ('HAND_PALM', 'Placing a palm'),
             ('JUMP_FRAMES', 'Jumping'), ('WORK_GRIP', 'Working'), ('BEND_SECONDS', 'Bending'), ('AIM_PITCH', 'Aiming'),
             ('STRIKE_FRAMES', 'Striking'), ('DRAW_FRAMES', 'Drawing')]
 CLIP_SECTION = {'gait': 'Walk and run', 'still': 'Walk and run', 'idle': 'Idle', 'drafted': 'Drafted',
                 'carry': 'Carrying', 'carried': 'Carrying', 'sit': 'Sitting', 'lie': 'Lying', 'crawl': 'Crawling',
-                'bend': 'Bending', 'hurt': 'Hurt', 'cower': 'Cowering', 'hunker': 'Cowering', 'cover': 'Taking cover', 'lead': 'Leading', 'rub': 'Rubbing the hands', 'talk': 'Talking', 'teach': 'Teaching', 'reload': 'Reloading', 'eat_sit': 'Eating', 'eat_stand': 'Eating', 'read': 'Reading', 'research': 'Researching', 'research_stand': 'Researching', 'research_floor': 'Researching', 'crouch': 'Working by place', 'sow': 'Working by place', 'bench': 'Working by place', 'bench_sit': 'Working by place', 'chair': 'Working by place', 'tame': 'Taming', 'tame_kneel': 'Taming', 'stomp': 'Beating fires', 'pat': 'Beating fires', 'piano': 'Playing music', 'piano_sit': 'Playing music', 'harp': 'Playing music', 'harp_sit': 'Playing music', 'drum': 'Playing music', 'drum_sit': 'Playing music', 'cast': 'Casting', 'gear': 'Hip gear', 'shield': 'Shield', 'flinch': 'Flinching', 'reel': 'Staggered', 'toss': 'Tossing', 'daze': 'Stunned', 'jump': 'Jumping', 'land': 'Jumping', 'work': 'Working', 'pluck': 'Kneeling at work', 'tend': 'Kneeling at work', 'toys': 'Kneeling at work', 'play_sit': 'Kneeling at work', 'visit_sit': 'Kneeling at work', 'meditate': 'Meditating', 'vomit': 'Vomiting', 'getup': 'Getting up', 'dive': 'Diving', 'duck': 'Hunkering', 'roll': 'Diving', 'sleep': 'Lying', 'baby': 'Lying', 'downed': 'Lying', 'downed_side': 'Lying', 'dead': 'Lying', 'ragdoll': 'Ragdoll', 'fall': 'Lying', 'limp': 'Limping', 'hop': 'Hopping', 'wade': 'Wading', 'swim': 'Swimming', 'tread': 'Treading water', 'aim': 'Aiming', 'strike': 'Striking', 'draw': 'Drawing', 'holster': 'Drawing'}
+                'bend': 'Bending', 'hurt': 'Hurt', 'cower': 'Cowering', 'hunker': 'Cowering', 'cover': 'Taking cover', 'lead': 'Leading', 'rub': 'Rubbing the hands', 'talk': 'Talking', 'teach': 'Teaching', 'reload': 'Reloading', 'eat_sit': 'Eating', 'eat_stand': 'Eating', 'read': 'Reading', 'research': 'Researching', 'research_stand': 'Researching', 'research_floor': 'Researching', 'crouch': 'Working by place', 'sow': 'Working by place', 'bench': 'Working by place', 'bench_sit': 'Working by place', 'chair': 'Working by place', 'tame': 'Taming', 'tame_kneel': 'Taming', 'stomp': 'Beating fires', 'pat': 'Beating fires', 'piano': 'Playing music', 'piano_sit': 'Playing music', 'harp': 'Playing music', 'harp_sit': 'Playing music', 'drum': 'Playing music', 'drum_sit': 'Playing music', 'cast': 'Casting', 'gear': 'Hip gear', 'shield': 'Shield', 'flinch': 'Flinching', 'reel': 'Staggered', 'toss': 'Tossing', 'snowball': 'Tossing', 'kiss': 'Kissing', 'daze': 'Stunned', 'jump': 'Jumping', 'land': 'Jumping', 'work': 'Working', 'pluck': 'Kneeling at work', 'tend': 'Kneeling at work', 'toys': 'Kneeling at work', 'play_sit': 'Kneeling at work', 'visit_sit': 'Kneeling at work', 'meditate': 'Meditating', 'vomit': 'Vomiting', 'getup': 'Getting up', 'dive': 'Diving', 'duck': 'Hunkering', 'roll': 'Diving', 'sleep': 'Lying', 'baby': 'Lying', 'downed': 'Lying', 'downed_side': 'Lying', 'dead': 'Lying', 'ragdoll': 'Ragdoll', 'fall': 'Lying', 'limp': 'Limping', 'hop': 'Hopping', 'wade': 'Wading', 'swim': 'Swimming', 'tread': 'Treading water', 'aim': 'Aiming', 'strike': 'Striking', 'draw': 'Drawing', 'holster': 'Drawing'}
 # The clips timed by the ground covered, posed by Phase: each one's pose at a phase, with the picked kind.
 CYCLES = {'crawl': lambda p, kind: walk.crawl_at(p), 'limp': lambda p, kind: walk.limp_at(p, kind),
           'hop': lambda p, kind: walk.hop_at(p, kind),
@@ -71,7 +71,7 @@ GROUND = {'crawl': lambda: walk.crawl_ground_per_cycle(), 'limp': lambda: walk.l
           'wade': lambda: walk.wade_ground_per_cycle(), 'swim': lambda: walk.swim_ground_per_cycle()}
 # The stance tables: hands by side ('L', 'R': wrist places in leg lengths) and 'body' (the stance's own numbers).
 STANCES = ('DRAFTED', 'CARRY')
-OVERS = ('drafted', 'carry', 'hurt', 'cower', 'lead', 'shield', 'rub', 'talk', 'teach', 'reload', 'cast', 'gear', 'flinch', 'reel', 'toss', 'daze', 'aim', 'strike', 'draw', 'holster')   # the clips the game lays over the gait
+OVERS = ('drafted', 'carry', 'hurt', 'cower', 'lead', 'shield', 'rub', 'talk', 'teach', 'kiss', 'snowball', 'reload', 'cast', 'gear', 'flinch', 'reel', 'toss', 'daze', 'aim', 'strike', 'draw', 'holster')   # the clips the game lays over the gait
 BODY_KEYS = ('DROP', 'NARROW', 'STAGGER', 'LEAN', 'HEAD_TILT')   # offered for every entry, with any other key an entry already has
 ANGLE_KEYS = {'HEAD_TILT'}   # body numbers in degrees either way from 0, which soft_range would give 0 .. 1
 ANGLE_RANGE = (-45.0, 45.0)
@@ -242,7 +242,7 @@ def loop_seconds(what, kind=''):
             'lead': getattr(walk, 'LEAD_SECONDS', None), 'shield': getattr(walk, 'SHIELD_DRAW_SECONDS' if kind else 'SHIELD_SECONDS', None), 'rub': getattr(walk, 'RUB_SECONDS', None), 'talk': getattr(walk, 'TALK_SECONDS', None), 'teach': getattr(walk, 'TEACH_SECONDS', None),
             'reload': getattr(walk, 'RELOAD_SECONDS', None),
             'eat_sit': getattr(walk, 'EAT_SIT_SECONDS', None), 'eat_stand': getattr(walk, 'EAT_STAND_SECONDS', None), 'read': getattr(walk, 'READ_SECONDS', None), 'research': getattr(walk, 'RESEARCH_SECONDS', None), 'research_stand': getattr(walk, 'RESEARCH_SECONDS', None), 'research_floor': getattr(walk, 'RESEARCH_SECONDS', None), 'crouch': getattr(walk, 'CROUCH_SECONDS', None), 'sow': getattr(walk, 'SOW_SECONDS', None), 'bench': getattr(walk, 'BENCH_SECONDS', None), 'bench_sit': getattr(walk, 'BENCH_SIT_SECONDS', None), 'chair': getattr(walk, 'CHAIR_SECONDS', None), 'tame': getattr(walk, 'TAME_SECONDS', None), 'tame_kneel': getattr(walk, 'CROUCH_SECONDS', None), 'stomp': getattr(walk, 'BEAT_SECONDS', None), 'pat': getattr(walk, 'BEAT_SECONDS', 0.0) * getattr(walk, 'PAT_HITS', 1), **{w: walk.MUSIC[w.replace('_sit', '')]['seconds'] for w in ('piano', 'piano_sit', 'harp', 'harp_sit', 'drum', 'drum_sit') if hasattr(walk, 'MUSIC')}, 'cast': getattr(walk, 'CAST_SECONDS', None),
-            'flinch': FLINCH_SECONDS, 'reel': getattr(walk, 'REEL_SECONDS', None), 'toss': getattr(walk, 'TOSS_SECONDS', None), 'daze': getattr(walk, 'DAZE_SECONDS', None),
+            'flinch': FLINCH_SECONDS, 'reel': getattr(walk, 'REEL_SECONDS', None), 'toss': getattr(walk, 'TOSS_SECONDS', None), 'snowball': getattr(walk, 'SNOW_SECONDS', None), 'kiss': getattr(walk, 'KISS_SECONDS', None), 'daze': getattr(walk, 'DAZE_SECONDS', None),
             'jump': JUMP_SECONDS, 'aim': AIM_SWEEP_SECONDS,
             'gear': (AIM_SWEEP_SECONDS if kind in ('aim', 'fire') else getattr(walk, 'HIP_DRAW_SECONDS', None) if kind in ('draw', 'put')
                      else getattr(walk, 'HIP_SECONDS', None)),
@@ -416,7 +416,8 @@ def loop_pose(what, kind, t):
     if what == 'eat_stand':
         return walk.eat_stand_at(t)
     if what == 'read':
-        return walk.read_at(t)
+        # read:L / read:R, the book held out to someone sat on that side (read_show_L, read_show_R)
+        return walk.read_at(t, {'L': 1, 'R': -1}.get(kind, 0)) if kind else walk.read_at(t)
     if what == 'cast':
         return walk.cast_at(t, touch=kind == 'touch')
     if what == 'gear':
@@ -425,6 +426,10 @@ def loop_pose(what, kind, t):
         return walk.hip_aim_at(t, kind == 'fire') if kind in ('aim', 'fire') else walk.hip_hold_at(t)
     if what == 'flinch':
         return walk.flinch_at(t, kind)   # Time is how far through the jolt: the hit at 0, over at 1
+    if what == 'snowball':
+        return walk.snowball_at(t)   # Time is how far through the throw: 0 standing .. let go at walk.SNOW_RELEASE .. 1 standing
+    if what == 'kiss':
+        return walk.kiss_at(t)
     if what == 'toss':
         return walk.toss_at(t)   # Time is how far through the pitch: 0 standing .. let go at walk.TOSS_RELEASE .. 1 standing
     if what == 'reel':
@@ -1369,6 +1374,80 @@ def load_object(name, material):
         obj.data.materials.append(mat)
     return obj
 
+PET = 'MaruPet'
+PET_MODEL = 'animal_cat_blob'   # IsoRim's cat (R3D_Animal_Cat: scale 1), textured by PET_TEXTURE
+PET_TEXTURE = os.path.join(ISORIM_ROOT, 'Textures', 'IsoRim', 'Animals', 'Cat.png')
+PET_BELLY = 0.5        # WalkFigures.PetBelly: of the height of its back, how far the pet is sunk below the forearm
+PET_BACK_SHARE = 0.45  # WalkFigures.PetBackShare: of its model's height, the top of its back
+
+def pet_mesh():
+    """IsoRim's cat as a mesh object in the game's model space (cells) in Blender's axes, with its texture places and
+    image; None without the model. Made once (not saved with the .blend, as the other preview objects)."""
+    obj = bpy.data.objects.get(PET)
+    if obj is not None:
+        return obj
+    path = os.path.join(ISORIM_MODELS, PET_MODEL + '.obj')
+    if not os.path.exists(path):
+        return None
+    vs, uvs, fs = [], [], []
+    with open(path) as f:
+        for line in f:
+            q = line.split()
+            if not q:
+                continue
+            if q[0] == 'v':
+                x, y, z = map(float, q[1:4])
+                vs.append((-x, z, y))   # the game's model space (IsoRim's loader flips z) in Blender's axes
+            elif q[0] == 'vt':
+                uvs.append((float(q[1]), float(q[2])))
+            elif q[0] == 'f':
+                corners = [c.split('/') for c in q[1:]][::-1]   # (written reversed for IsoRim's mirroring loader)
+                fs.append([(int(c[0]) - 1, int(c[1]) - 1 if len(c) > 1 and c[1] else -1) for c in corners])
+    me = bpy.data.meshes.new(PET)
+    me.from_pydata(vs, [], [[v for v, _ in face] for face in fs])
+    if uvs:
+        layer = me.uv_layers.new(name='UVMap')
+        i = 0
+        for face in fs:
+            for _, t in face:
+                if t >= 0:
+                    layer.data[i].uv = uvs[t]
+                i += 1
+    for poly in me.polygons:
+        poly.use_smooth = True
+    mat = bpy.data.materials.get(PET) or bpy.data.materials.new(PET)
+    mat.diffuse_color = (0.85, 0.6, 0.35, 1.0)   # (Solid view: a ginger cat)
+    if os.path.exists(PET_TEXTURE):
+        mat.use_nodes = True
+        nodes = mat.node_tree.nodes
+        bsdf = next((n for n in nodes if n.type == 'BSDF_PRINCIPLED'), None)
+        tex = nodes.new('ShaderNodeTexImage')
+        tex.image = bpy.data.images.load(PET_TEXTURE, check_existing=True)
+        if bsdf is not None:
+            mat.node_tree.links.new(tex.outputs['Color'], bsdf.inputs['Base Color'])
+    me.materials.append(mat)
+    obj = bpy.data.objects.new(PET, me)
+    obj.hide_select = True   # so the hand handles can be picked through it
+    obj.hide_render = True
+    bpy.context.scene.collection.objects.link(obj)
+    return obj
+
+def draw_pet(mw, mid):
+    """Puts IsoRim's cat on a cuddle clip's forearm (mid: the left forearm's PET_ALONG point lifted PET_LIFT, armature
+    space), as WalkFigures.DrawLoad does for a grown cat on a standard grown pawn. False without the model."""
+    obj = pet_mesh()
+    if obj is None:
+        return False
+    cell = walk.LEG / walk.MODEL_LEG / walk.GAME_SCALE   # armature units per cell, for a grown pawn
+    height = max(v.co.z for v in obj.data.vertices)   # Api.ModelHeight: its top, cells
+    sink = height * PET_BACK_SHARE * PET_BELLY
+    # Its front (-y, as the figure's) turned to +x, the carrier's left (the game's Rotation: yaw - 90).
+    obj.matrix_world = (mw @ Matrix.Translation(mid - Vector((0, 0, sink * cell)))
+                        @ Matrix.Rotation(math.radians(90.0), 4, 'Z') @ Matrix.Scale(cell, 4))
+    obj.hide_viewport = False
+    state['pet_back'] = height * PET_BACK_SHARE * (1 - PET_BELLY) * cell / walk.LEG   # its back over mid, leg lengths
+    return True
+
 def carried_mesh(kind):
     """The body posed as the carried person (walk.carried_at at the start of its loop, as carry_at places the hands
     from), armature space, as (vertices, faces); kept until the numbers change. The rig is put back as it was."""
@@ -1407,7 +1486,8 @@ def draw_load(p, what, kind):
     pet = shown and walk.CARRY[kind].get('pet')
     item = shown and (kind == 'item' or pet)
     person = shown and kind != 'item' and not pet
-    for name, on in ((LOAD + 'Item', item), (LOAD + 'Person', person)):
+    state.pop('pet_back', None)
+    for name, on in ((LOAD + 'Item', item and not (pet and pet_mesh() is not None)), (LOAD + 'Person', person), (PET, pet)):
         obj = bpy.data.objects.get(name)
         if obj is not None and not on:
             obj.hide_viewport = True
@@ -1416,11 +1496,14 @@ def draw_load(p, what, kind):
     bpy.context.view_layer.update()   # the bones' new places
     mw = walk.arm.matrix_world
     if pet:
-        # A cuddled pet (walk.pet_on): a box along the left forearm for its trunk, its top at walk.PET_BACK, where the
-        # right hand is laid (the game draws IsoRim's animal there, its trunk's middle on that point).
+        # A cuddled pet (walk.pet_on): IsoRim's cat where the game draws it (WalkFigures.DrawLoad): its base point on the
+        # left forearm's PET_ALONG point, PET_LIFT over it, let down PET_BELLY of its back's height (PetBackOf), head to
+        # the carrier's left. Without IsoRim's model, a box for its trunk, its top at walk.PET_BACK.
         pose = walk.arm.pose.bones
         fa = pose['forearm.L']
         mid = fa.head.lerp(fa.tail, walk.PET_ALONG) + Vector((0, 0, walk.PET_LIFT * walk.LEG))
+        if draw_pet(mw, mid):
+            return
         length, width, back = 0.5 * walk.LEG, 0.22 * walk.LEG, walk.PET_BACK * walk.LEG
         obj = load_object(LOAD + 'Item', False)
         obj.display_type = 'WIRE'
@@ -1470,15 +1553,19 @@ def draw_load(p, what, kind):
     obj.hide_viewport = False
 
 def clear_load():
-    for name in (LOAD + 'Item', LOAD + 'Person'):
+    for name in (LOAD + 'Item', LOAD + 'Person', PET):
         obj = bpy.data.objects.get(name)
         if obj is not None:
             me = obj.data
             bpy.data.objects.remove(obj)
             bpy.data.meshes.remove(me)
-    mat = bpy.data.materials.get(LOAD)
-    if mat is not None and mat.users == 0:
-        bpy.data.materials.remove(mat)
+    for name in (LOAD, PET):
+        mat = bpy.data.materials.get(name)
+        if mat is not None and mat.users == 0:
+            bpy.data.materials.remove(mat)
+    image = bpy.data.images.get(os.path.basename(PET_TEXTURE))
+    if image is not None and image.users == 0:
+        bpy.data.images.remove(image)
     state.pop('carried_key', None)
 
 HOLSTER = 'MaruHolster.'   # + slot: a holstered weapon's slab
@@ -1627,9 +1714,11 @@ def holster_frame(p, slot, kind=None, extra=None):
     a = (q @ aim).normalized()
     top = q @ top_of(aim, roll, Vector((0, -1, 0)))
     top = (top - a * top.dot(a)).normalized()
-    if melee_place(p, slot, kind):
-        # A weapon with another offset than the place is set for, turned by the difference (SlotLine).
-        spin = math.radians(getattr(p, 'wp_%s_offset' % (kind or getattr(p, 'hs_%s_weapon' % slot))) - walk.MELEE_SLOT_OFFSET)
+    name = kind or getattr(p, 'hs_%s_weapon' % slot)
+    if walk.is_melee(name):
+        # A weapon with another offset than the place is set for, turned by the difference (SlotLine); on a slot with no
+        # melee place, by its whole offset and end for end, so the blade runs along the aim's line hilt first.
+        spin = math.radians(getattr(p, 'wp_%s_offset' % name) - (walk.MELEE_SLOT_OFFSET if melee_place(p, slot, kind) else -180.0))
         a, top = a * math.cos(spin) + top * math.sin(spin), top * math.cos(spin) - a * math.sin(spin)
     return mw @ (B @ rest), a, top
 
@@ -2026,10 +2115,26 @@ def held_sides(p, what, kind):
     info = registered['stances'].get((table, kind))
     if info is None or (what == 'drafted' and drafted_pose_name(p, kind) != kind):
         return table, ()   # (a weapon's shield stance is worked out from its kind's: move the kind's hands)
-    return table, [s for s in info['sides'] if not info['toggle'] or getattr(p, sp(table, kind, s + '_on'))]
+    sides = [s for s in info['sides'] if not info['toggle'] or getattr(p, sp(table, kind, s + '_on'))]
+    if pet_hand(table, kind, 'R') and 'R' not in sides:
+        sides.append('R')   # the hand on the pet's back, placed by walk.cuddle_hand (STROKE_*), not the entry
+    return table, sides
+
+def pet_hand(table, kind, side):
+    """Whether this is a cuddle clip's hand on the pet (walk.cuddle_hand): its handle sets walk.py's STROKE_REST,
+    STROKE_FINGERS and STROKE_PALM (and on the stroke, shifts STROKE_FROM and STROKE_TO), not the CARRY entry."""
+    return (table == 'CARRY' and side == 'R' and kind in walk.CARRY and bool(walk.CARRY[kind].get('pet'))
+            and hasattr(walk, 'pet_last') and hasattr(walk, 'STROKE_PALM'))
+
+def pet_hand_turn(f, n):
+    """The right hand's turn from rest (armature space) that lays its fingers along f, its palm facing n (hand_on's)."""
+    d0, n0 = walk.hand_rest_axes('R', -1)
+    return (Matrix((f, n, f.cross(n))).transposed() @ Matrix((d0, n0, d0.cross(n0)))).to_quaternion()
 
 def turn_set(p, table, kind, side):
     """Whether a stance holds this hand at a turn of its own (an aim clip's hands are turned by the aim)."""
+    if pet_hand(table, kind, side):
+        return True
     return table != 'AIMED' and getattr(p, sp(table, kind, side + '_turn_on'))
 
 def aim_handle_place(side):
@@ -2044,6 +2149,10 @@ def handle_frame(p, table, kind, side, X):
     """Where a hand's handle goes (world): on the wrist place set, turned as the hand bone is, by the turn set or as
     the arm left it; on an aim clip, on its fist (aim_handle_place), turned as the hand is."""
     mw, chest, hn = walk.arm.matrix_world, state['chest'], 'hand.' + side
+    if pet_hand(table, kind, side) and walk.pet_last.get('kind') == kind:
+        last = walk.pet_last
+        q = pet_hand_turn(last['fingers'], last['facing'])
+        return mw @ last['wrist'], (mw.to_quaternion() @ q @ walk.rest[hn].to_quaternion()).normalized()
     if table == 'AIMED':
         q = X[hn].to_quaternion()
         return mw @ aim_handle_place(side), (mw.to_quaternion() @ q @ walk.rest[hn].to_quaternion()).normalized()
@@ -2074,6 +2183,7 @@ def place_handles(p, what, kind, X, write=True):
             bpy.context.scene.collection.objects.link(obj)
             state['handles'].pop(side, None)
         obj.empty_display_size = walk.LEG * walk.arm.matrix_world.to_scale().y * 0.25
+        obj.show_in_front = True   # (seen through the body, and a cuddled pet the right hand is laid on)
         if side in state['handles'] and p.playing:
             continue
         loc, q = handle_frame(p, table, kind, side, X)
@@ -2298,6 +2408,10 @@ def moved_handles():
                 state['dragged'] = state.get('dragged', set()) | {side}
                 moved = True
             continue
+        if pet_hand(table, kind, side) and walk.pet_last.get('kind') == kind:
+            pet_moved(p, loc, q, shifted, turned)
+            moved = True
+            continue
         chest = state['chest']
         if shifted:
             p[sp(table, kind, side)] = tuple((chest.inverted() @ (mw.inverted() @ loc) - walk.head[walk.HIPS]) / walk.LEG)
@@ -2316,6 +2430,36 @@ def moved_handles():
         finally:
             state['quiet'] = set()
             state['dragged'] = set()
+
+def pet_moved(p, loc, q, shifted, turned):
+    """The cuddle's right-hand handle moved (world loc, q, on the wrist): turned, its fingers' way and palm's
+    facing go to STROKE_FINGERS and STROKE_PALM (armature space); either way, the palm's place over the pet (walk.pet_on) to STROKE_REST
+    (along, across, up over PET_BACK), on the stroke the along shifting STROKE_FROM and STROKE_TO by as much, so the
+    stroke's path moves with the hand."""
+    last = walk.pet_last
+    mw = walk.arm.matrix_world
+    f, n = last['fingers'], last['facing']
+    if turned:
+        X = mw.to_quaternion().inverted() @ q @ walk.rest['hand.R'].to_quaternion().inverted()
+        d0, n0 = walk.hand_rest_axes('R', -1)
+        f, n = (X @ d0).normalized(), (X @ n0).normalized()
+        p['tup_STROKE_FINGERS'] = tuple(f)
+        p['tup_STROKE_PALM'] = tuple(n)
+    if shifted or turned:   # (turned about the wrist, the handle's place: the palm goes round it)
+        hn = 'hand.R'
+        palm = (mw.inverted() @ loc) + n * walk.HAND_HALF * walk.LEG + f * (walk.tail[hn] - walk.head[hn]).length * 0.5
+        off = (palm - last['pet']) / walk.LEG
+        rest = list(getattr(p, 'tup_STROKE_REST'))
+        rest[1] = off.y
+        if len(rest) > 2:
+            rest[2] = off.z - walk.PET_BACK - last['high']
+        if walk.CARRY[last['kind']].get('stroke'):
+            by = off.x - last['along']
+            p['walk_STROKE_FROM'] = getattr(p, 'walk_STROKE_FROM') + by
+            p['walk_STROKE_TO'] = getattr(p, 'walk_STROKE_TO') + by
+        else:
+            rest[0] = off.x
+        p['tup_STROKE_REST'] = tuple(rest)
 
 def game_clip(what, kind):
     """The game's name for the clip shown (walk.VARIANTS is keyed by it), or None for one without variants."""
@@ -2411,6 +2555,10 @@ def repose(_self=None, _context=None):
                     apply_over(Xg, Xs, 'LR', walk.REEL_UPPER)
                 elif what == 'toss':
                     apply_over(Xg, Xs, 'LR', walk.TOSS_UPPER)
+                elif what == 'snowball':
+                    apply_over(Xg, Xs, 'LR', walk.SNOW_UPPER)
+                elif what == 'kiss':
+                    apply_over(Xg, Xs, 'LR', walk.KISS_UPPER)
                 elif what == 'daze':
                     apply_over(Xg, Xs, 'LR', walk.DAZE_UPPER)
                 elif what == 'aim':
@@ -2497,7 +2645,7 @@ CATEGORIES = [('move', 'Moving', 'Walking, running, standing, swimming, crawling
               ('gear', 'Hip gear', 'Taking, holding and pointing a psychic lance, orbital targeter or tornado generator'),
               ('hurt', 'Hurt and reactions', 'Holding a wound, cowering, flinching, staggered and stunned')]
 CATEGORY_OF = {'drafted': 'drafted', 'carry': 'carry', 'carried': 'carry', 'bend': 'carry', 'lead': 'carry',
-               'sit': 'rest', 'lie': 'rest', 'getup': 'rest', 'sleep': 'rest', 'baby': 'rest', 'downed': 'hurt', 'downed_side': 'hurt', 'dead': 'hurt', 'ragdoll': 'hurt', 'fall': 'hurt', 'work': 'work', 'pluck': 'work', 'tend': 'work', 'toys': 'work', 'play_sit': 'rest', 'visit_sit': 'rest', 'meditate': 'rest', 'research': 'work', 'research_stand': 'work', 'research_floor': 'work', 'crouch': 'work', 'sow': 'work', 'bench': 'work', 'bench_sit': 'work', 'chair': 'work', 'tame': 'work', 'tame_kneel': 'work', 'stomp': 'work', 'pat': 'work', 'piano': 'rest', 'piano_sit': 'rest', 'harp': 'rest', 'harp_sit': 'rest', 'drum': 'rest', 'drum_sit': 'rest', 'eat_sit': 'rest', 'eat_stand': 'rest', 'read': 'rest', 'vomit': 'hurt', 'rub': 'hurt', 'talk': 'rest', 'teach': 'rest', 'toss': 'rest', 'reload': 'aim', 'aim': 'aim', 'strike': 'strike', 'cast': 'cast', 'gear': 'gear', 'shield': 'drafted', 'draw': 'draw', 'holster': 'draw',
+               'sit': 'rest', 'lie': 'rest', 'getup': 'rest', 'sleep': 'rest', 'baby': 'rest', 'downed': 'hurt', 'downed_side': 'hurt', 'dead': 'hurt', 'ragdoll': 'hurt', 'fall': 'hurt', 'work': 'work', 'pluck': 'work', 'tend': 'work', 'toys': 'work', 'play_sit': 'rest', 'visit_sit': 'rest', 'meditate': 'rest', 'research': 'work', 'research_stand': 'work', 'research_floor': 'work', 'crouch': 'work', 'sow': 'work', 'bench': 'work', 'bench_sit': 'work', 'chair': 'work', 'tame': 'work', 'tame_kneel': 'work', 'stomp': 'work', 'pat': 'work', 'piano': 'rest', 'piano_sit': 'rest', 'harp': 'rest', 'harp_sit': 'rest', 'drum': 'rest', 'drum_sit': 'rest', 'eat_sit': 'rest', 'eat_stand': 'rest', 'read': 'rest', 'vomit': 'hurt', 'rub': 'hurt', 'talk': 'rest', 'teach': 'rest', 'toss': 'rest', 'snowball': 'rest', 'kiss': 'rest', 'reload': 'aim', 'aim': 'aim', 'strike': 'strike', 'cast': 'cast', 'gear': 'gear', 'shield': 'drafted', 'draw': 'draw', 'holster': 'draw',
                'hurt': 'hurt', 'cower': 'hurt', 'hunker': 'hurt', 'cover': 'drafted', 'dive': 'hurt', 'duck': 'hurt', 'roll': 'hurt', 'flinch': 'hurt', 'reel': 'hurt', 'daze': 'hurt'}
 
 def category_of(clip):
@@ -2676,6 +2824,12 @@ def clip_items():
     if hasattr(walk, 'toss_at'):
         items.append(('toss', 'Tossing', 'Horseshoes and hoopstone: one underhand pitch, by Time (walk.toss_at); the whole '
                       'figure standing, over the sit from the waist up'))
+    if hasattr(walk, 'snowball_at'):
+        items.append(('snowball', 'Throwing a snowball', "Romance on the Rim's snowball fight: one quick overhand throw, by "
+                      'Time (walk.snowball_at, SNOW_KEYS); the whole figure standing'))
+    if hasattr(walk, 'kiss_at'):
+        items.append(('kiss', 'Kissing', "Romance on the Rim's kiss: leant in, the head tilted, the hands at the partner's "
+                      'waist, over the gait from the waist up (walk.kiss_at); the game draws the two closer'))
     if getattr(walk, 'RELOAD_CLIP', None) is not None and hasattr(walk, 'reload_at'):
         items.append(('reload', 'Reloading', "Combat Extended's reload: the left hand to the belt for a magazine and "
                       'back, from the waist up (walk.reload_at, from the mocap clip in reload_clip.json)'))
@@ -2688,6 +2842,10 @@ def clip_items():
     if hasattr(walk, 'read_at'):
         items.append(('read', 'Reading', 'The open book on the left palm, the right hand on its page turning one now and then '
                       '(walk.read_at), laid over the sit or the idle from the waist up; IsoRim\'s open book drawn on the hand'))
+        if hasattr(walk, 'READ_SHOW_OUT'):
+            items.append(('read:L', 'Reading: showing the book left', "Romance on the Rim's shared reading: the book held out to "
+                          'someone sat on the left (read_show_L, walk.read_at with show, READ_SHOW_ numbers)'))
+            items.append(('read:R', 'Reading: showing the book right', 'The same to the right (read_show_R)'))
     if getattr(walk, 'SLEEP_CLIP', None) is not None:
         items.append(('sleep', 'Asleep', 'Asleep on the back, upright: the game lays it down (walk.sleep_at, sleep_clip.json)'))
     if hasattr(walk, 'baby_at') and getattr(walk, 'CRAWL_CLIP', None) is not None:
@@ -3676,8 +3834,22 @@ class MARU_PT_gait(bpy.types.Panel):
     def draw_load(self, p, kind):
         box = self.layout.box()
         row = box.row()
-        row.label(text='Carried item' if kind == 'item' else 'Carried person (carried_%s)' % kind)
+        pet = kind in walk.CARRY and walk.CARRY[kind].get('pet')
+        row.label(text='Carried item' if kind == 'item' else "Cuddled pet (IsoRim's cat)" if pet
+                  else 'Carried person (carried_%s)' % kind)
         row.prop(p, 'load', text='', icon='HIDE_OFF' if p.load else 'HIDE_ON', emboss=False)
+        if pet:
+            col = box.column(align=True)
+            col.label(text='Right hand: G moves the palm on its back, R turns it')
+            col.label(text='(STROKE_REST, STROKE_FINGERS, STROKE_PALM)')
+            if bpy.data.objects.get(HANDLE + 'R') is not None:
+                col.operator('maru.gait_grab', text='Select right hand handle', icon='EMPTY_ARROWS').target = HANDLE + 'R'
+            elif p.over:
+                col.label(text='(no handles laid over the gait: untick Over the gait)')
+            if 'pet_back' in state:
+                # The game lays the right hand on the back of the animal it draws (WalkFigures.StrokePet), not PET_BACK.
+                col.label(text="Cat's back %.3f over the forearm, PET_BACK %.3f: the game moves the hand %+.3f"
+                          % (state['pet_back'], walk.PET_BACK, state['pet_back'] - walk.PET_BACK))
         if kind == 'item' and p.load:
             col = box.column(align=True)
             col.prop(p, 'load_size')

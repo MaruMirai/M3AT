@@ -106,11 +106,22 @@ namespace M3AT
         // the crown is the scalp, drawn in the hair's colour; a hat lying close on the head (the simple helmet stands
         // 0.005 cells off it) misses some of it in the exporter's test, and riding the head bone whole while the scalp
         // bends a little with the neck, it let that hair-coloured skin through, which looked like hair over the hat.
+        // Under a hat that doesn't go all round (the slicecap's crescent on the left), only where the hat is over it
+        // (OverHead): every scalp triangle above its rim left a hole in the head where it isn't.
         private int[] WithScalpUnder(int[] hides, int g, bool[] scalp)
         {
             Piece body = pieces[0];
             Rim rim = RimOf(g);
             HashSet<int> all = new HashSet<int>(hides);
+            // Only a hat that doesn't go all the way round the head is looked at so: under a whole one, a scalp triangle
+            // at its edge counts even where a line out from the middle passes just under it, as before.
+            bool partial = false;
+            for (int b = 0; b < RimBins && !Legacy; b++)
+            {
+                partial |= float.IsPositiveInfinity(rim.height[b]);
+            }
+            bool[] over = new bool[body.rest.Length];
+            bool[] tried = new bool[body.rest.Length];
             for (int k = 0; k + 2 < body.tris.Length; k += 3)
             {
                 bool under = true;
@@ -118,6 +129,12 @@ namespace M3AT
                 {
                     int i = body.tris[k + c];
                     under = scalp[i] && Above(body.rest[i], rim) + RimTuck > 0f;
+                    if (under && !tried[i])
+                    {
+                        tried[i] = true;
+                        over[i] = !partial || OverHead(body.rest[i], pieces[g].rest, pieces[g].tris);
+                    }
+                    under = under && over[i];
                 }
                 if (under)
                 {
@@ -128,6 +145,61 @@ namespace M3AT
             all.CopyTo(kept);
             Array.Sort(kept);
             return kept;
+        }
+
+        // A rim point closer to the head's vertical line than this share of the skin's furthest that way round is up by
+        // the crown, not where the hat comes down the side of the head (MeasureRim).
+        private const float RimCrown = 0.5f;
+
+#if AUTOTEST
+        internal static readonly bool Legacy = Environment.GetEnvironmentVariable("M3AT_LEGACY_HATS") == "1";
+#else
+        private const bool Legacy = false;
+#endif
+
+        private const float OverFrom = 0.01f;   // cells inside the skin the line out from the head's middle starts, for a hat lying on it
+
+        // Whether a line out from the head's middle through a point of the skin meets the hat's surface past it.
+        private bool OverHead(Vector3 point, Vector3[] rest, int[] tris)
+        {
+            if (Legacy)
+            {
+                return true;
+            }
+            Vector3 way = point - faceCentre;
+            if (way.sqrMagnitude < 1e-8f)
+            {
+                return true;
+            }
+            way.Normalize();
+            Vector3 from = point - way * OverFrom;
+            for (int k = 0; k + 2 < tris.Length; k += 3)
+            {
+                Vector3 a = rest[tris[k]], ab = rest[tris[k + 1]] - a, ac = rest[tris[k + 2]] - a;
+                Vector3 side = Vector3.Cross(way, ac);
+                float det = Vector3.Dot(ab, side);
+                if (Mathf.Abs(det) < 1e-9f)
+                {
+                    continue;
+                }
+                Vector3 off = from - a;
+                float u = Vector3.Dot(off, side) / det;
+                if (u < 0f || u > 1f)
+                {
+                    continue;
+                }
+                Vector3 up = Vector3.Cross(off, ab);
+                float v = Vector3.Dot(way, up) / det;
+                if (v < 0f || u + v > 1f)
+                {
+                    continue;
+                }
+                if (Vector3.Dot(ac, up) / det > 0f)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         // ---- the rim
@@ -145,6 +217,12 @@ namespace M3AT
 
         // The rim of a hat's surface.
         private Rim MeasureRim(Vector3[] rest, int[] tris)
+        {
+            return MeasureRim(rest, tris, Legacy);
+        }
+
+        // legacy: as it was before the slicecap's fix, to compare in the autotest.
+        private Rim MeasureRim(Vector3[] rest, int[] tris, bool legacy)
         {
             SkinRadius();
             Rim rim = new Rim();
@@ -170,17 +248,56 @@ namespace M3AT
                     rim.radius[b] = r;
                 }
             });
-            FillRim(rim);
+            if (!legacy)
+            {
+                // A way round whose lowest point is up by the crown isn't one the hat comes down: the slicecap, a crescent
+                // over the left of the scalp, gave the bare right the crescent's inner edge as its rim, and the hair was cut
+                // away above it there, a hole showing the scalp.
+                for (int b = 0; b < RimBins; b++)
+                {
+                    if (!float.IsPositiveInfinity(rim.height[b]) && rim.radius[b] < RimCrown * SkinMost(b))
+                    {
+                        rim.height[b] = float.PositiveInfinity;
+                    }
+                }
+            }
+            FillRim(rim, legacy);
             return rim;
+        }
+
+        // The skin's furthest from the head's middle this way round, at any height.
+        private float SkinMost(int b)
+        {
+            float most = 0f;
+            foreach (float r in skinRadius[b])
+            {
+                most = Mathf.Max(most, r);
+            }
+            return most;
         }
 
         // Ways with nothing measured (between a low-poly hat's points, or none of it there) take the nearest either side, and
         // the whole is smoothed a little: a step in the cut shows under a low hat's edge. All empty: left so, nothing is cut.
-        private static void FillRim(Rim rim)
+        // Only a gap with the hat measured on both sides is filled, not the ways past the end of a hat that doesn't go all
+        // round (legacy: those too).
+        private static void FillRim(Rim rim, bool legacy)
         {
             float[] height = (float[])rim.height.Clone(), radius = (float[])rim.radius.Clone();
             for (int b = 0; b < RimBins; b++)
             {
+                if (!legacy && float.IsPositiveInfinity(height[b]))
+                {
+                    bool left = false, right = false;
+                    for (int step = 1; step < RimBins / 8; step++)
+                    {
+                        left |= !float.IsPositiveInfinity(rim.height[(b + RimBins - step) % RimBins]);
+                        right |= !float.IsPositiveInfinity(rim.height[(b + step) % RimBins]);
+                    }
+                    if (!left || !right)
+                    {
+                        continue;
+                    }
+                }
                 for (int step = 1; step < RimBins / 8 && float.IsPositiveInfinity(height[b]); step++)
                 {
                     int left = (b + RimBins - step) % RimBins, right = (b + step) % RimBins;

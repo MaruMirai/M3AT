@@ -119,8 +119,10 @@ for _hat in ('SimpleHelmet', 'AdvancedHelmet', 'Tuque', 'CowboyHat', 'BowlerHat'
              'Beret', 'HatTop', 'HatLadies', 'AuthorityCap', 'Flophat', 'Headwrap', 'Shadecone', 'Slicecap', 'Tailcap'):
     GARMENT_PROPS[_hat] = {'bone': walk.HEAD, 'hard': True, 'hide_hair': 'tuck'}
 # The slicecap covers only a slice of the scalp, standing off it, so the body triangles it would hide left the inside
-# of the head showing past its edge: it hides none ('hides' False: no hide lines), and the hair is tucked under it.
-GARMENT_PROPS['Slicecap']['hides'] = False
+# of the head showing past its edge: it hides none ('hides' False: no hide lines). Nor does it tuck the hair, which cut
+# it where the cap isn't and showed the scalp round it: the hair stays whole and the game pushes the cap out past the
+# style worn ('over_hair', an over_hair line; Source/HatOverHair.cs).
+GARMENT_PROPS['Slicecap'].update({'hides': False, 'hide_hair': False, 'over_hair': True})
 # The hood's cowl hangs to the shoulders, which a whole hat on the head bone would sink into as the head bows, so it takes
 # the body's weights: the head's over the head, the neck's and chest's round the neck.
 GARMENT_PROPS['HatHood'] = {'hide_hair': 'tuck'}
@@ -873,6 +875,9 @@ def write_garment(g, path):
         for prop in ('hide_hair', 'hide_face'):
             if prop in props:
                 f.write('%s %s\n' % (prop, props[prop] if props[prop] == 'tuck' else 'yes' if props[prop] else 'no'))
+        if props.get('over_hair', False):
+            f.write('# over_hair: worn over the hair, pushed out past the style worn rather than cutting it.\n')
+            f.write('over_hair yes\n')
         if props.get('hide_clothes', props.get('hide_body', False)):
             f.write('hide_clothes yes\n')
         if props.get('with_legwear', False):
@@ -1386,6 +1391,12 @@ for name, at in (('eat_sit', getattr(walk, 'eat_sit_at', None)), ('eat_stand', g
 if hasattr(walk, 'read_at'):
     pose_worst = max(pose_worst, export_loop('read', walk.read_at, walk.loop_frames(walk.READ_SECONDS), walk.READ_SECONDS))
     masks['read'] = upper_mask('LR', walk.EAT_UPPER)
+    # The book held out to someone sat beside, on its left or right (Romance on the Rim's shared reading).
+    if hasattr(walk, 'read_show_L_at'):
+        for side in ('L', 'R'):
+            name = 'read_show_' + side
+            pose_worst = max(pose_worst, export_loop(name, getattr(walk, name + '_at'), walk.loop_frames(walk.READ_SECONDS), walk.READ_SECONDS))
+            masks[name] = upper_mask('LR', walk.EAT_UPPER)
 # Researching sat at the bench: both arms and the trunk from the waist up, over the sit.
 if getattr(walk, 'RESEARCH_CLIP', None) is not None:
     pose_worst = max(pose_worst, export_loop('work_research', walk.research_at, walk.RESEARCH_CLIP['frames'], walk.RESEARCH_SECONDS))
@@ -1478,6 +1489,15 @@ if hasattr(walk, 'toss_at'):
     pose_worst = max(pose_worst, export_loop('toss', lambda t: walk.toss_at(t * walk.TOSS_FRAMES / (walk.TOSS_FRAMES - 1)),
                                              walk.TOSS_FRAMES, walk.TOSS_SECONDS))
     masks['toss'] = upper_mask('LR', walk.TOSS_UPPER)
+# Throwing a snowball (Romance on the Rim's snowball fight): one quick overhand throw, as the toss is played.
+if hasattr(walk, 'snowball_at'):
+    pose_worst = max(pose_worst, export_loop('snowball', lambda t: walk.snowball_at(t * walk.SNOW_FRAMES / (walk.SNOW_FRAMES - 1)),
+                                             walk.SNOW_FRAMES, walk.SNOW_SECONDS))
+    masks['snowball'] = upper_mask('LR', walk.SNOW_UPPER)
+# Kissing (Romance on the Rim's kiss): a loop laid over the idle from the waist up.
+if hasattr(walk, 'kiss_at'):
+    pose_worst = max(pose_worst, export_loop('kiss', walk.kiss_at, walk.loop_frames(walk.KISS_SECONDS), walk.KISS_SECONDS))
+    masks['kiss'] = upper_mask('LR', walk.KISS_UPPER)
 # Jumping: one pass from take-off to landing, its first frame the take-off and its last the landing (the game plays it by
 # how far through the flight the pawn is, never round past the end); and the crouch held before it and after, one still
 # frame the game eases in and out (its length, LAND_SECONDS, is how long coming up out of a landing takes).
@@ -1661,6 +1681,9 @@ print('CAST cast and cast_touch over %.1f s, laid over the gait with the left ar
 print('REEL over %.1f s, a stumble to one knee, from the waist up on the move; DAZE over %.1f s' % (walk.REEL_SECONDS, walk.DAZE_SECONDS))
 if hasattr(walk, 'toss_at'):
     print('TOSS over %.1f s, an underhand pitch let go at %.2f of the way, from the waist up seated' % (walk.TOSS_SECONDS, walk.TOSS_RELEASE))
+if hasattr(walk, 'snowball_at'):
+    print('SNOWBALL over %.2f s, an overhand throw let go at %.2f of the way; KISS over %.1f s, from the waist up'
+          % (walk.SNOW_SECONDS, walk.SNOW_RELEASE, walk.KISS_SECONDS))
 if hasattr(walk, 'stomp_at'):
     print('BEAT work_stomp over %.2f s (stamped at %.2f), work_pat over %.2f s (%d slaps from %.2f)'
           % (walk.BEAT_SECONDS, walk.STOMP_HIT, walk.BEAT_SECONDS * walk.PAT_HITS, walk.PAT_HITS, walk.PAT_HIT))

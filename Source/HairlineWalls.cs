@@ -20,7 +20,10 @@ namespace M3AT
     public sealed partial class SkinnedFigure
     {
         public static bool HairlineWallsOn = true;   // false: the builder's walls under the hair's open edges, as before
-        private const float WallStep = 0.02f;       // cells between the walls' columns along the hairline (at 0.008 a quarter of a cut style's triangles)
+        // cells between the walls' columns along the hairline, measured along it, not per segment of it, as the
+        // Hairline curve's points are only about 0.013 apart (at 0.008 a quarter of a cut style's triangles)
+        public static float WallStep = 0.02f;
+        public static bool WallStepAlong = true;     // false: per segment of the line, as before (the harness's M3AT_WALL_SEGMENTS)
         private const float WallReach = 0.1f;        // cells out from the skin a wall looks for the hair
         private const float WallSink = 0.006f;       // cells a wall's foot is sunk into the head
         private const float WallTilt = 0.6f;         // a second look tilted this far up (added to the skin's normal) if the first misses
@@ -28,12 +31,165 @@ namespace M3AT
         private const float WalkStride = 0.01f;      // cells a step
         private const float WallJump = 0.03f;        // cells: neighbouring tops this near are always joined
         private const float WallJumpMost = 0.1f;     // cells: further apart than WallJump, joined only if the line between them stays on the hair
-        private const float WallOnHair = 0.012f;     // cells: how near the hair that line must stay
+        private const float WallOnHair = 0.012f;     // cells: how near the hair that line must stay, at the least
+        // and the share of the line's length it may bow off the hair: a straight line between two points on one curved
+        // sheet bows off it by about its length squared over eight times the curve's radius, so a fixed WallOnHair
+        // turned down longer lines across a tight fold, as where AFUf004's side layer folds down into the sideburn
+        // under it (0.05 cells apart, 0.013 to 0.015 off), and left a hole looking in under the layer.
+        private const float WallSagShare = 0.35f;
+        public static bool WallSagOn = true;         // false: WallOnHair alone, as before (the harness's M3AT_FIXED_SAG)
         // false: each wall takes the hair's colour where its columns meet it, blended across the quad only between
         // places within WallBlendPixels of each other on the atlas, else flat at its own column's; true: every wall at
         // the hair file's one wall_uv (a darker shade of the hair), which reads as monotone.
         public static bool WallOneColour = false;
         private const float WallBlendPixels = 6f;    // atlas pixels (HairBuilder.Size a panel's side)
+        // A column meets the hair at its edge, where the atlas has the art's outline ink and, just past it, clear pixels
+        // the shader cuts out (alpha under 0.5): a wall textured from there came out near black and was cut through in
+        // slanted strips (AFUf004's temples). So each column's texture place is moved onto the nearest pixel of the
+        // same panel at least WallInset pixels inside the art, looked for within WallSnapReach, and a quad is blended
+        // between its columns' places only if the art is solid all the way between them.
+        private const int WallInset = 4;             // atlas pixels in from the art's edge (past the ink, a pixel or two at 256)
+        private const int WallSnapReach = 16;        // atlas pixels a texture place is moved at most
+        private const int WallLineInside = 2;        // atlas pixels in from the edge every point of a blend must be
+
+        // The hair atlas's art, for keeping the walls' texture places on it: how many pixels each texel is inside the
+        // art (0: off it, under the shader's cut-out; then 1 at its edge, by eight-way steps, at most 255).
+        internal sealed class WallAtlas
+        {
+            private int width, height;
+            private byte[] inside;   // rows bottom first, as texture places count them
+
+            // pixels: rows bottom first, as Texture2D.GetPixels32 gives them.
+            internal static WallAtlas Of(Color32[] pixels, int width, int height)
+            {
+                WallAtlas a = new WallAtlas { width = width, height = height, inside = new byte[width * height] };
+                Queue<int> open = new Queue<int>();
+                for (int i = 0; i < pixels.Length; i++)
+                {
+                    a.inside[i] = pixels[i].a >= 128 ? (byte)255 : (byte)0;
+                }
+                // The art's edge is 1, each step further in one more (a pixel at the image's border counts as at the edge).
+                for (int y = 0; y < height; y++)
+                {
+                    for (int x = 0; x < width; x++)
+                    {
+                        int i = y * width + x;
+                        if (a.inside[i] != 0 && a.NextToClear(x, y))
+                        {
+                            a.inside[i] = 1;
+                            open.Enqueue(i);
+                        }
+                    }
+                }
+                while (open.Count > 0)
+                {
+                    int i = open.Dequeue(), x = i % width, y = i / width;
+                    for (int dy = -1; dy <= 1; dy++)
+                    {
+                        for (int dx = -1; dx <= 1; dx++)
+                        {
+                            int nx = x + dx, ny = y + dy;
+                            if (nx < 0 || ny < 0 || nx >= width || ny >= height)
+                            {
+                                continue;
+                            }
+                            int n = ny * width + nx;
+                            if (a.inside[n] == 255 && a.inside[i] < 254)
+                            {
+                                a.inside[n] = (byte)(a.inside[i] + 1);
+                                open.Enqueue(n);
+                            }
+                        }
+                    }
+                }
+                return a;
+            }
+
+            private bool NextToClear(int x, int y)
+            {
+                for (int dy = -1; dy <= 1; dy++)
+                {
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        int nx = x + dx, ny = y + dy;
+                        if (nx < 0 || ny < 0 || nx >= width || ny >= height || inside[ny * width + nx] == 0)
+                        {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
+
+            private int Inside(int x, int y)
+            {
+                return x < 0 || y < 0 || x >= width || y >= height ? 0 : inside[y * width + x];
+            }
+
+            // The texture place moved onto the nearest texel of its own panel at least WallInset inside the art, within
+            // WallSnapReach; else onto the one furthest inside there; as it was if there is no art there at all.
+            internal Vector2 Snap(Vector2 uv)
+            {
+                int x0 = Mathf.Clamp(Mathf.FloorToInt(uv.x * width), 0, width - 1), y0 = Mathf.Clamp(Mathf.FloorToInt(uv.y * height), 0, height - 1);
+                if (Inside(x0, y0) >= WallInset)
+                {
+                    return uv;
+                }
+                int panel = Mathf.Max(1, width / HairBuilder.Panels);
+                int left = x0 / panel * panel, right = Mathf.Min(left + panel, width) - 1;
+                int bestX = -1, bestY = -1, bestD = int.MaxValue, deepX = -1, deepY = -1, deepest = 0;
+                for (int dy = -WallSnapReach; dy <= WallSnapReach; dy++)
+                {
+                    for (int dx = -WallSnapReach; dx <= WallSnapReach; dx++)
+                    {
+                        int x = x0 + dx, y = y0 + dy, d = dx * dx + dy * dy;
+                        if (x < left || x > right || d > WallSnapReach * WallSnapReach)
+                        {
+                            continue;
+                        }
+                        int at = Inside(x, y);
+                        if (at >= WallInset && d < bestD)
+                        {
+                            bestD = d;
+                            bestX = x;
+                            bestY = y;
+                        }
+                        if (at > deepest)
+                        {
+                            deepest = at;
+                            deepX = x;
+                            deepY = y;
+                        }
+                    }
+                }
+                if (bestX < 0)
+                {
+                    if (deepX < 0)
+                    {
+                        return uv;
+                    }
+                    bestX = deepX;
+                    bestY = deepY;
+                }
+                return new Vector2((bestX + 0.5f) / width, (bestY + 0.5f) / height);
+            }
+
+            // Whether the art is solid, WallLineInside in from its edge, all along the straight line from a to b.
+            internal bool SolidBetween(Vector2 a, Vector2 b)
+            {
+                Vector2 pa = new Vector2(a.x * width, a.y * height), pb = new Vector2(b.x * width, b.y * height);
+                int steps = Mathf.Max(1, Mathf.CeilToInt((pb - pa).magnitude * 2f));
+                for (int s = 0; s <= steps; s++)
+                {
+                    Vector2 p = Vector2.Lerp(pa, pb, (float)s / steps);
+                    if (Inside(Mathf.FloorToInt(p.x), Mathf.FloorToInt(p.y)) < WallLineInside)
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            }
+        }
         internal const float HairlineCover = 0.5f;     // least share of the hairline with hair over it within CoverWalk steps
         private const int CoverWalk = 2;
 
@@ -49,8 +205,9 @@ namespace M3AT
         // cut hair; else, for a style that covers too little of the hairline, the builder's under its edges, re-hung
         // from the cut hair's open edges (Decimated). The hair is cut without its walls first, as re-hanging the
         // builder's only to drop them for the hairline's was wasted work. cover: the hairline's share covered, -1 if
-        // the hairline walls weren't tried (off, a beard, or hair with no walls line).
-        internal Piece CutWithWalls(Piece h, float share, bool beard, out float cover)
+        // the hairline walls weren't tried (off, a beard, or hair with no walls line). atlas: the hair's image, to keep the
+        // walls' texture places on its art (null: taken where the columns meet the hair).
+        internal Piece CutWithWalls(Piece h, float share, bool beard, WallAtlas atlas, out float cover)
         {
             cover = -1f;
             if (beard || !HairlineWallsOn || h.wallsFrom < 0)
@@ -59,7 +216,7 @@ namespace M3AT
             }
             Piece bare = WithoutWalls(h);
             Piece cut = share < 1f ? Decimated(bare, bare.uvs, share) : bare;
-            Piece walled = HairlineWalled(cut, out cover);
+            Piece walled = HairlineWalled(cut, atlas, out cover);
             if (walled != null)
             {
                 return walled;
@@ -90,7 +247,7 @@ namespace M3AT
         // The hair (its triangles before wallsFrom; any walls after are dropped) with hairline walls; null if the style
         // covers too little of the hairline (the caller keeps the builder's walls), or there is no scalp or head to go by.
         // cover: the share of the hairline with hair over it near enough.
-        internal Piece HairlineWalled(Piece hair, out float cover)
+        internal Piece HairlineWalled(Piece hair, WallAtlas atlas, out float cover)
         {
             cover = 0f;
             Piece body = pieces[0];
@@ -149,7 +306,7 @@ namespace M3AT
             {
                 return null;
             }
-            return Walled(hair, hairEnd, columns, body, crown);
+            return Walled(hair, hairEnd, columns, body, crown, atlas);
         }
 
         private struct Column
@@ -208,16 +365,60 @@ namespace M3AT
         private static SkinSpot[] DrawnLine(List<Vector3> line, Vector3[] bv, int[] bt, Vector3[] bn, List<int> headTris)
         {
             List<SkinSpot> spots = new List<SkinSpot>();
-            for (int i = 0; i < line.Count; i++)
+            foreach (Along at in AlongLoop(line))
             {
-                Vector3 a = line[i], b = line[(i + 1) % line.Count];
-                int steps = Mathf.Max(1, Mathf.CeilToInt((b - a).magnitude / WallStep));
-                for (int s = 0; s < steps; s++)
-                {
-                    spots.Add(OnSkin(Vector3.Lerp(a, b, (float)s / steps), bv, bt, bn, headTris));
-                }
+                spots.Add(OnSkin(Vector3.Lerp(line[at.i], line[(at.i + 1) % line.Count], at.f), bv, bt, bn, headTris));
             }
             return spots.ToArray();
+        }
+
+        // A place along a closed line of points: f of the way from point i to the next.
+        private struct Along
+        {
+            public int i;
+            public float f;
+        }
+
+        // Places evenly WallStep apart (as near as a whole number of them round goes) along the closed line through
+        // points, by the distance along it, so points closer together than WallStep (the curve's, or near-repeated
+        // ones, which gave slivers of columns) don't each get a column of their own.
+        private static List<Along> AlongLoop(List<Vector3> points)
+        {
+            List<Along> places = new List<Along>();
+            int count = points.Count;
+            float length = 0f;
+            for (int i = 0; i < count; i++)
+            {
+                length += (points[(i + 1) % count] - points[i]).magnitude;
+            }
+            if (!WallStepAlong)
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    int steps = Mathf.Max(1, Mathf.CeilToInt((points[(i + 1) % count] - points[i]).magnitude / WallStep));
+                    for (int k = 0; k < steps; k++)
+                    {
+                        places.Add(new Along { i = i, f = (float)k / steps });
+                    }
+                }
+                return places;
+            }
+            int spots = Mathf.Max(3, Mathf.RoundToInt(length / WallStep));
+            float step = length / spots, done = 0f;
+            int seg = 0;
+            for (int k = 0; k < spots; k++)
+            {
+                float want = k * step;
+                float segLength = (points[(seg + 1) % count] - points[seg]).magnitude;
+                while (done + segLength < want && seg < count - 1)
+                {
+                    done += segLength;
+                    seg++;
+                    segLength = (points[(seg + 1) % count] - points[seg]).magnitude;
+                }
+                places.Add(new Along { i = seg, f = segLength > 1e-9f ? Mathf.Clamp01((want - done) / segLength) : 0f });
+            }
+            return places;
         }
 
         // The scalp's edge as loops of spots WallStep apart: the edges of the scalp's triangles (all three corners in it)
@@ -258,22 +459,28 @@ namespace M3AT
                 {
                     continue;
                 }
-                List<SkinSpot> loop = new List<SkinSpot>();
+                List<int> ring = new List<int>();
                 for (int a = start; !done.Contains(a) && next.ContainsKey(a); a = next[a])
                 {
                     done.Add(a);
-                    int b = next[a];
-                    int steps = Mathf.Max(1, Mathf.CeilToInt((v[b] - v[a]).magnitude / WallStep));
-                    for (int s = 0; s < steps; s++)
+                    ring.Add(a);
+                }
+                List<Vector3> points = new List<Vector3>();
+                foreach (int a in ring)
+                {
+                    points.Add(v[a]);
+                }
+                List<SkinSpot> loop = new List<SkinSpot>();
+                foreach (Along at in AlongLoop(points))
+                {
+                    int a = ring[at.i], b = ring[(at.i + 1) % ring.Count];
+                    float f = at.f;
+                    loop.Add(new SkinSpot
                     {
-                        float f = (float)s / steps;
-                        loop.Add(new SkinSpot
-                        {
-                            at = Vector3.Lerp(v[a], v[b], f),
-                            normal = Vector3.Lerp(n[a], n[b], f).normalized,
-                            a = a, b = b, c = b, wa = 1f - f, wb = f, wc = 0f,
-                        });
-                    }
+                        at = Vector3.Lerp(v[a], v[b], f),
+                        normal = Vector3.Lerp(n[a], n[b], f).normalized,
+                        a = a, b = b, c = b, wa = 1f - f, wb = f, wc = 0f,
+                    });
                 }
                 if (loop.Count > 2)
                 {
@@ -419,7 +626,8 @@ namespace M3AT
         }
 
         // Whether two neighbouring columns' tops are on the same part of the hair, so a wall between them is: near each
-        // other, or with the line between them on the hair's surface all along. A fixed distance alone left a hole
+        // other, or with the line between them on the hair's surface all along (within WallOnHair, or WallSagShare of its
+        // length where that is more). A fixed distance alone left a hole
         // wherever the hair lies slanted to the looks (a lock's side meets two neighbouring looks at different depths
         // while being one surface), and only a gap between locks or onto another layer should be left open.
         private static bool Joins(Piece hair, int hairEnd, Vector3 a, Vector3 b)
@@ -433,9 +641,10 @@ namespace M3AT
             {
                 return false;
             }
+            float near = WallSagOn ? Mathf.Max(WallOnHair, apart * WallSagShare) : WallOnHair;
             for (int s = 1; s < 4; s++)
             {
-                if (HairDistance(hair, hairEnd, Vector3.Lerp(a, b, s / 4f)) > WallOnHair)
+                if (HairDistance(hair, hairEnd, Vector3.Lerp(a, b, s / 4f)) > near)
                 {
                     return false;
                 }
@@ -505,7 +714,7 @@ namespace M3AT
         // and whose tops are near each other. Each wall faces the open side, away from the crown along the skin (toward
         // the face or the nape), where it is seen from, and is lit as facing that way: one face, as two coplanar faces
         // wound either way flickered against each other in thin stripes.
-        private Piece Walled(Piece hair, int hairEnd, List<List<Column>> columns, Piece body, Vector3 crown)
+        private Piece Walled(Piece hair, int hairEnd, List<List<Column>> columns, Piece body, Vector3 crown, WallAtlas atlas)
         {
             // Which way round the file's triangles face out: as their winding, or (turned round as the reader may
             // turn hair) against it, by the hair's own normals.
@@ -577,6 +786,10 @@ namespace M3AT
                     int ta = hair.tris[c.tri], tb = hair.tris[c.tri + 1], tc = hair.tris[c.tri + 2];
                     float wa = 1f - c.u - c.v, wb = c.u, wc = c.v;
                     meets[i] = hair.uvs[ta] * wa + hair.uvs[tb] * wb + hair.uvs[tc] * wc;
+                    if (atlas != null)
+                    {
+                        meets[i] = atlas.Snap(meets[i]);
+                    }
                     // Away from the crown along the skin.
                     Vector3 f = c.foot.at - crown;
                     f -= c.foot.normal * Vector3.Dot(f, c.foot.normal);
@@ -607,9 +820,9 @@ namespace M3AT
                     {
                         continue;
                     }
-                    // Blended between the two places only if they are near on the atlas: two columns meeting the hair on
-                    // different sprite panels, or either side of a gap between locks, slid the texture across the gaps
-                    // between the art, cut out in stripes.
+                    // Blended between the two places only if they are near on the atlas and the art is solid between
+                    // them: two columns meeting the hair on different sprite panels, or either side of a gap between
+                    // locks, slid the texture across the gaps between the art, cut out in stripes.
                     Vector2 uvI = meets[i], uvJ = meets[j];
                     if (WallOneColour && hair.wallUv.HasValue)
                     {
@@ -618,7 +831,7 @@ namespace M3AT
                     else
                     {
                         Vector2 apart = new Vector2((uvJ.x - uvI.x) * HairBuilder.Panels * HairBuilder.Size, (uvJ.y - uvI.y) * HairBuilder.Size);
-                        if (apart.magnitude > WallBlendPixels)
+                        if (apart.magnitude > WallBlendPixels || (atlas != null && !atlas.SolidBetween(uvI, uvJ)))
                         {
                             uvJ = uvI;
                         }

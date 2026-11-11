@@ -47,7 +47,7 @@ namespace M3AT
         public EarHiding earHiding = EarHiding.AnyHeadgear;   // which headgear leaves the gene ears off (WalkFigures.EarHiding)
         public BeardMode beardMode = BeardMode.Flat;   // how beards are drawn (WalkFigures.Beards, FlatBeards)
         public bool retexturedWeaponModels = true;   // the game's own weapons keep IsoRim's model though another mod redraws their art (WalkFigures.RetexturedWeaponModels)
-        public bool bedBlankets = false;   // in a bed that shows only the sleeper's head, IsoRim's blanket over the body (WalkFigures.BedBlankets); off: lying on top
+        public bool bedBlankets = true;    // in a bed that shows only the sleeper's head, IsoRim's blanket over the body (WalkFigures.BedBlankets); off: lying on top
         public bool groundGarments = false;   // apparel lying on the map is drawn as the chibi's own garment for it (WalkFigures.GroundGarments); off: IsoRim's look
         public bool injuryAnims = true;   // pawns limp on a bad leg and hold where they are hurt (WalkFigures.InjuryAnims); a missing leg hops regardless
         public bool visibleWounds = true;   // injuries, blood, bandages and scars are drawn on the pawn (WalkFigures.VisibleWounds)
@@ -70,7 +70,7 @@ namespace M3AT
         public float freecamSpeed = DefaultFreecamSpeed;
         public float freecamScrollSpeed = DefaultFreecamScrollSpeed;   // the wheel's climb a notch, a share of the original 0.05 s of flying
         public float freecamFov = DefaultFreecamFov;
-        public bool freecamCutaway = true;    // IsoRim's own wall hiding while flying, not its complete walls (Freecam.SyncWalls)
+        public bool freecamCutaway = false;   // IsoRim's own wall hiding while flying, not its complete walls (Freecam.SyncWalls)
         public const float DefaultFreecamSensitivity = 0.05f, DefaultFreecamSpeed = 12f, DefaultFreecamFov = 70f, DefaultFreecamScrollSpeed = 0.5f;
         // Each weapon type's size changed from the export's (walk.TYPE_SCALE), against the same weapon on the ground
         // (WalkFigures.ScaleOf, over each weapon's WalkFigures.GroundRatio); a type not in it keeps the export's. Saved
@@ -100,7 +100,7 @@ namespace M3AT
             Scribe_Values.Look(ref beardMode, "beardMode", BeardMode.Flat);
             Scribe_Values.Look(ref retexturedWeaponModels, "retexturedWeaponModels", true);
             Scribe_Values.Look(ref groundGarments, "groundGarments", false);
-            Scribe_Values.Look(ref bedBlankets, "bedBlankets", false);
+            Scribe_Values.Look(ref bedBlankets, "bedBlankets", true);
             Scribe_Values.Look(ref injuryAnims, "injuryAnims", true);
             Scribe_Values.Look(ref visibleWounds, "visibleWounds", true);
             Scribe_Values.Look(ref outlines, "outlines", true);
@@ -120,7 +120,7 @@ namespace M3AT
             Scribe_Values.Look(ref freecamSpeed, "freecamSpeed", DefaultFreecamSpeed);
             Scribe_Values.Look(ref freecamScrollSpeed, "freecamScrollSpeed", DefaultFreecamScrollSpeed);
             Scribe_Values.Look(ref freecamFov, "freecamFov", DefaultFreecamFov);
-            Scribe_Values.Look(ref freecamCutaway, "freecamCutaway", true);
+            Scribe_Values.Look(ref freecamCutaway, "freecamCutaway", false);
             Scribe_Collections.Look(ref weaponScales, "weaponGroundScales", LookMode.Value, LookMode.Value);
             if (weaponScales == null)
             {
@@ -230,7 +230,9 @@ namespace M3AT
         }
 
         // A slider on one line: its label and value on the left, the slider on the right, the tooltip over both.
-        private static float Slider(Listing_Standard list, string label, float value, float least, float most, string tooltip)
+        // The value is drawn apart from the name, right-aligned, and the name cut short with "..." if both don't fit, as a
+        // long name ("Rifles and launchers") wrapped the value onto a second line the row's height left out of sight.
+        private static float Slider(Listing_Standard list, string name, string shownValue, float value, float least, float most, string tooltip)
         {
             Rect rect = list.GetRect(24f);
             if (Mouse.IsOver(rect))
@@ -238,8 +240,13 @@ namespace M3AT
                 Widgets.DrawHighlight(rect);
             }
             TooltipHandler.TipRegion(rect, tooltip);
+            Rect label = rect.LeftPart(SliderLabelShare);
+            float valueWidth = Text.CalcSize(shownValue).x;
+            Text.Anchor = TextAnchor.MiddleRight;
+            Widgets.Label(new Rect(label.xMax - valueWidth - 6f, label.y, valueWidth, label.height), shownValue);
             Text.Anchor = TextAnchor.MiddleLeft;
-            Widgets.Label(rect.LeftPart(SliderLabelShare), label);
+            Rect nameRect = new Rect(label.x, label.y, Mathf.Max(0f, label.width - valueWidth - 12f), label.height);
+            Widgets.Label(nameRect, name.Truncate(nameRect.width));
             Text.Anchor = TextAnchor.UpperLeft;
             Rect bar = rect.RightPart(1f - SliderLabelShare);
             bar.y += 6f;   // the slider's bar is drawn at the top of its rect, so it is set down to the label's middle
@@ -280,13 +287,13 @@ namespace M3AT
             float tallest = 0f;
 
             Header(list, "Pawns");
-            Settings.pawnSize = Mathf.Round(Slider(list, "Pawn size: " + Settings.pawnSize.ToStringPercent(), Settings.pawnSize, SizeLeast, SizeMost,
+            Settings.pawnSize = Mathf.Round(Slider(list, "Pawn size", Settings.pawnSize.ToStringPercent(), Settings.pawnSize, SizeLeast, SizeMost,
                 "How big every pawn is drawn. 100% (default) is the usual size; children, gender and height variety are on top of it. It changes only how pawns look, not the space they take up.") / SizeStep) * SizeStep;
             // Shown as how much smaller the head is than the full chibi head's, measured, not the key's amount.
-            float shrink = Slider(list, "Head shrink: " + (1f - HeadSize(Settings.headShrink)).ToStringPercent(), Settings.headShrink, 0f, 1f,
+            float shrink = Slider(list, "Head shrink", (1f - HeadSize(Settings.headShrink)).ToStringPercent(), Settings.headShrink, 0f, 1f,
                 "How much smaller the head is drawn than the default chibi. Left: default; right: smaller. No effect on vanilla or CE hit calculations.");
             Settings.headShrink = Mathf.Round(shrink / ShrinkStep) * ShrinkStep;
-            float spread = Slider(list, "Height variety: " + Settings.heightSpread.ToStringPercent("0.#"), Settings.heightSpread, 0f, 0.1f,
+            float spread = Slider(list, "Height variety", Settings.heightSpread.ToStringPercent("0.#"), Settings.heightSpread, 0f, 0.1f,
                 "How much pawns' heights vary (default " + Settings.DefaultHeightSpread.ToStringPercent("0.#") + "). A normal distribution is used, with most near the usual size and a few further off. 0% makes everyone of a gender the same size. Each pawn's height is derived from the pawn's id, so no save data is needed.");
             Settings.heightSpread = Mathf.Round(spread * 200f) / 200f;
             list.CheckboxLabeled("Gender size difference", ref Settings.genderSizes,
@@ -296,11 +303,11 @@ namespace M3AT
             if (Settings.variedBodies)
             {
                 BeginSubOptions(list);
-                Settings.bodySpread = Mathf.Round(Slider(list, "Body variety: " + Settings.bodySpread.ToStringPercent(), Settings.bodySpread, 0.05f, 0.6f,
+                Settings.bodySpread = Mathf.Round(Slider(list, "Body variety", Settings.bodySpread.ToStringPercent(), Settings.bodySpread, 0.05f, 0.6f,
                     "How far pawns' builds wander from their body type (default " + Settings.DefaultBodySpread.ToStringPercent() + "). Most stay near it, a few go most of the way to the next type. Each pawn's build is derived from the pawn's id, so no save data is needed.") * 20f) / 20f;
                 EndSubOptions(list);
             }
-            Settings.hairDetail = Mathf.Round(Slider(list, "Hair detail: " + Settings.hairDetail.ToStringPercent(), Settings.hairDetail, HairDetailLeast, 1f,
+            Settings.hairDetail = Mathf.Round(Slider(list, "Hair detail", Settings.hairDetail.ToStringPercent(), Settings.hairDetail, HairDetailLeast, 1f,
                 "How much of the shape of each hairstyle made from its sprites is kept (default " + Settings.DefaultHairDetail.ToStringPercent() + "). Higher looks smoother and follows the art more closely, but costs more with many pawns on screen. Hair a mod supplies as a 3D model is always drawn in full. Takes effect when this window closes.") / HairDetailStep) * HairDetailStep;
             if (list.ButtonTextLabeledPct("Beards", BeardName(Settings.beardMode), SliderLabelShare, TextAnchor.MiddleLeft, null,
                 "2D (default): the beard's sprite is laid flat on the face. Cheap, but only seen from the front, and cut off at the chin.\n\n3D: each beard is built as a 3D mesh from its sprites the first time it is worn, so it is seen from every side.\n\nOff: no beards are drawn or built."))
@@ -350,7 +357,7 @@ namespace M3AT
             if (Settings.ragdolls)
             {
                 BeginSubOptions(list);
-                Settings.flingPower = Mathf.Round(Slider(list, "Fling power: " + Settings.flingPower.ToStringPercent(), Settings.flingPower, FlingPowerLeast, FlingPowerMost,
+                Settings.flingPower = Mathf.Round(Slider(list, "Fling power", Settings.flingPower.ToStringPercent(), Settings.flingPower, FlingPowerLeast, FlingPowerMost,
                     "How far blows throw bodies and weapons (default 100%). 200% throws them about twice as far. With \"Throw bodies\" on, the biggest blasts throw a grown pawn about 6 cells at 100% and about 30 at 500%, and a grenade about a quarter of that; with it off, this only changes how hard a body is knocked about where it falls.") / FlingPowerStep) * FlingPowerStep;
                 list.CheckboxLabeled("Throw bodies between cells", ref Settings.flingBodies,
                     "Enough damage can throw the pawn they knock down or kill. Explosions and heavy melee move most. This lets M3AT move things around in the game itself, so could cause issues in multiplayer or other mods that expect the game alone to decide where things are. Off: bodies stay in the cell they fell in.");
@@ -383,7 +390,7 @@ namespace M3AT
                     {
                         shown = shownDefault;
                     }
-                    shown = Mathf.Round(Slider(list, name + ": " + shown.ToStringPercent(), shown, WeaponLeast, WeaponMost,
+                    shown = Mathf.Round(Slider(list, name, shown.ToStringPercent(), shown, WeaponLeast, WeaponMost,
                         "This weapon type's size in a pawn's hands or on its body against the same weapon lying on the ground (default " + shownDefault.ToStringPercent() + "). 100% is the size IsoRim draws it on the ground.") / WeaponStep) * WeaponStep;
                     // Within half a step of the default is the default, as the default is seldom on a step.
                     if (Mathf.Abs(shown - shownDefault) > WeaponStep * 0.5f + 0.0001f)
@@ -430,9 +437,9 @@ namespace M3AT
                 "Runs the game faster when many pawns are in view: their limbs move every second or third frame, while they still walk and turn smoothly. Off: every pawn's limbs move every frame.");
 
             list.Gap();
-            Header(list, "Flying freecam");
+            Header(list, "Freecam");
             list.Label("Set keyboard keys in RimWorld's keybindings. Current settings:\n"
-                + KeyName(Freecam.ToggleKey) + ": flying freecam on/off\n"
+                + KeyName(Freecam.ToggleKey) + ": freecam on/off\n"
                 + KeyName(Freecam.UpKey) + ": up\n"
                 + KeyName(Freecam.DownKey) + ": down\n"
                 + KeyName(Freecam.BoostKey) + ": double speed\n"
@@ -452,18 +459,18 @@ namespace M3AT
                 "In pointer mode, a left click that selects nothing goes back to looking, as a right click does. Off (default): it only clears the selection, as in the game.");
             list.CheckboxLabeled("Pointer mode returns the pointer", ref Settings.freecamPointerBack,
                 "Going into pointer mode puts the pointer back where it was when looking began (default). Off: it starts in the middle of the screen, under the cross.");
-            Settings.freecamSensitivity = Mathf.Round(Slider(list, "Look speed: " + Settings.freecamSensitivity.ToString("0.00"), Settings.freecamSensitivity, 0.02f, 0.6f,
+            Settings.freecamSensitivity = Mathf.Round(Slider(list, "Look speed", Settings.freecamSensitivity.ToString("0.00"), Settings.freecamSensitivity, 0.02f, 0.6f,
                 "How far the view turns for the mouse's movement, in degrees per pixel (default " + Settings.DefaultFreecamSensitivity.ToString("0.00") + ").") * 100f) / 100f;
             list.CheckboxLabeled("Invert mouse look", ref Settings.freecamInvertY, "Moving the mouse up looks down.");
             list.CheckboxLabeled("Use IsoRim's wall hiding", ref Settings.freecamCutaway,
                 "While flying, walls are cut down as IsoRim's own settings say: around the pointer (the middle of the screen while looking), near colonists and in front of rooms. Off (default): every wall stands at full height, as in IsoRim's first-person view.");
             list.CheckboxLabeled("Scroll wheel flies up and down", ref Settings.freecamScrollFlies,
                 "Scrolling up raises the camera and scrolling down lowers it, further at a higher flying speed. Off: the scroll wheel does nothing while flying.");
-            Settings.freecamSpeed = Mathf.Round(Slider(list, "Flying speed: " + Settings.freecamSpeed.ToString("0") + " cells/s", Settings.freecamSpeed, 2f, 60f,
+            Settings.freecamSpeed = Mathf.Round(Slider(list, "Flying speed", Settings.freecamSpeed.ToString("0") + " cells/s", Settings.freecamSpeed, 2f, 60f,
                 "How fast the camera flies, in cells a second (default " + Settings.DefaultFreecamSpeed.ToString("0") + "). Not affected by the game's speed."));
-            Settings.freecamScrollSpeed = Mathf.Round(Slider(list, "Scroll height speed: " + Settings.freecamScrollSpeed.ToString("0.00") + "x", Settings.freecamScrollSpeed, 0.1f, 2f,
+            Settings.freecamScrollSpeed = Mathf.Round(Slider(list, "Scroll height speed", Settings.freecamScrollSpeed.ToString("0.00") + "x", Settings.freecamScrollSpeed, 0.1f, 2f,
                 "How far one notch of the scroll wheel raises or lowers the camera, on top of the flying speed (default " + Settings.DefaultFreecamScrollSpeed.ToString("0.00") + "x).") * 20f) / 20f;
-            Settings.freecamFov = Mathf.Round(Slider(list, "Field of view: " + Settings.freecamFov.ToString("0") + "°", Settings.freecamFov, 40f, 110f,
+            Settings.freecamFov = Mathf.Round(Slider(list, "Field of view", Settings.freecamFov.ToString("0") + "°", Settings.freecamFov, 40f, 110f,
                 "How wide the camera sees, in degrees from the top of the screen to the bottom (default " + Settings.DefaultFreecamFov.ToString("0") + "°)."));
 
             // A report for the Workshop's bug thread (BugReport.cs): copied, and saved in case it is too long to paste.

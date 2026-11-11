@@ -195,12 +195,16 @@ namespace M3AT
             out float behind, out float spin, float extra = 0f)
         {
             Holster h = holsters[slot];
+            // A melee place is set for MeleeSlotOffset. A slot without one (the back's) takes a melee weapon on its gun
+            // place, turned by its whole offset so the blade runs along the aim's line as a barrel does (vanilla's blades
+            // point right in their sprites, as the guns' muzzles do), so two weapons on the back always cross; and turned
+            // end for end, the hilt where a muzzle would be, as a sword is carried hilt up over the shoulder.
+            spin = melee ? (h.melee ? offset - MeleeSlotOffset : offset + 180f) : 0f;
             melee = melee && h.melee;
             Vector3 at = melee ? h.meleeAt : h.at;
             aim = melee ? h.meleeAim : h.aim;
             roll = melee ? h.meleeRoll : h.roll;
             behind = h.behind;
-            spin = melee ? offset - MeleeSlotOffset : 0f;
             turn = p.whole[h.bone];
             // Moved with its bone's head for this shape, then out past whatever stands out there (measured at the slot's
             // own place, which a melee place is near).
@@ -642,11 +646,15 @@ namespace M3AT
         // The furthest out along way that a surface stands on the line through point, measured from point: any vertex
         // within HolsterReach of the line, or a triangle it passes through, as a garment may be a few big faces with no
         // vertex near. Negative infinity for none.
-        private static float Outer(Vector3[] verts, int[] tris, Vector3 point, Vector3 way, float far = HolsterDepth)
+        private static float Outer(Vector3[] verts, int[] tris, Vector3 point, Vector3 way, float far = HolsterDepth, bool[] only = null)
         {
             float best = float.NegativeInfinity;
             for (int i = 0; i < verts.Length; i++)
             {
+                if (only != null && !only[i])
+                {
+                    continue;   // a vertex left out (the belt's, an arm's: WaistOf)
+                }
                 Vector3 d = verts[i] - point;
                 float along = Vector3.Dot(d, way);
                 if (along < -HolsterDepth || along > far || along <= best)

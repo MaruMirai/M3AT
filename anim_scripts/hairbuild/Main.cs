@@ -54,9 +54,25 @@ namespace M3AT
             File.Copy(path, full, true);
             // Cut and walled as LoadHair does (HairlineWalls.cs); M3AT_EDGE_WALLS set keeps the builder's walls.
             HairlineWallsOn = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("M3AT_EDGE_WALLS"));
+            WallSagOn = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("M3AT_FIXED_SAG"));
+            WallStepAlong = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("M3AT_WALL_SEGMENTS"));
+            string wallStep = Environment.GetEnvironmentVariable("M3AT_WALL_STEP");
+            if (!string.IsNullOrEmpty(wallStep))
+            {
+                WallStep = float.Parse(wallStep, System.Globalization.CultureInfo.InvariantCulture);
+            }
             float cover;
             System.Diagnostics.Stopwatch took = System.Diagnostics.Stopwatch.StartNew();
-            Piece cut = CutWithWalls(h, share, beard, out cover);
+            // The image's art, as LoadHair reads it, for the walls' texture places.
+            WallAtlas atlas = null;
+            string image = path.Substring(0, path.Length - ".txt".Length) + ".png";
+            if (File.Exists(image) && string.IsNullOrEmpty(Environment.GetEnvironmentVariable("M3AT_WALLS_UNSNAPPED")))
+            {
+                Texture2D t = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                t.LoadImage(File.ReadAllBytes(image));
+                atlas = WallAtlas.Of(t.GetPixels32(), t.width, t.height);
+            }
+            Piece cut = CutWithWalls(h, share, beard, atlas, out cover);
             if (cover >= 0f)
             {
                 Console.WriteLine("WALLS " + Path.GetFileName(path) + " cut and walled in " + took.ElapsedMilliseconds + " ms: hairline covered "
@@ -221,6 +237,8 @@ namespace M3AT
             }
             SkinnedFigure figure;
             HairBuilder builder = SkinnedFigure.HarnessBuilder(args[0], beard, out figure);
+            HairBuilder.LineUpOn = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("M3AT_NO_LINEUP"));
+            HairBuilder.Tapered = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("M3AT_NO_TAPER"));
             if (!builder.UseHead(Sprites(args[1], false)))
             {
                 Console.Error.WriteLine("hairbuild: the head sprites are empty");
@@ -270,6 +288,14 @@ namespace M3AT
                     File.WriteAllText(path + ".shell.txt", built.shell);
                 }
                 File.WriteAllText(path + ".txt", built.mesh);
+                if (builder.lastSideBack != 0)
+                {
+                    Console.WriteLine("LINEUP " + style + ": side sprite moved " + builder.lastSideBack + " px back to the head's back");
+                }
+                if (builder.lastLineUp != 0)
+                {
+                    Console.WriteLine("LINEUP " + style + ": front and back sprites " + builder.lastLineUp + " px apart, each moved half way onto the head");
+                }
                 Console.WriteLine("BUILD " + style + ": " + built.triangles + " triangles in " + watch.ElapsedMilliseconds + " ms"
                     + (built.shell != null ? ", its shell hides " + built.hidden + " of the body's" : "") + " -> " + path + ".txt");
                 figure.HarnessDecimate(path + ".txt", detail, beard);

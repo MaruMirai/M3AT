@@ -155,7 +155,22 @@ namespace M3AT
             }
             Holster h = g.place;
             float k = g.scale;
-            float push = Clearance(p.shape, mask, h, 250 + (mount == "pack" ? 0 : mount == "belt" ? 1 : 2)) + GearGap;
+            Matrix4x4 local;
+            if (mount == "belt")
+            {
+                // A ring about the slot's height, stretched to the waist: its half width is how far out the slot is, past
+                // what stands out at either side, and its half depth the bare waist's, its depth's share of that, plus what
+                // stands out in front and behind, its middle moved toward the side that stands out more (BeltPushes).
+                Vector4 out_ = BeltPushes(p.shape, mask, h);
+                float half = Mathf.Max(h.at.x + GearGap, 0.01f);
+                float sx = (half + Mathf.Max(out_.x, out_.y)) / GearBeltWidth;
+                float sz = (half * g.depth + (out_.z + out_.w) / 2f) / GearBeltWidth;
+                local = Matrix4x4.Translate(new Vector3(0f, h.at.y, (out_.z - out_.w) / 2f)) * Matrix4x4.Rotate(g.turn) * Matrix4x4.Scale(new Vector3(sx, k, sz))
+                    * Matrix4x4.Translate(new Vector3(0f, -IsoRimWaist, 0f));
+                frame = p.whole[h.bone] * Matrix4x4.Translate(p.shape.boneMove[h.bone]) * local;
+                return true;
+            }
+            float push = Clearance(p.shape, mask, h, 250 + (mount == "pack" ? 0 : 2)) + GearGap;
             Vector3 way;
             if (mount == "pack")
             {
@@ -165,22 +180,111 @@ namespace M3AT
                 GearPackPlace(p, out place, out way, out push);
             }
             Vector3 at = h.at + h.outward * push;
-            Matrix4x4 local;
-            if (mount == "belt")
-            {
-                // A ring about the slot's height, stretched to the waist: its half width is how far out the slot is.
-                float sx = Mathf.Max(at.x, 0.01f) / GearBeltWidth;
-                local = Matrix4x4.Translate(new Vector3(0f, at.y, 0f)) * Matrix4x4.Rotate(g.turn) * Matrix4x4.Scale(new Vector3(sx, k, sx * g.depth))
-                    * Matrix4x4.Translate(new Vector3(0f, -IsoRimWaist, 0f));
-            }
-            else
-            {
-                // A pack's reference is the middle of its back plane, a hip tool's its clip, 0.19 out.
-                Vector3 reference = new Vector3(mount == "pack" ? 0f : GearBeltWidth, IsoRimWaist, 0f);
-                local = Matrix4x4.Translate(at) * Matrix4x4.Rotate(g.turn) * Matrix4x4.Scale(new Vector3(k, k, k)) * Matrix4x4.Translate(-reference);
-            }
+            // A pack's reference is the middle of its back plane, a hip tool's its clip, 0.19 out.
+            Vector3 reference = new Vector3(mount == "pack" ? 0f : GearBeltWidth, IsoRimWaist, 0f);
+            local = Matrix4x4.Translate(at) * Matrix4x4.Rotate(g.turn) * Matrix4x4.Scale(new Vector3(k, k, k)) * Matrix4x4.Translate(-reference);
             frame = p.whole[h.bone] * Matrix4x4.Translate(p.shape.boneMove[h.bone]) * local;
             return true;
+        }
+
+        // The belt's ring is measured on its own rather than by Clearance's one line out of the slot: at rest the arms hang
+        // beside the hips, so that line met a parka's sleeve or power armour's gauntlet (0.1 to 0.3 past the waist), and a
+        // ring scaled evenly from it grew its depth by as much again. So it looks out of each side and straight in front and
+        // behind, at the trunk and legs alone (WaistOf), and each way's push sets its own half of the ring.
+        private const float BeltArmMost = 0.5f;   // a vertex weighted more than this to the arms is an arm's, not the waist's
+        private const float BeltReach = 0.4f;     // model units: how far out from where it looks a surface is looked for (power armour's front is 0.15 from the middle)
+        private const int BeltKey = 260;          // holsterPush's keys for the belt's four ways (260 .. 263), past the other gear's
+        private static readonly string[] ArmBones = { "shoulder.", "upper_arm.", "forearm.", "hand.", "thumb." };
+        private readonly Dictionary<int, bool[]> waistOf = new Dictionary<int, bool[]>();
+        private readonly Dictionary<int, int[]> waistTris = new Dictionary<int, int[]>();
+
+        // A piece's vertices that are not the arms', and its triangles with all three corners among them (by piece number).
+        private bool[] WaistOf(int g, out int[] tris)
+        {
+            bool[] keep;
+            if (waistOf.TryGetValue(g, out keep))
+            {
+                tris = waistTris[g];
+                return keep;
+            }
+            Piece piece = pieces[g];
+            bool[] arm = new bool[boneIndex.Count];
+            foreach (KeyValuePair<string, int> b in boneIndex)
+            {
+                for (int i = 0; i < ArmBones.Length; i++)
+                {
+                    arm[b.Value] |= b.Key.StartsWith(ArmBones[i]);
+                }
+            }
+            keep = new bool[piece.rest.Length];
+            for (int i = 0; i < keep.Length; i++)
+            {
+                float onArm = 0f;
+                for (int k = piece.firstWeight != null ? piece.firstWeight[i] : 0; piece.firstWeight != null && k < piece.firstWeight[i + 1]; k++)
+                {
+                    if (arm[piece.weightBone[k]])
+                    {
+                        onArm += piece.weight[k];
+                    }
+                }
+                keep[i] = onArm <= BeltArmMost;
+            }
+            List<int> kept = new List<int>();
+            for (int t = 0; t + 2 < piece.tris.Length; t += 3)
+            {
+                if (keep[piece.tris[t]] && keep[piece.tris[t + 1]] && keep[piece.tris[t + 2]])
+                {
+                    kept.Add(piece.tris[t]);
+                    kept.Add(piece.tris[t + 1]);
+                    kept.Add(piece.tris[t + 2]);
+                }
+            }
+            tris = kept.ToArray();
+            waistOf[g] = keep;
+            waistTris[g] = tris;
+            return keep;
+        }
+
+        // How much further out than the bare base body's the waist stands at the belt's height, in this shape and these
+        // garments, model units: x out of the slot's side, y the other side, z straight along +z, w along -z.
+        private Vector4 BeltPushes(Shape s, GarmentMask mask, Holster h)
+        {
+            mask &= ~UnclearMask;
+            Vector3 middle = new Vector3(0f, h.at.y, h.at.z);
+            Vector3 other = new Vector3(-h.outward.x, h.outward.y, h.outward.z);
+            Vector3[] from = { h.at, new Vector3(-h.at.x, h.at.y, h.at.z), middle, middle };
+            Vector3[] ways = { h.outward, other, Vector3.forward, Vector3.back };
+            Vector4 pushes = Vector4.zero;
+            Vector3 moved = s.boneMove[h.bone];
+            int[] bodyTris;
+            bool[] body = WaistOf(0, out bodyTris);
+            for (int i = 0; i < 4; i++)
+            {
+                (GarmentMask, int) key = (mask, BeltKey + i);
+                float push;
+                if (!s.holsterPush.TryGetValue(key, out push))
+                {
+                    push = 0f;
+                    float bare = Outer(pieces[0].rest, bodyTris, from[i], ways[i], BeltReach, body);
+                    float outer = Outer(s.pieces[0].rest, bodyTris, from[i] + moved, ways[i], BeltReach, body);
+                    for (int g = 1; g < pieces.Length && g <= MaxHiding; g++)
+                    {
+                        if ((mask & GarmentBit(g)) != 0)
+                        {
+                            int[] tris;
+                            bool[] keep = WaistOf(g, out tris);
+                            outer = Mathf.Max(outer, Outer(GarmentShape(s, g, mask).rest, tris, from[i] + moved, ways[i], BeltReach, keep));
+                        }
+                    }
+                    if (!float.IsNegativeInfinity(outer) && !float.IsNegativeInfinity(bare))
+                    {
+                        push = Mathf.Max(outer - bare, 0f);
+                    }
+                    s.holsterPush[key] = push;
+                }
+                pushes[i] = push;
+            }
+            return pushes;
         }
 
         public float HipGrab = 0.45f;    // the share of hip_draw at which the hand closes on the hip gear in its slot (anim.txt's hip_timing)

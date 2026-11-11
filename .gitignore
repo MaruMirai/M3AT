@@ -49,3 +49,8 @@ previews/
 anim_scripts/hairbuild/bin/
 anim_scripts/hairbuild/obj/
 CLAUDE.local.md
+
+# Discord bot token for discord/setup_server.py: never committed.
+discordBotToken
+discordServerId
+discord/__pycache__/
