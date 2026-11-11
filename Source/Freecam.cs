@@ -241,7 +241,7 @@ namespace M3AT
         // loaded with it wanted has its 3D view turned on first, if it was on when the freecam was last flown.
         private static void Resume()
         {
-            if (!Wanted || Find.CurrentMap == null || IsoRim.Api.FirstPersonPawn != null || IsoRim.Api.ControlsLocked)
+            if (!Wanted || Find.CurrentMap == null || FirstPersonOn() || IsoRim.Api.ControlsLocked)
             {
                 return;
             }
@@ -418,8 +418,23 @@ namespace M3AT
 
         // ---------------------------------------------------------------- once a frame
 
-        // Whether IsoRim's first person key starts first person now: with the one person selected, on the map shown
-        // (as FirstPerson.Toggle has it). Should it ever be wrong, Resume puts the freecam back the frame after.
+        // IsoRim's first person is on, also while our pose holds the view (Api 71's FirstPersonOn). Before Api 71 only
+        // FirstPersonPawn can say, and that is null under a pose, so the key is predicted instead (FirstPersonStarts).
+        private static readonly bool hasFirstPersonOn = IsoRim.Api.Version >= 71;
+
+        private static bool FirstPersonOn()
+        {
+            return hasFirstPersonOn ? ReadFirstPersonOn() : IsoRim.Api.FirstPersonPawn != null;
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static bool ReadFirstPersonOn()
+        {
+            return IsoRim.Api.FirstPersonOn;   // called only on Api 71 or later
+        }
+
+        // Before Api 71: whether IsoRim's first person key starts first person now: with the one person selected, on the
+        // map shown (as FirstPerson.Toggle has it). Should it ever be wrong, Resume puts the freecam back the frame after.
         private static bool FirstPersonStarts()
         {
             Pawn chosen = Find.Selector != null && Find.Selector.NumSelected == 1 ? Find.Selector.SingleSelectedThing as Pawn : null;
@@ -458,8 +473,11 @@ namespace M3AT
                     }
                 }
                 // IsoRim's first person key while flying: IsoRim has just started first person (its keys are read before this),
-                // but a pose wins over it, so the freecam steps aside for it, as it is set aside for first person anyway.
-                bool toFirstPerson = on && !typing && firstPersonKey != null && firstPersonKey.JustPressed && FirstPersonStarts();
+                // but a pose wins over it, so the freecam steps aside for it, as it is set aside for first person anyway. From
+                // Api 71 IsoRim says so itself; before it, the key and its selection rule are predicted.
+                bool toFirstPerson = on && (hasFirstPersonOn
+                    ? ReadFirstPersonOn()
+                    : !typing && firstPersonKey != null && firstPersonKey.JustPressed && FirstPersonStarts());
                 if (on && (toFirstPerson || Find.CurrentMap != map || !IsoRim.Api.View3DActive || IsoRim.Api.ControlsLocked))
                 {
                     // Set aside, still wanted: it comes back with the 3D view, on the next map, after first person.
@@ -469,8 +487,8 @@ namespace M3AT
                     }
                     Leave(false);
                 }
-                // Not this frame after stepping aside for first person: it hides behind the pose until the pose is gone, so
-                // Api.FirstPersonPawn says none yet. If first person didn't start after all, it comes back on the next.
+                // Not this frame after stepping aside for first person: before Api 71 it hides behind the pose until the pose is
+                // gone, so Api.FirstPersonPawn says none yet. If first person didn't start after all, it comes back on the next.
                 if (!on && !toFirstPerson)
                 {
                     Resume();
