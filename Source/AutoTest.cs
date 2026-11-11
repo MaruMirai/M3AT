@@ -26,6 +26,11 @@ namespace M3AT
     // Stills mode (the default) pauses the game and moves it on one tick a frame, so every picture is at a known tick.
     // -m3atTestVideo runs it at normal speed instead and records the game window with ffmpeg (x11grab), one clip per
     // scenario, for a person to look at. -m3atTestQuit closes the game when done.
+    //
+    // -m3atTest=shots -m3atTestLoad=<save> loads that save instead and changes nothing in it: the camera held at the
+    // freecam eye saved with the game, it steps the game a tick a frame for -m3atShotTicks (300) and writes a scene image
+    // every -m3atShotEvery (2) ticks (from -m3atShotFrom ticks in, 0; each file named by its tick), for picking the best
+    // still (a Workshop picture) out of a run.
     [StaticConstructorOnStartup]
     internal static class AutoTest
     {
@@ -75,6 +80,11 @@ namespace M3AT
             outDir = Path.Combine(dir, DateTime.Now.ToString("yyyyMMdd-HHmmss"));
             Directory.CreateDirectory(outDir);
             IsoRim.Api.BeforeViewUpdate += Frame;
+            string save;
+            if (GenCommandLine.TryGetCommandLineArg("m3atTestLoad", out save) && !string.IsNullOrEmpty(save))
+            {
+                LongEventHandler.ExecuteWhenFinished(() => GameDataSaveLoader.LoadGame(save));
+            }
             Log.Message(Tag + "will run " + string.Join(", ", wanted) + (video ? " (video)" : "") + " into " + outDir);
         }
 
@@ -124,6 +134,17 @@ namespace M3AT
             report.AppendLine("# M3AT autotest " + DateTime.Now.ToString("yyyy-MM-dd HH:mm")).AppendLine();
             report.AppendLine(video ? "Video mode: each scenario at normal speed, recorded." : "Stills mode: paused, one tick a frame.").AppendLine();
             probe = new StreamWriter(Path.Combine(outDir, "probe.txt"));
+            if (wanted.Count == 1 && wanted[0] == "shots")
+            {
+                yield return Shots();
+                Finish();
+                if (quit)
+                {
+                    yield return WaitReal(1f);
+                    Root.Shutdown();
+                }
+                yield break;
+            }
             pose = IsoRim.Api.PushViewPose(PoseOwner, Pose, new IsoRim.ViewPoseOptions { Priority = 1000 });
             Find.TickManager.CurTimeSpeed = TimeSpeed.Paused;
             middle = FindPatch();
@@ -175,6 +196,72 @@ namespace M3AT
                 yield return WaitReal(1f);
                 Root.Shutdown();
             }
+        }
+
+        // A loaded save run on, a tick a frame, a scene image every few ticks, from the freecam's eye saved with the game
+        // (else the player's view as it comes back). Nothing is spawned or cleared.
+        private static IEnumerator Shots()
+        {
+            int ticks = IntArg("m3atShotTicks", 300), every = Math.Max(1, IntArg("m3atShotEvery", 2));
+            Pause();
+            // The camera held where the freecam was when the game was saved, from the first frame: as it comes back on
+            // load it can start looking at the ground. Freed at Finish.
+            FreecamPlaces places = Current.Game.GetComponent<FreecamPlaces>();
+            if (places != null && places.TryGet(map, out FreecamPlaces.Place saved))
+            {
+                float fov = Mathf.Clamp(SettingsMod.Settings.freecamFov, 30f, 110f);
+                pose = IsoRim.Api.PushViewPose(PoseOwner, () => IsoRim.ViewPose.FromEye(saved.eye, saved.yaw, saved.pitch, fov),
+                    new IsoRim.ViewPoseOptions { Priority = 1000 });
+                report.AppendLine("- camera held at the saved freecam eye " + saved.eye + ", yaw " + saved.yaw + ", pitch " + saved.pitch + ", fov " + fov);
+            }
+            else
+            {
+                report.AppendLine("- no saved freecam eye for this map: the camera is the player's view as it comes back");
+            }
+            // Time for the freecam to come back, the 3D view to settle and hair to build.
+            yield return WaitReal(8f);
+            int n = 0, from = IntArg("m3atShotFrom", 0);
+            for (int t = 0; t < from; t++)
+            {
+                Find.TickManager.DoSingleTick();
+                yield return null;
+            }
+            for (int t = 0; t < ticks; t++)
+            {
+                Find.TickManager.DoSingleTick();
+                foreach (Pawn p in map.mapPawns.AllPawnsSpawned)
+                {
+                    p.Drawer?.tweener?.ResetTweenedPosToRoot();
+                }
+                yield return null;
+                if (t % every != 0)
+                {
+                    continue;
+                }
+                string file = Path.Combine(outDir, "shot_t" + (from + t).ToString("D4") + ".png");
+                n++;
+                imageDone = false;
+                bool asked = IsoRim.Api.RequestSceneImage(tex =>
+                {
+                    if (tex != null)
+                    {
+                        File.WriteAllBytes(file, tex.EncodeToPNG());
+                        UnityEngine.Object.Destroy(tex);
+                    }
+                    imageDone = true;
+                }, new IsoRim.SceneImageOptions { IncludeOverlays = false });
+                for (int i = 0; asked && i < 120 && !imageDone; i++)
+                {
+                    yield return null;
+                }
+            }
+            report.AppendLine("## shots").AppendLine().AppendLine("- " + n + " pictures over " + ticks + " ticks, one every " + every);
+        }
+
+        private static int IntArg(string name, int fallback)
+        {
+            string v;
+            return GenCommandLine.TryGetCommandLineArg(name, out v) && int.TryParse(v, out int i) ? i : fallback;
         }
 
         private static void Finish()
