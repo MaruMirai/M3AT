@@ -43,7 +43,7 @@ namespace M3AT
     {
         private const string Tag = "[M3AT] ";
         public const int Version = 35;   // raise when the build changes, so cached hair is made again
-        public const int BeardVersion = 4;   // and cached beards
+        public const int BeardVersion = 5;   // and cached beards
         internal static bool Tapered = true;    // the hull's flanks narrowing behind the head's middle (Hull; M3AT_NO_TAPER off)
         internal static bool LineUpOn = true;   // LinedUp (the harness turns it off with M3AT_NO_LINEUP, to compare)
         private static bool pixelsFailed;   // IsoRim's pixel reading has thrown once (logged once)
@@ -131,6 +131,7 @@ namespace M3AT
         public const int Panels = 4;              // the atlas: the south, east and north sprites, then the crown panel
         private const float NearHead = 0.4f;      // head widths round the hair within which the body is looked at
         private const float EyeRow = 70.6f / 128f * Size;   // the eye line's row in the sprites, as Facial Animation's textures have it
+        private const float MouthRow = 319.5f / 512f * Size;   // the mouth's row in the sprites (FaceLayers.MouthCentre)
         private const float FaceEyes = 0.31f;     // the chibi's eye line above its chin, in head heights (export_frames.py's FACE_EYES)
         private const float BeardPuffBU = 0.3f;   // how far a beard stands further off the skin than the hair's ClearBU
         private const float ChestClear = 0.02f;   // cells a beard is kept off the chest: past the outermost clothes' layer
@@ -191,7 +192,7 @@ namespace M3AT
         // The head: its extent in the game's model space, and where the head the sprites are drawn over is in them.
         private float cx, half, top, chin, back, front;
         private float sx, sy, sz, midX;
-        private float eyes;   // a beard's: the chibi's eye line, y
+        private float eyes, mouth;   // a beard's: where Facial Animation's eye line and mouth are drawn on the chibi, y (FaceRows)
         private int hx0, hx1, hy0, hy1, hz0, hz1;
         private bool[][] headMask;   // per view, Size x Size, top first: the drawn-over head's outline, grown by HeadGrow
         private int[] frontFrom, frontTo;   // a beard's: each row's first and last solid column in the front sprite (BeardAlpha), of the sprites being built
@@ -513,8 +514,31 @@ namespace M3AT
             sy = (top - chin) / (hy1 - hy0);
             sz = (front - back) / (hz1 - hz0);
             midX = (hx0 + hx1) / 2f;
-            eyes = chin + FaceEyes * (top - chin);
+            FaceRows();
             return true;
+        }
+
+        // Where Facial Animation's eye line and mouth come out on the chibi's face, which a beard's rows are fitted to
+        // (HeightOf). The face patch keeps the art at its own scale (FACE_SPAN head heights across the texture, from the
+        // exporter's chin, the head's lowest point), and FaceLayers moves the art by FaceRaise and the mouth by MouthRaise
+        // on top. The sprites share Facial Animation's layout, so a beard's mouth line is on its mouth's row. Fitted by the
+        // eyes and chin alone, the rows between were squeezed into the chibi's short chin, which put the moustache about
+        // 0.015 cells over the mouth.
+        private void FaceRows()
+        {
+            float lowest = float.MaxValue;
+            for (int i = 0; i < body.Length; i++)
+            {
+                if (onHead[i])
+                {
+                    lowest = Mathf.Min(lowest, body[i].y);
+                }
+            }
+            float span = FaceSpan * (top - lowest);
+            float eyeY = lowest + FaceEyes * (top - lowest);
+            eyes = eyeY + FaceLayers.FaceRaise * span;
+            mouth = eyeY + (FaceLayers.MouthCentre.y + FaceLayers.FaceRaise + FaceLayers.MouthRaise - FaceEyeV) * span;
+            mouth = Mathf.Clamp(mouth, chin + 0.1f * (eyes - chin), eyes - 0.1f * (eyes - chin));   // a face set up otherwise
         }
 
         private static bool Box(bool[] m, out int c0, out int c1, out int r0, out int r1)
@@ -667,6 +691,7 @@ namespace M3AT
                     j = waiting.Dequeue();
                 }
                 Stopwatch watch = Stopwatch.StartNew();
+                LoadTrail.Note((beard ? "beard" : "hair") + " build " + j.style + " starts" + LoadTrail.MemoryNow());
                 try
                 {
                     j.built = Build(j.style, j.sprites);
@@ -676,6 +701,9 @@ namespace M3AT
                     j.error = e.GetType().Name + ": " + e.Message;
                 }
                 j.ms = watch.Elapsed.TotalMilliseconds;
+                Interlocked.Increment(ref LoadTrail.hairBuilt);
+                LoadTrail.Note((beard ? "beard" : "hair") + " build " + j.style + " done in " + j.ms.ToString("0") + " ms"
+                               + (j.error != null ? " (" + j.error + ")" : "") + LoadTrail.MemoryNow());
                 lock (waiting)
                 {
                     done.Add(j);
@@ -703,7 +731,11 @@ namespace M3AT
             {
                 return top - (Y - hy0) * (top - eyes) / (EyeRow - hy0);
             }
-            return Y <= hy1 ? eyes - (Y - EyeRow) * (eyes - chin) / (hy1 - EyeRow) : chin - (Y - hy1) * sy;
+            if (Y <= MouthRow)
+            {
+                return eyes - (Y - EyeRow) * (eyes - mouth) / (MouthRow - EyeRow);
+            }
+            return Y <= hy1 ? mouth - (Y - MouthRow) * (mouth - chin) / (hy1 - MouthRow) : chin - (Y - hy1) * sy;
         }
 
         private float RowOf(float y)
@@ -716,7 +748,11 @@ namespace M3AT
             {
                 return hy0 + (top - y) * (EyeRow - hy0) / (top - eyes);
             }
-            return y >= chin ? EyeRow + (eyes - y) * (hy1 - EyeRow) / (eyes - chin) : hy1 + (chin - y) / sy;
+            if (y >= mouth)
+            {
+                return EyeRow + (eyes - y) * (MouthRow - EyeRow) / (eyes - mouth);
+            }
+            return y >= chin ? MouthRow + (mouth - y) * (hy1 - MouthRow) / (mouth - chin) : hy1 + (chin - y) / sy;
         }
 
         private void ToSprite(Vector3 p, out float X, out float Y, out float Z)
@@ -754,10 +790,10 @@ namespace M3AT
             Color32[] south = Streaked(sp)[0];   // with the 3D beard's strand streaks
             for (int r = 0; r < texSize; r++)
             {
-                float y = eyeY + ((r + 0.5f) / texSize - FaceEyeV) * span;
-                float Y = y >= eyeY
-                    ? EyeRow - (y - eyeY) * (EyeRow - hy0) / (topAll - eyeY)
-                    : EyeRow + (eyeY - y) * (hy1 - EyeRow) / (eyeY - chinAll);
+                // FaceLayers shows this texel FaceRaise higher up the face than its own place on the patch, so it takes
+                // the sprite row the 3D beard puts there.
+                float y = eyeY + ((r + 0.5f) / texSize - FaceEyeV + FaceLayers.FaceRaise) * span;
+                float Y = RowOf(y);
                 int row = Mathf.RoundToInt(Y);
                 for (int i = 0; i < texSize; i++)
                 {

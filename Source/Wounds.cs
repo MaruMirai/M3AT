@@ -22,11 +22,23 @@ namespace M3AT
     // They are drawn as the face layers are (FaceLayers, the MarusFaceLayer shader in its wound mode): sun-lit as the skin
     // under them, see-through and writing no depth, before the body's night light pass, so the night darkens them
     // with the body; queued after the face layers, so a wound on the face goes over them.
+    //
+    // A bionic prosthetic's panel seams and lights, and an archotech one's circuit traces and inset panels, are laid on the
+    // same way (LimbDecals), from DecalFile's rows of cells (anim_scripts/make_prosthetic_decals.py), stacked under the
+    // wound sheet's rows as it is loaded.
     public static class Wounds
     {
         private const string Tag = "[M3AT] ";
         public const string SheetFile = "Models/wounds.png";   // from the mod's root
-        private const int Columns = 3, Rows = 12;   // the sheet's grid (key_wounds.py's OUT_CELL px cells)
+        public const string DecalFile = "Models/prosthetic_decals.png";   // from the mod's root: more rows of cells
+        private const int Columns = 3, SheetRows = 12;   // the wound sheet's grid (key_wounds.py's OUT_CELL px cells)
+        private static int Rows = SheetRows;   // and the texture's, with the decals' row under it once loaded (Material)
+        private const int DecalRow = SheetRows, ArchoRow = SheetRows + 1;   // the bionic and archotech decals' rows, from the top
+        private const int Panel = 0, Strip = 1, JointLight = 2;   // the bionic row's cells
+        private const int TraceA = 0, TraceB = 1, Inset = 2;      // the archotech row's
+        private const int EyeRow = SheetRows + 2;   // the prosthetic eyes' row: bionic, archotech
+        private const float EyeArtSpan = 0.09f;   // a prosthetic eye's cell on the face, texture places: past the eye's opening (about 0.065), as it is cut to the eye
+        private const float DecalSpan = 0.13f;   // a decal's side, model units, on the upper arm or thigh; less further down
         private const float Span = 0.12f;   // model units: a cell's side on the trunk for a wound of SpanDamage
         private const float SpanDamage = 10f;   // damage (the injury's severity) drawn at Span; a bullet does about this
         private const float LeastSize = 0.45f, MostSize = 1.8f;   // shares of that, for the slightest and the worst wounds
@@ -94,7 +106,7 @@ namespace M3AT
         // The wounds to draw on this figure's eyes, as last laid on (Draw comes first in a frame); null with wounds off.
         public static FaceLayers.EyeWound[] EyeWoundsOn(SkinnedFigure.Posed fig)
         {
-            return WalkFigures.VisibleWounds && fig.wounds != null ? fig.wounds.eyeWounds : null;
+            return (WalkFigures.VisibleWounds || WalkFigures.Prosthetics) && fig.wounds != null ? fig.wounds.eyeWounds : null;
         }
 
         // Lays the pawn's wounds on the figure as End left it (once they or mask, the garments worn as worn, change) and
@@ -102,7 +114,7 @@ namespace M3AT
         // size the model's scale.
         public static void Draw(Pawn pawn, SkinnedFigure skin, SkinnedFigure.Posed fig, GarmentMask mask, Apparel[] worn, Vector3 position, float yaw, float size, Color skinColour)
         {
-            if (!WalkFigures.VisibleWounds || pawn.health == null || !Api.ViewReady || Material() == null)
+            if ((!WalkFigures.VisibleWounds && !WalkFigures.Prosthetics) || pawn.health == null || !Api.ViewReady || Material() == null)
             {
                 return;
             }
@@ -122,7 +134,9 @@ namespace M3AT
                     return;
                 }
                 // (The block's hit flash, which the wounds' mode leaves off, is the face's, as they share it.)
-                Api.SubmitFigureMesh(mesh, material, FaceLayers.PlacedAt(position, yaw, size), FaceLayers.BlockFor(SkinnedFigure.SmoothShading, 0),
+                MaterialPropertyBlock block = FaceLayers.BlockFor(SkinnedFigure.SmoothShading, 0);
+                FaceLayers.SetNoShift(block);   // the face layers' shift, which these share the shader of
+                Api.SubmitFigureMesh(mesh, material, FaceLayers.PlacedAt(position, yaw, size), block,
                     FigureMeshFlags.NoCull, 0, FaceLayers.Flash);
             }
             catch (Exception e)
@@ -138,10 +152,14 @@ namespace M3AT
         {
             int sign = 17;
             List<Hediff> hediffs = pawn.health.hediffSet.hediffs;
-            for (int i = 0; i < hediffs.Count; i++)
+            if (Rows > SheetRows)
+            {
+                sign = sign * 31 + WalkFigures.DecalSign(pawn);
+            }
+            for (int i = 0; i < hediffs.Count && WalkFigures.VisibleWounds; i++)
             {
                 Hediff_Injury injury = hediffs[i] as Hediff_Injury;
-                if (injury == null || injury.Part == null || KindOf(injury.def) < 0)
+                if (injury == null || injury.Part == null || KindOf(injury.def) < 0 || WalkFigures.OnProsthetic(pawn.health.hediffSet, injury.Part))
                 {
                     continue;
                 }
@@ -179,12 +197,20 @@ namespace M3AT
             eyeWounds.Clear();
             Color32 skinTint = skinColour;
             List<Hediff> hediffs = pawn.health.hediffSet.hediffs;
-            for (int pass = 0; pass < 4; pass++)
+            if (Rows > SheetRows)
+            {
+                LimbDecals(pawn, skin);   // under everything: no wound is laid on a prosthetic anyway
+                if (eyesDrawn)
+                {
+                    ProstheticEyes(pawn);
+                }
+            }
+            for (int pass = 0; pass < 4 && WalkFigures.VisibleWounds; pass++)
             {
                 for (int i = 0; i < hediffs.Count; i++)
                 {
                     Hediff_Injury injury = hediffs[i] as Hediff_Injury;
-                    int kind = injury != null && injury.Part != null ? KindOf(injury.def) : -1;
+                    int kind = injury != null && injury.Part != null && !WalkFigures.OnProsthetic(pawn.health.hediffSet, injury.Part) ? KindOf(injury.def) : -1;
                     if (kind < 0)
                     {
                         continue;
@@ -235,6 +261,92 @@ namespace M3AT
                     });
                 }
             }
+        }
+
+        // Each decorated limb's decals (WalkFigures.DecalLimbs). A bionic one: on each segment's skin a panel's seam, or on
+        // the lower arm and leg a light strip running along it, and a lit joint plate at the elbow or knee; a hand or foot
+        // one panel. An archotech one: on each segment two circuit traces and an inset panel, a hand or foot one trace.
+        // Under the clothes (not onClothes), as the limb is. Their spots and turns go by the added part's load ID.
+        private static void LimbDecals(Pawn pawn, SkinnedFigure skin)
+        {
+            decorated.Clear();
+            WalkFigures.DecalLimbs(pawn, decorated);
+            for (int i = 0; i < decorated.Count; i++)
+            {
+                string bone = decorated[i].bone;
+                int seed = decorated[i].seed;
+                int b = skin.BoneNamed(bone);
+                if (b < 0)
+                {
+                    continue;
+                }
+                bool lower = bone.StartsWith("forearm", StringComparison.Ordinal) || bone.StartsWith("shin", StringComparison.Ordinal);
+                bool end = bone.StartsWith("hand", StringComparison.Ordinal) || bone.StartsWith("foot", StringComparison.Ordinal);
+                float span = DecalSpan * (end ? 0.6f : lower ? 0.85f : 1f);
+                if (decorated[i].archotech)
+                {
+                    AddDecal(seed, b, ArchoRow, (seed & 1) == 0 ? TraceA : TraceB, span, true);   // the traces run along the limb
+                    if (!end)
+                    {
+                        AddDecal(seed * 7 + 1, b, ArchoRow, (seed & 1) == 0 ? TraceB : TraceA, span, true);
+                        AddDecal(seed * 7 + 2, b, ArchoRow, Inset, span * 0.8f, true);
+                    }
+                    continue;
+                }
+                AddDecal(seed, b, DecalRow, Panel, span, true);   // its seams across the limb
+                if (lower)
+                {
+                    AddDecal(seed * 7 + 1, b, DecalRow, Strip, span * 1.1f, true);
+                    AddDecal(seed * 7 + 2, b, DecalRow, JointLight, span * 0.75f, true);
+                }
+            }
+        }
+
+        private static readonly List<WalkFigures.LimbDecal> decorated = new List<WalkFigures.LimbDecal>();
+
+        // A bionic or archotech eye (WalkFigures.ProstheticEyes) drawn over the eye Facial Animation draws: its art laid on
+        // under the lids, as a wound on the eye is, so it blinks and closes with the eye; fitted to Facial Animation's own
+        // iris on that half (FaceLayers.IrisOn: its place and size, cut to its shape), so it moves as the eye looks. Without
+        // a readable iris, at EyeArtSpan where frame puts it, cut to the white.
+        private static void ProstheticEyes(Pawn pawn)
+        {
+            eyes.Clear();
+            WalkFigures.ProstheticEyes(pawn, eyes);
+            for (int i = 0; i < eyes.Count; i++)
+            {
+                if (EyeRow >= Rows)
+                {
+                    return;   // an older decal file without the eyes' row
+                }
+                int column = eyes[i].archotech ? 1 : 0;
+                eyeWounds.Add(new FaceLayers.EyeWound
+                {
+                    frame = new Vector4(EyeUOf(eyes[i].bone), EyeV, 1f / EyeArtSpan, 0f),
+                    cell = new Vector4((float)column / Columns, 1f - (EyeRow + 1f) / Rows, 1f / Columns, 1f / Rows),
+                    colour = new Color32(255, 255, 255, 255),
+                    fitIris = true,
+                });
+            }
+        }
+
+        private static readonly List<WalkFigures.LimbDecal> eyes = new List<WalkFigures.LimbDecal>();
+
+        private static void AddDecal(int seed, int bone, int row, int column, float span, bool down)
+        {
+            if (row >= Rows)
+            {
+                return;   // an older decal file without that row
+            }
+            decals.Add(new SkinnedFigure.Decal
+            {
+                seed = seed,
+                bones = new[] { bone },
+                cell = new Rect((float)column / Columns, 1f - (row + 1f) / Rows, 1f / Columns, 1f / Rows),
+                span = span,
+                down = down,   // a strip runs along the limb, its top up it at rest
+                onClothes = false,
+                colour = new Color32(255, 255, 255, 255),
+            });
         }
 
         // A wound on an eye, its place and turn picked from its own load ID, so it stays put and its blood stays with it
@@ -467,6 +579,33 @@ namespace M3AT
 
         // The wounds' material (MarusFaceLayer in its wound mode, the sheet on it), made once; null if the shader or the
         // sheet is missing (said once).
+        // The wound sheet with the prosthetics' decals' rows stacked under it (Rows that many more), if that file is there
+        // and its cells are the sheet's size; else the sheet as it is, and no decals are laid on.
+        private static Texture2D WithDecals(Texture2D wounds)
+        {
+            string path = Path.Combine(Root, DecalFile);
+            if (!File.Exists(path))
+            {
+                return wounds;
+            }
+            Texture2D extra = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+            extra.LoadImage(File.ReadAllBytes(path));
+            int cell = wounds.height / SheetRows;
+            if (extra.width != wounds.width || extra.height % cell != 0 || extra.height == 0)
+            {
+                Log.Warning(Tag + DecalFile + " is " + extra.width + " by " + extra.height + ", not rows of the wound sheet's cells; no prosthetic decals.");
+                return wounds;
+            }
+            Color32[] low = extra.GetPixels32(), high = wounds.GetPixels32();   // rows bottom first: the decals go under
+            Color32[] all = new Color32[low.Length + high.Length];
+            low.CopyTo(all, 0);
+            high.CopyTo(all, low.Length);
+            Texture2D both = new Texture2D(wounds.width, wounds.height + extra.height, TextureFormat.RGBA32, true);
+            both.SetPixels32(all);
+            Rows = SheetRows + extra.height / cell;
+            return both;
+        }
+
         private static Material Material()
         {
             if (tried)
@@ -483,6 +622,7 @@ namespace M3AT
             }
             sheet = new Texture2D(2, 2, TextureFormat.RGBA32, true);
             sheet.LoadImage(File.ReadAllBytes(path));
+            sheet = WithDecals(sheet);
             sheet.wrapMode = TextureWrapMode.Clamp;
             sheet.filterMode = FilterMode.Trilinear;
             sheet.name = "Marus_Wounds";

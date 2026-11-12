@@ -248,9 +248,11 @@ namespace M3AT
             if (seenGame != Current.Game)
             {
                 seenGame = Current.Game;
+                LoadTrail.Note("freecam: a game seen with it wanted, 3D view " + (Options.freecam3D ? "turned on" : "left off") + LoadTrail.MemoryNow());
                 if (Options.freecam3D)
                 {
                     IsoRim.Api.View3DActive = true;
+                    LoadTrail.Note("freecam: 3D view on" + LoadTrail.MemoryNow());
                 }
             }
             if (IsoRim.Api.View3DActive)
@@ -266,6 +268,7 @@ namespace M3AT
             {
                 return;
             }
+            LoadTrail.Note("freecam: entering" + LoadTrail.MemoryNow());
             IsoRim.Api.LeaveFirstPerson();
             IsoRim.Api.View3DActive = true;
 

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using HarmonyLib;
 using IsoRim;
@@ -24,12 +25,12 @@ namespace M3AT
     // than the head. The head's sprite outline (the head's Basic layer, and the skin layer when it is the whole sprite
     // skin) is left out, since it would wrap round the sides of the 3D head; the head's mood covers and highlights
     // (Experimentals' blush, hot and cold faces) and skin marks (freckles, moles) are kept.
-    public static class FaceLayers
+    public static partial class FaceLayers
     {
         private const string Tag = "[M3AT] ";
         private const float MouthZoom = 1f;   // how much the mouth is enlarged round itself (IsoRim's default is 1.6; the chibi face is already large)
-        private static readonly Vector2 MouthCentre = new Vector2(0.5f, 1f - 319.5f / 512f);   // where it is in Facial Animation's textures (u, v from the bottom)
-        private const float MouthRaise = 0.012f;   // how far up the face the mouth is moved, in texture widths (it sits low on the chibi's short chin)
+        internal static readonly Vector2 MouthCentre = new Vector2(0.5f, 1f - 319.5f / 512f);   // where it is in Facial Animation's textures (u, v from the bottom)
+        internal const float MouthRaise = 0.012f;   // how far up the face the mouth is moved, in texture widths (it sits low on the chibi's short chin)
         // With the Nose_Pig key the snout's flat end covers the face from the nose tip nearly to the chin (texture rows 302 to
         // 332 at 512), so the mouth goes down onto its lower half, below the nostrils (anim_scripts/generation/pigSnout/make_nostrils.py).
         private const float MouthRaisePig = -0.0117f;
@@ -46,6 +47,26 @@ namespace M3AT
             public bool smooth;   // carries normals (SkinnedFigure): shaded smoothly as the body is (MarusFace.frag.glsl _Smooth)
             public List<Vector2> restUvs;   // the exported texture places, which FaceTuning moves from
             public int tuned;               // the FaceTuning.Version its meshes' texture places were last laid for
+            // Posed on the graphics card (SkinnedFigure.FaceOnGpu): the pawn's bones (three rows each, null when posed on the
+            // CPU), counted up whenever they change, and its own blocks carrying them (BlockFor), each with the count it last
+            // took them at, as the bones differ from pawn to pawn.
+            public Vector4[] bones;
+            public int bonesAt;
+            public object gpuShape;   // the shape whose rest pose the meshes hold (SkinnedFigure.Shape)
+            public MaterialPropertyBlock[] blocks;
+            public int[] blocksAt;
+        }
+
+        private static readonly int bonesId = Shader.PropertyToID("_MarusBones");
+
+        // The pawn's bones into a block made for one draw (the flat beard, ridges, eye wounds), if the patch is posed on the
+        // graphics card.
+        private static void AddBones(MaterialPropertyBlock block, Patch patch)
+        {
+            if (patch != null && patch.bones != null)
+            {
+                block.SetVectorArray(bonesId, patch.bones);
+            }
         }
 
         private static bool tried, available;
@@ -57,6 +78,52 @@ namespace M3AT
         private static Shader layerShader, glowShader;
         private const int LayerQueue = 2950;   // before IsoRim's light pass (3099)
 
+        // Facial Animation's master node decides once, as it is made, whether the pawn's face animates: it keeps the pawn's
+        // controller only if the controller says it can (CheckUpdateableInitial), and that says no until the controller has
+        // met its pawn, which it does only on its first tick (InitializeIfNeed). A render tree made before the pawn has
+        // ticked (drawn paused: a game just loaded, a pawn just spawned; this mod's own EnsureInitialized in FaceOf) has a
+        // master with no controller, and that face never moves again, blinking, talking, crying, blushing, until the tree is
+        // made again. So where the master has none: the controller is met to its pawn and asked again, by Facial Animation's
+        // own code (its settings for which pawns animate decide), and given back to the master if it can animate. Looked at
+        // again every ControllerRetry ticks while it can't, so a pawn Facial Animation leaves still costs nothing.
+        private const int ControllerRetry = 250;
+        private static Type controllerCompType;
+        private static FieldInfo masterControllerField;
+        private static MethodInfo controllerInit, controllerCheck;
+        private static bool controllerTried;
+
+        private static void KeepController(Face f, int tick)
+        {
+            if (!controllerTried)
+            {
+                controllerTried = true;
+                controllerCompType = GenTypes.GetTypeInAnyAssembly("FacialAnimation.FacialAnimationControllerComp");
+                masterControllerField = masterType != null ? AccessTools.Field(masterType, "controller") : null;
+                controllerInit = controllerCompType != null ? AccessTools.Method(controllerCompType, "InitializeIfNeed") : null;
+                controllerCheck = controllerCompType != null ? AccessTools.Method(controllerCompType, "CheckUpdateableInitial") : null;
+                if (masterControllerField == null || controllerInit == null || controllerCheck == null)
+                {
+                    Log.Warning(Tag + "can't reach Facial Animation's controller (its code has changed?): a face drawn before its pawn first ticks stays still.");
+                }
+            }
+            if (masterControllerField == null || controllerInit == null || controllerCheck == null || masterControllerField.GetValue(f.master) != null
+                || tick - f.controllerTried < ControllerRetry)
+            {
+                return;
+            }
+            f.controllerTried = tick;
+            ThingComp comp = ((ThingWithComps)f.pawn).AllComps.Find(c => controllerCompType.IsInstanceOfType(c));
+            if (comp == null)
+            {
+                return;
+            }
+            controllerInit.Invoke(comp, null);
+            if ((bool)controllerCheck.Invoke(comp, null))
+            {
+                masterControllerField.SetValue(f.master, comp);
+            }
+        }
+
         private class Face
         {
             public Pawn pawn;
@@ -66,8 +133,11 @@ namespace M3AT
             public readonly List<string> kinds = new List<string>();   // the controller's type name
             public readonly List<string> layers = new List<string>();  // its layer (NLFacialAnimationLayerType: Cover, Bottom, ...)
             public int tick = -1;
+            public int controllerTried = -ControllerRetry;   // the tick the master's controller was last looked to (KeepController)
             public int missing;   // the halves of the face whose eye is missing (CutLeft, CutRight), looked at once a tick
             public int missingTick = -1;
+            public Color white = Color.white;   // the eye whites' tint this tick (WhiteTintOf)
+            public int whiteTick = -1;
         }
 
         // Halves of Facial Animation's face texture (MarusFace.frag.glsl _EyeCut). Its eyeball mask colours the right
@@ -120,6 +190,7 @@ namespace M3AT
                 FindEyes();
                 layerShader = DefDatabase<ShaderDef>.GetNamedSilentFail("MarusFaceLayer")?.Shader;
                 glowShader = DefDatabase<ShaderDef>.GetNamedSilentFail("MarusFaceGlow")?.Shader;
+                stackShader = DefDatabase<ShaderDef>.GetNamedSilentFail("MarusFaceStack")?.Shader;   // without it, a draw per layer
                 available = controllerField != null && layerTypeField != null && overrideRotField != null && layerShader != null && glowShader != null;
                 Log.Message(Tag + "Facial Animation's face on the chibi: " + (available ? "ready" : "not found"));
             }
@@ -381,10 +452,12 @@ namespace M3AT
             p.face.MarkDynamic();
             p.mouth.MarkDynamic();
             p.mouthLow.MarkDynamic();
-            // Set once, roomy enough for any pose (cells, the model's own space): it is only for culling.
-            p.face.bounds = p.mouth.bounds = p.mouthLow.bounds = new Bounds(new Vector3(0f, 0.7f, 0f), new Vector3(2.5f, 2f, 2.5f));
+            p.face.bounds = p.mouth.bounds = p.mouthLow.bounds = PatchBounds;
             return p;
         }
+
+        // Set once, roomy enough for any pose (cells, the model's own space): it is only for culling.
+        public static readonly Bounds PatchBounds = new Bounds(new Vector3(0f, 0.7f, 0f), new Vector3(2.5f, 2f, 2.5f));
 
         // The mouth's texture places: enlarged round the mouth and moved up the face by raise (texture widths). FaceTuning's
         // mouth numbers go on top (temporary, for lining the face up in game).
@@ -402,7 +475,7 @@ namespace M3AT
 
         // How far up the face Facial Animation's art is moved, in texture widths (found in game with FaceTuning; it sat a
         // little high on the chibi's head). The ridges, the flat beard and eye wounds share the patch, so move with it.
-        private const float FaceRaise = -0.006f;
+        internal const float FaceRaise = -0.006f;
 
         // The whole face's texture places moved up by FaceRaise, then moved and scaled about the eye line by FaceTuning
         // (texture widths; up and to the pawn's left, as the art moves, so the places move the other way).
@@ -674,10 +747,17 @@ namespace M3AT
                 if (f.tick != tick && f.master != null && updateMethod != null)
                 {
                     f.tick = tick;
+                    KeepController(f, tick);
                     updateMethod.Invoke(f.master, null);
                 }
                 Retune(patch);
                 Matrix4x4 placed = PlacedAt(position, yaw, size);
+                if (f.whiteTick != tick)
+                {
+                    f.whiteTick = tick;
+                    f.white = WhiteTintOf(pawn);
+                }
+                whiteTint = f.white;
                 if (f.missingTick != tick)
                 {
                     f.missingTick = tick;
@@ -689,6 +769,11 @@ namespace M3AT
                 int place = 0;
                 Texture iris = null, white = null;   // this frame's eye textures, the shape of the eye the wounds are cut to
                 bool woundsDrawn = wounds == null || wounds.Length == 0;
+                // Stacked (DrawStacked): the layers gathered here and drawn eight to a draw at the end. Not with wounds on
+                // the eye, which go in between the layers.
+                bool stacking = StackLayers && stackShader != null && woundsDrawn;
+                calls.Clear();
+                eyeLayers.Clear();
                 for (int i = 0; i < f.parts.Count; i++)
                 {
                     PawnRenderNode node = f.parts[i];
@@ -697,6 +782,11 @@ namespace M3AT
                     Graphic g = node.GraphicFor(pawn);
                     overrideRotField.SetValue(node, rot);   // as it was, for the game's own drawing (portraits)
                     string kind = f.kinds[i];
+                    Vector2 shift = ShiftOf(node, g, kind, f.layers[i]);
+                    if (kind == "EyeballControllerComp" && f.layers[i].EndsWith("_Basic", StringComparison.Ordinal))
+                    {
+                        NoteEyeLayer(g, f.layers[i], shift);   // for a prosthetic eye's iris
+                    }
                     if (!woundsDrawn)
                     {
                         // The lid's own layers come after the white (its Bottom) and the iris, so a wound drawn here goes
@@ -728,17 +818,24 @@ namespace M3AT
                         Graphic closed = ClosedLid(node, pawn);
                         if (closed != null && closed != g)
                         {
-                            DrawLayer(g, kind, f.layers[i], f.missing, patch, mouth, placed, ref place);
+                            Layer(stacking, g, kind, f.layers[i], f.missing, shift, patch, mouth, placed, ref place);
                             g = closed;
                             cut = CutBoth & ~f.missing;
                         }
                     }
-                    DrawLayer(g, kind, f.layers[i], cut, patch, mouth, placed, ref place);
+                    Layer(stacking, g, kind, f.layers[i], cut, shift, patch, mouth, placed, ref place);
+                }
+                if (stacking)
+                {
+                    DrawStacked(patch, mouth, placed, ref place);
                 }
                 if (!woundsDrawn)
                 {
                     DrawEyeWounds(wounds, iris, white, f.missing, patch, placed, ref place);   // no lid layers at all
                 }
+#if AUTOTEST
+                PerfFaceDone(pawn);
+#endif
             }
             catch (Exception e)
             {
@@ -746,8 +843,403 @@ namespace M3AT
             }
         }
 
+        // ---- Stacked: up to StackSize layers in one draw (MarusFaceStack.frag.glsl), as drawn one at a time a face took about
+        // ten draws, and in the game a face changes (a blink, a new mouth) on under one frame in fifty: each mix of layers
+        // gets its material once (stacked, by a hash of what it was made from) and keeps it. The glow layers are drawn as
+        // before, added on after the light pass. Turned off (StackLayers), or for a face with wounds on its eyes, or one with
+        // a layer whose shader isn't known here (drawn with Facial Animation's own material), each layer is a draw again.
+
+        public static bool StackLayers = true;
+#if AUTOTEST
+        internal static int StackSize = 8;   // (settable by the test: -m3atStackSize)
+        internal static bool StackLogged;
+#else
+        private const int StackSize = 8;   // the engine's 16 textures a material: a texture and a mask each
+#endif
+        private const int StackedMost = 4000;   // materials kept at most; past it all are let go and made again as wanted
+        private static Shader stackShader;
+
+        private struct LayerCall
+        {
+            public Graphic g;
+            public string kind, layer;
+            public int cut;
+            public Vector2 shift;   // Facial Animation's offset now (ShiftOf), texture places
+        }
+
+        private struct Stacked
+        {
+            public Texture tex, mask;
+            public Color colour, colourTwo;
+            public int mode, cut;
+            public bool mouth;
+            public int call;   // its LayerCall, for one drawn on its own (Solo)
+            public Vector2 shift;
+        }
+
+        private static readonly List<LayerCall> calls = new List<LayerCall>();
+        private static readonly List<Stacked> stack = new List<Stacked>();
+        private static readonly Dictionary<long, Material> stacked = new Dictionary<long, Material>();
+        private static readonly int mouthMapId = Shader.PropertyToID("_MouthMap");
+        private static int[] stackT, stackM, stackC;
+        private static readonly int[] stackQ = { Shader.PropertyToID("_Q0"), Shader.PropertyToID("_Q1") };
+
+        // One layer: drawn now, or kept for DrawStacked.
+        private static void Layer(bool stacking, Graphic g, string kind, string layer, int cut, Vector2 shift, Patch patch, Mesh mouth, Matrix4x4 placed, ref int place)
+        {
+            if (stacking)
+            {
+                calls.Add(new LayerCall { g = g, kind = kind, layer = layer, cut = cut, shift = shift });
+            }
+            else
+            {
+                DrawLayer(g, kind, layer, cut, shift, patch, mouth, placed, ref place);
+            }
+        }
+
+        // The layers gathered by Layer, in their order: the glow layers each on their own, the rest StackSize to a draw.
+        private static void DrawStacked(Patch patch, Mesh mouth, Matrix4x4 placed, ref int place)
+        {
+            stack.Clear();
+            for (int i = 0; i < calls.Count; i++)
+            {
+                LayerCall call = calls[i];
+                Material gm = call.g != null ? call.g.MatSouth : null;
+                if (gm == null || gm.mainTexture == null || IsDummy(call.g) || call.cut == CutBoth)
+                {
+                    continue;
+                }
+                int mode = ModeOf(gm.shader);
+                if (mode < 0 && patch.bones != null)
+                {
+                    mode = ModeTransparent;   // as DrawLayer
+                }
+                if (mode < 0)
+                {
+                    // Facial Animation's own material, which only it can draw: every layer a draw of its own, in order.
+                    for (int k = 0; k < calls.Count; k++)
+                    {
+                        DrawLayer(calls[k].g, calls[k].kind, calls[k].layer, calls[k].cut, calls[k].shift, patch, mouth, placed, ref place);
+                    }
+                    return;
+                }
+                if (call.kind == "LidControllerComp" && call.layer == "Cover" && mode == ModeSkinOverlay)
+                {
+                    mode = ModeLidCover;
+                }
+                if (call.kind == "SkinControllerComp" && mode != ModeTransparent)
+                {
+                    continue;   // as DrawLayer: the whole sprite skin
+                }
+                if (mode == ModeGlow)
+                {
+                    DrawLayer(call.g, call.kind, call.layer, call.cut, call.shift, patch, mouth, placed, ref place);
+                    continue;
+                }
+                // Its colours and mask as LitFor gives its own material.
+                Color colour = gm.color;
+                if (mode == ModeLidCover)
+                {
+                    Color32 c = gm.color;
+                    c.r = (byte)(c.r & 0xF8);
+                    c.g = (byte)(c.g & 0xF8);
+                    c.b = (byte)(c.b & 0xF8);
+                    colour = c;
+                }
+                Color two = mode == ModeComplex && gm.HasProperty(ShaderPropertyIDs.ColorTwo) ? gm.GetColor(ShaderPropertyIDs.ColorTwo) : Color.white;
+                Texture mask = null;
+                if (mode == ModeComplex || mode == ModeSkinOverlay || mode == ModeLidCover)
+                {
+                    mask = gm.HasProperty(ShaderPropertyIDs.MaskTex) ? gm.GetTexture(ShaderPropertyIDs.MaskTex) : null;
+                    mask = mask != null ? mask : (mode == ModeComplex ? BaseContent.BlackTex : BaseContent.WhiteTex);
+                }
+                if (call.kind == "LidControllerComp" && call.layer == "Bottom")
+                {
+                    colour *= whiteTint;
+                }
+                stack.Add(new Stacked { tex = gm.mainTexture, mask = mask, colour = colour, colourTwo = two, mode = mode, cut = call.cut, mouth = call.kind == "MouthControllerComp", call = i, shift = call.shift });
+            }
+            Vector4 mouthMap = MouthMap(mouth == patch.mouthLow ? MouthRaisePig : MouthRaise);
+#if AUTOTEST
+            if (!StackLogged)
+            {
+                StackLogged = true;
+                System.Text.StringBuilder sb = new System.Text.StringBuilder(Tag + "stacked face, " + calls.Count + " calls, " + stack.Count + " stacked, mouth map " + mouthMap + ":");
+                foreach (LayerCall call in calls)
+                {
+                    Material cm = call.g != null ? call.g.MatSouth : null;
+                    sb.Append("\n  call " + call.kind + "/" + call.layer + " cut " + call.cut + " mat " + (cm != null ? cm.name + " shader " + (cm.shader != null ? cm.shader.name : "null") + " mode " + ModeOf(cm.shader) + " tex " + (cm.mainTexture != null ? cm.mainTexture.name + " " + cm.mainTexture.GetType().Name : "null") : "null") + " dummy " + IsDummy(call.g));
+                }
+                for (int i = 0; i < stack.Count; i++)
+                {
+                    Stacked l = stack[i];
+                    sb.Append("\n  layer " + i + " mode " + l.mode + " cut " + l.cut + " mouth " + l.mouth + " tex " + (l.tex != null ? l.tex.name : "null") + " mask " + (l.mask != null ? l.mask.name : "null") + " colour " + l.colour + " two " + l.colourTwo);
+                }
+                Log.Message(sb.ToString());
+            }
+#endif
+            Matrix4x4 local = Matrix4x4.Translate(patch.centre) * Matrix4x4.Scale(new Vector3(1.003f, 1.003f, 1.003f)) * Matrix4x4.Translate(-patch.centre);   // as DrawLayer
+            // In order: runs of up to StackSize layers a draw, and between them any layer that must be drawn on its own.
+            int from = 0;
+            for (int i = 0; i <= stack.Count; i++)
+            {
+                bool solo = i < stack.Count && Solo(stack[i]);
+                if (i < stack.Count && !solo && i - from < StackSize)
+                {
+                    continue;
+                }
+                if (i > from)
+                {
+                    Material mat = StackedMaterial(from, i - from, place, mouthMap);
+                    MaterialPropertyBlock block = BlockFor(patch, patch.smooth, 0);
+                    SetStackShifts(block, from, i - from);
+                    Api.SubmitFigureMesh(patch.face, mat, placed * local, block, FigureMeshFlags.NoCull, 0, Flash);
+                    place++;
+                }
+                if (solo)
+                {
+                    LayerCall call = calls[stack[i].call];
+                    DrawLayer(call.g, call.kind, call.layer, call.cut, call.shift, patch, mouth, placed, ref place);
+                    from = i + 1;
+                }
+                else
+                {
+                    from = i;
+                }
+            }
+        }
+
+        // A layer drawn on its own, not stacked: one whose texture is a render texture (the lid cover, which Facial
+        // Animation paints from the sprite head), as only an atlas tile's place is sure to reach the stacked slots' _ST.
+        // And a CutoutComplex one (a second colour), which the stacked material has no room for.
+        private static bool Solo(Stacked l)
+        {
+            return l.tex is RenderTexture || l.mask is RenderTexture || l.mode == ModeComplex;
+        }
+
+        // The mouth's texture places from the face's, as Zoomed makes the mouth's: scale in xy, offset in zw.
+        private static Vector4 MouthMap(float raise)
+        {
+            Vector2 shift = new Vector2(FaceTuning.mouthX, raise + FaceTuning.mouthY);
+            float zoom = MouthZoom * FaceTuning.mouthScale;
+            Vector2 offset = MouthCentre - (MouthCentre + shift) / zoom;
+            return new Vector4(1f / zoom, 1f / zoom, offset.x, offset.y);
+        }
+
+        private static long Mix(long h, long v)
+        {
+            return (h ^ v) * 0x100000001B3L + (h >> 29);
+        }
+
+        private static long ColourKey(Color c)
+        {
+            return ((Color32)c).r | ((long)((Color32)c).g << 8) | ((long)((Color32)c).b << 16) | ((long)((Color32)c).a << 24);
+        }
+
+        // The material for stack[from .. from + count), drawn place-th in the face (its queue): made once for each such mix.
+        private static Material StackedMaterial(int from, int count, int place, Vector4 mouthMap)
+        {
+            int chunk = Mathf.Clamp(place, 0, MaxLayers - 1);
+            long key = Mix(Mix(unchecked((long)0xcbf29ce484222325UL), chunk), mouthMap.GetHashCode());
+            for (int i = from; i < from + count; i++)
+            {
+                Stacked l = stack[i];
+                key = Mix(key, System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(l.tex));
+                key = Mix(key, l.mask != null ? System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(l.mask) : 0);
+                key = Mix(key, ColourKey(l.colour));
+                key = Mix(key, ColourKey(l.colourTwo));
+                key = Mix(key, l.mode * 16 + l.cut * 2 + (l.mouth ? 1 : 0));
+            }
+            key = Mix(key, count);
+            Material m;
+            if (stacked.TryGetValue(key, out m) && m != null)
+            {
+                return m;
+            }
+            if (stacked.Count >= StackedMost)
+            {
+                foreach (Material old in stacked.Values)
+                {
+                    if (old != null)
+                    {
+                        UnityEngine.Object.Destroy(old);
+                    }
+                }
+                stacked.Clear();
+            }
+            if (stackT == null)
+            {
+                stackT = new int[8];
+                stackM = new int[8];
+                stackC = new int[8];
+                for (int i = 0; i < 8; i++)
+                {
+                    stackT[i] = Shader.PropertyToID("_T" + i);
+                    stackM[i] = Shader.PropertyToID("_M" + i);
+                    stackC[i] = Shader.PropertyToID("_C" + i);
+                }
+            }
+            m = new Material(stackShader);
+            m.name = "MarusFace_stack_" + chunk;
+            m.renderQueue = LayerQueue + chunk;   // in the stack's order, as the layers were
+            m.SetVector(mouthMapId, mouthMap);
+            // Each layer's mode, eye cut and whether it is on the mouth's places, one number each (0: not in use).
+            Vector4[] q = { Vector4.zero, Vector4.zero };
+            for (int i = 0; i < count; i++)
+            {
+                Stacked l = stack[from + i];
+                m.SetTexture(stackT[i], l.tex);
+                m.SetTexture(stackM[i], l.mask != null ? l.mask : BaseContent.WhiteTex);
+                m.SetColor(stackC[i], l.colour);
+                q[i / 4][i % 4] = 1 + l.mode + 8 * l.cut + (l.mouth ? 32 : 0);
+            }
+            m.SetVector(stackQ[0], q[0]);
+            m.SetVector(stackQ[1], q[1]);
+            stacked[key] = m;
+            return m;
+        }
+
         // One layer on the patch, with the halves in cut (CutLeft, CutRight) left out.
-        private static void DrawLayer(Graphic g, string kind, string layer, int cut, Patch patch, Mesh mouth, Matrix4x4 placed, ref int place)
+#if AUTOTEST
+        // The perf test (AutoTest.Perf): how often a pawn's face, as drawn, differs from its last frame's (its layers'
+        // materials, textures, colours, cuts and modes), to see how often a face baked into a texture would be baked again.
+        private static int perfSig;
+        internal static long PerfFaces, PerfFaceChanges, PerfLayers;
+        private static int perfLayers;
+        private static readonly Dictionary<int, int> perfLast = new Dictionary<int, int>();
+
+        // Facial Animation's own state for the pawn, as the autotest reports it: its job, mood, pain, the thoughts it goes by
+        // and the animations it has picked, by reflection (FacialAnimationControllerComp).
+        internal static string FaState(Pawn pawn)
+        {
+            try
+            {
+                ThingComp comp = ((ThingWithComps)pawn).AllComps.FirstOrDefault(c => c.GetType().Name == "FacialAnimationControllerComp");
+                if (comp == null)
+                {
+                    return "no Facial Animation controller";
+                }
+                object param = AccessTools.Field(comp.GetType(), "animationParam").GetValue(comp);
+                Type pt = param.GetType();
+                string job = (string)AccessTools.Field(pt, "currentJobName").GetValue(param);
+                float mood = (float)AccessTools.Field(pt, "currentMood").GetValue(param);
+                float pain = (float)AccessTools.Field(pt, "currentPain").GetValue(param);
+                List<Thought> thoughts = (List<Thought>)AccessTools.Field(pt, "currentThoughts").GetValue(param);
+                List<string> names = new List<string>();
+                foreach (object anim in (System.Collections.IEnumerable)AccessTools.Field(comp.GetType(), "currentJobAnimationList").GetValue(comp))
+                {
+                    Def def = (Def)AccessTools.Field(anim.GetType(), "animationDef").GetValue(anim);
+                    names.Add(def.defName);
+                }
+                int temporary = ((System.Collections.ICollection)AccessTools.Field(comp.GetType(), "forcedTemporaryAnimationList").GetValue(comp)).Count;
+                List<string> shapes = new List<string>();
+                foreach (ThingComp c in ((ThingWithComps)pawn).AllComps)
+                {
+                    FieldInfo shape = c.GetType().Name.EndsWith("ControllerComp") ? AccessTools.Field(c.GetType(), "Shape") : null;
+                    if (shape != null)
+                    {
+                        object v = shape.GetValue(c);
+                        shapes.Add(c.GetType().Name.Replace("ControllerComp", "") + "=" + (v is Def d ? d.defName : "null"));
+                    }
+                }
+                return "job " + job + ", mood " + mood.ToString("F2") + ", pain " + pain.ToString("F2") + ", thoughts " + (thoughts == null ? "none" : string.Join("/", thoughts.Select(t => t.def.defName).Distinct()))
+                    + ", animations " + string.Join("/", names) + (temporary > 0 ? ", " + temporary + " forced" : "") + ", shapes " + string.Join(" ", shapes)
+                    + ", " + MasterReport(pawn);
+            }
+            catch (Exception e)
+            {
+                return "Facial Animation's state unreadable: " + e.Message;
+            }
+        }
+
+        // Whether the face found Facial Animation's master node (whose UpdateAnimation moves the face on each tick), and
+        // whether that node kept its controller (Facial Animation drops it for a pawn it won't animate).
+        private static string MasterReport(Pawn pawn)
+        {
+            Face f;
+            if (!faces.TryGetValue(pawn.thingIDNumber, out f))
+            {
+                return "face not read yet";
+            }
+            if (f.master == null)
+            {
+                return "no master node found (of " + f.parts.Count + " parts)";
+            }
+            object controller = AccessTools.Field(f.master.GetType(), "controller")?.GetValue(f.master);
+            return "master node " + f.master.GetType().Name + ", controller " + (controller != null ? "kept" : "dropped") + ", last updated tick " + f.tick;
+        }
+
+        // Plays these Facial Animation animations on the pawn from startTick, as its face editor previews them.
+        internal static bool FaPlay(Pawn pawn, int startTick, params string[] defNames)
+        {
+            Type t = GenTypes.GetTypeInAnyAssembly("FacialAnimation.FacialAnimationControllerComp");
+            MethodInfo play = t != null ? AccessTools.Method(t, "PlayTemporaryAnimation", new[] { typeof(Pawn), typeof(int), typeof(string[]) }) : null;
+            return play != null && (bool)play.Invoke(null, new object[] { pawn, startTick, defNames });
+        }
+
+        // Every Facial Animation animation loaded (its own and Experimentals'), by defName.
+        internal static List<string> FaAnimations()
+        {
+            Type t = GenTypes.GetTypeInAnyAssembly("FacialAnimation.FaceAnimationDef");
+            if (t == null)
+            {
+                return new List<string>();
+            }
+            Type db = typeof(DefDatabase<>).MakeGenericType(t);
+            System.Collections.IEnumerable all = (System.Collections.IEnumerable)db.GetProperty("AllDefsListForReading").GetValue(null);
+            List<string> names = new List<string>();
+            foreach (object d in all)
+            {
+                names.Add(((Def)d).defName);
+            }
+            return names;
+        }
+
+        private static void PerfFaceDone(Pawn pawn)
+        {
+            int last;
+            PerfFaces++;
+            PerfLayers += perfLayers;
+            if (!perfLast.TryGetValue(pawn.thingIDNumber, out last) || last != perfSig)
+            {
+                PerfFaceChanges++;
+            }
+            perfLast[pawn.thingIDNumber] = perfSig;
+            perfSig = 17;
+            perfLayers = 0;
+        }
+#endif
+
+        // Red eyes from smokeleaf: the eye whites (the lid's Bottom layer, under the iris) tinted toward StonedWhite while
+        // the pawn is high (its SmokeleafHigh hediff), all of it from StonedFull severity down (a joint gives 0.5, falling by
+        // 1 a day) and fading out below it, so over the last few hours of the high. White when not.
+        private static Color WhiteTintOf(Pawn pawn)
+        {
+            if (stonedDef == null)
+            {
+                stonedDef = DefDatabase<HediffDef>.GetNamedSilentFail("SmokeleafHigh");
+                if (stonedDef == null)
+                {
+                    return Color.white;
+                }
+            }
+            Hediff high = pawn.health != null ? pawn.health.hediffSet.GetFirstHediffOfDef(stonedDef) : null;
+            if (high == null)
+            {
+                return Color.white;
+            }
+            // In eighths, as each tint makes its own stacked face material (StackedMaterial keys them by colour).
+            float share = Mathf.Ceil(Mathf.Clamp01(high.Severity / StonedFull) * StonedSteps) / StonedSteps;
+            return Color.Lerp(Color.white, StonedWhite, share);
+        }
+
+        private static HediffDef stonedDef;
+        private static Color whiteTint = Color.white;   // the eye whites' tint for the face being drawn (Draw)
+        private static readonly Color StonedWhite = new Color(1f, 0.74f, 0.74f);   // a slight red, times the whites' own colour
+        private const float StonedSteps = 8f;
+        private const float StonedFull = 0.15f;   // SmokeleafHigh severity from which the tint is whole (about 3.6 game hours left)
+
+        private static void DrawLayer(Graphic g, string kind, string layer, int cut, Vector2 shift, Patch patch, Mesh mouth, Matrix4x4 placed, ref int place)
         {
             Material gm = g != null ? g.MatSouth : null;
             if (gm == null || gm.mainTexture == null || IsDummy(g) || cut == CutBoth)
@@ -755,6 +1247,16 @@ namespace M3AT
                 return;   // an empty layer
             }
             int mode = ModeOf(gm.shader);
+#if AUTOTEST
+            perfSig = perfSig * 31 + System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(gm);
+            perfSig = perfSig * 31 + System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(gm.mainTexture);
+            perfSig = perfSig * 31 + gm.color.GetHashCode() + 7 * cut + 101 * mode + (kind == "MouthControllerComp" && mouth != patch.mouth ? 13 : 0);
+            perfLayers++;
+#endif
+            if (mode < 0 && patch.bones != null)
+            {
+                mode = ModeTransparent;   // posed on the graphics card: a shader that doesn't pose it would draw it at rest
+            }
             if (kind == "LidControllerComp" && layer == "Cover" && mode == ModeSkinOverlay)
             {
                 mode = ModeLidCover;   // only the cover's shape: its art is the sprite head's painted shading
@@ -772,7 +1274,13 @@ namespace M3AT
                 * Matrix4x4.Scale(new Vector3(grow, grow, grow))
                 * Matrix4x4.Translate(-patch.centre);
             Material mat = mode >= 0 ? LitFor(gm, mode, place) : gm;   // a shader not known here: Facial Animation's own, unlit
-            Api.SubmitFigureMesh(kind == "MouthControllerComp" ? mouth : patch.face, mat, placed * local, mode >= 0 ? BlockFor(patch.smooth, cut) : null,
+            if (mode >= 0 && kind == "LidControllerComp" && layer == "Bottom")
+            {
+                mat.color *= whiteTint;   // (LitFor copies the colour afresh each draw)
+            }
+            MaterialPropertyBlock block = mode >= 0 ? BlockFor(patch, patch.smooth, cut) : null;
+            SetShift(block, shift);
+            Api.SubmitFigureMesh(kind == "MouthControllerComp" ? mouth : patch.face, mat, placed * local, block,
                 FigureMeshFlags.NoCull, 0, mode >= 0 ? Flash : 0f);
             place++;
         }
@@ -786,13 +1294,15 @@ namespace M3AT
             public Vector4 frame;   // its middle (texture places on the face), then its way across over its span (cos, sin)
             public Vector4 cell;    // its square on the wound sheet: place and size
             public Color colour;    // times the sheet; as a Decal's, alpha under 1 makes it a scar, this the skin colour
+            public bool fitIris;    // a prosthetic eye's iris: laid on Facial Animation's iris on that half (frame.x), at its size,
+                                    // cut to it and moved with its gaze (IrisOn); else as frame has it, cut to the white
         }
 
         private const int ModeEyeWound = 7;
         private static readonly int woundAtId = Shader.PropertyToID("_WoundAt");
         private static readonly int woundCellId = Shader.PropertyToID("_WoundCell");
         private static readonly int maskTwoId = Shader.PropertyToID("_MaskTwo");
-        private static readonly Dictionary<ValueTuple<Texture, Texture, int>, Material> woundMaterials = new Dictionary<ValueTuple<Texture, Texture, int>, Material>();
+        private static readonly Dictionary<WoundKey, Material> woundMaterials = new Dictionary<WoundKey, Material>();
 
         // A layer's texture, or null for an empty one.
         private static Texture LayerTexture(Graphic g)
@@ -815,32 +1325,73 @@ namespace M3AT
             Matrix4x4 drawn = placed * local;
             for (int i = 0; i < wounds.Length; i++)
             {
-                ValueTuple<Texture, Texture, int> key = new ValueTuple<Texture, Texture, int>(iris, white, place);
+                // Its own material, its square and colour set on it, with the face layers' own block (BlockFor), as their
+                // draws are known to reach the shader.
+                EyeWound w = wounds[i];
+                Texture shape = white ?? iris;
+                Vector2 shift = Vector2.zero;
+                Iris fitted;
+                EyeLayer layer;
+                if (w.fitIris)
+                {
+                    shape = iris ?? white;   // unmeasured: cut to the iris all the same, as the art fills its square
+                }
+                if (w.fitIris && IrisOn(w.frame.x, out fitted, out layer))
+                {
+                    // The art's iris (IrisArtShare of its square across) at Facial Animation's iris's size and place.
+                    w.frame = new Vector4(fitted.middle.x, fitted.middle.y, IrisArtShare / fitted.radius, 0f);
+                    shape = layer.tex;
+                    shift = layer.shift;
+                }
+                WoundKey key = new WoundKey { iris = shape, white = null, place = place, frame = w.frame, cell = w.cell, colour = w.colour };
                 Material m;
                 if (!woundMaterials.TryGetValue(key, out m))
                 {
                     m = new Material(layerShader);
                     m.name = "MarusFace_eye_wound_" + place;
                     m.mainTexture = Wounds.Sheet;
+                    m.color = w.colour;
                     m.SetFloat(faceModeId, ModeEyeWound);
-                    m.SetTexture(ShaderPropertyIDs.MaskTex, iris != null ? iris : BaseContent.ClearTex);
-                    m.SetTexture(maskTwoId, white != null ? white : BaseContent.ClearTex);
+                    m.SetVector(woundAtId, w.frame);
+                    m.SetVector(woundCellId, w.cell);
+                    // The eye's shape: its white, which covers the whole opening, iris and all, else the iris. In the first mask
+                    // slot, which the other face layers use too: a texture set on the second (_MaskTwo) read as clear in the game.
+                    m.SetTexture(ShaderPropertyIDs.MaskTex, shape ?? BaseContent.ClearTex);
+                    m.SetTexture(maskTwoId, BaseContent.ClearTex);
                     m.renderQueue = LayerQueue + place;
                     woundMaterials[key] = m;
                 }
-                // A block of its own, as each wound differs from pawn to pawn.
-                MaterialPropertyBlock block = new MaterialPropertyBlock();
-                block.SetColor("_Color", wounds[i].colour);
-                block.SetVector(woundAtId, wounds[i].frame);
-                block.SetVector(woundCellId, wounds[i].cell);
-                block.SetFloat("_EyeCut", cut);
-                if (patch.smooth)
-                {
-                    block.SetFloat("_Smooth", 1f);
-                    block.SetFloat("_ShadeBands", SkinnedFigure.ShadeBands);
-                }
+                MaterialPropertyBlock block = BlockFor(patch, patch.smooth, cut);
+                SetShift(block, shift);
                 Api.SubmitFigureMesh(patch.face, m, drawn, block, FigureMeshFlags.NoCull);
                 place++;
+            }
+        }
+
+        // An eye wound's material, by everything set on it.
+        private struct WoundKey : IEquatable<WoundKey>
+        {
+            public Texture iris, white;
+            public int place;
+            public Vector4 frame, cell;
+            public Color colour;
+
+            public bool Equals(WoundKey o)
+            {
+                return iris == o.iris && white == o.white && place == o.place && frame == o.frame && cell == o.cell && colour == o.colour;
+            }
+
+            public override bool Equals(object o)
+            {
+                return o is WoundKey && Equals((WoundKey)o);
+            }
+
+            public override int GetHashCode()
+            {
+                int h = place;
+                h = h * 31 + (iris != null ? iris.GetHashCode() : 0);
+                h = h * 31 + (white != null ? white.GetHashCode() : 0);
+                return h * 31 + frame.GetHashCode() * 7 + cell.GetHashCode() * 3 + colour.GetHashCode();
             }
         }
 
@@ -853,14 +1404,47 @@ namespace M3AT
         // The per-draw settings: smooth shading (the skinned chibi), the halves left out and the hit flash (Flash, which
         // MarusFace.frag.glsl leaves off the wounds that share these blocks). Null for none of them.
         private static readonly MaterialPropertyBlock[] blocks = new MaterialPropertyBlock[8 * (FlashSteps + 1)];
+        // The same for a patch posed on the graphics card: a block of the patch's own, with the pawn's bones too (set again
+        // when they have changed); a patch posed on the CPU takes the shared ones.
+        internal static MaterialPropertyBlock BlockFor(Patch patch, bool smooth, int cut)
+        {
+            if (patch == null || patch.bones == null)
+            {
+                return BlockFor(smooth, cut);
+            }
+            int step = Mathf.RoundToInt(Flash * FlashSteps);
+            int i = (smooth ? 4 : 0) + cut + 8 * step;
+            if (patch.blocks == null)
+            {
+                patch.blocks = new MaterialPropertyBlock[blocks.Length];
+                patch.blocksAt = new int[blocks.Length];
+            }
+            MaterialPropertyBlock b = patch.blocks[i];
+            if (b == null)
+            {
+                b = new MaterialPropertyBlock();
+                if (smooth)
+                {
+                    b.SetFloat("_Smooth", 1f);
+                    b.SetFloat("_ShadeBands", SkinnedFigure.ShadeBands);
+                }
+                b.SetFloat("_EyeCut", cut);
+                b.SetFloat(flashId, step / (float)FlashSteps);
+                patch.blocks[i] = b;
+                patch.blocksAt[i] = patch.bonesAt - 1;
+            }
+            if (patch.blocksAt[i] != patch.bonesAt)
+            {
+                b.SetVectorArray(bonesId, patch.bones);
+                patch.blocksAt[i] = patch.bonesAt;
+            }
+            return b;
+        }
+
         internal static MaterialPropertyBlock BlockFor(bool smooth, int cut)
         {
             int step = Mathf.RoundToInt(Flash * FlashSteps);
             int i = (smooth ? 4 : 0) + cut + 8 * step;
-            if (i == 0)
-            {
-                return null;
-            }
             if (blocks[i] == null)
             {
                 MaterialPropertyBlock b = new MaterialPropertyBlock();
@@ -946,6 +1530,8 @@ namespace M3AT
             // A block of its own, as the tint differs from pawn to pawn.
             MaterialPropertyBlock block = new MaterialPropertyBlock();
             block.SetColor("_Color", tint);
+            AddBones(block, patch);
+            SetNoShift(block);
             if (patch.smooth)
             {
                 block.SetFloat("_Smooth", 1f);

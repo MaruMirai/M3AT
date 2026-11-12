@@ -164,6 +164,17 @@ namespace M3AT
         private const float HurtTended = 0.5f;   // share of a tended wound's damage that still counts
         private const float CowerEase = 3f;   // how fast a pawn takes up (or drops) cowering, per real second
         private const float LeadEase = 3f;   // how fast a pawn's hand goes to a rope it leads by, or leaves it, per real second
+        private const float SadEase = 1f;   // how fast a pawn slumps into a sad wander (Sad), or straightens out of it, per real second
+        private const float DrunkFrom = 0.2f;   // AlcoholHigh's severity from which a pawn sways (tipsy) ..
+        private const float DrunkFull = 0.75f;   // .. and from which it sways all the way (hammered)
+        private const float DrunkEase = 0.3f;   // how fast the sway comes on or wears off, per real second
+        private const float DrunkWeave = 0.07f;   // cells a pawn drunk all the way is drawn to each side of its path on the move, with the sway
+        private const float DrunkAiming = 0.5f;   // share of the sway kept while aiming, as it steadies itself for the shot
+        private const float StirRestFrom = 5f;   // game seconds a cook works between bouts of stirring, at least
+        private const float StirRestTo = 14f;   // .. and at most
+        private const float BurnEase = 4f;   // how fast a pawn on fire takes to patting at the flames (Burning), or leaves off, per real second
+        private const int GlanceTicks = 150;   // game ticks a pawn looks at whom it had a social interaction with (InteractedPostfix)
+        private const float GlanceLook = 0.8f;   // share of the way it turns its head round toward them (LessonLookOf)
         private const float MealScale = 0.5f;   // of the carried size: a meal being eaten (DrawMeal), by the game's FoodMeals category
         private const float FoodScale = 0.3f;   // .. and any other food being eaten (pemmican, berries, chocolate)
         private const float MealTurn = 90f;   // degrees about the vertical a meal being eaten is turned
@@ -261,6 +272,7 @@ namespace M3AT
         private const float KneelCameSpread = 50f;   // degrees: and the furthest round from that side it looks, to keep off the limbs
         private const float FeedCloser = 0.35f;   // cells: how far a pawn feeding a patient in a bed (tame) is drawn toward them from its cell's middle
         private const float BenchCloser = 0.3f;   // cells: how far a pawn stood at a bench (work_bench) is drawn toward it from its cell's middle
+        private const float FireCloser = 0.1f;   // cells: how far a pawn sat at a campfire (work_stir_campfire) is drawn toward it, its roasting stick out over the fire (walk.ROAST_AIM) and its head short of it
         // Playing music (InstrumentKind): how far a pawn is drawn toward the instrument from the middle of its
         // interaction cell, stood at it and sat on a seat there (cells; walk.MUSIC's 'closer', keep the two in step). The
         // keyboards are two cells off and the harp and drum one, out of the chibi's reach; a chair is drawn in the
@@ -333,7 +345,11 @@ namespace M3AT
         }
         public static bool BedBlankets   // IsoRim's blanket over a sleeper in a head-only bed (DrawTuckedIn); false: lying on top of the bed
         {
-            get { return SettingsMod.Settings != null && SettingsMod.Settings.bedBlankets; }
+            get { return SettingsMod.Settings != null && SettingsMod.Settings.sleepWear == SleepWear.Blankets; }
+        }
+        public static bool VatClothes   // a pawn in a growth vat or biosculpter pod is drawn in its clothes; false: without them (InVat)
+        {
+            get { return SettingsMod.Settings != null && SettingsMod.Settings.vatClothes; }
         }
         public static bool GroundGarments   // apparel on the map is baked as the chibi's garment (GroundClothes); false: IsoRim's look
         {
@@ -466,6 +482,8 @@ namespace M3AT
             public string shieldClip;   // its shield_draw clip while that plays it; null: none
             public float eat;   // 0 .. 1: how far into eating it is (EatOf)
             public string eatClip;   // eat_sit or eat_stand (kept while it eases out of it)
+            public float pillAt;   // how far through the pill clip it is, 0 .. 1 (PillOf; kept as it eases out, so it stays down)
+            public int pillTicks;   // game ticks the chew it is timed by takes (the most left of it seen)
             public float look;   // degrees the head is turned about the vertical, eased (LessonLookOf: at a lesson)
             public float talk;   // 0 .. 1: how far into talking it is (TalkOf: a board game, a speech)
             public float toss;   // 0 .. 1: how far into pitching horseshoes or hoopstone it is (Tossing)
@@ -484,6 +502,15 @@ namespace M3AT
             public float rubFree;   // 0 .. 1: how far it is at leisure to rub them (AtLeisure)
             public Bout chat = new Bout();   // talking now and then at a party (Partying)
             public float rubAt = -1f;   // how far through the bout of each it is this frame, 0 .. 1; -1: between bouts
+            public float waveAt = -1f;   // how far through a wave in passing it is this frame, 0 .. 1; -1: none (WaveOf)
+            public float sad;   // 0 .. 1: slumped in a sad wander (Sad)
+            public float drunkBy;   // 0 .. 1: how drunk it is (DrunkOf), looked at with its legs
+            public float drunk;   // .. and how far it sways with it, eased toward that
+            public float weave;   // cells it is drawn to its right this frame, weaving drunk on the move (DrunkWeave)
+            public Bout stir = new Bout();   // stirring the pot now and then while cooking (StirOf)
+            public float stirAt = -1f;   // how far through a bout of stirring it is this frame, 0 .. 1; -1: between bouts
+            public string stirClip;   // the stirring clip for the work it does (work_stir, work_stir_crouch); null when not cooking
+            public float burn;   // 0 .. 1: patting at the flames on itself (Burning)
             public float chatAt = -1f;
             public Pawn chatWith;   // whom the bout of talking under way is to (ListenerOf); null: no one in particular
             public float? chatFace;   // which way they are (degrees clockwise from north), kept if they leave
@@ -533,6 +560,7 @@ namespace M3AT
             public float tuckNeck = float.NaN;   // under the blanket: the neck's distance down the bed from its head end before TuckedDown moves it, cells
             public float tuckShift;   // and how far TuckedDown moved the figure toward the feet, cells
             public int blanketFrame = -1;   // the frame IsoRim last drew (or queued) the blanket over this sleeper (DrawTuckedIn; for AutoTest)
+            public float lovinWay;     // and with no blanket, which way it goes (+1 the figure's +x), kept as it eases back out
             public float lovinShift;   // under the blanket at lovin: cells the head and lump are drawn across the bed toward the partner, eased (LovinOf)
             public float lieFloor;
             public float risen = 1f;   // how far through getting up, 0 .. 1; 1: done (RiseOf)
@@ -1152,6 +1180,12 @@ namespace M3AT
                 {
                     harmony.Patch(wear, postfix: new HarmonyMethod(typeof(WalkFigures), nameof(WornPostfix)));
                 }
+                // Social interactions, for a glance at the other and a wave in passing (InteractedPostfix).
+                MethodInfo interact = AccessTools.Method(typeof(Pawn_InteractionsTracker), nameof(Pawn_InteractionsTracker.TryInteractWith));
+                if (interact != null)
+                {
+                    harmony.Patch(interact, postfix: new HarmonyMethod(typeof(WalkFigures), nameof(InteractedPostfix)));
+                }
                 // A baby rocked in the arms by the figure, not by the game's sway (PlayOffsetPrefix).
                 MethodInfo playOffset = AccessTools.PropertyGetter(typeof(JobDriver_PlayWalking), nameof(JobDriver_PlayWalking.ForcedBodyOffset));
                 if (playOffset != null)
@@ -1244,6 +1278,7 @@ namespace M3AT
                 return ready;
             }
             tried = true;
+            LoadTrail.Note("loading the chibi (first figure drawn)" + LoadTrail.MemoryNow());
             try
             {
                 int frames = 0, levels = 0;
@@ -1330,6 +1365,7 @@ namespace M3AT
                         Log.Message(Tag + "the chibi is skinned at runtime (" + Folder + "/skin.txt, anim.txt), garments: "
                             + (garments.Length > 0 ? garments : "none") + ".");
                         ready = true;
+                        LoadTrail.Note("chibi loaded, skinned" + LoadTrail.MemoryNow());
                         return ready;
                     }
                     skin = null;
@@ -1393,9 +1429,10 @@ namespace M3AT
             }
             if (pawn.Dead)
             {
-                // Not gone to bones, nor in a gibbet cage or a grave (only spawned or carried corpses).
+                // Not gone to bones, nor in a grave (only spawned or carried corpses, or one hung in a gibbet cage).
                 Corpse corpse = pawn.Corpse;
-                return corpse != null && (corpse.Spawned || corpse.ParentHolder is Pawn_CarryTracker) && RotOf(pawn) != RotDrawMode.Dessicated;
+                return corpse != null && (corpse.Spawned || corpse.ParentHolder is Pawn_CarryTracker || corpse.ParentHolder is Building_GibbetCage cage && cage.Spawned)
+                    && RotOf(pawn) != RotDrawMode.Dessicated;
             }
             if (pawn.ParentHolder is IThingHolderWithDrawnPawn)
             {
@@ -1869,6 +1906,13 @@ namespace M3AT
             if (!eases.TryGetValue(pawn.thingIDNumber, out e))
             {
                 e = new Ease();
+            }
+            if (eatClip == "pill")
+            {
+                PillOf(pawn, e);
+            }
+            if (!eases.ContainsKey(pawn.thingIDNumber))
+            {
                 e.run = run;   // first seen: already at its pace and in its stance
                 e.drafted = drafted;
                 e.handHeld = weaponShows;
@@ -2002,6 +2046,7 @@ namespace M3AT
                     e.hurtBy = HurtOf(pawn, out hurtClip);
                     e.hurtClip = hurtClip ?? e.hurtClip;
                     e.cold = ColdOf(pawn);
+                    e.drunkBy = DrunkOf(pawn);
                 }
                 e.limp = recent ? Mathf.MoveTowards(e.limp, e.limpBy, LimpEase * Time.deltaTime) : e.limpBy;
                 e.hurt = recent ? Mathf.MoveTowards(e.hurt, e.hurtBy, LimpEase * Time.deltaTime) : e.hurtBy;
@@ -2014,6 +2059,11 @@ namespace M3AT
                 float putAway = e.drawAt >= 0f && !e.handHeld ? 0f : 1f;
                 e.cower = recent ? Mathf.MoveTowards(e.cower, cowering, CowerEase * Time.deltaTime) : cowering;
                 e.lead = recent ? Mathf.MoveTowards(e.lead, leading * putAway, LeadEase * Time.deltaTime) : leading;
+                e.drunk = recent ? Mathf.MoveTowards(e.drunk, e.drunkBy, DrunkEase * Time.deltaTime) : e.drunkBy;
+                float sad = skin != null && skin.Has("sad") && Sad(pawn) ? 1f : 0f;
+                e.sad = recent ? Mathf.MoveTowards(e.sad, sad, SadEase * Time.deltaTime) : sad;
+                float burning = skin != null && skin.Has("burning") && Burning(pawn) && swim <= 0f && !flying ? 1f : 0f;
+                e.burn = recent ? Mathf.MoveTowards(e.burn, burning, BurnEase * Time.deltaTime) : burning;
                 if (skin != null)
                 {
                     // A shield carried on the back is taken from there into the guard on its feet with its hands free
@@ -2064,6 +2114,9 @@ namespace M3AT
                 {
                     e.work = recent ? Mathf.MoveTowards(e.work, 0f, WorkEase * Time.deltaTime) : 0f;
                 }
+                // Cooking: stirring the pot now and then in place of the bench or ground work, once at it.
+                e.stirClip = skin != null && workKind != null ? StirOf(pawn, workKind) : null;
+                e.stirAt = e.stirClip != null ? BoutOf(pawn, e.stir, e.stirClip, e.work >= 1f, StirRestFrom, StirRestTo) : -1f;
                 if (e.flying && !flying)
                 {
                     e.landed = recent ? 0f : 1f;   // just landed
@@ -2084,6 +2137,8 @@ namespace M3AT
                 e.rubAt = skin != null && skin.Has("rub") ? BoutOf(pawn, e.rub, "rub", idleHands && talking <= 0f && e.cold && atLeisure, RubRestFrom, RubRestTo) : -1f;
                 // Talking now and then at a party, or while relaxing socially with someone near (to whom it turns).
                 e.chatAt = skin != null && skin.Has("talk") ? ChatOf(pawn, e, idleHands && talking <= 0f && e.rubAt < 0f) : -1f;
+                // A quick wave in passing at whom it just chatted with, with the hands free (WaveOf).
+                e.waveAt = skin != null && skin.Has("wave") && idleHands && pawn.GetPosture() == PawnPosture.Standing ? WaveOf(pawn) : -1f;
                 e.frame = frame;
             }
             return e;
@@ -2165,6 +2220,7 @@ namespace M3AT
             {
                 return;
             }
+            skin.Fit(fig, LimbsOf(set));   // and its prosthetics (Prosthetics.cs)
             List<Hediff_MissingPart> missing = set.GetMissingPartsCommonAncestors();
             int fingersL = 0, fingersR = 0, toesL = 0, toesR = 0;
             for (int i = 0; i < missing.Count; i++)
@@ -2271,7 +2327,8 @@ namespace M3AT
             return null;
         }
 
-        // How well a leg works, 0 .. 1: the worst of it and the parts of it it walks on (the foot; not the toes).
+        // How well a leg works, 0 .. 1: the worst of it and the parts of it it walks on (the foot; not the toes). A prosthetic
+        // counts at its own efficiency, capped at a natural leg's: a peg or a simple leg limps, a bionic one doesn't.
         private static float LegWorks(HediffSet set, BodyPartRecord leg)
         {
             float worst = 1f;
@@ -2280,6 +2337,10 @@ namespace M3AT
                 if (part != leg && (part.def.tags == null || !part.def.tags.Contains(BodyPartTagDefOf.MovingLimbSegment)))
                 {
                     continue;
+                }
+                if (part != leg && set.PartOrAnyAncestorHasDirectlyAddedParts(part) && !set.HasDirectlyAddedPartFor(part))
+                {
+                    continue;   // replaced with the leg's prosthetic, which the game marks missing: the prosthetic's own works is counted
                 }
                 float works = set.PartIsMissing(part) ? 0f : PawnCapacityUtility.CalculatePartEfficiency(set, part);
                 worst = Mathf.Min(worst, works);
@@ -2306,8 +2367,11 @@ namespace M3AT
             for (int i = 0; i < hediffs.Count; i++)
             {
                 Hediff h = hediffs[i];
-                if (h.Part == null)
+                if (h.Part == null || set.PartOrAnyAncestorHasDirectlyAddedParts(h.Part))
                 {
+                    // Nothing on or under a prosthetic hurts to hold: the game marks the parts a fitted one replaces (a
+                    // prosthetic arm's hand and fingers) freshly missing, and every pawn with one clutched it. A worse
+                    // prosthetic leg still limps (LimpOf, by how well the leg works).
                     continue;
                 }
                 float damage;
@@ -2648,8 +2712,9 @@ namespace M3AT
 
         // The lying loop for a pawn lying on its back or side: a corpse as the death fall ends it (dead), in a bed asleep
         // (sleep, downed or not) or awake (the plain lie), as a bed's blanket covers it and the downed loops' groaning and
-        // curling up are for the ground; downed on its back on a couch (downed) or curled on its side on the ground
-        // (downed_side), asleep (sleep), else the plain lie; the plain lie wherever the export has no such clip. A baby
+        // curling up are for the ground; downed and awake, on its back on a couch (downed) or curled on its side on the
+        // ground (downed_side); downed and unconscious (under anaesthetic, a catatonic breakdown, psychic shock), as
+        // asleep (sleep: the downed loops writhe in pain); asleep (sleep), else the plain lie; the plain lie wherever the export has no such clip. A baby
         // is always downed (its life stage's alwaysDowned), so unless in pain shock it sleeps, or awake waves and kicks (baby),
         // but lies still (the plain lie) while resting: awake in a lie-down job (LayDown, LayDownAwake, LayDownResting).
         private static string LieClip(Pawn pawn, bool dead, bool inBed, bool held)
@@ -2657,8 +2722,18 @@ namespace M3AT
             string clip = dead ? "dead" : Baby(pawn) && !pawn.health.InPainShock
                 ? (!pawn.Awake() ? "sleep" : pawn.jobs?.curDriver is JobDriver_LayDown ? "lie" : "baby")
                 : inBed ? (!pawn.Awake() ? "sleep" : "lie")
-                : pawn.Downed ? (held ? "downed" : OnBack(pawn) ? (!pawn.Awake() ? "sleep" : "downed") : "downed_side") : !pawn.Awake() ? "sleep" : "lie";
-            return skin.Has(clip) ? clip : "lie";
+                : pawn.Downed ? (!pawn.Awake() ? "sleep" : held || OnBack(pawn) ? "downed" : "downed_side") : !pawn.Awake() ? "sleep" : "lie";
+            if (!skin.Has(clip))
+            {
+                return "lie";
+            }
+            // Asleep, one of the sleep clip's variants (sleep~2: on the side, still), picked per sleep by the job's id so it
+            // keeps one all night; on the back while someone tends it there.
+            if (clip == "sleep" && !OnBack(pawn) && !held)
+            {
+                clip = skin.Variant(clip, Gen.HashCombineInt(pawn.thingIDNumber, pawn.CurJob != null ? pawn.CurJob.loadID : 0));
+            }
+            return clip;
         }
 
         // Whether the pawn is laid on its back to be tended on the ground (Ease.onBack): set by whoever kneels beside it to
@@ -2984,13 +3059,84 @@ namespace M3AT
             {
                 return null;
             }
+            // A drug smoked, or a pill or powder taken, has a clip of its own (DrugClipOf); a pill only over the chew it
+            // is timed by (PillOf), as before it the pawn only has it in hand.
+            string drug = DrugClipOf(food.def);
+            if (drug != null && skin.Has(drug) && (drug != "pill" || Chewing(pawn)))
+            {
+                return drug;
+            }
             IntVec3 c = job.GetTarget(TargetIndex.B).Cell;
             bool table = c.IsValid && c.AdjacentToCardinal(pawn.Position) && c.HasEatSurface(pawn.Map)
                 && food.def.ingestible != null && food.def.ingestible.ingestHoldUsesTable;
             string clip = table ? "eat_sit" : "eat_stand";
+            if (!skin.Has(clip))
+            {
+                return null;
+            }
+            // Any other drug (beer at a table, psychite tea) is drunk, never eaten with a knife and fork: it
+            // takes the clip itself, the drink both eat clips were made from, and no variant.
+            if (food.def.IsDrug)
+            {
+                return clip;
+            }
             // A variant per meal (eat_sit~2: knife and fork), by the job, so it keeps the one it sat down with.
-            return skin.Has(clip) ? skin.Variant(clip, Gen.HashCombineInt(pawn.thingIDNumber, job.loadID)) : null;
+            return skin.Variant(clip, Gen.HashCombineInt(pawn.thingIDNumber, job.loadID));
         }
+
+        // How a drug is taken, by the sound the game makes as it is (its ingestible's ingestSound, which mods' drugs take
+        // up from the game's bases too), else the verb of its ingest command: "smoke" for a joint or flake smoked
+        // (Ingest_Smoke), "pill" for a pill taken (Ingest_Pill) or a powder snorted (Ingest_Snort, yayo), as one; null
+        // for anything else (drunk, injected, eaten), which takes the eating clips. Cached per ThingDef.
+        private static string DrugClipOf(ThingDef def)
+        {
+            string clip;
+            if (drugClips.TryGetValue(def, out clip))
+            {
+                return clip;
+            }
+            IngestibleProperties ing = def.ingestible;
+            string sound = ing != null && ing.ingestSound != null ? ing.ingestSound.defName : "";
+            string verb = ing != null && ing.ingestCommandString != null ? ing.ingestCommandString : "";
+            if (sound == "Ingest_Smoke" || verb.StartsWith("Smoke"))
+            {
+                clip = "smoke";
+            }
+            else if (sound == "Ingest_Pill" || sound == "Ingest_Snort" || verb.StartsWith("Snort") || verb.StartsWith("Take"))
+            {
+                clip = "pill";
+            }
+            drugClips[def] = clip;
+            return clip;
+        }
+
+        private static readonly Dictionary<ThingDef, string> drugClips = new Dictionary<ThingDef, string>();
+
+        // Whether the pawn's job is in its chew (Toils_Ingest.ChewIngestible, the toil the game times eating by).
+        private static bool Chewing(Pawn pawn)
+        {
+            return pawn.jobs != null && pawn.jobs.curDriver != null && pawn.jobs.curDriver.CurToilString == "ChewIngestible";
+        }
+
+        // Taking a pill: e.pillAt how far through the chew it is, by its ticks left against the most of them seen (the
+        // chew sets them all at once as it begins, by the pill's ingest ticks and the pawn's eating speed), so the clip is
+        // played once through over it whatever its length. Kept once the chew is over, so it eases out from its end.
+        private static void PillOf(Pawn pawn, Ease e)
+        {
+            int left = Chewing(pawn) ? pawn.jobs.curDriver.ticksLeftThisToil : 0;
+            if (left <= 0)
+            {
+                e.pillTicks = 0;
+                return;
+            }
+            if (left > e.pillTicks)
+            {
+                e.pillTicks = left;   // begun
+            }
+            e.pillAt = Mathf.Clamp(1f - (float)left / e.pillTicks, 0f, PillLast);
+        }
+
+        private const float PillLast = 0.999f;   // the pill clip's phase no further on than this, as 1 wraps round to its start
 
         // The reading clip for a pawn reading (the game's Reading job, or a mod's on the same driver, once the book is open:
         // Book.IsOpen, set for the reading toil only), standing or sat still with it in hand; null when it is not reading,
@@ -3129,7 +3275,15 @@ namespace M3AT
             }
             else
             {
-                return 0f;
+                // Just after a social interaction (a chat in passing, an insult): a glance at whom it was with, wherever
+                // they have got to.
+                Pawn with = GlanceOf(pawn);
+                if (with == null)
+                {
+                    return 0f;
+                }
+                float? toward = FaceOf(pawn, with);
+                return toward.HasValue ? Mathf.Clamp(Mathf.DeltaAngle(yaw, toward.Value) * GlanceLook, -LookMost, LookMost) : 0f;
             }
             float? face = FaceOf(pawn, pawn.CurJob.targetB);
             return face.HasValue ? Mathf.Clamp(Mathf.DeltaAngle(yaw, face.Value) * share, -LookMost, LookMost) : 0f;
@@ -3207,6 +3361,114 @@ namespace M3AT
             return 1f;
         }
 
+        // Sad: a sad wander, or a visitor giving up (the game's Wander_Sad, Wander_OwnRoom, Wander_Psychotic and its short
+        // form, GiveUpExit), slumped as it goes.
+        private static bool Sad(Pawn pawn)
+        {
+            MentalStateDef state = pawn.MentalStateDef;
+            if (state == null)
+            {
+                return false;
+            }
+            string name = state.defName;
+            return name == "Wander_Sad" || name == "Wander_OwnRoom" || name == "Wander_Psychotic" || name == "Wander_Psychotic_Short"
+                || name == "GiveUpExit";
+        }
+
+        private static HediffDef alcoholHigh;
+
+        // How drunk a pawn is, 0 .. 1: its AlcoholHigh (beer, ambrosia's isn't) from DrunkFrom (tipsy) to DrunkFull
+        // (hammered).
+        private static float DrunkOf(Pawn pawn)
+        {
+            if (alcoholHigh == null)
+            {
+                alcoholHigh = DefDatabase<HediffDef>.GetNamedSilentFail("AlcoholHigh");
+            }
+            Hediff high = alcoholHigh != null && pawn.health != null ? pawn.health.hediffSet.GetFirstHediffOfDef(alcoholHigh) : null;
+            return high != null ? Mathf.InverseLerp(DrunkFrom, DrunkFull, high.Severity) : 0f;
+        }
+
+        // The stirring clip for a pawn cooking at the work kind it does (work_stir at a bench, work_stir_crouch knelt at the
+        // ground; sat at a campfire, stir_campfire, it holds a roasting stick out the whole time, so none), or null: a bill whose recipe is cooked (its work skill Cooking: meals, brewing wort), not butchering.
+        private static string StirOf(Pawn pawn, string kind)
+        {
+            Job job = pawn.CurJob;
+            if (job == null || job.def != JobDefOf.DoBill || job.bill == null || job.bill.recipe == null)
+            {
+                return null;
+            }
+            RecipeDef recipe = job.bill.recipe;
+            if (recipe.workSkill != SkillDefOf.Cooking
+                || (recipe.specialProducts != null && recipe.specialProducts.Contains(SpecialProductType.Butchery))
+                || (job.targetA.Thing != null && job.targetA.Thing.def.defName.Contains("Butcher")))
+            {
+                return null;
+            }
+            string clip = kind == "bench" ? "work_stir" : kind == "crouch" ? "work_stir_crouch" : null;
+            return clip != null && skin.Has(clip) ? clip : null;
+        }
+
+        // On fire on its feet and not rolling it out (ExtinguishSelf has its own roll, Rolling): patting at the flames.
+        private static bool Burning(Pawn pawn)
+        {
+            return pawn.IsBurning() && !pawn.Downed && !Rolling(pawn) && pawn.GetPosture() == PawnPosture.Standing;
+        }
+
+        // The last social interaction each pawn (by thingIDNumber) was in, in game ticks: whom with, and whether it waves
+        // (it began a friendly one: a chat, a deep talk, kind words). Recorded as the game has it (InteractedPostfix):
+        // interactions happen at once, in passing, whatever the pawns are doing, so all there is to show is a glance at
+        // the other (GlanceOf) and, with the hands free, a quick wave (WaveOf).
+        private struct Interaction
+        {
+            public int tick;
+            public Pawn with;
+            public bool wave;
+        }
+        private static readonly Dictionary<int, Interaction> interactions = new Dictionary<int, Interaction>();
+
+        private static void InteractedPostfix(Pawn ___pawn, Pawn recipient, InteractionDef intDef, bool __result)
+        {
+            if (!__result || skin == null || ___pawn == null || recipient == null || intDef == null
+                || !___pawn.RaceProps.Humanlike || !recipient.RaceProps.Humanlike)
+            {
+                return;
+            }
+            if (interactions.Count > 512)
+            {
+                interactions.Clear();
+            }
+            int now = Find.TickManager.TicksGame;
+            string name = intDef.defName;
+            bool friendly = name == "Chitchat" || name == "DeepTalk" || name == "KindWords";
+            interactions[___pawn.thingIDNumber] = new Interaction { tick = now, with = recipient, wave = friendly };
+            interactions[recipient.thingIDNumber] = new Interaction { tick = now, with = ___pawn, wave = false };
+        }
+
+        // Whom the pawn had a social interaction with within GlanceTicks, if they are still about; else null.
+        private static Pawn GlanceOf(Pawn pawn)
+        {
+            Interaction i;
+            if (!interactions.TryGetValue(pawn.thingIDNumber, out i))
+            {
+                return null;
+            }
+            int since = Find.TickManager.TicksGame - i.tick;
+            return since >= 0 && since <= GlanceTicks && i.with != null && i.with.Spawned && i.with.Map == pawn.Map ? i.with : null;
+        }
+
+        // How far through a wave at whom it began a friendly interaction with it is (0 .. 1, once through on game time), or -1.
+        private static float WaveOf(Pawn pawn)
+        {
+            Interaction i;
+            if (!interactions.TryGetValue(pawn.thingIDNumber, out i) || !i.wave)
+            {
+                return -1f;
+            }
+            float t = (Find.TickManager.TicksGame - i.tick) / (skin.SecondsOf("wave") * GenTicks.TicksPerRealSecond);
+            return t >= 0f && t < 1f ? t : -1f;
+        }
+
         // Leading an animal (or several) on a rope: the game's rope tracker has someone tied to this pawn.
         private static bool Leading(Pawn pawn)
         {
@@ -3228,7 +3490,10 @@ namespace M3AT
             {
                 return PlaysWithOthers(pawn, job);
             }
-            return name == "GiveSpeech" || name == "SpeakOnCellNoSpeechBubbles" || name == "VisitSickPawn";
+            // (a warden at a prisoner or slave: the game stands it there talking for a while, once there)
+            return name == "GiveSpeech" || name == "SpeakOnCellNoSpeechBubbles" || name == "VisitSickPawn"
+                || name == "PrisonerAttemptRecruit" || name == "PrisonerConvert" || name == "PrisonerEnslave" || name == "PrisonerReduceWill"
+                || name == "SlaveSuppress" || name == "PrisonerInterrogateIdentity" || name == "TalkCreepJoiner";
         }
 
         // Pitching horseshoes or hoopstone (the game's Play_Horseshoes and Play_Hoopstone: a JobDriver_WatchBuilding that
@@ -3872,7 +4137,9 @@ namespace M3AT
         // HolsterBefore, so it can put its weapon away first). Drafted counts the same: a drafted pawn ordered to a job does it.
         // Vomiting is played the same way (bent over, facing the cell it is sick on), whatever the setting, as it is not
         // work, and so is meditating (Meditate and MeditatePray: sat cross-legged on the spot, facing the way the game
-        // turns it; on a chair or throne it keeps the sit).
+        // turns it; on a chair or throne it keeps the sit, but praying there puts its palms together and bows its head,
+        // meditate_sit, laid over the sit as seated work is), and so is visiting a grave (VisitGrave: sat cross-legged
+        // beside it, facing it).
         // Trial only: feeding a patient played with the taming clips (FeedPatient in WorkOf).
         internal static readonly bool FeedAsTame = Environment.GetEnvironmentVariable("M3AT_FEED_TAME") == "1";
 
@@ -3882,7 +4149,7 @@ namespace M3AT
             face = 0f;
             Job job = pawn.CurJob;
             bool vomit = job != null && job.def == JobDefOf.Vomit;
-            bool meditate = job != null && pawn.jobs != null && pawn.jobs.curDriver is JobDriver_Meditate;
+            bool meditate = job != null && pawn.jobs != null && (pawn.jobs.curDriver is JobDriver_Meditate || pawn.jobs.curDriver is JobDriver_VisitGrave);
             string play = job != null ? PlaysByBaby(pawn) : null;
             bool music = job != null && pawn.jobs != null && (pawn.jobs.curDriver is JobDriver_PlayMusicalInstrument || PlaysForLover(pawn));
             if (job == null || job.def == null || (!vomit && !meditate && play == null && !music && !WorkAnimations) || (!coming && pawn.pather != null && pawn.pather.Moving))
@@ -3890,6 +4157,20 @@ namespace M3AT
                 return null;
             }
             LocalTargetInfo a = job.targetA;
+            if (pawn.jobs != null && pawn.jobs.curDriver is JobDriver_VisitGrave && a.Thing != null && a.Thing.Spawned)
+            {
+                // (a grave is two cells long and is visited from beside either: faced at its nearest cell, which is
+                // also what counts as being there)
+                IntVec3 nearest = a.Cell;
+                foreach (IntVec3 c in a.Thing.OccupiedRect())
+                {
+                    if ((c - pawn.Position).LengthHorizontalSquared < (nearest - pawn.Position).LengthHorizontalSquared)
+                    {
+                        nearest = c;
+                    }
+                }
+                a = nearest;
+            }
             if (job.def == JobDefOf.FeedPatient && job.targetB.Thing is Pawn)
             {
                 // (feeding: target A is the meal, in the feeder's own hands by then, which stands on no bed; the patient
@@ -3915,7 +4196,7 @@ namespace M3AT
             }
             else if (meditate)
             {
-                kind = "meditate";
+                kind = job.def.defName == "MeditatePray" && SeatUnder(pawn) != null && skin.Has("work_meditate_sit") ? "meditate_sit" : "meditate";
             }
             else if (music)
             {
@@ -4071,6 +4352,23 @@ namespace M3AT
                     case "Hack":
                         kind = PlaceWork(pawn, a, "hands", true);
                         break;
+                    case "Flick":
+                    case "Open":
+                        // (a switch, a lamp or a lid: the right hand reached out to it if it stands tall, knelt at it if
+                        // it is low; on an export without the reach, by where it is)
+                        kind = skin.Has("work_reach") && a.Thing != null && DrawnTall(a.Thing.def) ? "reach" : PlaceWork(pawn, a, "hands", false);
+                        break;
+                    case "Refuel":
+                    case "RefuelAtomic":
+                    case "RearmTurret":
+                    case "RearmTurretAtomic":
+                    case "EjectFuel":
+                    case "FillFermentingBarrel":
+                    case "TakeBeerOutOfFermentingBarrel":
+                        // (the hands at it for the game's wait, by where it is: stood at a generator or a turret, knelt
+                        // at a campfire, a torch or a barrel; the fuel stays in hand meanwhile)
+                        kind = PlaceWork(pawn, a, "hands", false);
+                        break;
                     case "DoBill":
                     {
                         // Any bill (crafting, cooking, drugs, butchering, surgery) by where it is done; on an older export,
@@ -4093,11 +4391,17 @@ namespace M3AT
                             string hammer = SeatUnder(pawn) != null ? "hammer_bench_sit" : "hammer_bench";
                             kind = skin.Has("work_" + hammer) ? hammer : PlaceWork(pawn, a, tool, true);
                         }
-                        // (a campfire, vanilla's or a mod's, is cooked at knelt on the ground, whatever its fill; sat
-                        // on a seat beside it, by place as any bill)
-                        else if (bench.Contains("Campfire") && SeatUnder(pawn) == null && skin.Has("work_crouch"))
+                        // (a campfire, vanilla's or a mod's, is worked at sat cross-legged on the ground stirring a pot
+                        // reached out to it the whole time, whatever its fill, as knelt the chibi's head went over the
+                        // fire; knelt on an export without that; sat on a seat beside it, hunched forward reaching the
+                        // spoon out to it, else by place as any bill)
+                        else if (bench.Contains("Campfire") && SeatUnder(pawn) == null && (skin.Has("work_stir_campfire") || skin.Has("work_crouch")))
                         {
-                            kind = "crouch";
+                            kind = skin.Has("work_stir_campfire") ? "stir_campfire" : "crouch";
+                        }
+                        else if (bench.Contains("Campfire") && SeatUnder(pawn) != null && skin.Has("work_stir_campfire_sit"))
+                        {
+                            kind = "stir_campfire_sit";
                         }
                         else
                         {
@@ -4385,7 +4689,7 @@ namespace M3AT
         // Whether a work kind is played sat down, from the waist up over the sit, rather than as the whole figure standing.
         private static bool SeatedWork(string kind)
         {
-            return kind == "research" || kind == "bench_sit" || kind == "chair" || kind == "hammer_bench_sit"
+            return kind == "research" || kind == "meditate_sit" || kind == "bench_sit" || kind == "chair" || kind == "hammer_bench_sit" || kind == "stir_campfire_sit"
                 || kind == "piano_sit" || kind == "harp_sit" || kind == "drum_sit";
         }
 
@@ -4770,7 +5074,101 @@ namespace M3AT
         // Returns the garments found as a mask (bit g: garment g), for SkinnedFigure.HideUnder.
         private static GarmentMask WornGarments(Pawn pawn, Apparel[] worn)
         {
-            List<Apparel> all = pawn.apparel != null ? pawn.apparel.WornApparel : null;
+            int version;
+            return WornGarments(pawn, worn, out version);
+        }
+
+        // The last answer for each pawn (by id), as working it out walks every garment of the export for each worn apparel,
+        // every frame, though what a pawn wears rarely changes. It is worked out again when anything it goes by has changed:
+        // the apparel worn (the things, in order), whether a shield shows, the shoes option, the baby romper and the model.
+        private sealed class WornCache
+        {
+            public SkinnedFigure skin;
+            public Apparel[] apparel = new Apparel[0];   // what was worn, in the game's order
+            public bool shieldShows, shoes;
+            public Apparel romper;
+            public Apparel[] worn;   // the answer: the apparel each garment is drawn for
+            public GarmentMask mask;
+            public int version;   // new each time an answer is worked out (wornVersions), for HideGarments
+        }
+        private static readonly Dictionary<int, WornCache> wornCaches = new Dictionary<int, WornCache>();
+        private static int wornVersions;
+        private const int WornCacheMost = 1000;   // pawns kept at most; past it all are let go, as it is only a cache
+
+        // The same, and which answer it is (version: the same number means the same mask and worn, so what follows from them
+        // alone, SkinnedFigure.HideGarments, need not be worked out again).
+        private static GarmentMask WornGarments(Pawn pawn, Apparel[] worn, out int version)
+        {
+            // In a vat (a growth vat, a biosculpter pod): no baby romper, and the clothes only with the vatClothes option.
+            // In a bed, what the sleepWear option has it wear (SleepWear.cs): pajamas in the romper's place, or nothing.
+            bool inVat = InVat(pawn);
+            SleepWear sleep = inVat ? SleepWear.Blankets : SleepWearOf(pawn);
+            List<Apparel> all = DressedIn(pawn, inVat, sleep);
+            bool shieldShows = ShieldShows(pawn);
+            bool shoes = Shoes;
+            Apparel romper = inVat ? null : sleep == SleepWear.Pajamas ? PajamasOf(pawn) : BabyRomperOf(pawn, all);   // (Nothing keeps a baby's romper, as it would come and go)
+            WornCache c;
+            if (!wornCaches.TryGetValue(pawn.thingIDNumber, out c))
+            {
+                if (wornCaches.Count >= WornCacheMost)
+                {
+                    wornCaches.Clear();
+                }
+                c = new WornCache();
+                wornCaches[pawn.thingIDNumber] = c;
+            }
+            else if (c.skin == skin && c.shieldShows == shieldShows && c.shoes == shoes && c.romper == romper
+                && c.worn != null && c.worn.Length == worn.Length && SameApparel(c.apparel, all))
+            {
+                Array.Copy(c.worn, worn, worn.Length);
+                version = c.version;
+                return c.mask;
+            }
+            GarmentMask mask = WornGarmentsNow(pawn, all, worn, shieldShows, shoes, romper);
+            c.skin = skin;
+            c.shieldShows = shieldShows;
+            c.shoes = shoes;
+            c.romper = romper;
+            int count = all != null ? all.Count : 0;
+            if (c.apparel.Length != count)
+            {
+                c.apparel = new Apparel[count];
+            }
+            for (int i = 0; i < count; i++)
+            {
+                c.apparel[i] = all[i];
+            }
+            if (c.worn == null || c.worn.Length != worn.Length)
+            {
+                c.worn = new Apparel[worn.Length];
+            }
+            Array.Copy(worn, c.worn, worn.Length);
+            c.mask = mask;
+            c.version = ++wornVersions;
+            version = c.version;
+            return mask;
+        }
+
+        private static bool SameApparel(Apparel[] was, List<Apparel> now)
+        {
+            int count = now != null ? now.Count : 0;
+            if (was.Length != count)
+            {
+                return false;
+            }
+            for (int i = 0; i < count; i++)
+            {
+                if (was[i] != now[i])
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        // Works WornGarments out (all: the worn apparel; romper: BabyRomperOf's, null for none).
+        private static GarmentMask WornGarmentsNow(Pawn pawn, List<Apparel> all, Apparel[] worn, bool shieldShows, bool shoes, Apparel romper)
+        {
             for (int g = 1; g < skin.Pieces; g++)
             {
                 worn[g] = null;
@@ -4795,7 +5193,6 @@ namespace M3AT
             }
             // A held garment (a shield) only while CE would draw it: drafted, or a job or duty that shows the weapon. One
             // carried on the back the rest of the time (CarriedOnBack) is always drawn, in the hand or on the back.
-            bool shieldShows = ShieldShows(pawn);
             for (int g = 1; !shieldShows && g < skin.Pieces; g++)
             {
                 if (worn[g] != null && skin.IsHeld(g) && !skin.CarriedOnBack(g))
@@ -4808,7 +5205,7 @@ namespace M3AT
             // They go as the first apparel covering the legs, so body armour over it leaves them off with it, below.
             Apparel legs = null;
             bool torso = false;
-            for (int i = 0; Shoes && all != null && i < all.Count; i++)
+            for (int i = 0; shoes && all != null && i < all.Count; i++)
             {
                 List<BodyPartGroupDef> groups = all[i].def.apparel == null ? null : all[i].def.apparel.bodyPartGroups;
                 if (groups == null)
@@ -4831,11 +5228,12 @@ namespace M3AT
                     worn[g] = legs;
                 }
             }
-            // The baby romper, on a baby a few hours old with nothing over its trunk or legs (BabyRomperOf).
-            Apparel romper = null;
-            for (int g = 1; g < skin.Pieces; g++)
+            // The baby romper, on a baby a few hours old with nothing over its trunk or legs (BabyRomperOf), or the pajamas
+            // in bed (PajamasOf).
+            bool pajamas = IsPajamas(romper);
+            for (int g = 1; romper != null && g < skin.Pieces; g++)
             {
-                if (worn[g] == null && skin.ForBaby(g) && (romper = romper ?? BabyRomperOf(pawn, all)) != null)
+                if (worn[g] == null && (pajamas ? g == PajamaPiece() : skin.ForBaby(g)))
                 {
                     worn[g] = romper;
                 }
@@ -5460,7 +5858,7 @@ namespace M3AT
             return true;
         }
 
-        private static void DrawGarments(Apparel[] worn, SkinnedFigure.Posed fig, Vector3 at, float yaw, float size)
+        private static void DrawGarments(Pawn pawn, Apparel[] worn, SkinnedFigure.Posed fig, Vector3 at, float yaw, float size)
         {
             for (int g = 1; g < skin.Pieces; g++)
             {
@@ -5471,6 +5869,10 @@ namespace M3AT
                     if (own.HasValue)
                     {
                         colour = own.Value;   // the shoes, worn with legwear of any colour
+                    }
+                    else if (IsPajamas(worn[g]))
+                    {
+                        colour = PajamaColourOf(pawn);   // each pawn's own pastel, not the stand-in's cloth
                     }
                     else if (worn[g].WornByCorpse && skin.Tinted(g, worn[g]) && TakesItsColour(worn[g]))
                     {
@@ -5505,7 +5907,8 @@ namespace M3AT
             fig.flash = HitFlash.Of(pawn, drawing != null && drawing.ForOtherMod);   // the game's red damage flash, on what it is drawn in (DrawMeshes, the face's layers)
             FaceLayers.Flash = fig.flash;
             Color skinColour = SkinOf(pawn);
-            GarmentMask mask = WornGarments(pawn, wornBuffer);
+            int wornVersion;
+            GarmentMask mask = WornGarments(pawn, wornBuffer, out wornVersion);
             skin.Wearing(fig, mask, WearsGear(pawn, "pack"), PackScaleOf(size), PackScaleOf(size) * (skin.BorrowsPack(mask, wornBuffer) ? KidPackSize : 1f));
             if (skin.CarriesShield(mask))
             {
@@ -5518,7 +5921,7 @@ namespace M3AT
             skin.HairUnderHats(fig, hair, mask);
             skin.HideUnder(fig, mask, hair);
             string earFile = headless ? null : EarFileOf(pawn);
-            skin.HideGarments(fig, mask, wornBuffer);
+            skin.HideGarments(fig, mask, wornBuffer, wornVersion);
             skin.DrawBody(fig, hair, at, yaw, size, skinColour, pawn.story.HairColor);
             int fur = FurOf(pawn);
             if (fur > 0)
@@ -5527,7 +5930,7 @@ namespace M3AT
                 skin.HideFur(fig, fur, mask, hair);
                 skin.Draw(fig, fur, at, yaw, size, skinColour, true);
             }
-            DrawGarments(wornBuffer, fig, at, yaw, size);
+            DrawGarments(pawn, wornBuffer, fig, at, yaw, size);
             skin.DrawHair(fig, hair, mask, at, yaw, size, pawn.story.HairColor, skinColour);
             string ridgeDesign = headless ? null : RidgesOf(pawn);
             if (ridgeDesign != null && !skin.HidesFace(mask, wornBuffer))
@@ -5583,9 +5986,10 @@ namespace M3AT
             {
                 return null;
             }
-            if (pawn.apparel != null)
+            bool inVat = InVat(pawn);
+            List<Apparel> worn = DressedIn(pawn, inVat, inVat ? SleepWear.Blankets : SleepWearOf(pawn));
+            if (worn != null)
             {
-                List<Apparel> worn = pawn.apparel.WornApparel;
                 for (int i = 0; i < worn.Count; i++)
                 {
                     if (SkinnedFigure.HidesBeard(worn[i].def))
@@ -5658,7 +6062,8 @@ namespace M3AT
             float handTurn = 0f;
             // Feeding a patient with the taming clips, the meal is on the right palm, held out to them palm up.
             bool feeding = held == null && FeedingFromHand(pawn, ease);
-            eatenInHand = feeding || ease.eatClip == "eat_stand" && ease.eat >= 0.5f;
+            // A pill or powder is held on the left palm the same way (the pill clip pinches from it).
+            eatenInHand = feeding || (ease.eatClip == "eat_stand" || ease.eatClip == "pill") && ease.eat >= 0.5f;
             if (eatenInHand)
             {
                 Vector3 wrist = feeding ? wristR : wristL;
@@ -5689,6 +6094,10 @@ namespace M3AT
                 if (held == null && ease.eatClip == "read" && ease.eat >= 0.5f && DrawBook(pawn, load, fig, at, yaw, size))
                 {
                     // (the open book, on the left hand)
+                }
+                else if (held == null && ease.eatClip == "smoke" && ease.eat >= 0.5f && DrawJoint(fig, at, yaw, size))
+                {
+                    // (the joint, across the right hand's fingers)
                 }
                 else if (held == null && (feeding || ease.eatClip != null && ease.eat >= 0.5f))
                 {
@@ -5787,6 +6196,131 @@ namespace M3AT
             return true;
         }
 
+        // A joint being smoked: this mod's Models/tool_joint.obj (anim_scripts/make_joint.py) by the export's `tool smoke`
+        // line on the right hand, sized with the pawn, in place of the drug's own picture (a bundle of them). False if the
+        // export has no such line or the model isn't there.
+        private static bool DrawJoint(SkinnedFigure.Posed fig, Vector3 at, float yaw, float size)
+        {
+            SkinnedFigure.Tool tool = skin.ToolOf("smoke");
+            Matrix4x4 hand;
+            if (tool == null || !skin.BoneOf(fig, tool.bone, out hand))
+            {
+                return false;
+            }
+            ModelHandle model = ToolModel(tool.model);
+            if (model == null)
+            {
+                return false;
+            }
+            try
+            {
+                Api.DrawModel(model, at, yaw, Matrix4x4.Scale(new Vector3(size, size, size)) * hand * tool.place, Color.white);
+            }
+            catch (Exception e)
+            {
+                Log.ErrorOnce(Tag + "Drawing a joint being smoked failed: " + e, 0x4d3a7e03);
+            }
+            return true;
+        }
+
+        private const string RolledJointModel = "tool_joint_unlit";   // the joint being rolled (anim_scripts/make_joint.py)
+        private const float RolledJointAhead = 0.03f;   // cells (at a grown pawn's size) it lies in front of the wrists' middle
+        private const float RolledJointLap = 0.04f;     // cells under the wrists' middle it is held, sat working on the lap
+        private const float RolledJointInset = 0.08f;   // cells in from the bench's edge its middle lies at least
+        private const float RolledJointRadius = 0.008f; // cells: the model's mean radius, so it lies on the table, not in it
+        internal static int rolledJointFrame = -1;   // the frame a joint being rolled was last drawn, and where (the autotest's rolljoint)
+        internal static Vector3 rolledJointAt;
+        private static readonly Dictionary<RecipeDef, bool> rollsJoints = new Dictionary<RecipeDef, bool>();
+
+        // A bill making a joint (Make_SmokeleafJoint, or a mod's: a product smoked, DrugClipOf, named a joint), cached.
+        private static bool RollsJoint(RecipeDef recipe)
+        {
+            bool rolls;
+            if (!rollsJoints.TryGetValue(recipe, out rolls))
+            {
+                rolls = false;
+                if (recipe.products != null)
+                {
+                    foreach (ThingDefCountClass product in recipe.products)
+                    {
+                        ThingDef def = product.thingDef;
+                        if (def != null && def.defName.IndexOf("Joint", StringComparison.OrdinalIgnoreCase) >= 0 && DrugClipOf(def) == "smoke")
+                        {
+                            rolls = true;
+                        }
+                    }
+                }
+                rollsJoints[recipe] = rolls;
+            }
+            return rolls;
+        }
+
+        // The joint being rolled while a bill makes one sat at it (at the drug lab or a crafting spot): an unlit joint lying
+        // across in front of the worker's hands, on the bench top under them (sat at the drug lab) or in the hands (sat at a
+        // crafting spot on a chair). Not stood or knelt at it, where the game's picture of the leaves lies on the spot. Only during the recipe's work itself (the driver's
+        // workLeft), not while it fetches the leaves. lift: the floor's height under the figure (IsoRim's placing).
+        private static void DrawRolledJoint(Pawn pawn, Ease ease, SkinnedFigure.Posed fig, Vector3 at, float yaw, float size, float lift)
+        {
+            Job job = pawn.CurJob;
+            JobDriver_DoBill driver = pawn.jobs != null ? pawn.jobs.curDriver as JobDriver_DoBill : null;
+            // (seated only: stood or knelt at it, the game's own picture of the leaves lies where the joint would)
+            if (ease.workKind != "bench_sit" && ease.workKind != "chair")
+            {
+                return;
+            }
+            if (job == null || driver == null || driver.workLeft <= 0f || job.bill == null || job.bill.recipe == null || !RollsJoint(job.bill.recipe))
+            {
+                return;
+            }
+            Vector3 wristL, wristR;
+            if (!skin.JointOf(fig, "hand.L", out wristL) || !skin.JointOf(fig, "hand.R", out wristR))
+            {
+                return;
+            }
+            ModelHandle model = ToolModel(RolledJointModel);
+            if (model == null)
+            {
+                return;
+            }
+            try
+            {
+                Vector3 hands = 0.5f * (wristL + wristR) * size + Vector3.forward * (RolledJointAhead * size);
+                if (ease.workKind == "chair")
+                {
+                    // On the lap, no table: in the hands.
+                    hands.y -= RolledJointLap * size;
+                }
+                else
+                {
+                    // On the bench's top (the bill giver's), on its near edge: sat back on the chair, the hands are over
+                    // the pawn's own cell, short of the bench.
+                    Thing bench = job.targetA.Thing;
+                    if (bench == null || !bench.Spawned)
+                    {
+                        return;
+                    }
+                    Quaternion turn = Quaternion.AngleAxis(yaw, Vector3.up);
+                    Vector3 world = at + turn * hands;
+                    CellRect rect = bench.OccupiedRect();
+                    world.x = Mathf.Clamp(world.x, rect.minX + RolledJointInset, rect.maxX + 1f - RolledJointInset);
+                    world.z = Mathf.Clamp(world.z, rect.minZ + RolledJointInset, rect.maxZ + 1f - RolledJointInset);
+                    hands = Quaternion.Inverse(turn) * (world - at);
+                    hands.y = lift + Mathf.Max(0f, Api.SurfaceHeight(bench)) - at.y + RolledJointRadius * size;
+                }
+                // Lying across in front of it (the model runs up +y from its filter end): its middle at hands, its length
+                // along the figure's left-right.
+                Matrix4x4 local = Matrix4x4.Translate(hands) * Matrix4x4.Scale(new Vector3(size, size, size))
+                    * Matrix4x4.Rotate(Quaternion.Euler(0f, 0f, -90f)) * Matrix4x4.Translate(new Vector3(0f, -0.05f, 0f));
+                Api.DrawModel(model, at, yaw, local, Color.white);
+                rolledJointFrame = Time.frameCount;
+                rolledJointAt = at + Quaternion.AngleAxis(yaw, Vector3.up) * hands;
+            }
+            catch (Exception e)
+            {
+                Log.ErrorOnce(Tag + "Drawing a joint being rolled failed: " + e, 0x4d3a7e04);
+            }
+        }
+
         private static bool eatenInHand;   // DrawLoad is drawing a meal in the hand: JobDriver_Ingest is not to move it (HeldPrefix)
 
         // JobDriver_Ingest.ModifyCarriedThingDrawPos: false (the thing is drawn where it is held) while DrawLoad draws a meal
@@ -5864,6 +6398,144 @@ namespace M3AT
             }
             return true;
         }
+
+        // A corpse hung in a gibbet cage, where IsoRim's placing puts it (the cage's middle, a yaw of its own, the cage floor):
+        // slumped where it stands (walk.caged_pose: the knees buckled, the back curled, the head hung, the arms down), leant
+        // as IsoRim leans its own figure there, its feet on the cage floor. No taller than
+        // IsoRim's figure (placed.Size, already shrunk by its GibbetScale to stay under the cage's dome), which the
+        // chibi's ScaleUp would otherwise put through it.
+        private static bool DrawCaged(FigureDrawContext ctx, FigurePlacement placed, float size)
+        {
+            Pawn pawn = ctx.Pawn;
+            size = Mathf.Min(size * GibbetScale, placed.Size);
+            if (!ctx.ForOtherMod && !SkinnedFigure.MaybeOnScreen(placed.Position, size))
+            {
+                return true;
+            }
+            try
+            {
+                SkinnedFigure.Shape shape = ShapeFor(pawn);
+                SkinnedFigure.Posed fig = skin.For(pawn.thingIDNumber, shape);
+                skin.Begin(fig);
+                CutLimbs(pawn, fig);
+                if (skin.Has("caged"))
+                {
+                    skin.Add(fig, "caged", 0f, 1f);
+                }
+                else
+                {
+                    // An export without the caged pose: part way to the ragdoll's, whose arms are held out for lying.
+                    float slump = skin.Has("ragdoll") ? GibbetSlump : 0f;
+                    skin.Add(fig, "idle", 0f, 1f - slump);
+                    skin.Add(fig, "ragdoll", 0f, slump);
+                }
+                skin.End(fig, Matrix4x4.Rotate(Quaternion.AngleAxis(GibbetLean, Vector3.right)));
+                float lowest, bodyTop;
+                skin.Extent(fig, out lowest, out bodyTop);
+                Vector3 at = new Vector3(placed.Position.x, placed.Position.y - lowest * size, placed.Position.z);
+                DrawDressed(pawn, fig, at, placed.Yaw, size);
+            }
+            catch (Exception e)
+            {
+                Log.Error(Tag + "drawing a chibi in a gibbet cage failed, IsoRim's figures are kept: " + e);
+                skin = null;
+                ready = false;
+                return false;
+            }
+            return true;
+        }
+
+        // The glass over the couch of a building that shows who is inside, as IsoRim's glass model of it has it: in the
+        // building's own space (x across, z along, as built facing north), an elliptic tube (or arch) along z, centred
+        // centre over the building's floor, across and up its inner half widths, along its inner half length, and
+        // surface the couch's height (IsoRim's surfaceHeight), all cells. Measured from growth_vat_glass.obj and
+        // biosculpter_pod_glass.obj in IsoRim's Models.
+        private struct GlassTube
+        {
+            public float across, up, centre, along, surface;
+            public GlassTube(float across, float up, float centre, float along, float surface)
+            {
+                this.across = across;
+                this.up = up;
+                this.centre = centre;
+                this.along = along;
+                this.surface = surface;
+            }
+        }
+
+        private static readonly Dictionary<string, GlassTube> Glasses = new Dictionary<string, GlassTube>
+        {
+            { "GrowthVat", new GlassTube(0.34f, 0.26f, 0.45f, 0.8f, 0.26f) },
+            { "BiosculpterPod", new GlassTube(0.515f, 0.515f, 0.34f, 0.7f, 0.30f) },
+        };
+
+        private const float GlassClear = 0.03f;   // cells kept under the glass: the hair and the outline stand off the body
+        private const float GlassMostDown = 0.2f;   // cells, the most a figure is let down into the couch
+
+        // Whether the pawn lies in a vat drawn with glass over it (a growth vat, a biosculpter pod: Glasses), where it is
+        // drawn with no baby romper and, unless the vatClothes option is on, no clothes.
+        private static bool InVat(Pawn pawn)
+        {
+            Thing holder = pawn.ParentHolder is ThingComp comp ? comp.parent : pawn.ParentHolder as Thing;
+            return holder != null && Glasses.ContainsKey(holder.def.defName);
+        }
+
+        // The last fit per pawn (how far it was let down, and slid along toward its feet), for the autotest.
+        internal static readonly Dictionary<int, Vector2> glassFits = new Dictionary<int, Vector2>();
+
+        // The move (cells) keeping a figure lying on a couch under glass (a growth vat, a biosculpter pod) inside it, as a big
+        // one's head went through the glass: let down only as far as its highest point needs, never more than GlassMostDown,
+        // and slid along the glass to bring a head (or feet) past its end back inside, as far as the other end has room
+        // (centred if it is longer than the glass). A small one is left where it was. The body as posed at at, yaw and size.
+        private static Vector3 UnderGlass(Pawn pawn, SkinnedFigure.Posed fig, Vector3 at, float yaw, float size, float floor)
+        {
+            Thing holder = pawn.ParentHolder is ThingComp comp ? comp.parent : pawn.ParentHolder as Thing;
+            GlassTube glass;
+            if (holder == null || !holder.Spawned || !Glasses.TryGetValue(holder.def.defName, out glass))
+            {
+                return Vector3.zero;
+            }
+            Vector3[] verts = skin.BodyVerts(fig);
+            Vector3 middle = holder.TrueCenter();
+            Quaternion turn = Quaternion.AngleAxis(yaw, Vector3.up);
+            Quaternion back = Quaternion.Inverse(holder.Rotation.AsQuat);
+            float ground = floor - glass.surface;
+            float half = glass.across - GlassClear, up = glass.up - GlassClear, room = glass.along - GlassClear;
+            float need = 0f, first = float.MaxValue, last = float.MinValue;
+            for (int i = 0; i < verts.Length; i++)
+            {
+                Vector3 world = at + turn * (verts[i] * size);
+                Vector3 local = back * (world - middle);
+                first = Mathf.Min(first, local.z);
+                last = Mathf.Max(last, local.z);
+                float across = local.x / half;
+                if (across * across >= 1f)
+                {
+                    continue;   // out past the glass's sides: letting it down would not help
+                }
+                need = Mathf.Max(need, world.y - ground - up * Mathf.Sqrt(1f - across * across) - glass.centre);
+            }
+            float slide = 0f;
+            if (last - first > 2f * room)
+            {
+                slide = -0.5f * (first + last);
+            }
+            else if (last > room)
+            {
+                slide = room - last;
+            }
+            else if (first < -room)
+            {
+                slide = -room - first;
+            }
+            float down = Mathf.Min(need, GlassMostDown);
+            glassFits[pawn.thingIDNumber] = new Vector2(down, slide);
+            return holder.Rotation.AsQuat * new Vector3(0f, 0f, slide) + Vector3.down * down;
+        }
+
+        private const float GibbetScale = 0.78f;  // IsoRim's: a corpse in a gibbet cage shrunk to stay under its dome
+        private const float GibbetSlump = 0.6f;   // of the way from standing to the ragdoll pose (DrawCaged, without the caged pose)
+        private const float GibbetLean = 5f;      // degrees forward about x, as IsoRim's figure hangs
 
         // The whole move of a carried figure (DrawHeld): its carried loop on the carrier's chest as posed, scaled about its
         // hips by k, its size over the carrier's, and that scale undone as a whole, as it is drawn at its own size.
@@ -5965,6 +6637,19 @@ namespace M3AT
             {
                 return false;
             }
+#if AUTOTEST
+            // The perf test (AutoTest's Perf): 1 leaves the figure to IsoRim, as without this mod; 2 draws no figure at all.
+            if (PerfMode == 1 || PerfMode == 0 && PerfAllowed != null && !PerfAllowed.Contains(pawn.thingIDNumber))
+            {
+                return false;
+            }
+            if (PerfMode == 2)
+            {
+                return true;
+            }
+            long perfFrom = System.Diagnostics.Stopwatch.GetTimestamp();
+            PerfDraws++;
+#endif
             FigureDrawContext was = drawing;
             drawing = ctx;
             try
@@ -5974,6 +6659,12 @@ namespace M3AT
             finally
             {
                 drawing = was;
+#if AUTOTEST
+                if (was == null)
+                {
+                    PerfTicks += System.Diagnostics.Stopwatch.GetTimestamp() - perfFrom;   // (a carried figure drawn inside its carrier's is in the carrier's)
+                }
+#endif
             }
         }
 
@@ -6124,7 +6815,7 @@ namespace M3AT
             return Mathf.Round(scale / BlanketStep) * BlanketStep;
         }
 
-        // Lovin under the blanket (the bedBlankets option): the two lie side by side in a double bed, a cell apart, staring up.
+        // Lovin under the blanket (the sleepWear option's Blankets): the two lie side by side in a double bed, a cell apart, staring up.
         // Each is drawn LovinCloser across the bed toward the other, head and lump together, its head turned LovinLook
         // toward them, so they lie close facing each other. LovinOf: which side of the figure the partner is (+1 its +x,
         // which a look of + degrees turns the face toward, as the lying clips are laid down about x), scaled by how far
@@ -6140,6 +6831,28 @@ namespace M3AT
             {
                 return 0f;
             }
+            return LovinSideOf(pawn, placed, yaw);
+        }
+
+        // Lovin with no blanket over the bed (the sleepWear option not Blankets, a bed that shows the body, or an IsoRim
+        // without the blanket): the two lie on their sides facing each other (lovin_L, lovin_R: still, breathing, from the
+        // downed side lying), each drawn LovinSideCloser across the bed toward the other. The partner's side as LovinOf
+        // gives it; 0 for anyone else, or where the blanket is drawn.
+        private const float LovinSideCloser = 0.04f;   // cells each moves toward the other (the slots are a cell apart)
+
+        private static float LovinBareOf(Pawn pawn, FigurePlacement placed, float yaw)
+        {
+            if (placed.Situation != FigureSituation.InBed || BedBlankets && BlanketReady() && placed.HeadOnlyInBed || !skin.Has("lovin_L") || !skin.Has("lovin_R"))
+            {
+                return 0f;
+            }
+            return LovinSideOf(pawn, placed, yaw);
+        }
+
+        // Which side of the figure its partner at lovin (or Romance on the Rim's pillow talk) lies, both in the same bed:
+        // +1 its +x, -1 its -x, 0 none.
+        private static float LovinSideOf(Pawn pawn, FigurePlacement placed, float yaw)
+        {
             Job job = pawn.CurJob;
             // (Romance on the Rim's pillow talk the same: its partner target B)
             Pawn partner = job == null ? null : job.def == JobDefOf.Lovin ? job.targetA.Pawn : job.def.defName == "RomanceOnTheRim_PillowTalk" ? job.targetB.Pawn : null;
@@ -6221,12 +6934,22 @@ namespace M3AT
             {
                 return false;
             }
-            if (placed.Situation == FigureSituation.Attached || placed.Situation == FigureSituation.InVat || placed.Situation == FigureSituation.Gibbet
-                || placed.Bones)
+            if (placed.Situation == FigureSituation.Attached || placed.Situation == FigureSituation.InVat || placed.Bones)
             {
-                return false;   // IsoRim's own: on a host, upright in a vat, in a cage, gone to bones
+                return false;   // IsoRim's own: on a host, upright in a vat (no IsoRim model floats them so yet), gone to bones
+            }
+            if (placed.Situation == FigureSituation.Gibbet)
+            {
+                return DrawCaged(ctx, placed, size);
             }
             SawAim(pawn, placed);
+            // Off screen: nothing posed or drawn, and IsoRim told it was, so it draws nothing either. What eases over time
+            // waits meanwhile, and the one-off events (a fall, getting up) go by frames in a row, so one missed off screen is
+            // not played late. Another mod's draw (a portrait, a measure) is always made.
+            if (!ctx.ForOtherMod && !SkinnedFigure.MaybeOnScreen(placed.Position, size))
+            {
+                return true;
+            }
             float lift = placed.Lift;
             drawLoc.x = placed.Position.x;
             drawLoc.z = placed.Position.z;
@@ -6359,6 +7082,7 @@ namespace M3AT
                 // At a lesson, the head turned toward the other (not lying or on the move), eased on real time.
                 // Under the blanket at lovin, toward the partner beside it (LovinOf).
                 float lovinSide = lying && !dead ? LovinOf(pawn, placed, yaw) : 0f;
+                float lovinBare = lying && !dead ? LovinBareOf(pawn, placed, yaw) : 0f;   // (or with no blanket, on the side facing them)
                 float looked = !lying && !crawling && flight < 0f ? LessonLookOf(pawn, ease, yaw) : lovinSide * LovinLook;
                 ease.look = Mathf.MoveTowards(ease.look, looked, LookSpeed * Time.deltaTime);
                 float headHeight = skin.HeadHeight(shape);
@@ -6379,7 +7103,7 @@ namespace M3AT
                 }
                 // A leg gone: the weight over the other foot in whatever it is doing on its feet (the hop has it already).
                 string standOn = ease.limpBy <= 0f ? null : ease.limpClip == "hop_L" ? "R" : ease.limpClip == "hop_R" ? "L" : null;
-                bool sitsDown = seated || rise > 0f || duck > 0f || ease.workKind == "meditate" || ease.workKind == "play" || ease.workKind == "research_floor" || ease.workKind == "visit";
+                bool sitsDown = seated || rise > 0f || duck > 0f || ease.workKind == "meditate" || ease.workKind == "play" || ease.workKind == "research_floor" || ease.workKind == "visit" || ease.workKind == "stir_campfire";
                 if (standOn == null || lying || crawling || flight >= 0f || swim > 0f)
                 {
                     ease.balance = 0f;
@@ -6418,7 +7142,7 @@ namespace M3AT
                     {
                         yaw = ease.fellYaw.Value;   // lying where it fell, the way it fell
                     }
-                    string lieClip = LieClip(pawn, dead, inBed, inBed || onCouch);
+                    string lieClip = lovinBare != 0f ? (lovinBare > 0f ? "lovin_R" : "lovin_L") : LieClip(pawn, dead, inBed, inBed || onCouch);
                     if (inBed && lieClip != BedMiddleClip && skin.Has(BedMiddleClip))
                     {
                         // Every lying clip with its body's middle where the sleep's is: their hips are in one place, but
@@ -6540,7 +7264,10 @@ namespace M3AT
                     // At work: the stroke of its tool (or the work by its place), the whole figure, in place of the idle
                     // (standing only: the game has it stand still at the work; work sat down is laid over the sit below).
                     string workClip = ease.workKind != null ? skin.Variant(WorkClipOf(ease.workKind), ease.workRoll) : null;
-                    ease.toolKind = workClip != null ? workClip.Substring("work_".Length) : null;
+                    // Cooking: a bout of stirring now and then in its place (StirOf), the spoon in hand once it is half in.
+                    float stir = ease.stirClip != null ? BoutWeight(ease.stirAt) : 0f;
+                    ease.toolKind = stir >= 0.5f ? ease.stirClip.Substring("work_".Length)
+                        : workClip != null ? workClip.Substring("work_".Length) : null;
                     float work = workClip != null && skin.Has(workClip) && sat <= 0f && !SeatedWork(ease.workKind) ? ease.work * (1f - ease.carry) * (1f - hunker) * (1f - reel) : 0f;
                     // Pitching horseshoes or hoopstone: one underhand toss round each throw, the whole figure in place of
                     // the idle (seated, from the waist up, below); between throws the idle.
@@ -6562,7 +7289,11 @@ namespace M3AT
                             : ease.workKind == "stomp" ? BeatPhase(pawn, ease, workClip, StompHit, 1)
                             : ease.workKind == "pat" ? BeatPhase(pawn, ease, workClip, PatHit, PatHits)
                             : LoopPhase(pawn, workClip);
-                        skin.Add(fig, workClip, workPhase, (1f - moving) * (1f - drafted) * work * up);
+                        skin.Add(fig, workClip, workPhase, (1f - moving) * (1f - drafted) * work * (1f - stir) * up);
+                        if (stir > 0f)
+                        {
+                            skin.Add(fig, ease.stirClip, ease.stirAt, (1f - moving) * (1f - drafted) * work * stir * up);
+                        }
                     }
                     ease.shownWork = work * (1f - moving) * (1f - drafted) * up;
                     // Aiming: the weapon brought up out of the drafted stance and pointed at the target. Standing still,
@@ -6649,7 +7380,7 @@ namespace M3AT
                     float show = ease.eatClip == "read" && shown != null && skin.Has(shown) ? Mathf.SmoothStep(0f, 1f, ease.readShow) : 0f;
                     if (eat > 0f)
                     {
-                        skin.Over(fig, ease.eatClip, LoopPhase(pawn, ease.eatClip), eat * (1f - show));
+                        skin.Over(fig, ease.eatClip, ease.eatClip == "pill" ? ease.pillAt : LoopPhase(pawn, ease.eatClip), eat * (1f - show));
                     }
                     if (eat > 0f && show > 0f)
                     {
@@ -6714,6 +7445,37 @@ namespace M3AT
                     if (skin.Has("rub") && ease.rubAt >= 0f)
                     {
                         skin.Over(fig, "rub", ease.rubAt, BoutWeight(ease.rubAt) * ease.rubFree * idleHands);
+                    }
+                    // A sad wander: slumped, the head hung, from the waist up over the gait (the arms only part way, so
+                    // they still swing a little), not while drafted, carrying, working or bending.
+                    if (ease.sad > 0f && skin.Has("sad"))
+                    {
+                        skin.Over(fig, "sad", LoopPhase(pawn, "sad"), ease.sad * (1f - ease.drafted) * (1f - ease.carry) * (1f - bend) * (1f - ease.shownWork) * (1f - eat) * land);
+                    }
+                    // On fire and not rolling it out: patting at the flames on itself from the waist up, over the
+                    // drafted stance and anything else the arms do (Top), but not over an aim, a load or a bend.
+                    if (ease.burn > 0f && skin.Has("burning"))
+                    {
+                        skin.Top(fig, "burning", LoopPhase(pawn, "burning"), ease.burn * (1f - ease.aim) * (1f - ease.carry) * (1f - bend) * (1f - ease.shownWork) * land * (1f - daze));
+                    }
+                    // A wave in passing at whom it chatted with: the right arm only, over the rest (Top), with the hands free.
+                    if (ease.waveAt >= 0f && skin.Has("wave"))
+                    {
+                        skin.Top(fig, "wave", ease.waveAt, BoutWeight(ease.waveAt) * idleHands * (1f - ease.burn));
+                    }
+                    // Drunk: swaying from the waist, the head lolling, added on top of whatever it does (Nudge), steadier
+                    // while aiming; the arms hanging loose only with the hands free. On the move it weaves with the sway.
+                    ease.weave = 0f;
+                    if (ease.drunk > 0f && skin.Has("drunk"))
+                    {
+                        float drunkPhase = LoopPhase(pawn, "drunk");
+                        // (not over throwing up, a drunk pawn's vomiting: that clip is bent double already)
+                        float sway = ease.drunk * land * (1f - (1f - DrunkAiming) * ease.aim)
+                            * (ease.workKind == "vomit" ? 1f - ease.shownWork : 1f);
+                        skin.Nudge(fig, "drunk", drunkPhase, sway);
+                        skin.Nudge(fig, "drunk_arms", drunkPhase, sway * idleHands);
+                        // (the trunk leans to the figure's left in the loop's first half: drawn that way, to its right less)
+                        ease.weave = -DrunkWeave * size * ease.drunk * moving * land * Mathf.Sin(2f * Mathf.PI * drunkPhase);
                     }
                     skin.Over(fig, skin.Variant("bend_walk", ease.bentRoll), 0f, bend * onTheMove * land);
                     // The shield guard (a shield shown in the left hand): the left fist out in front of the shoulder, over
@@ -6805,8 +7567,14 @@ namespace M3AT
                 }
                 // Rested on what is under it: the feet on the floor, the seat on the chair's, the back on the bed or
                 // ground.
-                float lowest, bodyTop;
-                skin.Extent(fig, out lowest, out bodyTop);
+                // Only where something below rests on it (lying, diving, getting up, seated, and the tail getting up or
+                // diving): standing or on the move it isn't read, and finding it skins the whole body on the CPU, which with
+                // GPU skinning is the one thing left doing so for a figure on its feet.
+                float lowest = 0f, bodyTop = 0f;
+                if (lying || duck > 0f || rise > 0f || sat > 0f)
+                {
+                    skin.Extent(fig, out lowest, out bodyTop);
+                }
                 if (lying && onGround && ease.depth > 0f)
                 {
                     // Lying in water, which IsoRim draws as an opaque sheet: floating, sunk about half its thickness as it
@@ -6814,6 +7582,7 @@ namespace M3AT
                     floor -= Mathf.Min(ease.depth, FloatSink * Mathf.Max(0f, bodyTop - lowest) * size);
                 }
                 float y = Lift * size;
+                Vector3 underGlass = Vector3.zero;   // cells, the move keeping a figure on a couch under its glass (UnderGlass)
                 if (lying && ease.doll != null)
                 {
                     // As the ragdoll lies (its joints on the ground at 0), but never into the ground; at rest, on its lowest
@@ -6824,6 +7593,10 @@ namespace M3AT
                 else if (lying)
                 {
                     y = floor - lowest * size + Lift * size;
+                    if (placed.Situation == FigureSituation.OnCouch)
+                    {
+                        underGlass = UnderGlass(pawn, fig, new Vector3(drawLoc.x, y + lift, drawLoc.z), yaw, size, floor);
+                    }
                 }
                 else if (duck > 0f)
                 {
@@ -6856,12 +7629,22 @@ namespace M3AT
                     float wading = y - Mathf.Min(ease.depth, Mathf.Max(0f, (neck.y - HeadClear) * size));
                     y = Mathf.Lerp(wading, WaterLine - neck.y * size, swim);
                 }
-                Vector3 at = new Vector3(drawLoc.x, y + lift, drawLoc.z);
+                Vector3 at = new Vector3(drawLoc.x, y + lift, drawLoc.z) + underGlass;
+                if (!lying && ease.weave != 0f)
+                {
+                    // Weaving drunk on the move, to either side of its path.
+                    at += Quaternion.Euler(0f, yaw, 0f) * Vector3.right * ease.weave;
+                }
                 if (ease.workKind == "bench" || ease.workKind == "hammer_bench")
                 {
                     // Stood at a bench: the game keeps it in the middle of the cell beside it, out of reach of its top, so
                     // it is drawn stepped up to it, as far as it has taken up the stance.
                     at += Quaternion.Euler(0f, ease.workFace, 0f) * Vector3.forward * (BenchCloser * ease.shownWork);
+                }
+                else if (ease.workKind == "stir_campfire")
+                {
+                    // Sat at a campfire: drawn shuffled up to it, so the hands reach its stone ring.
+                    at += Quaternion.Euler(0f, ease.workFace, 0f) * Vector3.forward * (FireCloser * ease.shownWork);
                 }
                 else if (ease.workKind == "tame" && pawn.CurJobDef == JobDefOf.FeedPatient)
                 {
@@ -6948,6 +7731,16 @@ namespace M3AT
                         blanketAt += toward;
                     }
                 }
+                else if (lying && (lovinBare != 0f || ease.lovinShift > 0f))
+                {
+                    // At lovin with no blanket, drawn across the bed toward the partner, eased in and out.
+                    ease.lovinShift = Mathf.MoveTowards(ease.lovinShift, lovinBare != 0f ? LovinSideCloser : 0f, LovinEase * Time.deltaTime);
+                    if (lovinBare != 0f)
+                    {
+                        ease.lovinWay = Mathf.Sign(lovinBare);
+                    }
+                    at += Quaternion.AngleAxis(yaw, Vector3.up) * Vector3.right * (ease.lovinWay * ease.lovinShift);
+                }
                 else
                 {
                     ease.lovinShift = 0f;
@@ -7003,6 +7796,10 @@ namespace M3AT
                 else if (!forOther && !lying && !crawling && flight < 0f && ease.shownWork >= ToolShown)
                 {
                     DrawTool(pawn, ease.toolKind, fig, at, yaw, size);
+                }
+                if (!forOther && !lying && !crawling && flight < 0f && load == null && ease.shownWork >= ToolShown)
+                {
+                    DrawRolledJoint(pawn, ease, fig, at, yaw, size, lift);
                 }
                 // What it has but isn't holding, on the body (not lying, where it would go through the bed or ground, nor
                 // swimming).

@@ -1,0 +1,7 @@
+# M3AT roasting stick colours (anim_scripts/make_stick.py); fixed (no stuff)
+
+newmtl stick_wood
+Kd 0.620 0.480 0.320
+
+newmtl stick_meat
+Kd 0.550 0.240 0.160

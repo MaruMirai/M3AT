@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Text;
 using HarmonyLib;
@@ -84,6 +85,7 @@ namespace M3AT
             // error a scenario logs is in Player.log and the report anyway), so its auto-open is turned off for the run,
             // as its "Auto-open is OFF" button does; KeepLogShut closes one opened before this ran.
             AccessTools.Field(typeof(LudeonTK.EditWindow_Log), "canAutoOpen")?.SetValue(null, false);
+            FaceLayers.StackSize = Math.Min(8, Math.Max(1, IntArg("m3atStackSize", 8)));
             string save;
             if (GenCommandLine.TryGetCommandLineArg("m3atTestLoad", out save) && !string.IsNullOrEmpty(save))
             {
@@ -148,9 +150,9 @@ namespace M3AT
             report.AppendLine("# M3AT autotest " + DateTime.Now.ToString("yyyy-MM-dd HH:mm")).AppendLine();
             report.AppendLine(video ? "Video mode: each scenario at normal speed, recorded." : "Stills mode: paused, one tick a frame.").AppendLine();
             probe = new StreamWriter(Path.Combine(outDir, "probe.txt"));
-            if (wanted.Count == 1 && wanted[0] == "shots")
+            if (wanted.Count == 1 && (wanted[0] == "shots" || wanted[0] == "perf"))
             {
-                yield return Shots();
+                yield return wanted[0] == "perf" ? Perf() : Shots();
                 Finish();
                 if (quit)
                 {
@@ -272,6 +274,249 @@ namespace M3AT
             report.AppendLine("## shots").AppendLine().AppendLine("- " + n + " pictures over " + ticks + " ticks, one every " + every);
         }
 
+        // ---- perf: the frame time with the chibi, with IsoRim's own figures (as without this mod) and with no person figures
+        // at all, on a loaded save run on at normal speed, the camera following its colonists. Each is measured in turn,
+        // round after round, so whatever drifts over the run (pawns walking off, the time of day) falls on all three alike.
+        // Nothing is spawned or changed in the save.
+
+        // One thing measured: which figures (WalkFigures.PerfMode), how many colonists drawn as the chibi (-1 all; the rest are
+        // left to IsoRim, whose figures cost next to nothing) and whether fewerPoses is on.
+        private sealed class PerfCondition
+        {
+            public string name;
+            public int mode, chibis = -1;
+            public bool fewer, unstacked;
+            public List<float> frames = new List<float>();
+            public double drawerMs;
+            public long draws;
+            public long faces, faceChanges, layers;
+        }
+
+        // -m3atPerfCounts=0,5,10,20f: the chibi on that many colonists (f: with fewerPoses on); else the chibi, IsoRim's figures
+        // and none.
+        private static List<PerfCondition> PerfConditions()
+        {
+            List<PerfCondition> list = new List<PerfCondition>();
+            string counts;
+            if (GenCommandLine.TryGetCommandLineArg("m3atPerfCounts", out counts) && !string.IsNullOrEmpty(counts))
+            {
+                foreach (string raw in counts.Split(','))
+                {
+                    string t = raw.Trim();
+                    bool fewer = t.Contains("f"), unstacked = t.Contains("n");
+                    int n;
+                    if (int.TryParse(t.TrimEnd('f', 'n'), out n))
+                    {
+                        list.Add(new PerfCondition { name = n + " chibis" + (fewer ? ", fewer poses" : "") + (unstacked ? ", a draw per face layer" : ""), mode = 0, chibis = n, fewer = fewer, unstacked = unstacked });
+                    }
+                }
+                return list;
+            }
+            list.Add(new PerfCondition { name = "chibi (M3AT)", mode = 0 });
+            list.Add(new PerfCondition { name = "IsoRim's figures", mode = 1 });
+            list.Add(new PerfCondition { name = "no person figures", mode = 2 });
+            return list;
+        }
+
+        // Puts a condition in place: the mode, the colonists drawn as the chibi (those nearest the group's middle) and the option.
+        private static void SetPerf(PerfCondition c, List<Pawn> colonists, bool fewerWas)
+        {
+            WalkFigures.PerfMode = c.mode;
+            SettingsMod.Settings.fewerPoses = c.fewer;
+            FaceLayers.StackLayers = !c.unstacked;
+            if (c.chibis < 0)
+            {
+                WalkFigures.PerfAllowed = null;
+                return;
+            }
+            Vector3 mid = Centroid(colonists, out float spread);
+            List<Pawn> near = colonists.FindAll(p => p.Spawned && p.Map == map);
+            near.Sort((a, b) => (a.DrawPos - mid).sqrMagnitude.CompareTo((b.DrawPos - mid).sqrMagnitude));
+            WalkFigures.PerfAllowed = new HashSet<int>();
+            for (int i = 0; i < c.chibis && i < near.Count; i++)
+            {
+                WalkFigures.PerfAllowed.Add(near[i].thingIDNumber);
+            }
+        }
+
+        private static IEnumerator Perf()
+        {
+            int seconds = IntArg("m3atPerfSeconds", 20), rounds = IntArg("m3atPerfRounds", 3);
+            List<Pawn> colonists = new List<Pawn>(map.mapPawns.FreeColonistsSpawned);
+            List<PerfCondition> conditions = PerfConditions();
+            bool fewerWas = SettingsMod.Settings.fewerPoses;
+            lookPitch = 40f;
+            lookYaw = 0f;
+            lookHeight = 0f;
+            lookAt = Centroid(colonists, out float spread);
+            lookDistance = Mathf.Clamp(spread * 2.4f, 10f, 40f);
+            pose = IsoRim.Api.PushViewPose(PoseOwner, Pose, new IsoRim.ViewPoseOptions { Priority = 1000 });
+            Find.TickManager.CurTimeSpeed = TimeSpeed.Normal;
+            report.AppendLine("## perf").AppendLine();
+            report.AppendLine("- " + colonists.Count + " colonists followed by the camera (" + map.mapPawns.AllPawnsSpawned.Count + " pawns on the map), "
+                + lookDistance.ToString("F0") + " cells off, pitched " + lookPitch + "°; normal speed; " + rounds + " rounds of " + seconds + " s per condition, after 3 s to settle each");
+            // Warmed up first in each: hair built, IsoRim's figure looks made.
+            for (int c = 0; c < conditions.Count; c++)
+            {
+                SetPerf(conditions[c], colonists, fewerWas);
+                yield return FollowFor(colonists, c == 0 ? 15f : 5f, null);
+            }
+            // (Asked once the chibi has been drawn: GPU skinning also wants our materials, made at the first draw.)
+            report.AppendLine("- screen " + Screen.width + "x" + Screen.height + ", GPU skinning " + SkinnedFigure.GpuSkinning);
+            for (int r = 0; r < rounds; r++)
+            {
+                foreach (PerfCondition c in conditions)
+                {
+                    SetPerf(c, colonists, fewerWas);
+                    yield return FollowFor(colonists, 3f, null);
+                    WalkFigures.PerfTicks = 0;
+                    WalkFigures.PerfDraws = 0;
+                    long faces = FaceLayers.PerfFaces, changes = FaceLayers.PerfFaceChanges, layers = FaceLayers.PerfLayers;
+                    int before = c.frames.Count;
+                    yield return FollowFor(colonists, seconds, c.frames);
+                    c.drawerMs += WalkFigures.PerfTicks * 1000.0 / Stopwatch.Frequency;
+                    c.draws += WalkFigures.PerfDraws;
+                    c.faces += FaceLayers.PerfFaces - faces;
+                    c.faceChanges += FaceLayers.PerfFaceChanges - changes;
+                    c.layers += FaceLayers.PerfLayers - layers;
+                    Log.Message(Tag + "perf round " + (r + 1) + " " + c.name + ": " + Summary(c.frames.GetRange(before, c.frames.Count - before)));
+                }
+            }
+            WalkFigures.PerfMode = 0;
+            WalkFigures.PerfAllowed = null;
+            FaceLayers.StackLayers = true;
+            SettingsMod.Settings.fewerPoses = fewerWas;
+            Pause();
+            report.AppendLine().AppendLine("| condition | frames | mean ms | median ms | p95 ms | p99 ms | FPS (mean) | in our drawer, ms per frame | chibis drawn per frame |");
+            report.AppendLine("|---|---|---|---|---|---|---|---|---|");
+            foreach (PerfCondition c in conditions)
+            {
+                List<float> f = c.frames;
+                f.Sort();
+                float mean = Mean(f);
+                int n = Math.Max(1, f.Count);
+                report.AppendLine("| " + c.name + " | " + f.Count + " | " + mean.ToString("F2") + " | " + Pct(f, 0.5f).ToString("F2") + " | " + Pct(f, 0.95f).ToString("F2")
+                    + " | " + Pct(f, 0.99f).ToString("F2") + " | " + (mean > 0f ? 1000f / mean : 0f).ToString("F1")
+                    + " | " + (c.drawerMs / n).ToString("F2") + " | " + ((double)c.draws / n).ToString("F1") + " |");
+            }
+            report.AppendLine();
+            if (conditions.Count == 3 && conditions[1].mode == 1)
+            {
+                float a = Mean(conditions[0].frames), b = Mean(conditions[1].frames), z = Mean(conditions[2].frames);
+                float ma = Pct(conditions[0].frames, 0.5f), mb = Pct(conditions[1].frames, 0.5f), mz = Pct(conditions[2].frames, 0.5f);
+                report.AppendLine("- the chibi over IsoRim's figures: " + Delta(a, b, ma, mb));
+                report.AppendLine("- the chibi over no figures: " + Delta(a, z, ma, mz));
+                report.AppendLine("- IsoRim's figures over no figures: " + Delta(b, z, mb, mz));
+            }
+            else
+            {
+                PerfFit(conditions, false);
+                PerfFit(conditions, true);
+            }
+            foreach (PerfCondition c in conditions)
+            {
+                if (c.faces > 0)
+                {
+                    report.AppendLine("- " + c.name + ": faces drawn " + c.faces + ", " + (100.0 * c.faceChanges / c.faces).ToString("F1") + "% of them changed from the same pawn's last ("
+                        + ((double)c.layers / c.faces).ToString("F1") + " layers a face)");
+                }
+            }
+            report.AppendLine("- (the mod's other work runs throughout: its tick patches, map components and freecam, which are small)");
+        }
+
+        // A straight line through mean frame time against chibis drawn per frame, for the conditions with fewerPoses so: the
+        // cost of a chibi on screen (its slope), its CPU share in our drawer, and the frame without any.
+        private static void PerfFit(List<PerfCondition> conditions, bool fewer)
+        {
+            List<PerfCondition> cs = conditions.FindAll(c => c.fewer == fewer || (fewer && c.chibis == 0));
+            if (cs.Count < 2 || !cs.Exists(c => c.fewer == fewer && c.chibis > 0))
+            {
+                return;
+            }
+            double sx = 0, sy = 0, sxx = 0, sxy = 0, sd = 0, sdx = 0;
+            foreach (PerfCondition c in cs)
+            {
+                double x = (double)c.draws / Math.Max(1, c.frames.Count), y = Mean(c.frames), d = c.drawerMs / Math.Max(1, c.frames.Count);
+                sx += x; sy += y; sxx += x * x; sxy += x * y; sd += d; sdx += d * x;
+            }
+            int k = cs.Count;
+            double slope = (k * sxy - sx * sy) / Math.Max(1e-9, k * sxx - sx * sx), intercept = (sy - slope * sx) / k;
+            double cpu = sdx / Math.Max(1e-9, sxx);   // our drawer's time is none at none drawn: a line through 0
+            report.AppendLine("- fewer poses " + (fewer ? "on" : "off") + ": **" + slope.ToString("F3") + " ms a frame per chibi on screen** (frame "
+                + intercept.ToString("F2") + " ms with none), of which about " + cpu.ToString("F3") + " ms is the CPU in our drawer, the rest the graphics side");
+        }
+
+        // Runs for seconds of real time with the camera on the colonists' middle, each frame's time (ms) into frames if given.
+        private static IEnumerator FollowFor(List<Pawn> colonists, float seconds, List<float> frames)
+        {
+            float until = Time.realtimeSinceStartup + seconds;
+            while (Time.realtimeSinceStartup < until)
+            {
+                Vector3 to = Centroid(colonists, out float spread);
+                lookAt = Vector3.Lerp(lookAt, to, 0.02f);   // drifting after them slowly, not jumping with each step
+                if (frames != null)
+                {
+                    frames.Add(Time.unscaledDeltaTime * 1000f);
+                }
+                yield return null;
+            }
+        }
+
+        private static Vector3 Centroid(List<Pawn> pawns, out float spread)
+        {
+            Vector3 sum = Vector3.zero;
+            int n = 0;
+            foreach (Pawn p in pawns)
+            {
+                if (p.Spawned && p.Map == map)
+                {
+                    sum += p.DrawPos;
+                    n++;
+                }
+            }
+            Vector3 mid = n > 0 ? sum / n : middle.ToVector3Shifted();
+            spread = 0f;
+            foreach (Pawn p in pawns)
+            {
+                if (p.Spawned && p.Map == map)
+                {
+                    spread = Mathf.Max(spread, (p.DrawPos - mid).MagnitudeHorizontal());
+                }
+            }
+            return new Vector3(mid.x, 0f, mid.z);
+        }
+
+        private static float Mean(List<float> f)
+        {
+            double sum = 0;
+            foreach (float v in f)
+            {
+                sum += v;
+            }
+            return f.Count > 0 ? (float)(sum / f.Count) : 0f;
+        }
+
+        // A percentile of a sorted list.
+        private static float Pct(List<float> sorted, float at)
+        {
+            return sorted.Count == 0 ? 0f : sorted[Mathf.Clamp(Mathf.RoundToInt(at * (sorted.Count - 1)), 0, sorted.Count - 1)];
+        }
+
+        private static string Summary(List<float> f)
+        {
+            List<float> s = new List<float>(f);
+            s.Sort();
+            float mean = Mean(s);
+            return s.Count + " frames, mean " + mean.ToString("F2") + " ms (" + (mean > 0f ? 1000f / mean : 0f).ToString("F1") + " FPS), median " + Pct(s, 0.5f).ToString("F2") + " ms";
+        }
+
+        private static string Delta(float meanA, float meanB, float medA, float medB)
+        {
+            float fpsA = meanA > 0f ? 1000f / meanA : 0f, fpsB = meanB > 0f ? 1000f / meanB : 0f;
+            return (meanA - meanB).ToString("+0.00;-0.00") + " ms a frame on the mean (" + (medA - medB).ToString("+0.00;-0.00") + " on the median), "
+                + fpsB.ToString("F1") + " → " + fpsA.ToString("F1") + " FPS";
+        }
+
         private static int IntArg(string name, int fallback)
         {
             string v;
@@ -297,30 +542,59 @@ namespace M3AT
 
         private static IEnumerator ScenarioOf(string name)
         {
+            if (name.StartsWith("faceshapes_", StringComparison.Ordinal))
+            {
+                return FaceShapesTest(name.Substring("faceshapes_".Length).Split('+'));
+            }
+            if (name.StartsWith("faceanim_", StringComparison.Ordinal))
+            {
+                return FaceAnimTest(name.Substring("faceanim_".Length));
+            }
             switch (name)
             {
                 case "hitflash": return HitFlashTest();
+                case "lively": return LivelyTest(null);
+                case "lively_wave": return LivelyTest("wave");
+                case "lively_sad": return LivelyTest("sad");
+                case "lively_burning": return LivelyTest("burning");
+                case "lively_catatonic": return LivelyTest("catatonic");
+                case "lively_flick": return LivelyTest("flick");
+                case "lively_refuel": return LivelyTest("refuel");
                 case "beatfire": return BeatFireTest();
                 case "horseshoes": return TossTest();
                 case "hunker": return HunkerTest();
                 case "cuddle": return CuddleTest();
                 case "read": return ReadTest();
+                case "pray": return PrayTest();
                 case "eat": return EatTest();
+                case "drugs": return DrugsTest();
                 case "visit": return VisitTest();
                 case "music": return MusicTest();
+                case "rolljoint": return RollJointTest();
+                case "drunk": return DrunkTest();
+                case "cook": return CookTest();
                 case "teach": return TeachTest();
                 case "romance": return RomanceTest(null);
                 case "readroom": return ReadRoomTest();
                 case "bedcompare": return BedCompareTest();
                 case "sharedbed": return SharedBedTest();
+                case "sleepwear": return SleepWearTest();
+                case "sleepside": return SleepSideTest();
                 case "lovin": return LovinTest();
+                case "lovinbare": return LovinTest(SleepWear.Dressed);
                 case "kidbed": return KidBedTest();
+                case "gibbet": return GibbetTest();
+                case "vat": return VatTest();
                 case "tend": return TendTest(null);
                 case "bows": return BowTest(null);
                 case "tendbed": return TendBedTest();
                 case "feed": return FeedTest(null);
                 case "slicecap": return SlicecapTest();
                 case "hats": return HatsTest();
+                case "prosthetics": return ProstheticsTest();
+                case "faceab": return FaceAbTest();
+                case "faceanim": return FaceAnimTest(null);
+                case "faceshapes": return FaceShapesTest(null);
             }
             if (name.StartsWith("feed_"))
             {
@@ -343,13 +617,13 @@ namespace M3AT
 
         // ---- the scenarios ----
 
-        // Asleep under IsoRim's blanket (the bedBlankets option, turned on for the test): two in a double bed, each in its
+        // Asleep under IsoRim's blanket (the sleepWear option's Blankets, turned on for the test): two in a double bed, each in its
         // own half (its own lump, IsoRim's width kept to that half), and one alone in a single bed beside it to compare.
         // Each sleeper's figure tucked in (only the head drawn, BedTuck.cs) and IsoRim drawing its blanket (DrawTuckedIn).
         private static IEnumerator SharedBedTest()
         {
-            bool was = SettingsMod.Settings.bedBlankets;
-            SettingsMod.Settings.bedBlankets = true;
+            SleepWear was = SettingsMod.Settings.sleepWear;
+            SettingsMod.Settings.sleepWear = SleepWear.Blankets;
             try
             {
                 Building_Bed MakeBed(string def, IntVec3 at)
@@ -471,17 +745,151 @@ namespace M3AT
                 lookPitch = LookPitch;
                 lookDistance = LookDistance;
                 lookHeight = LookHeight;
-                SettingsMod.Settings.bedBlankets = was;
+                SettingsMod.Settings.sleepWear = was;
             }
         }
 
-        // Lovin beside sleeping, under IsoRim's blanket (the bedBlankets option, on for the test): two double beds side by side,
+        // What pawns in bed are drawn wearing (the sleepWear option, SleepWear.cs): a grown pawn in a shirt, trousers, a
+        // duster, a flak vest, a simple helmet and a utility belt, and a child in a shirt and trousers, each asleep in a
+        // single bed, through each choice but Blankets in turn.
+        private static IEnumerator SleepWearTest()
+        {
+            SleepWear was = SettingsMod.Settings.sleepWear;
+            try
+            {
+                Building_Bed MakeBed(IntVec3 at)
+                {
+                    Thing made = ThingMaker.MakeThing(ThingDef.Named("Bed"), ThingDefOf.WoodLog);
+                    made.SetFaction(Faction.OfPlayer);
+                    return (Building_Bed)Spawn(made, at, Rot4.North);
+                }
+                void Dress(Pawn p, params string[] defs)
+                {
+                    p.apparel.DestroyAll();
+                    foreach (string name in defs)
+                    {
+                        ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail(name);
+                        if (def != null)
+                        {
+                            p.apparel.Wear((Apparel)ThingMaker.MakeThing(def, GenStuff.DefaultStuffFor(def)), false);
+                        }
+                    }
+                }
+                Building_Bed bedA = MakeBed(middle);
+                Building_Bed bedC = MakeBed(middle + new IntVec3(2, 0, 0));
+                Pawn a = NewPawn(middle + new IntVec3(-1, 0, -2), null);
+                Pawn c = NewChild(middle + new IntVec3(3, 0, -2));
+                Dress(a, "Apparel_BasicShirt", "Apparel_Pants", "Apparel_Duster", "Apparel_FlakVest", "Apparel_SimpleHelmet", "Apparel_PackBandolier", "Apparel_ShieldBelt");
+                Dress(c, "Apparel_BasicShirt", "Apparel_Pants");
+                bedA.TryGetComp<CompAssignableToPawn>().TryAssignPawn(a);
+                bedC.TryGetComp<CompAssignableToPawn>().TryAssignPawn(c);
+                Pawn[] sleepers = { a, c };
+                Building_Bed[] beds = { bedA, bedC };
+                void Tuck()
+                {
+                    for (int k = 0; k < sleepers.Length; k++)
+                    {
+                        Pawn p = sleepers[k];
+                        if (p.needs.rest != null)
+                        {
+                            p.needs.rest.CurLevel = 0.05f;
+                        }
+                        if (!p.InBed() || p.CurrentBed() != beds[k])
+                        {
+                            p.jobs.Notify_TuckedIntoBed(beds[k]);
+                        }
+                    }
+                }
+                lookAt = bedA.TrueCenter() + new Vector3(1f, 0f, 0f);
+                lookYaw = 0f;
+                foreach (SleepWear mode in new[] { SleepWear.Dressed, SleepWear.NoEquipment, SleepWear.Pajamas, SleepWear.Nothing })
+                {
+                    SettingsMod.Settings.sleepWear = mode;
+                    Tuck();
+                    yield return WaitReal(1f);
+                    yield return Ticks(20, "sleepwear", a);
+                    Tuck();
+                    yield return Shot("sleep_" + mode);
+                    Check(mode + ": both in bed", a.InBed() && c.InBed(), "a in bed " + a.InBed() + ", c in bed " + c.InBed());
+                }
+                Note("Look: Dressed, both in all they wear; NoEquipment, the grown pawn in its shirt and trousers only (no duster, vest, helmet, bandolier or belt); Pajamas, both in pastel romper pajamas, each its own colour; Nothing, both bare.");
+            }
+            finally
+            {
+                SettingsMod.Settings.sleepWear = was;
+            }
+        }
+
+        // The sleep clip's variants (sleep~2: on the side, still, walk.SLEEP_HOLD): four pawns asleep on top of single beds
+        // (the sleepWear option at Dressed, so the body shows), each picking one by its job (WalkFigures.LieClip).
+        private static IEnumerator SleepSideTest()
+        {
+            SleepWear was = SettingsMod.Settings.sleepWear;
+            SettingsMod.Settings.sleepWear = SleepWear.Dressed;
+            try
+            {
+                Pawn[] sleepers = new Pawn[4];
+                Building_Bed[] beds = new Building_Bed[4];
+                for (int k = 0; k < 4; k++)
+                {
+                    Thing made = ThingMaker.MakeThing(ThingDef.Named("Bed"), ThingDefOf.WoodLog);
+                    made.SetFaction(Faction.OfPlayer);
+                    beds[k] = (Building_Bed)Spawn(made, middle + new IntVec3(2 * k - 3, 0, 0), Rot4.North);
+                    sleepers[k] = NewPawn(middle + new IntVec3(2 * k - 3, 0, -2), null);
+                    beds[k].TryGetComp<CompAssignableToPawn>().TryAssignPawn(sleepers[k]);
+                }
+                void Tuck()
+                {
+                    for (int k = 0; k < 4; k++)
+                    {
+                        Pawn p = sleepers[k];
+                        if (p.needs.rest != null)
+                        {
+                            p.needs.rest.CurLevel = 0.05f;
+                        }
+                        if (!p.InBed() || p.CurrentBed() != beds[k])
+                        {
+                            p.jobs.Notify_TuckedIntoBed(beds[k]);
+                        }
+                    }
+                }
+                Tuck();
+                lookAt = middle.ToVector3Shifted();
+                lookYaw = 90f;
+                yield return WaitReal(2f);
+                for (int i = 0; i < 6; i++)
+                {
+                    Tuck();
+                    yield return Ticks(20, "sleepside", sleepers[0]);
+                    if (i % 3 == 2)
+                    {
+                        yield return Shot("side_t" + (i + 1) * 20);
+                    }
+                }
+                int side = 0;
+                for (int k = 0; k < 4; k++)
+                {
+                    string clip = Field<string>(sleepers[k], "lieNow");
+                    side += clip == "sleep~2" ? 1 : 0;
+                    Check("sleeper " + k + ": asleep in its bed", sleepers[k].InBed() && !sleepers[k].Awake(), "clip " + (clip ?? "none"));
+                }
+                Note(side + " of 4 on the side (sleep~2). Look: those on the side lie still on top of the bed, breathing, not writhing; none through the bed.");
+                lookYaw = 0f;
+                yield return Shot("side_foot");
+            }
+            finally
+            {
+                SettingsMod.Settings.sleepWear = was;
+            }
+        }
+
+        // Lovin beside sleeping, under IsoRim's blanket (the sleepWear option's Blankets, on for the test): two double beds side by side,
         // one couple at lovin (awake: the lie clip) and one asleep (sleep), to see whether the heads and lumps lie as far up
         // the bed (Ease.headAlong, blanketAlong: cells from IsoRim's head place toward the feet).
         private static IEnumerator BedCompareTest()
         {
-            bool was = SettingsMod.Settings.bedBlankets;
-            SettingsMod.Settings.bedBlankets = true;
+            SleepWear was = SettingsMod.Settings.sleepWear;
+            SettingsMod.Settings.sleepWear = SleepWear.Blankets;
             try
             {
                 Building_Bed MakeBed(IntVec3 at)
@@ -564,16 +972,19 @@ namespace M3AT
             }
             finally
             {
-                SettingsMod.Settings.bedBlankets = was;
+                SettingsMod.Settings.sleepWear = was;
             }
         }
 
-        // Lovin under IsoRim's blanket (the bedBlankets option, on for the test): two spouses in a double bed, each head and
+        // Lovin under IsoRim's blanket (the sleepWear option's Blankets, on for the test): two spouses in a double bed, each head and
         // lump drawn across toward the other and the heads turned to face each other (WalkFigures.LovinOf).
-        private static IEnumerator LovinTest()
+        // lovinbare: the same with no blanket (the sleepWear option at Dressed): the two on their sides facing each other
+        // (lovin_L, lovin_R), drawn toward each other (WalkFigures.LovinBareOf), the heads not turned.
+        private static IEnumerator LovinTest(SleepWear wear = SleepWear.Blankets)
         {
-            bool was = SettingsMod.Settings.bedBlankets;
-            SettingsMod.Settings.bedBlankets = true;
+            SleepWear was = SettingsMod.Settings.sleepWear;
+            SettingsMod.Settings.sleepWear = wear;
+            bool bare = wear != SleepWear.Blankets;
             try
             {
                 Thing made = ThingMaker.MakeThing(ThingDef.Named("DoubleBed"), ThingDefOf.WoodLog);
@@ -625,10 +1036,26 @@ namespace M3AT
                     Pawn p = two[k];
                     Check("lover " + k + ": in the bed at lovin", p.InBed() && p.CurrentBed() == bed && p.CurJobDef == JobDefOf.Lovin,
                         "at " + p.Position + ", job " + (p.CurJobDef != null ? p.CurJobDef.defName : "none") + ", posture " + p.GetPosture());
-                    Check("lover " + k + ": drawn toward the other", shifts[k] > 0.1f, "shift " + shifts[k].ToString("F2") + " cells");
-                    Check("lover " + k + ": head turned", Mathf.Abs(looks[k]) > 40f, "look " + looks[k].ToString("F0") + " degrees");
+                    Check("lover " + k + ": drawn toward the other", shifts[k] > (bare ? 0.02f : 0.1f), "shift " + shifts[k].ToString("F2") + " cells");
+                    if (bare)
+                    {
+                        string clip = Field<string>(p, "lieNow");
+                        Check("lover " + k + ": on the side", clip == "lovin_L" || clip == "lovin_R", "clip " + (clip ?? "none"));
+                    }
+                    else
+                    {
+                        Check("lover " + k + ": head turned", Mathf.Abs(looks[k]) > 40f, "look " + looks[k].ToString("F0") + " degrees");
+                    }
                 }
-                Check("lovers: heads turned opposite ways", looks[0] * looks[1] < 0f, looks[0].ToString("F0") + " and " + looks[1].ToString("F0"));
+                if (bare)
+                {
+                    Check("lovers: facing opposite ways", Field<string>(a, "lieNow") != Field<string>(b, "lieNow"),
+                        Field<string>(a, "lieNow") + " and " + Field<string>(b, "lieNow"));
+                }
+                else
+                {
+                    Check("lovers: heads turned opposite ways", looks[0] * looks[1] < 0f, looks[0].ToString("F0") + " and " + looks[1].ToString("F0"));
+                }
                 lookYaw = 180f;
                 yield return Shot("lovin_head");
                 lookAt = bed.TrueCenter() + new Vector3(0f, 0f, 0.5f);
@@ -637,24 +1064,172 @@ namespace M3AT
                 lookDistance = 1.8f;
                 lookHeight = 0.4f;
                 yield return Shot("lovin_close");
-                Note("Look: the two heads close together on the pillows, turned to face each other, each lump of blanket moved with its head, no body poking through.");
+                Note(bare ? "Look: the two on their sides on top of the bed, close and facing each other, not through each other or the bed."
+                    : "Look: the two heads close together on the pillows, turned to face each other, each lump of blanket moved with its head, no body poking through.");
             }
             finally
             {
                 lookPitch = LookPitch;
                 lookDistance = LookDistance;
                 lookHeight = LookHeight;
-                SettingsMod.Settings.bedBlankets = was;
+                SettingsMod.Settings.sleepWear = was;
             }
         }
 
-        // Children and a baby asleep under IsoRim's blanket (the bedBlankets option, on for the test), each alone in a single
+        // Children and a baby asleep under IsoRim's blanket (the sleepWear option's Blankets, on for the test), each alone in a single
         // bed, beside a grown sleeper to compare: the lump's size (BlanketScaleOf, measured from the body in its shape) and where it starts
         // (the neck, BlanketNeck), and where the head lies against the pillow.
+        // Corpses hung in Ideology's gibbet cages (a grown man, a grown woman, a child), which the chibi draws slumped upright
+        // on the cage floor (WalkFigures.DrawCaged) where it used to leave them to IsoRim's figure.
+        private static IEnumerator GibbetTest()
+        {
+            ThingDef cageDef = DefDatabase<ThingDef>.GetNamedSilentFail("GibbetCage");
+            if (cageDef == null || !ModsConfig.IdeologyActive)
+            {
+                Check("gibbet: Ideology's gibbet cage", false, "not loaded");
+                yield break;
+            }
+            float[] ages = { 30f, 30f, 9f };
+            Gender[] genders = { Gender.Male, Gender.Female, Gender.Male };
+            string[] names = { "man", "woman", "child 9" };
+            Building_GibbetCage[] cages = new Building_GibbetCage[ages.Length];
+            for (int k = 0; k < ages.Length; k++)
+            {
+                Thing made = ThingMaker.MakeThing(cageDef, cageDef.MadeFromStuff ? ThingDefOf.Steel : null);
+                made.SetFaction(Faction.OfPlayer);
+                cages[k] = (Building_GibbetCage)Spawn(made, middle + new IntVec3(3 * k - 3, 0, 0), Rot4.South);
+                DevelopmentalStage stage = ages[k] < 13f ? DevelopmentalStage.Child : DevelopmentalStage.Adult;
+                Pawn pawn = PawnGenerator.GeneratePawn(new PawnGenerationRequest(PawnKindDefOf.Colonist, Faction.OfPlayer,
+                    fixedBiologicalAge: ages[k], fixedChronologicalAge: ages[k], fixedGender: genders[k], developmentalStages: stage));
+                pawn.equipment.DestroyAllEquipment();
+                Spawn(pawn, middle + new IntVec3(3 * k - 3, 0, -3));
+                pawn.Kill(null);
+                Corpse corpse = pawn.Corpse;
+                if (corpse != null && corpse.Spawned)
+                {
+                    corpse.DeSpawn();
+                }
+                // (straight into the cage's container: its storage filter turns colonists' corpses away)
+                bool inside = corpse != null && (cages[k].TryAcceptThing(corpse) || cages[k].GetDirectlyHeldThings().TryAdd(corpse));
+                Check(names[k] + ": corpse hung in the cage", inside && corpse.ParentHolder == cages[k], corpse == null ? "no corpse" : "in " + corpse.ParentHolder);
+            }
+            lookAt = middle.ToVector3Shifted();
+            lookYaw = 0f;
+            yield return WaitReal(3f);
+            yield return Ticks(30, "gibbet", null);
+            yield return Shot("cages");
+            float wasDistance = lookDistance;
+            lookDistance = 3f;
+            for (int k = 0; k < ages.Length; k++)
+            {
+                lookAt = cages[k].TrueCenter();
+                yield return Shot("cage_" + names[k].Replace(' ', '_'));
+            }
+            lookDistance = wasDistance;
+            Note("Look at: each corpse slumped upright in its cage, feet on the cage floor, its head bowed and under the dome, "
+                + "no part through the bars; the child smaller.");
+        }
+
+        // People in Biotech's growth vats (a baby, a child, a teen) and in Ideology's biosculpter pod (a grown pawn), to see
+        // how each is drawn: the chibi on the vat's couch, or IsoRim's own figure (WalkFigures leaves InVat to it). Put
+        // straight into each container, as the test map has no power to load them the game's way; the vat's clock is
+        // started so the game counts it working (it ages its child 20 ticks a tick, which this short test hardly shows).
+        private static IEnumerator VatTest()
+        {
+            List<Thing> holders = new List<Thing>();
+            List<string> names = new List<string>();
+            List<Pawn> occupants = new List<Pawn>();
+            ThingDef vatDef = DefDatabase<ThingDef>.GetNamedSilentFail("GrowthVat");
+            if (vatDef == null || !ModsConfig.BiotechActive)
+            {
+                Check("vat: Biotech's growth vat", false, "not loaded");
+            }
+            else
+            {
+                float[] ages = { 1f, 7f, 15f };
+                string[] labels = { "baby 1", "child 7", "teen 15" };
+                FieldInfo startTick = typeof(Building_Enterable).GetField("startTick", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+                FieldInfo selected = typeof(Building_Enterable).GetField("selectedPawn", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+                for (int k = 0; k < ages.Length; k++)
+                {
+                    Thing made = ThingMaker.MakeThing(vatDef, vatDef.MadeFromStuff ? ThingDefOf.Steel : null);
+                    made.SetFaction(Faction.OfPlayer);
+                    Building_GrowthVat vat = (Building_GrowthVat)Spawn(made, middle + new IntVec3(3 * k - 4, 0, 1), Rot4.South);
+                    DevelopmentalStage stage = ages[k] < 3f ? DevelopmentalStage.Baby : ages[k] < 13f ? DevelopmentalStage.Child : DevelopmentalStage.Adult;
+                    Pawn pawn = PawnGenerator.GeneratePawn(new PawnGenerationRequest(PawnKindDefOf.Colonist, Faction.OfPlayer,
+                        fixedBiologicalAge: ages[k], fixedChronologicalAge: ages[k], developmentalStages: stage));
+                    pawn.equipment.DestroyAllEquipment();
+                    bool inside = vat.innerContainer.TryAdd(pawn);
+                    if (inside)
+                    {
+                        selected?.SetValue(vat, pawn);
+                        startTick?.SetValue(vat, Find.TickManager.TicksGame);
+                    }
+                    Check(labels[k] + ": in the growth vat", inside && pawn.ParentHolder == vat, "in " + pawn.ParentHolder);
+                    holders.Add(vat);
+                    occupants.Add(pawn);
+                    names.Add("vat_" + labels[k].Replace(' ', '_'));
+                }
+            }
+            ThingDef podDef = DefDatabase<ThingDef>.GetNamedSilentFail("BiosculpterPod");
+            if (podDef == null || !ModsConfig.IdeologyActive)
+            {
+                Check("vat: Ideology's biosculpter pod", false, "not loaded");
+            }
+            else
+            {
+                Thing made = ThingMaker.MakeThing(podDef, podDef.MadeFromStuff ? ThingDefOf.Steel : null);
+                made.SetFaction(Faction.OfPlayer);
+                Thing pod = Spawn(made, middle + new IntVec3(5, 0, 1), Rot4.South);
+                CompBiosculpterPod comp = pod.TryGetComp<CompBiosculpterPod>();
+                Pawn pawn = PawnGenerator.GeneratePawn(new PawnGenerationRequest(PawnKindDefOf.Colonist, Faction.OfPlayer,
+                    fixedBiologicalAge: 30f, fixedChronologicalAge: 30f));
+                pawn.equipment.DestroyAllEquipment();
+                FieldInfo cycle = typeof(CompBiosculpterPod).GetField("currentCycleKey", BindingFlags.Instance | BindingFlags.NonPublic);
+                ThingOwner owner = comp?.GetDirectlyHeldThings();
+                bool inside = owner != null && owner.TryAdd(pawn);
+                if (inside && cycle != null && comp.AvailableCycles.Count > 0)
+                {
+                    cycle.SetValue(comp, comp.AvailableCycles[0].Props.key);
+                }
+                Check("grown 30: in the biosculpter pod", inside && pawn.ParentHolder != null, "in " + pawn.ParentHolder
+                    + ", state " + (comp != null ? comp.State.ToString() : "no comp"));
+                holders.Add(pod);
+                occupants.Add(pawn);
+                names.Add("pod_grown_30");
+            }
+            if (holders.Count == 0)
+            {
+                yield break;
+            }
+            lookAt = middle.ToVector3Shifted() + new Vector3(0.5f, 0f, 1f);
+            lookYaw = 0f;
+            yield return WaitReal(3f);
+            yield return Ticks(30, "vat", null);
+            yield return Shot("vats");
+            for (int k = 0; k < occupants.Count; k++)
+            {
+                Vector2 fit;
+                bool fitted = WalkFigures.glassFits.TryGetValue(occupants[k].thingIDNumber, out fit);
+                Check(names[k] + ": fitted under the glass (WalkFigures.UnderGlass)", fitted, fitted
+                    ? string.Format("let down {0:F3} cells, slid {1:F3} cells along the glass", fit.x, fit.y) : "never fitted");
+            }
+            float wasDistance = lookDistance;
+            lookDistance = 3f;
+            for (int k = 0; k < holders.Count; k++)
+            {
+                lookAt = holders[k].TrueCenter();
+                yield return Shot(names[k]);
+            }
+            lookDistance = wasDistance;
+            Note("Look at: who draws each occupant (the chibi or IsoRim's figure), how it lies or floats in the vat or pod, "
+                + "whether it shows through the glass, and its size against the vat.");
+        }
+
         private static IEnumerator KidBedTest()
         {
-            bool was = SettingsMod.Settings.bedBlankets;
-            SettingsMod.Settings.bedBlankets = true;
+            SleepWear was = SettingsMod.Settings.sleepWear;
+            SettingsMod.Settings.sleepWear = SleepWear.Blankets;
             try
             {
                 float[] ages = { 25f, 13f, 8f, 4f, 1f };
@@ -746,7 +1321,7 @@ namespace M3AT
             }
             finally
             {
-                SettingsMod.Settings.bedBlankets = was;
+                SettingsMod.Settings.sleepWear = was;
             }
         }
 
@@ -929,8 +1504,472 @@ namespace M3AT
             Note("Look: stepped up to each instrument, the hands on the keys, the palms toward the harp's strings, beating the drum's head; seated on the chair, leant in.");
         }
 
+        // Drunk: a pawn given AlcoholHigh as hammered swaying standing, then weaving as it walks off (DrunkOf, Ease.drunk,
+        // Ease.weave).
+        private static IEnumerator DrunkTest()
+        {
+            ClearPatch();
+            Pawn pawn = NewPawn(middle + new IntVec3(-3, 0, 0), null);
+            Hold(pawn);
+            Look(pawn, 0f);
+            yield return WaitReal(2f);
+            Hediff high = pawn.health.AddHediff(DefDatabase<HediffDef>.GetNamed("AlcoholHigh"));
+            high.Severity = 0.8f;
+            float drunk = 0f;
+            yield return Ticks(130, "drunk_stand", pawn);   // (looked at with the legs, every LimpCheck ticks)
+            yield return WaitReal(5f);   // (the sway comes on over real time, DrunkEase)
+            // A picture every quarter of the sway's loop (DRUNK_SECONDS, 4 s).
+            for (int i = 0; i < 4; i++)
+            {
+                yield return Ticks(60, "drunk_stand", pawn);
+                drunk = Mathf.Max(drunk, Field<float>(pawn, "drunk"));
+                yield return Shot("drunk_stand_" + i);
+            }
+            Check("drunk: swaying", drunk > 0.9f, "drunk " + drunk.ToString("F2") + ", severity " + high.Severity.ToString("F2"));
+            IntVec3 to = middle + new IntVec3(4, 0, 0);
+            Job walk = JobMaker.MakeJob(JobDefOf.Goto, to);
+            walk.playerForced = true;
+            pawn.jobs.StartJob(walk, JobCondition.InterruptForced);
+            Note("drunk: walking to " + to + ": job " + (pawn.CurJobDef != null ? pawn.CurJobDef.defName : "none") + ", moving "
+                + pawn.pather.Moving + ", standable " + to.Standable(map));
+            float weave = 0f;
+            for (int i = 0; i < 24 && (i == 0 || pawn.pather.Moving); i++)
+            {
+                yield return Ticks(8, "drunk_walk", pawn);
+                lookAt = pawn.DrawPos;
+                weave = Mathf.Max(weave, Mathf.Abs(Field<float>(pawn, "weave")));
+                if (i == 6 || i == 12)
+                {
+                    yield return Shot("drunk_walk_" + i);
+                }
+            }
+            Check("drunk: weaving on the move", weave > 0.01f, "weave up to " + weave.ToString("F3") + " cells");
+            Note("Look: drunk_stand_* leant to a side with the head lolling, the arms hanging; drunk_walk_* off its straight path.");
+        }
+
+        // Stirring while cooking: a simple meal cooked at a fueled stove (stood at it, a bout of work_stir now and then
+        // between the bench work: StirOf, Ease.stirAt), at a campfire (sat cross-legged holding a roasting stick out the whole time, the
+        // work kind stir_campfire) and sat on a chair at a campfire (hunched forward holding the stick out, stir_campfire_sit).
+        private static IEnumerator CookTest()
+        {
+            RecipeDef recipe = DefDatabase<RecipeDef>.GetNamedSilentFail("CookMealSimple");
+            ThingDef food = DefDatabase<ThingDef>.GetNamedSilentFail("RawPotatoes");
+            if (recipe == null || food == null)
+            {
+                Check("cook", false, "no CookMealSimple recipe or RawPotatoes");
+                yield break;
+            }
+            foreach (var (benchName, want, onChair) in new[] { ("FueledStove", "work_stir", false), ("Campfire", "stir_campfire", false), ("Campfire", "stir_campfire_sit", true) })
+            {
+                string caseName = benchName + (onChair ? "_chair" : "");
+                ThingDef benchDef = DefDatabase<ThingDef>.GetNamedSilentFail(benchName);
+                if (benchDef == null)
+                {
+                    Check(benchName, false, "no such def");
+                    continue;
+                }
+                ClearPatch();
+                Thing bench = ThingMaker.MakeThing(benchDef, benchDef.MadeFromStuff ? GenStuff.DefaultStuffFor(benchDef) : null);
+                bench.SetFaction(Faction.OfPlayer);
+                bench = Spawn(bench, middle, Rot4.South);
+                bench.TryGetComp<CompRefuelable>()?.Refuel(50f);
+                IntVec3 spot = bench.InteractionCell;
+                if (onChair)
+                {
+                    Thing chair = ThingMaker.MakeThing(DefDatabase<ThingDef>.GetNamed("DiningChair"), ThingDefOf.WoodLog);
+                    chair.SetFaction(Faction.OfPlayer);
+                    IntVec3 toBench = bench.Position - spot;   // (facing the bench, as the game sits the pawn)
+                    Spawn(chair, spot, toBench.z > 0 ? Rot4.North : toBench.z < 0 ? Rot4.South : toBench.x > 0 ? Rot4.East : Rot4.West);
+                }
+                Thing raw = ThingMaker.MakeThing(food);
+                raw.stackCount = 60;
+                Spawn(raw, spot + (spot - bench.Position) + new IntVec3(-1, 0, 0));
+                IBillGiver giver = bench as IBillGiver;
+                if (giver == null)
+                {
+                    Check(benchName, false, "the bench takes no bills");
+                    continue;
+                }
+                Bill_Production bill = (Bill_Production)recipe.MakeNewBill();
+                bill.repeatCount = 4;
+                giver.BillStack.AddBill(bill);
+                WorkGiverDef workGiver = null;
+                foreach (WorkGiverDef wg in DefDatabase<WorkGiverDef>.AllDefsListForReading)
+                {
+                    if (typeof(WorkGiver_DoBill).IsAssignableFrom(wg.giverClass) && wg.fixedBillGiverDefs != null && wg.fixedBillGiverDefs.Contains(benchDef))
+                    {
+                        workGiver = wg;
+                        break;
+                    }
+                }
+                Pawn pawn = null;
+                for (int i = 0; i < 20; i++)
+                {
+                    pawn = NewPawn(spot + new IntVec3(1, 0, -1), null);
+                    if (workGiver == null || !pawn.WorkTypeIsDisabled(workGiver.workType))
+                    {
+                        break;
+                    }
+                    pawn.Destroy();
+                }
+                IntVec3 away = spot - bench.Position;   // (the camera across the bench, at the pawn's front, a little to the side)
+                float across = Mathf.Atan2(away.x, away.z) * Mathf.Rad2Deg + 25f;
+                Look(pawn, across);
+                lookDistance = 2.2f;
+                lookHeight = 0.6f;
+                yield return WaitReal(2f);
+                string kind = null, stirClip = null;
+                float stirred = -1f;
+                int shots = 0, jobs = 0, atWork = 0;
+                bool bouts = want != null && want.StartsWith("work_");   // (stirred in bouts; else the work kind itself, or pictures only)
+                string why = "";
+                for (int i = 0; i < 400 && shots < 3; i++)
+                {
+                    if (pawn.CurJobDef != JobDefOf.DoBill)
+                    {
+                        JobFailReason.Clear();
+                        Job job = workGiver != null && jobs < 4 ? ((WorkGiver_Scanner)workGiver.Worker).JobOnThing(pawn, bench, true) : null;
+                        if (job == null)
+                        {
+                            why = ", the work giver " + (workGiver != null ? workGiver.defName : "none") + " gave none" + (JobFailReason.HaveReason ? ": " + JobFailReason.Reason : "");
+                            break;
+                        }
+                        jobs++;
+                        job.playerForced = true;
+                        pawn.jobs.StartJob(job, JobCondition.InterruptForced);
+                    }
+                    yield return Ticks(10, "cook_" + caseName, pawn);
+                    string k = Field<string>(pawn, "workKind");
+                    kind = k ?? kind;
+                    stirClip = Field<string>(pawn, "stirClip") ?? stirClip;
+                    float at = Field<float>(pawn, "stirAt");
+                    stirred = Mathf.Max(stirred, at);
+                    // (at the work: a picture every 6 game seconds or so, once it has settled into it)
+                    bool working = k != null && Field<float>(pawn, "work") > 0.9f;
+                    atWork = working ? atWork + 1 : 0;
+                    if (bouts ? at > 0.3f && at < 0.7f : working && atWork % 36 == 6)
+                    {
+                        Look(pawn, across);
+                        yield return WaitReal(0.5f);
+                        yield return Shot(caseName + (bouts ? "_stir_" : "_work_") + shots++);
+                    }
+                }
+                if (bouts)
+                {
+                    Check(caseName + ": " + want, stirClip == want, "work kind " + (kind ?? "none") + ", stirring clip " + (stirClip ?? "none") + ", jobs " + jobs + why);
+                    Check(caseName + ": stirred", stirred > 0.3f, "stirAt reached " + stirred.ToString("F2"));
+                }
+                else if (want != null)
+                {
+                    Check(caseName + ": " + want, kind == want && shots > 0, "work kind " + (kind ?? "none") + ", pictures " + shots + ", jobs " + jobs + why);
+                }
+                else
+                {
+                    Note(caseName + ": work kind " + (kind ?? "none") + ", stirring clip " + (stirClip ?? "none") + ", pictures " + shots + ", jobs " + jobs + why);
+                }
+                lookDistance = LookDistance;
+                lookHeight = LookHeight;
+            }
+            Note("Look: FueledStove_stir_* the spoon in the right fist down into the pot, the left hand on its rim; Campfire_work_* sat " +
+                 "cross-legged, the right arm reached out with the spoon toward the fire, the head short of its stones; " +
+                 "Campfire_chair_work_* sat on a chair at it hunched forward, the spoon reached out to the fire.");
+        }
+
+        // Rolling smokeleaf joints (a Make_SmokeleafJoint bill, WalkFigures.DrawRolledJoint): at the drug lab stood and sat
+        // on a chair at its spot, at a crafting spot knelt and sat. The bill's own work giver gives the job, so the pawn
+        // fetches the leaves laid beside it and carries them over first. The joint is checked drawn seated only, on the
+        // bench's top within its cells at the lab, in the lap at the spot, and not drawn stood or knelt.
+        private static IEnumerator RollJointTest()
+        {
+            RecipeDef recipe = DefDatabase<RecipeDef>.GetNamedSilentFail("Make_SmokeleafJoint");
+            ThingDef leaves = DefDatabase<ThingDef>.GetNamedSilentFail("SmokeleafLeaves");
+            if (recipe == null || leaves == null)
+            {
+                Check("rolljoint", false, "no Make_SmokeleafJoint recipe or SmokeleafLeaves");
+                yield break;
+            }
+            var cases = new[] { ("DrugLab", false, "bench"), ("DrugLab", true, "bench_sit"), ("CraftingSpot", false, "crouch"), ("CraftingSpot", true, "chair") };
+            foreach (var (benchName, seated, want) in cases)
+            {
+                ThingDef benchDef = DefDatabase<ThingDef>.GetNamedSilentFail(benchName);
+                if (benchDef == null)
+                {
+                    Check(benchName, false, "no such def");
+                    continue;
+                }
+                ClearPatch();
+                string name = benchName + (seated ? "_seated" : "_standing");
+                Thing bench = ThingMaker.MakeThing(benchDef, benchDef.MadeFromStuff ? GenStuff.DefaultStuffFor(benchDef) : null);
+                bench.SetFaction(Faction.OfPlayer);
+                bench = Spawn(bench, middle, Rot4.South);
+                IntVec3 spot = bench.InteractionCell;
+                if (seated)
+                {
+                    Thing chair = ThingMaker.MakeThing(DefDatabase<ThingDef>.GetNamed("DiningChair"), ThingDefOf.WoodLog);
+                    chair.SetFaction(Faction.OfPlayer);
+                    IntVec3 toBench = bench.Position - spot;   // (facing the bench, as the game sits the pawn)
+                    Spawn(chair, spot, toBench.z > 0 ? Rot4.North : toBench.z < 0 ? Rot4.South : toBench.x > 0 ? Rot4.East : Rot4.West);
+                }
+                Thing leaf = ThingMaker.MakeThing(leaves);
+                leaf.stackCount = 20;
+                Spawn(leaf, spot + (spot - bench.Position) + new IntVec3(-1, 0, 0));   // (behind the spot, off the bench)
+                IBillGiver giver = bench as IBillGiver;
+                if (giver == null)
+                {
+                    Check(name, false, "the bench takes no bills");
+                    continue;
+                }
+                giver.BillStack.AddBill(recipe.MakeNewBill());
+                // (anything lying on the bench's cells is hauled off first, which the work giver gives in the bill's place)
+                foreach (IntVec3 c in giver.IngredientStackCells)
+                {
+                    foreach (Thing t in new List<Thing>(c.GetThingList(map)))
+                    {
+                        if (t.def.category == ThingCategory.Item)
+                        {
+                            Note(name + ": cleared " + t.LabelShort + " off the bench at " + c);
+                            t.Destroy();
+                        }
+                    }
+                }
+                WorkGiverDef workGiver = null;
+                foreach (WorkGiverDef wg in DefDatabase<WorkGiverDef>.AllDefsListForReading)
+                {
+                    if (typeof(WorkGiver_DoBill).IsAssignableFrom(wg.giverClass) && wg.fixedBillGiverDefs != null && wg.fixedBillGiverDefs.Contains(benchDef))
+                    {
+                        workGiver = wg;
+                        break;
+                    }
+                }
+                Pawn pawn = null;
+                for (int i = 0; i < 20; i++)
+                {
+                    pawn = NewPawn(spot + new IntVec3(1, 0, -1), null);
+                    if (workGiver == null || !pawn.WorkTypeIsDisabled(workGiver.workType))
+                    {
+                        break;
+                    }
+                    pawn.Destroy();
+                }
+                IntVec3 away = spot - bench.Position;   // (the camera across the bench, at the pawn's front, a little to the side)
+                float across = Mathf.Atan2(away.x, away.z) * Mathf.Rad2Deg + 25f;
+                Look(pawn, across);
+                lookDistance = 2.2f;
+                lookHeight = 0.6f;
+                yield return WaitReal(2f);
+                Job job = workGiver != null ? ((WorkGiver_Scanner)workGiver.Worker).JobOnThing(pawn, bench, true) : null;
+                if (job == null)
+                {
+                    Check(name + ": a job", false, "the work giver " + (workGiver != null ? workGiver.defName : "none") + " gave no job");
+                    lookDistance = LookDistance;
+                    lookHeight = LookHeight;
+                    continue;
+                }
+                job.playerForced = true;
+                pawn.jobs.StartJob(job, JobCondition.InterruptForced);
+                string kind = null;
+                int drawn = 0, shots = 0;
+                bool onTop = true;
+                string where = "never drawn";
+                int stepsAtWork = 0;
+                for (int i = 0; i < 200 && pawn.CurJobDef == JobDefOf.DoBill && shots < 4 && stepsAtWork < 40; i++)
+                {
+                    yield return Ticks(10, "rolljoint_" + name, pawn);
+                    string k = Field<string>(pawn, "workKind");
+                    if (k != null && Field<float>(pawn, "work") > 0.5f)
+                    {
+                        kind = k;
+                        stepsAtWork++;
+                        if (!seated && stepsAtWork % 10 == 5)
+                        {
+                            Look(pawn, across);
+                            yield return WaitReal(0.5f);
+                            yield return Shot(name + "_" + shots++);
+                        }
+                    }
+                    if (WalkFigures.rolledJointFrame >= Time.frameCount - 1)
+                    {
+                        drawn++;
+                        Vector3 j = WalkFigures.rolledJointAt;
+                        float over = j.y - (benchName == "DrugLab" ? IsoRim.Api.SurfaceHeight(bench) : 0f);
+                        bool inside = bench.OccupiedRect().Contains(j.ToIntVec3());
+                        where = "at " + j.ToString("F2") + ", " + over.ToString("F3") + " cells over the " + (benchName == "DrugLab" ? "bench top" : "ground")
+                            + (benchName == "DrugLab" ? (inside ? ", over the bench" : ", off the bench") : "");
+                        if (want != "chair" && (Mathf.Abs(over) > 0.05f || benchName == "DrugLab" && !inside))
+                        {
+                            onTop = false;
+                        }
+                        if (drawn % 10 == 1)
+                        {
+                            Look(pawn, across);
+                            yield return WaitReal(0.5f);
+                            yield return Shot(name + "_" + shots++);
+                        }
+                    }
+                }
+                Check(name + ": " + want, kind == want, "work kind " + (kind ?? "none") + ", job " + (pawn.CurJobDef != null ? pawn.CurJobDef.defName : "none"));
+                if (seated)
+                {
+                    Check(name + ": the joint drawn", drawn > 0, "drawn on " + drawn + " steps");
+                    Check(name + ": where it lies", drawn > 0 && onTop, where);
+                }
+                else
+                {
+                    Check(name + ": no joint stood or knelt", drawn == 0 && kind == want, "drawn on " + drawn + " steps" + (kind == want ? "" : ", never at the work"));
+                }
+                if (pawn.jobs != null)
+                {
+                    pawn.jobs.EndCurrentJob(JobCondition.InterruptForced);
+                }
+                lookDistance = LookDistance;
+                lookHeight = LookHeight;
+            }
+            Note("Look: sat at the drug lab, an unlit joint (no ember) lying across on its top in front of the hands; sat at the crafting spot, in the lap; stood at the lab and knelt at the spot, none (the game's leaves on the spot).");
+        }
+
         // The slicecap (Ideology's), a crescent of shell over the left of the scalp, worn over the hair (over_hair,
         // HatOverHair.cs): the hair left whole and the cap pushed out past it, on a few styles from short to big.
+        // One bare pawn given each set of added parts in turn (Prosthetics.cs), seen from the front and the back: the
+        // limbs coloured as what they are made of, the joints darker, a peg leg a peg down to the ground.
+        private static IEnumerator ProstheticsTest()
+        {
+            Rand.PushState(20261112);
+            Pawn pawn;
+            try
+            {
+                pawn = NewPawn(middle, null);
+            }
+            finally
+            {
+                Rand.PopState();
+            }
+            pawn.apparel.DestroyAll();
+            Hold(pawn);
+            Look(pawn, 0f);
+            lookDistance = 2.2f;
+            lookHeight = 0.7f;
+            // Each set: its name, then added part, body part, side.
+            string[][] sets =
+            {
+                new[] { "wood", "PegLeg", "Leg", "left", "WoodenHand", "Hand", "right", "WoodenFoot", "Foot", "right" },
+                new[] { "simple", "SimpleProstheticLeg", "Leg", "left", "SimpleProstheticArm", "Shoulder", "right" },
+                new[] { "bionic", "BionicLeg", "Leg", "right", "BionicArm", "Shoulder", "left", "PowerClaw", "Hand", "right", "BionicEye", "Eye", "left" },
+                new[] { "archotech", "ArchotechLeg", "Leg", "left", "ArchotechLeg", "Leg", "right", "ArchotechArm", "Shoulder", "left", "ArchotechArm", "Shoulder", "right", "ArchotechEye", "Eye", "right" },
+            };
+            foreach (string[] set in sets)
+            {
+                pawn.health.RemoveAllHediffs();
+                int wanted = 0;
+                for (int i = 1; i + 2 < set.Length; i += 3)
+                {
+                    HediffDef def = DefDatabase<HediffDef>.GetNamedSilentFail(set[i]);
+                    BodyPartRecord part = null;
+                    foreach (BodyPartRecord p in pawn.RaceProps.body.AllParts)
+                    {
+                        if (p.def.defName == set[i + 1] && WalkFigures.SideOf(p) == (set[i + 2] == "left" ? "L" : "R"))
+                        {
+                            part = p;
+                            break;
+                        }
+                    }
+                    if (def == null || part == null)
+                    {
+                        Note(set[0] + ": no " + set[i] + " or no " + set[i + 2] + " " + set[i + 1]);
+                        continue;
+                    }
+                    pawn.health.AddHediff(def, part);
+                    wanted++;
+                }
+                yield return Ticks(5, "prosthetics", pawn);
+                string limbs = WalkFigures.AutoLimbs(pawn);
+                int found = 0;
+                foreach (char c in limbs)
+                {
+                    found += c != '0' ? 1 : 0;
+                }
+                bool eyed = set[0] == "bionic" || set[0] == "archotech";
+                if (eyed || set[0] == "wood")
+                {
+                    found += eyed ? 1 : 0;   // its eye, which is not a limb: seen in the face shots
+                    Look(pawn, 0f);
+                    HairDef hair = pawn.story.hairDef;
+                    pawn.story.hairDef = DefDatabase<HairDef>.GetNamedSilentFail("Bald") ?? hair;   // so it hides neither eye
+                    pawn.Drawer.renderer.SetAllGraphicsDirty();
+                    yield return Ticks(2, "prosthetics", pawn);
+                    lookDistance = 1.2f;
+                    lookHeight = 1.0f;
+                    lookPitch = 20f;
+                    yield return Shot(set[0] + "_eye");
+                    // Facial Animation's gaze (FaceGaze.cs), forced well past its own: right (x), then up (z), in its units.
+                    foreach (KeyValuePair<string, Vector3> gaze in new[] { new KeyValuePair<string, Vector3>("right", new Vector3(0.015f, 0f, 0f)), new KeyValuePair<string, Vector3>("up", new Vector3(0f, 0f, 0.015f)) })
+                    {
+                        FaceLayers.TestGaze = gaze.Value;
+                        yield return Ticks(2, "prosthetics", pawn);
+                        yield return Shot(set[0] + "_eye_look_" + gaze.Key);
+                    }
+                    FaceLayers.TestGaze = Vector3.zero;
+                    Note(set[0] + " irises: " + FaceLayers.IrisReport());
+                    if (eyed && SettingsMod.Settings != null)
+                    {
+                        SettingsMod.Settings.prostheticEyes = false;
+                        yield return Ticks(3, "prosthetics", pawn);
+                        yield return Shot(set[0] + "_eye_off");
+                        SettingsMod.Settings.prostheticEyes = true;
+                    }
+                    pawn.story.hairDef = hair;
+                    pawn.Drawer.renderer.SetAllGraphicsDirty();
+                    lookDistance = 2.2f;
+                    lookHeight = 0.7f;
+                    lookPitch = LookPitch;
+                }
+                Check(set[0] + ": every added part has a look", found == wanted, limbs + ", " + wanted + " parts added");
+                string hurt = WalkFigures.AutoHurt(pawn);
+                Check(set[0] + ": no hurt place held", hurt.StartsWith("hold 0.00", StringComparison.Ordinal), hurt);
+                // A limp only where one leg works worse than the other: the peg, and a simple leg beside a natural one.
+                bool limps = set[0] == "wood" || set[0] == "simple";
+                Check(set[0] + (limps ? ": limps" : ": walks evenly"), hurt.Contains(", limp 0.00") != limps, hurt);
+                foreach (float yaw in new[] { 0f, 180f })
+                {
+                    lookYaw = yaw;
+                    yield return Shot(set[0] + "_" + (int)yaw);
+                }
+                lookYaw = 0f;
+                if (set[0] == "wood" || set[0] == "simple")
+                {
+                    // Dressed: what a trouser leg or sleeve does over a peg or a pylon.
+                    foreach (string worn in new[] { "Apparel_Pants", "Apparel_BasicShirt" })
+                    {
+                        ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail(worn);
+                        if (def != null)
+                        {
+                            pawn.apparel.Wear((Apparel)ThingMaker.MakeThing(def, GenStuff.DefaultStuffFor(def)));
+                        }
+                    }
+                    pawn.Drawer.renderer.SetAllGraphicsDirty();
+                    yield return Ticks(3, "prosthetics", pawn);
+                    foreach (float yaw in new[] { 0f, 180f })
+                    {
+                        lookYaw = yaw;
+                        yield return Shot(set[0] + "_dressed_" + (int)yaw);
+                    }
+                    lookYaw = 0f;
+                    pawn.apparel.DestroyAll();
+                }
+                if (set[0] == "archotech" && SettingsMod.Settings != null)
+                {
+                    SettingsMod.Settings.archotechProsthetics = false;
+                    yield return Ticks(3, "prosthetics", pawn);
+                    Check("archotech off: drawn as flesh", WalkFigures.AutoLimbs(pawn) == "00000000", WalkFigures.AutoLimbs(pawn));
+                    yield return Shot("archotech_off");
+                    SettingsMod.Settings.archotechProsthetics = true;
+                }
+            }
+            lookDistance = LookDistance;
+            lookHeight = LookHeight;
+            Note("Look: in the _eye_look_right shots both irises (and a prosthetic one) moved to the picture's right, in _eye_look_up up, within the eye's white; ");
+            Note("Look: the bionic eye (the pawn's left) dark steel with a cyan iris, the archotech eye (its right) olive with a yellow iris; both blink with the lids. Then wood brown, simple a beige socket and foot or hand on a thin steel pylon, bionic dark blue metal with panel seams and cyan lights, archotech pale olive with yellow circuit traces and inset panels, each with darker joints; the peg leg a thin peg reaching the ground.");
+        }
+
         private static IEnumerator SlicecapTest()
         {
             ThingDef cap = DefDatabase<ThingDef>.GetNamedSilentFail("Apparel_Slicecap");
@@ -1055,6 +2094,259 @@ namespace M3AT
         }
 
         // The red flash of a hit: the figure is flashed by HitFlash.Of, 16 game ticks from full to none, the outlines never.
+        // The face drawn eight layers a draw (FaceLayers.DrawStacked) against a draw per layer, close up, the same frame each
+        // time (paused, so Facial Animation's face is the same in both): the pictures in each pair should match.
+        private static IEnumerator FaceAbTest()
+        {
+            List<Pawn> pawns = new List<Pawn>();
+            for (int i = 0; i < 4; i++)
+            {
+                Pawn pawn = NewPawn(middle + new IntVec3(2 * i - 3, 0, 0), null);
+                Hold(pawn);
+                pawns.Add(pawn);
+            }
+            yield return WaitReal(4f);   // their hair built
+            float distance = lookDistance, pitch = lookPitch, height = lookHeight;
+            lookPitch = 20f;
+            lookDistance = 1.3f;
+            lookHeight = 1.0f;
+            for (int k = 0; k < pawns.Count; k++)
+            {
+                Look(pawns[k], 0f);
+                for (int sample = 0; sample < 3; sample++)
+                {
+                    yield return Ticks(40 + 37 * sample, "faceab", pawns[k]);
+                    FaceLayers.StackLayers = true;
+                    yield return Shot("p" + k + "_s" + sample + "_stacked");
+                    FaceLayers.StackLayers = false;
+                    yield return Shot("p" + k + "_s" + sample + "_layers");
+                    FaceLayers.StackLayers = true;
+                }
+            }
+            lookDistance = distance;
+            lookPitch = pitch;
+            lookHeight = height;
+            Note("Look: each _stacked picture the same as the _layers one after it: the eyes, lids, brows, mouth and blush in the same places and colours.");
+        }
+
+        // The same check through what Facial Animation and its Experimentals animate: a pawn put in each state in turn, its
+        // face taken stacked and a draw per layer the same frame, three times over the state's animation. Also the stacked
+        // drawing's own odd cases: a missing eye (its halves cut, the closed lid on its own), a wound on the eye (drawn a
+        // layer at a time), the pig snout (the lowered mouth) and red eyes (Facial Animation's colours reloaded).
+        private static IEnumerator FaceAnimTest(string only)
+        {
+            float distance = lookDistance, pitch = lookPitch, height = lookHeight;
+            string[] cases = { "idle", "drafted", "eating", "pain", "naked", "gloomy", "hopeless", "cheerful", "asleep", "anaesthetic", "painshock",
+                "missing_eye", "eye_wound", "pig_snout", "red_eyes" };
+            foreach (string what in cases)
+            {
+                if (only != null && what != only)
+                {
+                    continue;
+                }
+                Pawn pawn = NewPawn(middle, null);
+                Pawn other = null;
+                Hold(pawn);
+                bool lying = false;
+                string skipped = null;
+                switch (what)
+                {
+                    case "drafted":
+                        pawn.drafter.Drafted = true;
+                        break;
+                    case "talking":
+                        other = NewPawn(middle + new IntVec3(1, 0, 0), null);   // beside it, out of the camera's way
+                        Hold(other);
+                        pawn.Rotation = Rot4.South;
+                        other.Rotation = Rot4.West;
+                        break;
+                    case "eating":
+                        if (pawn.needs.food != null)
+                        {
+                            pawn.needs.food.CurLevel = 0.05f;
+                        }
+                        Thing meal = Spawn(ThingMaker.MakeThing(ThingDefOf.MealSimple), middle + new IntVec3(1, 0, 0));
+                        pawn.jobs.StartJob(JobMaker.MakeJob(JobDefOf.Ingest, meal), JobCondition.InterruptForced);
+                        break;
+                    case "pain":
+                        // Pain 0.5 (Experimentals' tears from 0.4), short of the pain shock that downs it at 0.8.
+                        for (int k = 0; k < 40 && pawn.health.hediffSet.PainTotal < 0.5f && !pawn.Downed; k++)
+                        {
+                            FaceHurt(pawn, 1, 3f);
+                        }
+                        break;
+                    case "naked":
+                        pawn.apparel.DestroyAll();
+                        break;
+                    case "gloomy":
+                    case "hopeless":
+                    case "cheerful":
+                        break;   // the mood is set before each sample, below
+                    case "asleep":
+                        Thing bed = ThingMaker.MakeThing(ThingDef.Named("Bed"), ThingDefOf.WoodLog);
+                        bed.SetFaction(Faction.OfPlayer);
+                        Building_Bed b = (Building_Bed)Spawn(bed, middle + new IntVec3(0, 0, 2), Rot4.North);
+                        b.TryGetComp<CompAssignableToPawn>().TryAssignPawn(pawn);
+                        if (pawn.needs.rest != null)
+                        {
+                            pawn.needs.rest.CurLevel = 0.05f;
+                        }
+                        pawn.jobs.Notify_TuckedIntoBed(b);
+                        lying = true;
+                        break;
+                    case "anaesthetic":
+                        pawn.health.AddHediff(HediffDefOf.Anesthetic);
+                        lying = true;
+                        break;
+                    case "painshock":
+                        FaceHurt(pawn, 12, 9f);
+                        lying = true;
+                        break;
+                    case "missing_eye":
+                    case "eye_wound":
+                        BodyPartRecord eye = pawn.health.hediffSet.GetNotMissingParts().FirstOrDefault(p => p.def.defName == "Eye");
+                        if (eye == null)
+                        {
+                            skipped = "no eye part";
+                        }
+                        else if (what == "missing_eye")
+                        {
+                            pawn.health.AddHediff(HediffDefOf.MissingBodyPart, eye);
+                        }
+                        else
+                        {
+                            Hediff_Injury cut = (Hediff_Injury)HediffMaker.MakeHediff(DefDatabase<HediffDef>.GetNamed("Cut"), pawn, eye);
+                            cut.Severity = 3f;
+                            pawn.health.AddHediff(cut);
+                        }
+                        break;
+                    case "pig_snout":
+                    case "red_eyes":
+                        GeneDef gene = DefDatabase<GeneDef>.GetNamedSilentFail(what == "pig_snout" ? "Nose_Pig" : "Eyes_Red");
+                        if (gene == null || pawn.genes == null)
+                        {
+                            skipped = "no " + (what == "pig_snout" ? "Nose_Pig" : "Eyes_Red") + " gene (Biotech)";
+                        }
+                        else
+                        {
+                            pawn.genes.AddGene(gene, true);
+                        }
+                        break;
+                }
+                if (skipped != null)
+                {
+                    Note(what + ": skipped, " + skipped);
+                    DestroyAll(pawn, other);
+                    continue;
+                }
+                yield return WaitReal(3f);   // its hair built
+                for (int sample = 0; sample < 3; sample++)
+                {
+                    // (Downed where it stood it falls as a ragdoll: let it settle first.)
+                    if (other != null)
+                    {
+                        // A word each sample, so the mouth has something to say (Facial Animation's talking).
+                        pawn.interactions.TryInteractWith(other, InteractionDefOf.Chitchat);
+                    }
+                    // Mood as Experimentals reads it (its share of the most), held there, as it drifts back to what the thoughts make it.
+                    float mood = what == "gloomy" ? 0.3f : what == "hopeless" ? 0.1f : what == "cheerful" ? 0.9f : -1f;
+                    if (mood >= 0f && pawn.needs.mood != null)
+                    {
+                        pawn.needs.mood.CurLevelPercentage = mood;
+                    }
+                    yield return Ticks(sample == 0 ? (what == "painshock" ? 600 : 130) : 65, "faceanim " + what, pawn);
+                    Note(what + " " + sample + ": " + FaceLayers.FaState(pawn));
+                    // Framed on the face: from the front standing, from above the head lying on its back.
+                    lookAt = pawn.DrawPos;
+                    // (In bed the head lies at the bed's north end: seen from beyond it, looking back down the bed.)
+                    lookYaw = what == "asleep" ? 180f : lying ? 0f : 180f + pawn.Rotation.AsAngle;
+                    lookPitch = what == "asleep" ? 50f : lying ? 70f : 20f;
+                    lookDistance = what == "painshock" ? 2.2f : lying ? 1.2f : 1.3f;
+                    lookHeight = lying ? 0.3f : 1.0f;
+                    FaceLayers.StackLayers = true;
+                    yield return Shot(what + "_" + sample + "_stacked");
+                    FaceLayers.StackLayers = false;
+                    yield return Shot(what + "_" + sample + "_layers");
+                    FaceLayers.StackLayers = true;
+                }
+                Probe("faceanim " + what + " end", pawn);
+                DestroyAll(pawn, other);
+            }
+            lookDistance = distance;
+            lookPitch = pitch;
+            lookHeight = height;
+            Note("Look: each _stacked picture the same as the _layers one after it, in every state: blinking and looking about, drafted, talking, eating, pain, the naked blush, sad, asleep, unconscious, downed in pain, a missing eye, a wounded eye, the pig snout's lowered mouth and red eyes.");
+        }
+
+        // Every Facial Animation animation both mods define, played on one pawn as its face editor previews them, its face
+        // taken stacked and a draw per layer the same frame: tears, blush, sweat, cold, the moods, the mouth shapes, flinching.
+        private static IEnumerator FaceShapesTest(string[] only)
+        {
+            float distance = lookDistance, pitch = lookPitch, height = lookHeight;
+            Pawn pawn = NewPawn(middle, null);
+            Hold(pawn);
+            yield return WaitReal(3f);   // its hair built
+            lookAt = pawn.DrawPos;
+            lookYaw = 0f;
+            lookPitch = 20f;
+            lookDistance = 1.3f;
+            lookHeight = 1.0f;
+            List<string> all = only != null ? new List<string>(only) : FaceLayers.FaAnimations();
+            int[] at = only != null ? new[] { 1, 4, 15 } : new[] { 1 };   // ticks into it each picture is taken at
+            Note(all.Count + " animations: " + string.Join(", ", all));
+            yield return Shot("neutral_stacked");
+            foreach (string anim in all)
+            {
+                // From the next tick, then that one tick stepped: a one-tick animation shows and is held, the game paused.
+                if (!FaceLayers.FaPlay(pawn, Find.TickManager.TicksGame + 1, anim))
+                {
+                    Note(anim + ": wouldn't play");
+                    continue;
+                }
+                int done = 0;
+                foreach (int t in at)
+                {
+                    yield return Ticks(t - done, "faceshapes " + anim, pawn);
+                    done = t;
+                    Note(anim + " +" + t + ": " + FaceLayers.FaState(pawn));
+                    FaceLayers.StackLayers = true;
+                    yield return Shot(anim + "_t" + t + "_stacked");
+                    FaceLayers.StackLayers = false;
+                    yield return Shot(anim + "_t" + t + "_layers");
+                    FaceLayers.StackLayers = true;
+                }
+            }
+            lookDistance = distance;
+            lookPitch = pitch;
+            lookHeight = height;
+            Note("Look: each _stacked picture the same as its _layers one, and each animation's face different from neutral where it changes the face.");
+        }
+
+        private static int hurtNext;
+
+        private static void FaceHurt(Pawn pawn, int count, float severity)
+        {
+            List<BodyPartRecord> parts = pawn.health.hediffSet.GetNotMissingParts().Where(p => p.depth == BodyPartDepth.Outside && p.def.hitPoints >= 20 && p.def.defName != "Eye").ToList();
+            for (int i = 0; i < count && parts.Count > 0; i++)
+            {
+                hurtNext++;   // each cut on another part, so none is cut away
+                Hediff_Injury cut = (Hediff_Injury)HediffMaker.MakeHediff(DefDatabase<HediffDef>.GetNamed("Cut"), pawn, parts[(hurtNext * 5) % parts.Count]);
+                cut.Severity = severity;
+                pawn.health.AddHediff(cut);
+            }
+        }
+
+        private static void DestroyAll(params Pawn[] pawns)
+        {
+            foreach (Pawn p in pawns)
+            {
+                if (p != null && !p.Destroyed)
+                {
+                    p.Destroy();
+                }
+            }
+        }
+
         private static IEnumerator HitFlashTest()
         {
             Pawn pawn = NewPawn(middle, null);
@@ -1078,6 +2370,177 @@ namespace M3AT
             Check("flash fading", mid > 0f && mid < first, "after 4 ticks " + mid.ToString("F2"));
             Check("flash gone after 20 ticks", last <= 0.001f, "after 20 ticks " + last.ToString("F2"));
             Note("Look: the figure is tinted red in hit_0, less in hit_4, none in hit_20; the outline never red.");
+        }
+
+        // The everyday life clips: a wave and a glance at a chat in passing (wave), a sad wander slumped (sad), patting at
+        // the flames on itself while on fire (burning), a catatonic breakdown lying still rather than writhing
+        // (catatonic), a lamp flicked by reaching to it (flick) and a generator and a campfire refuelled at their height
+        // (refuel). only: one of those, or all.
+        private static IEnumerator LivelyTest(string only)
+        {
+            if (only == null || only == "wave")
+            {
+                ClearPatch();
+                Pawn a = NewPawn(middle + new IntVec3(-1, 0, 0), null);
+                Pawn b = NewPawn(middle + new IntVec3(1, 0, 1), null);
+                Hold(a);
+                Hold(b);
+                Look(a, 0f);
+                yield return WaitReal(3f);
+                bool done = a.interactions.TryInteractWith(b, InteractionDefOf.Chitchat);
+                float wave = -1f, look = 0f, lookB = 0f;
+                for (int i = 0; i < 8; i++)
+                {
+                    yield return Ticks(12, "wave", a);
+                    wave = Mathf.Max(wave, Field<float>(a, "waveAt"));
+                    look = Mathf.Max(look, Mathf.Abs(Field<float>(a, "look")));
+                    lookB = Mathf.Max(lookB, Mathf.Abs(Field<float>(b, "look")));
+                    if (i == 2 || i == 4)
+                    {
+                        yield return Shot("wave_t" + (i + 1) * 12);
+                    }
+                }
+                Check("wave: interaction made", done, done ? "chitchat" : "the game refused it");
+                Check("wave: played", wave > 0.3f, "waveAt reached " + wave.ToString("F2"));
+                Check("wave: the initiator glances", look > 5f, look.ToString("F0") + " degrees");
+                Check("wave: the recipient glances back", lookB > 5f, lookB.ToString("F0") + " degrees");
+            }
+            if (only == null || only == "sad")
+            {
+                ClearPatch();
+                Pawn pawn = NewPawn(middle, null);
+                Look(pawn, 0f);
+                yield return WaitReal(3f);
+                bool started = pawn.mindState.mentalStateHandler.TryStartMentalState(DefDatabase<MentalStateDef>.GetNamed("Wander_Sad"), forced: true);
+                float sad = 0f;
+                for (int i = 0; i < 12; i++)
+                {
+                    yield return Ticks(15, "sad", pawn);
+                    lookAt = pawn.DrawPos;
+                    sad = Mathf.Max(sad, Field<float>(pawn, "sad"));
+                    if (i == 7 || i == 11)
+                    {
+                        yield return Shot("sad_t" + (i + 1) * 15);
+                    }
+                }
+                Check("sad: mental state", started, started ? "Wander_Sad" : "not started");
+                Check("sad: slumped", sad > 0.5f, "sad " + sad.ToString("F2"));
+                pawn.mindState.mentalStateHandler.Reset();
+            }
+            if (only == null || only == "burning")
+            {
+                ClearPatch();
+                Pawn pawn = NewPawn(middle, null);
+                pawn.drafter.Drafted = true;
+                Look(pawn, 0f);
+                yield return WaitReal(3f);
+                pawn.TryAttachFire(0.4f, null);
+                float burn = 0f;
+                for (int i = 0; i < 8; i++)
+                {
+                    yield return Ticks(8, "burning", pawn);
+                    burn = Mathf.Max(burn, Field<float>(pawn, "burn"));
+                    if (i == 3 || i == 6)
+                    {
+                        yield return Shot("burning_t" + (i + 1) * 8);
+                    }
+                }
+                Check("burning: on fire", pawn.IsBurning() || burn > 0f, pawn.IsBurning() ? "burning" : "the fire went out");
+                Check("burning: patting", burn > 0.5f, "burn " + burn.ToString("F2") + ", job " + pawn.CurJobDef?.defName);
+                (pawn.GetAttachment(ThingDefOf.Fire) as Fire)?.Destroy();
+            }
+            if (only == null || only == "catatonic")
+            {
+                ClearPatch();
+                Pawn pawn = NewPawn(middle, null);
+                Look(pawn, 0f);
+                yield return WaitReal(3f);
+                pawn.health.AddHediff(DefDatabase<HediffDef>.GetNamed("CatatonicBreakdown"));
+                yield return Ticks(60, "catatonic", pawn);
+                yield return WaitReal(2f);
+                yield return Ticks(30, "catatonic", pawn);
+                MethodInfo lieClip = typeof(WalkFigures).GetMethod("LieClip", BindingFlags.NonPublic | BindingFlags.Static);
+                string clip = lieClip != null ? (string)lieClip.Invoke(null, new object[] { pawn, false, false, false }) : null;
+                yield return Shot("catatonic");
+                Check("catatonic: downed", pawn.Downed, "downed " + pawn.Downed + ", awake " + pawn.Awake());
+                Check("catatonic: lies still as asleep", clip != null && clip.StartsWith("sleep"), "lying clip " + (clip ?? "none"));
+            }
+            if (only == null || only == "flick")
+            {
+                ClearPatch();
+                ThingDef lampDef = DefDatabase<ThingDef>.GetNamed("StandingLamp");
+                Thing lamp = ThingMaker.MakeThing(lampDef, lampDef.MadeFromStuff ? ThingDefOf.Steel : null);
+                lamp.SetFaction(Faction.OfPlayer);
+                Spawn(lamp, middle + new IntVec3(1, 0, 0), Rot4.North);
+                Pawn pawn = NewPawn(middle + new IntVec3(-1, 0, 0), null);
+                Look(pawn, 0f);
+                yield return WaitReal(3f);
+                string kind = null;
+                for (int i = 0; i < 4 && kind == null; i++)
+                {
+                    lamp.Map.designationManager.RemoveAllDesignationsOn(lamp);
+                    lamp.Map.designationManager.AddDesignation(new Designation(lamp, DesignationDefOf.Flick));
+                    Job job = JobMaker.MakeJob(JobDefOf.Flick, lamp);
+                    job.playerForced = true;
+                    pawn.jobs.StartJob(job, JobCondition.InterruptForced);
+                    for (int t = 0; t < 30; t++)
+                    {
+                        yield return Ticks(2, "flick", pawn);
+                        string k = Field<string>(pawn, "workKind");
+                        if (k != null && Field<float>(pawn, "work") > 0.3f)
+                        {
+                            kind = k;
+                            yield return Shot("flick");
+                            break;
+                        }
+                    }
+                }
+                Check("flick: reaching to a standing lamp", kind == "reach", "work kind " + (kind ?? "none"));
+            }
+            if (only == null || only == "refuel")
+            {
+                foreach (string what in new[] { "WoodFiredGenerator", "Campfire" })
+                {
+                    ClearPatch();
+                    ThingDef def = DefDatabase<ThingDef>.GetNamed(what);
+                    Thing built = ThingMaker.MakeThing(def, def.MadeFromStuff ? ThingDefOf.WoodLog : null);
+                    built.SetFaction(Faction.OfPlayer);
+                    Spawn(built, middle + new IntVec3(2, 0, 0), Rot4.North);
+                    CompRefuelable fuel = built.TryGetComp<CompRefuelable>();
+                    fuel?.ConsumeFuel(fuel.Fuel);
+                    Thing logs = ThingMaker.MakeThing(ThingDefOf.WoodLog);
+                    logs.stackCount = 75;
+                    Spawn(logs, middle + new IntVec3(-1, 0, -1));
+                    Pawn pawn = NewPawn(middle + new IntVec3(-1, 0, 0), null);
+                    Look(pawn, 0f);
+                    yield return WaitReal(3f);
+                    Job job = RefuelWorkGiverUtility.RefuelJob(pawn, built, forced: true);
+                    if (job == null)
+                    {
+                        Check("refuel " + what + ": job", false, "no refuel job");
+                        continue;
+                    }
+                    pawn.jobs.StartJob(job, JobCondition.InterruptForced);
+                    string kind = null;
+                    for (int t = 0; t < 60 && kind == null; t++)
+                    {
+                        yield return Ticks(5, "refuel_" + what, pawn);
+                        lookAt = pawn.DrawPos;
+                        string k = Field<string>(pawn, "workKind");
+                        if (k != null && Field<float>(pawn, "work") > 0.5f)
+                        {
+                            kind = k;
+                            yield return Shot("refuel_" + what);
+                        }
+                    }
+                    string want = what == "Campfire" ? "crouch" : "bench";
+                    Check("refuel " + what + ": " + want, kind == want, "work kind " + (kind ?? "none"));
+                }
+            }
+            Note("Look: wave_t36 the right hand up beside the head waving at the other, both heads turned to each other; " +
+                 "sad_* slumped with the head hung on the walk; burning_* both hands patting at the chest and belly; " +
+                 "catatonic lying still on the side, not writhing; flick the right hand out to the lamp; refuel_* stood at " +
+                 "the generator and knelt at the campfire.");
         }
 
         // Beating out fires: on an item on the floor (stomp), on tall furniture (pat), on a person standing (pat) and on
@@ -1272,6 +2735,75 @@ namespace M3AT
             Note("Look: the open book on the left palm under the chin, tipped up to the face, the head bowed to it; the right hand on the right page, once a loop lifted over to the left and back. Seated the same over the sit.");
         }
 
+        // Praying (Ideology's MeditatePray) on the bare floor, sat cross-legged (work_meditate, as meditating), then on a
+        // dining chair (work_meditate_sit: the palms together and the head bowed, laid over the sit); and visiting a
+        // grave (VisitGrave), sat cross-legged beside it facing it (work_meditate).
+        private static IEnumerator PrayTest()
+        {
+            foreach (string name in new[] { "floor", "chair", "grave" })
+            {
+                ClearPatch();
+                if (name != "grave" && !ModsConfig.IdeologyActive)
+                {
+                    Check(name + ": praying", false, "Ideology not active");
+                    continue;
+                }
+                Pawn pawn = NewPawn(middle + new IntVec3(-2, 0, -2), null);
+                if (pawn.needs.joy != null)
+                {
+                    pawn.needs.joy.CurLevel = 0.1f;
+                }
+                Job job;
+                string want;
+                if (name == "grave")
+                {
+                    Thing grave = ThingMaker.MakeThing(ThingDefOf.Grave);
+                    grave.SetFaction(Faction.OfPlayer);
+                    Spawn(grave, middle + new IntVec3(1, 0, 0), Rot4.North);
+                    job = JobMaker.MakeJob(DefDatabase<JobDef>.GetNamed("VisitGrave"), grave);
+                    want = "meditate";
+                }
+                else
+                {
+                    if (name == "chair")
+                    {
+                        Thing c = ThingMaker.MakeThing(DefDatabase<ThingDef>.GetNamed("DiningChair"), ThingDefOf.WoodLog);
+                        c.SetFaction(Faction.OfPlayer);
+                        Spawn(c, middle, Rot4.South);
+                    }
+                    job = JobMaker.MakeJob(JobDefOf.MeditatePray, middle);
+                    want = name == "chair" ? "meditate_sit" : "meditate";
+                }
+                job.playerForced = true;
+                job.ignoreJoyTimeAssignment = true;
+                pawn.jobs.StartJob(job, JobCondition.InterruptForced);
+                float most = 0f;
+                string seen = null;
+                for (int i = 0; i < 80 && most < 0.99f; i++)
+                {
+                    yield return Ticks(10, "pray_" + name, pawn);
+                    seen = Field<string>(pawn, "workKind") ?? seen;
+                    if (Field<string>(pawn, "workKind") == want)
+                    {
+                        most = Mathf.Max(most, Field<float>(pawn, "work"));
+                    }
+                }
+                Look(pawn, 0f);
+                yield return WaitReal(2f);
+                Check(name + ": " + want, most >= 0.99f, "work weight " + most.ToString("F2") + ", kind " + (seen ?? "none") + ", job "
+                    + (pawn.CurJobDef != null ? pawn.CurJobDef.defName : "none") + ", posture " + pawn.GetPosture());
+                Building under = pawn.Position.GetEdifice(map);
+                Note(name + ": pawn at " + pawn.Position + " (patch middle " + middle + "), on " + (under != null ? under.def.defName : "nothing")
+                    + ", facing " + pawn.Rotation.ToStringHuman());
+                for (int i = 0; i < 3; i++)
+                {
+                    yield return Shot(name + "_" + i);
+                    yield return Ticks(60, "pray_" + name, pawn);
+                }
+            }
+            Note("Look: on the floor sat cross-legged, hands on the knees; on the chair the plain sit with the palms pressed together in front of the chest, fingers up, head bowed; by the grave sat cross-legged facing it.");
+        }
+
         // Eating (the game's Ingest job, given a meal on the floor a few cells off): with a dining chair at a table, it picks
         // the meal up, carries it there (carry_item over the walk), sits and eats at the table (eat_sit, or its knife and fork
         // variant, laid over the sit); with no furniture it eats standing (eat_stand, the meal in the left palm).
@@ -1351,6 +2883,114 @@ namespace M3AT
                 }
             }
             Note("Look: the meal carried between the hands on the walk over; at the table sat facing it, the right hand going from the plate to the mouth (or knife and fork, eat_sit~2) with the meal on the table; standing, the meal on the left palm, the right hand to the mouth.");
+        }
+
+        // Taking drugs (the Ingest job on a drug by its feet): a smokeleaf joint smoked standing and with a dining chair at
+        // a table near (smoke, the joint on the right hand), a pill (wake-up) and a powder (yayo) taken standing (pill, once
+        // through over the chew, what it takes on the left palm).
+        private static IEnumerator DrugsTest()
+        {
+            var cases = new[] { ("SmokeleafJoint", false, "smoke"), ("SmokeleafJoint", true, "smoke"), ("WakeUp", false, "pill"), ("Yayo", false, "pill") };
+            foreach (var (drugName, seated, want) in cases)
+            {
+                ThingDef drug = DefDatabase<ThingDef>.GetNamedSilentFail(drugName);
+                if (drug == null)
+                {
+                    Note(drugName + ": not in this game; skipped");
+                    continue;
+                }
+                ClearPatch();
+                string name = drugName + (seated ? "_seated" : "");
+                IntVec3 chairAt = middle + new IntVec3(1, 0, 0);
+                if (seated)
+                {
+                    Thing c = ThingMaker.MakeThing(DefDatabase<ThingDef>.GetNamed("DiningChair"), ThingDefOf.WoodLog);
+                    c.SetFaction(Faction.OfPlayer);
+                    Spawn(c, chairAt, Rot4.North);
+                    Thing t = ThingMaker.MakeThing(DefDatabase<ThingDef>.GetNamed("Table1x2c"), ThingDefOf.WoodLog);
+                    t.SetFaction(Faction.OfPlayer);
+                    Spawn(t, middle + new IntVec3(1, 0, 1), Rot4.North);
+                }
+                Thing taken = Spawn(ThingMaker.MakeThing(drug), middle + new IntVec3(-1, 0, 0));
+                Pawn pawn = NewPawn(middle, null);
+                Look(pawn, 0f);
+                yield return WaitReal(1f);
+                Job job = JobMaker.MakeJob(JobDefOf.Ingest, taken);
+                job.count = 1;
+                job.playerForced = true;
+                pawn.jobs.StartJob(job, JobCondition.InterruptForced);
+                float most = 0f;
+                string clip = null;
+                int shots = 0;
+                bool sat = false;
+                for (int i = 0; i < 400 && pawn.CurJobDef == JobDefOf.Ingest; i++)
+                {
+                    yield return Ticks(5, "drug_" + name, pawn);
+                    string c = Field<string>(pawn, "eatClip");
+                    float w = Field<float>(pawn, "eat");
+                    if (c != null && pawn.CurJobDef == JobDefOf.Ingest)
+                    {
+                        clip = c;
+                        most = Mathf.Max(most, w);
+                    }
+                    if (seated && pawn.Position == chairAt)
+                    {
+                        sat = true;
+                    }
+                    // A pill's chew is only 100 ticks or so: a picture every 15 of them once it is in; a joint's, every 60.
+                    if (c == want && w > 0.5f && shots < 8 && i % (want == "pill" ? 3 : 12) == 0)
+                    {
+                        yield return Shot(name + "_" + shots++);
+                    }
+                }
+                Check(name + ": " + want, clip == want && most >= 0.9f, "clip " + (clip ?? "none") + ", weight " + most.ToString("F2")
+                    + ", pill at " + Field<float>(pawn, "pillAt").ToString("F2"));
+                if (seated)
+                {
+                    Note(name + ": " + (sat ? "sat on the chair" : "did not sit (at " + pawn.Position + ")"));
+                }
+                if (drugName == "SmokeleafJoint" && !seated)
+                {
+                    // The eyes reddened while high (FaceLayers.WhiteTintOf), close up, stacked and layer by layer; then
+                    // with the high taken away, to compare.
+                    Hold(pawn);
+                    pawn.Rotation = Rot4.South;
+                    // Both eyes, whatever the colony's ideoligion did with them (Ideology's blindness takes them out).
+                    foreach (BodyPartRecord eye in pawn.RaceProps.body.AllParts.Where(b => b.def == BodyPartDefOf.Eye).ToList())
+                    {
+                        if (pawn.health.hediffSet.PartIsMissing(eye))
+                        {
+                            pawn.health.RestorePart(eye);
+                        }
+                    }
+                    HediffDef highDef = DefDatabase<HediffDef>.GetNamedSilentFail("SmokeleafHigh");
+                    Hediff high = highDef != null ? pawn.health.hediffSet.GetFirstHediffOfDef(highDef) : null;
+                    Check("stoned: high on smokeleaf", high != null, high != null ? "severity " + high.Severity.ToString("F2") : "no SmokeleafHigh");
+                    float distance = lookDistance, pitch = lookPitch, height = lookHeight;
+                    lookPitch = 15f;
+                    lookDistance = 1.4f;
+                    lookHeight = 1.0f;
+                    Look(pawn, 0f);
+                    foreach (bool stoned in new[] { true, false })
+                    {
+                        if (!stoned && high != null)
+                        {
+                            pawn.health.RemoveHediff(high);
+                        }
+                        pawn.Rotation = Rot4.South;
+                        yield return Ticks(90, "drug_eyes", pawn);   // (turned round to the camera)
+                        FaceLayers.StackLayers = true;
+                        yield return Shot("eyes_" + (stoned ? "stoned" : "sober") + "_stacked");
+                        FaceLayers.StackLayers = false;
+                        yield return Shot("eyes_" + (stoned ? "stoned" : "sober") + "_layers");
+                        FaceLayers.StackLayers = true;
+                    }
+                    lookDistance = distance;
+                    lookPitch = pitch;
+                    lookHeight = height;
+                }
+            }
+            Note("Look: smoking, the joint across the right hand's fingers, held up by the chest, to the lips for a drag, lowered as the head tips back to blow; the left arm hanging (seated, the sit's). A pill or powder: the drug on the left palm, the right fingers pinching from it up to the mouth, the head tipped back to swallow.");
         }
 
         // Visiting the sick (VisitSickPawn, which the game allows only for a patient awake in a bed): by one on a sleeping
@@ -2171,8 +3811,8 @@ namespace M3AT
                 Check("romance: the mod loaded", false, "no RomanceOnTheRim.LordJob_Kiss");
                 yield break;
             }
-            bool blankets = SettingsMod.Settings.bedBlankets;
-            SettingsMod.Settings.bedBlankets = true;   // (pillow talk lies close under the blanket as lovin does)
+            SleepWear blankets = SettingsMod.Settings.sleepWear;
+            SettingsMod.Settings.sleepWear = SleepWear.Blankets;   // (pillow talk lies close under the blanket as lovin does)
             foreach (string date in only ?? new[] { "kiss", "skygaze", "music", "pillow", "snowball", "shareread" })
             {
                 ClearPatch();
@@ -2205,7 +3845,7 @@ namespace M3AT
                 }
                 CleanUp();
             }
-            SettingsMod.Settings.bedBlankets = blankets;
+            SettingsMod.Settings.sleepWear = blankets;
             Note("Look: what each figure does in each date; the romance mod moves only the sprite's head and body (AnimationDefs), which the chibi doesn't take.");
         }
 
@@ -3130,6 +4770,13 @@ namespace M3AT
 
     public static partial class WalkFigures
     {
+        // The perf test (AutoTest.Perf): which figures are drawn (0 ours, 1 IsoRim's, 2 none), and the time spent in DrawFigure
+        // (Stopwatch ticks) and its calls, summed until the test takes them.
+        internal static int PerfMode;
+        internal static HashSet<int> PerfAllowed;   // the pawns drawn as the chibi while PerfMode is 0 (by id), null for all
+        internal static long PerfTicks;
+        internal static int PerfDraws;
+
         // The figure's state as AutoTest probes it: one line of the Ease fields the scenarios look at.
         internal static string AutoWeapon(Pawn pawn)
         {

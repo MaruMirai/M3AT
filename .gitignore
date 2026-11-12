@@ -54,3 +54,6 @@ CLAUDE.local.md
 discordBotToken
 discordServerId
 discord/__pycache__/
+
+# Workshop description drafts
+workshop_description*.txt

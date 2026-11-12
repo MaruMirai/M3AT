@@ -19,7 +19,8 @@
 //     skin's: the sprite's brightness alone is kept, its dark seams a darker skin and the rest pale healed skin, so no
 //     red or bruise blue is left and a scar shows on any skin.
 //   7 a wound on the eye (FaceLayers.DrawEyeWounds), drawn on the face patch under the lids: the sheet's square at _WoundAt,
-//     a _Color alpha under 1 making it a scar as in mode 6, cut to the eye's shape (the alpha of _MaskTex, the iris, or _MaskTwo, the white).
+//     a _Color alpha under 1 making it a scar as in mode 6, cut to the eye's shape (the alpha of _MaskTex: the white, or
+//     for a prosthetic eye Facial Animation's iris, moved with it by the shift).
 // _Smooth 1 (set per draw for the runtime-skinned chibi, FaceLayers.Patch.smooth): shaded by the patch's own normals,
 // rounded to _ShadeBands levels, as MarusSmooth.frag.glsl shades the body under it.
 // _EyeCut (set per draw): halves of the face left out, so a missing eye's eyeball and open lid go and Facial Animation's
@@ -40,6 +41,9 @@ layout(set = 2, binding = 0) uniform MaterialUniforms
     vec4 _Color;      // @color @default = vec4(1.0, 1.0, 1.0, 1.0)
     vec4 _MainTex_ST; // @default = vec4(0.0, 0.0, 1.0, 1.0)
     vec4 _ColorTwo;   // @color @default = vec4(1.0, 1.0, 1.0, 1.0)
+    // (Beside the other vec4s: after the run of floats below they read as nothing in the game, and no eye wound showed.)
+    vec4 _WoundAt;     // @default = vec4(0.0, 0.0, 0.0, 0.0)   mode 7, per draw: its middle (face texture places), its way across over its span
+    vec4 _WoundCell;   // @default = vec4(0.0, 0.0, 0.0, 0.0)   mode 7, per draw: its square on the sheet, place and size
     float _FaceMode;  // @default = 0.0
     vec4 _IsoSun;     // global, no default: xyz = direction toward IsoRim's sun (or moon)
     vec4 _IsoView;    // global, no default: xyz = true-space direction toward the camera, w = Squash
@@ -47,14 +51,26 @@ layout(set = 2, binding = 0) uniform MaterialUniforms
     float _Smooth;    // @default = 0.0   1: shade by vSmoothNormal (the skinned chibi)
     float _ShadeBands; // @default = 0.0  as MarusSmooth.frag.glsl
     float _EyeCut;    // @default = 0.0   set per draw (FaceLayers.EyeCut): 1 leaves out the texture's left half, 2 its right
-    vec4 _WoundAt;     // @default = vec4(0.0, 0.0, 0.0, 0.0)   mode 7, per draw: its middle (face texture places), its way across over its span
-    vec4 _WoundCell;   // @default = vec4(0.0, 0.0, 0.0, 0.0)   mode 7, per draw: its square on the sheet, place and size
     float _IsoFlash;   // @default = 0.0   per draw (FaceLayers.Flash): how red a hit figure is now, as MarusSmooth.frag.glsl; not on wounds (modes 6, 7)
 } uMaterial;
 
 layout(set = 2, binding = 1) uniform sampler2D _MainTex;
 layout(set = 2, binding = 2) uniform sampler2D _MaskTex; // @default = black   always set by FaceLayers.LitFor where it is read
 layout(set = 2, binding = 3) uniform sampler2D _MaskTwo; // @default = black   mode 7 only (FaceLayers.DrawEyeWounds)
+
+// The pawn's bones, read only by the vertex stage (the face patch skinned on the graphics card, MarusFace.vert.glsl);
+// declared here as the engine reads the material layout from the fragment stage.
+layout(std430, set = 2, binding = 6) readonly buffer _MarusBones
+{
+    vec4 marusBones[];
+};
+
+// Facial Animation's offset of this layer now (FaceLayers.ShiftOf, FaceGaze.cs): face texture places it is moved by, in the
+// first slot's xy (the stacked shader's layout, two layers a vec4). Set on every block these draws are given; none: none.
+layout(std430, set = 2, binding = 7) readonly buffer _MarusFaceShift
+{
+    vec4 faceShift[];
+};
 
 const float DEG = 0.017453292519943295;
 
@@ -141,7 +157,9 @@ void main()
     if (((cut & 1) != 0 && vUv.x < 0.5) || ((cut & 2) != 0 && vUv.x >= 0.5))
         discard;
 
-    vec2 uv = vUv * uMaterial._MainTex_ST.zw + uMaterial._MainTex_ST.xy;
+    // Where the layer is read: moved by Facial Animation's offset (where its eyes look, its brows and mouth shift).
+    vec2 place = faceShift.length() > 0 ? vUv - faceShift[0].xy : vUv;
+    vec2 uv = place * uMaterial._MainTex_ST.zw + uMaterial._MainTex_ST.xy;
     vec4 t = texture(_MainTex, uv);
     vec4 tint = uMaterial._Color * vColor;
     int mode = int(uMaterial._FaceMode + 0.5);
@@ -178,12 +196,17 @@ void main()
     }
     else if (mode == 7)
     {
-        vec2 from = vUv - uMaterial._WoundAt.xy;
+        vec2 from = place - uMaterial._WoundAt.xy;   // a prosthetic eye's iris moves with the iris's shift
         vec2 local = vec2(dot(from, uMaterial._WoundAt.zw), dot(from, vec2(-uMaterial._WoundAt.w, uMaterial._WoundAt.z))) + 0.5;
         if (local.x < 0.0 || local.x > 1.0 || local.y < 0.0 || local.y > 1.0)
             discard;
-        vec4 sprite = texture(_MainTex, uMaterial._WoundCell.xy + local * uMaterial._WoundCell.zw);
-        float onEye = smoothstep(0.3, 0.7, max(texture(_MaskTex, vUv).a, texture(_MaskTwo, vUv).a));
+        // The engine turns a texture upside down against a place worked out here (a mesh's UVs are turned with it), so the
+        // square's place on the sheet is turned back; without it the eye took the sheet's top row, a stab wound.
+        vec2 at = uMaterial._WoundCell.xy + local * uMaterial._WoundCell.zw;
+        vec4 sprite = texture(_MainTex, vec2(at.x, 1.0 - at.y));
+        // The eye's shape read where the face layers read their art (uv, by _MainTex_ST, through which the engine turns its
+        // textures the right way up), not at vUv, which read the masks upside down and clear.
+        float onEye = smoothstep(0.3, 0.7, max(texture(_MaskTex, uv).a, texture(_MaskTwo, uv).a));
         c = sprite * tint;
         if (tint.a < 0.99)
             c.rgb = ScarColour(sprite.rgb, tint.rgb);

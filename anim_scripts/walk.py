@@ -925,6 +925,20 @@ RAGDOLL_KNEE = 50.0
 RAGDOLL_POINT = 25.0   # the feet pointed (heel up)
 RAGDOLL_HAND = 0.35    # the hands closed, a share of FIST
 
+# Caged (caged_pose): a corpse in a gibbet cage, slumped where it stands on the cage floor (WalkFigures.DrawCaged): the
+# knees buckled and the hips sunk over the planted feet, the back curled and the head hung forward and lolled to one
+# side, the shoulders rolled forward, the arms hanging straight down by the sides, the hands half closed. Degrees but
+# CAGED_DROP (leg lengths).
+CAGED_DROP = 0.2      # the hips let down, the knees bent to keep the feet where they stand
+CAGED_NARROW = 0.85   # the feet drawn in under the hips (NARROW)
+CAGED_CURL = 22.0     # the back curled forward from the waist
+CAGED_NOD = 30.0      # the head hung forward on the neck
+CAGED_LOLL = 14.0     # and fallen over to its left
+CAGED_ROLL = 12.0     # the shoulders rolled forward
+CAGED_ARMS = 6.0      # the arms in closer to the sides than the walk's (on top of ARM_DOWN)
+CAGED_ELBOW = 8.0     # the elbows all but straight
+CAGED_HAND = 0.3      # the hands closed, a share of FIST
+
 # Crawling (crawl_at): downed, pulling along on the belly. One hand reaches ahead while the other pulls back, and the leg
 # on the other side is drawn up and out to push. Made upright like lying (the game tips it face down, by its own crawl
 # angle, Crawl.ChestLift), so ahead is up here and the ground is in front. Timed by the ground covered, like the walk: the
@@ -1036,6 +1050,20 @@ MEDITATE_LIFT = 0.08   # leg lengths (the base body's seat is 0.076 below the fl
 MEDITATE_CLIP = clip_file('meditate')
 MEDITATE_SECONDS = MEDITATE_CLIP['frames'] / MEDITATE_CLIP['fps'] if MEDITATE_CLIP is not None else None
 
+# Praying sat on a chair or throne (pray_sit_at, work_meditate_sit: the game's MeditatePray on a seat, which otherwise
+# keeps the plain sit): the sit's loop with the palms pressed together in front of the chest, the fingers up, the trunk
+# leant a little forward and the head bowed, laid over the sit from the waist up (EAT_UPPER), as seated work is.
+PRAY_SECONDS = SIT_SECONDS   # one loop, the sit's, so its breathing closes
+PRAY_LEAN = 6.0        # degrees the trunk is leant forward from the waist
+PRAY_BOW = 16.0        # degrees the head is bowed, half at the neck and half at the head
+PRAY_BOB = 2.0         # degrees the bow deepens and lifts with each breath
+PRAY_HANDS = (0.0, -0.32, -0.25)   # where the palms meet: leg lengths from the middle between the shoulder joints
+                                   # (x left, y back, z up, level and turned as the chest is)
+PRAY_FINGERS = (0.0, -0.45, 1.0)   # the fingers' way (the same frame): up, tipped forward
+PRAY_PALM = (-1.0, 0.0, 0.0)       # the left palm's facing (the right mirrored): in, onto the other
+PRAY_CURL = 0.08                   # the fingers all but straight
+PRAY_ELBOW = (0.8, 0.3, -0.7)      # the left elbow out and down (the right mirrored)
+
 # Lying loops from mocap clips made lying down (lying_at): asleep (Meshy's Sleep_Normally, on the back), downed in bed
 # (Groan_Holding_Stomach_in_Sleep, on the back, the knees drawn up and let down) and downed on the ground
 # (SideLying_Reach_Help on its side, cut before it props itself up to reach out), each `import_pluck.py ... --as <name>`.
@@ -1044,6 +1072,21 @@ MEDITATE_SECONDS = MEDITATE_CLIP['frames'] / MEDITATE_CLIP['fps'] if MEDITATE_CL
 SLEEP_CLIP = clip_file('sleep')
 DOWNED_CLIP = clip_file('downed')
 DOWNED_SIDE_CLIP = clip_file('downed_side')
+# Asleep on the side (sleep~2, a VARIANTS entry: SLEEP_CLIP set to DOWNED_SIDE_CLIP and SLEEP_HOLD on): the downed
+# side lying without its writhing, held on one frame of it (SLEEP_HOLD_FRAME, the frame nearest the clip's mean pose,
+# measured over every bone's turn) and breathing slowly from the chest (SLEEP_BREATHS a loop, the upper chest turned
+# SLEEP_BREATH degrees about its own side-to-side line, the neck SLEEP_BREATH_NECK back against it so the head stays).
+SLEEP_HOLD = False
+SLEEP_HOLD_FRAME = 18
+SLEEP_BREATHS = 2
+SLEEP_HOLD_SECONDS = 8.0   # the held loop's length (2 breaths in 8 s: a sleeper's 15 a minute)
+SLEEP_BREATH = 2.5
+SLEEP_BREATH_NECK = 1.5
+# At lovin in a bed with no blanket over it (lovin_L, lovin_R: the partner on the figure's left or right; WalkFigures
+# draws the two toward each other): the same still side lying, facing the partner (mirrored left for right where the
+# clip faces the other way, mirror_pose), breathing a little faster.
+LOVIN_SECONDS = 6.0
+LOVIN_BREATHS = 3
 # A baby awake on its back (baby_at): the lie loop's trunk and breathing, with the arms waving and the legs kicking laid
 # on it. The arms are posed by hand: they flail all the while (BABY_FLAIL: each arm's raise forward, swing out and
 # elbow bend, and how far the fingers curl, wandering about a middle by a few sines a loop, each a whole number of times
@@ -1282,6 +1325,55 @@ EAT_REACH = True   # whether the eating wrist is brought to the mouth (eat_at); 
 EAT_STAND_CLIP = clip_file('eat_stand')
 EAT_STAND_SECONDS = EAT_STAND_CLIP['frames'] / EAT_STAND_CLIP['fps'] if EAT_STAND_CLIP is not None else None
 
+# Taking drugs (the Ingest job's chew, as eating, by how the drug is taken: WalkFigures.DrugClipOf, its ingestSound).
+# Both procedural, laid over the sit or the idle from the waist up (EAT_UPPER). Smoking (smoke_at, smoke: smokeleaf,
+# flake): a loop, the joint (Models/tool_joint.obj, anim_scripts/make_joint.py) through the right hand's fingers
+# across them, its filter end on the palm's side; the hand raised loosely by the right shoulder, palm toward the face,
+# brought to the lips for a drag (the filter end on the mouth), lowered as the head tips back to breathe the smoke out,
+# and the ash flicked once a loop. Its place on the hand is a `tool smoke joint R` line (smoke_rest). The left arm hangs.
+# Taking a pill (pill_at, pill: pills, and a powder snorted, yayo): once through over the chew (the game times it), the
+# left palm up holding what it takes as eating standing does (EAT_MEAL, so the game draws it there), the right fingers
+# pinching from it, up to the mouth, the head tipped back to swallow and level again, the hand back to the left palm.
+# Hand places are given as where a point on the hand goes (the joint's filter end, the pinch between the fingertips and
+# the thumb's): in the head's rest frame from its joint, leg lengths, x out to the figure's right (the right hand's
+# side), y back (- forward), z up; or (rest places) from the right shoulder in a level frame turned as the chest is,
+# shares of the arm's reach, x out (+ is left), y back, z up, as TEACH_KEYS. Ways (fingers, palm facing) in that frame.
+SMOKE_SECONDS = 6.0   # one loop: one drag (the game's joint lasts 720 ticks, 12 s, so two)
+SMOKE_BREATHS = 2     # breaths a loop, besides the drag's
+SMOKE_MOUTH = (0.03, -0.32, 0.05)   # where the filter end goes at the drag: the lips, from the head's joint (head's frame)
+SMOKE_AT = (0.0, 0.14, 0.24, 0.36, 0.48, 0.62, 0.76, 0.82, 0.88)   # the keys round the loop
+SMOKE_KEYS = {
+    'mouth': (0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0),   # share of the way from the rest place to the lips
+    'drop': (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.07, 0.0),   # the rest place let down (shares of the reach): the flick
+    'bow': (0.0, 0.0, 4.0, 4.0, -12.0, -8.0, 0.0, 0.0, 0.0),   # the head bowed to the hand, then tipped back to blow
+    'breath': (0.3, 0.3, 0.6, 1.0, 0.4, 0.0, 0.2, 0.2, 0.3),   # the chest filled: in on the drag, out after
+    'curl': (0.25, 0.25, 0.2, 0.2, 0.25, 0.25, 0.25, 0.4, 0.25),   # the fingers' curl (shares of FIST)
+}
+SMOKE_REST = (-0.3, -0.55, -0.2)   # the filter end at rest, from the right shoulder (level frame, shares of the reach)
+SMOKE_REST_FACING = (0.6, 0.6, 0.5)   # the right palm's facing at rest: in toward the chest and the face, a little up
+SMOKE_REST_FINGERS = (0.1, -0.3, 1.0)   # the fingers' way at rest: up
+SMOKE_MOUTH_FACING = (0.4, 1.0, 0.45)   # the palm's facing at the lips: back to the face, a little in
+SMOKE_MOUTH_FINGERS = (0.35, 0.0, 1.0)   # the fingers' way at the lips: up and in across the face
+SMOKE_ELBOW = (-0.7, 0.2, -0.7)   # the right elbow out and down (chest's frame)
+SMOKE_JOINT = (0.45, 0.02, 0.35)   # where the joint crosses the fingers: shares from the fingers' joint (hand.R.001's
+                                   # head) toward their tip, across toward the thumb's side, and its length (the filter
+                                   # end on the palm side); the joint's line tipped toward the fingertips by SMOKE_TIP
+SMOKE_TIP = 25.0      # degrees
+SMOKE_SIZE = 1.0      # the joint model's size (its own units are cells at a grown pawn's size)
+PILL_SECONDS = 100 / 60.0   # the clip's own length; the game plays it over the chew (100 ticks for a pill at full eating speed)
+PILL_FRAMES = 30
+PILL_AT = (0.0, 0.14, 0.42, 0.52, 0.66, 0.84, 1.0)   # the keys once through
+PILL_KEYS = {
+    'mouth': (0.0, 0.0, 1.0, 1.0, 0.2, 0.0, 0.0),   # share of the way from over the left palm to the lips
+    'bow': (6.0, 6.0, 0.0, -6.0, -18.0, -4.0, 6.0),   # the head: looking down at the palm, tipped back to swallow
+    'curl': (0.2, 0.55, 0.55, 0.3, 0.2, 0.2, 0.2),   # the right fingers: pinched from the palm to the lips
+}
+PILL_MOUTH = (0.0, -0.36, 0.05)   # the pinch at the lips, from the head's joint (head's frame)
+PILL_PALM = (0.0, 0.0, 0.05)   # the pinch over the left palm: leg lengths from the palm's face, in the level frame
+PILL_FACING = ((0.2, 0.3, -1.0), (0.5, 1.0, 0.0))   # the right palm's facing over the left palm (down) and at the lips
+PILL_FINGERS = ((0.4, -1.0, 0.0), (0.4, -0.2, 1.0))   # the right fingers' way over the palm (forward) and at the lips
+PILL_ELBOW = (-0.7, 0.3, -0.6)
+
 # Reading (read_at, read: the game's Reading job, once the book is open, sat or standing still with it). Procedural: the
 # open book lies on the left palm under its spine, tipped up toward the face, the right hand resting on the right-hand
 # page, the trunk leant a little and the head bowed to it; once a loop the right hand lifts the page, carries it over to
@@ -1367,6 +1459,10 @@ SOW_SPREAD = 30.0    # degrees each knee is swung out about its hip-to-ankle lin
 SOW_RAISE = 6.0      # degrees the trunk is straightened back from the waist, out of the thighs (raise_trunk)
 BENDSOW_CLIP = clip_file('bendsow')
 BENCH_CLIP = clip_file('bench')
+BENCH_RAISE = 4.0    # degrees the bench work's trunk is stood up from the waist (raise_trunk), the hands kept: the clip
+                     # stoops the chibi's big head right down onto what lies on the bench (a stove's pot, the food); more
+                     # than about 4 pulls the shoulders back out of the hands' reach (8: 0.3 leg lengths short)
+BENCH_LOOK = 20.0    # degrees the head is lifted on top of that (+ up), which leaves the hands as they are
 BENCH_SECONDS = BENCH_CLIP['frames'] / BENCH_CLIP['fps'] if BENCH_CLIP is not None else None
 BENCH_SIT_CLIP = clip_file('bench_sit')
 BENCH_SIT_SECONDS = BENCH_SIT_CLIP['frames'] / BENCH_SIT_CLIP['fps'] if BENCH_SIT_CLIP is not None else None
@@ -1736,6 +1832,106 @@ TEACH_NOD = 3.0      # degrees each
 TEACH_ELBOW_R = (-0.7, 0.4, -0.6)   # the right elbow out and down (chest's frame)
 TEACH_ELBOW_L = (0.7, 0.4, -0.6)    # the left
 TEACH_UPPER = {'spine.001': 1.0}   # in place of UPPER: from the waist up
+
+# A quick wave in passing (wave_at, wave: the game's social interactions, a chat or a greeting, which happen at once while
+# the pawn walks or works, WalkFigures.InteractedPostfix). Played once through, not looped: the right hand brought up
+# out to the side of the head palm out (well clear of it, the chibi's arm being short beside its head), waved side to
+# side twice and let fall. Only that arm is laid over the rest (WAVE_UPPER), so
+# it waves on the move too. Each key's wrist from the right shoulder in a level frame turned as the chest is, shares of
+# the arm's reach: x out (+ is left), y forward (-), z up; the palm's facing and the fingers' way in the same frame.
+WAVE_SECONDS = 1.6   # once through
+WAVE_AT = (0.0, 0.22, 0.36, 0.5, 0.64, 0.78)   # the keys (the last back down to the first, round the loop)
+WAVE_KEYS = {
+    'wrist': ((-0.15, -0.1, -0.95), (-0.72, -0.5, 0.3), (-0.8, -0.42, 0.28), (-0.68, -0.55, 0.32), (-0.8, -0.42, 0.28),
+              (-0.7, -0.52, 0.3)),
+    'palm': ((1, 0, 0), (0, -1, 0), (0, -1, 0), (0, -1, 0), (0, -1, 0), (0, -1, 0)),
+    'fingers': ((0, 0, -1), (-0.1, 0, 1), (-0.6, 0, 1), (0.35, 0, 1), (-0.6, 0, 1), (0.2, 0, 1)),
+    'curl': (0.35, 0.05, 0.0, 0.0, 0.0, 0.05),
+}
+WAVE_ELBOW = (-0.8, 0.3, -0.6)   # the elbow out and down (chest's frame)
+WAVE_UPPER = {'shoulder.R': 1.0}   # in place of UPPER: the right arm only
+
+# Sad (sad_at, sad: the Wander_Sad, Wander_OwnRoom and Wander_Psychotic mental breaks, and a visitor giving up): slumped,
+# the trunk leant forward, the shoulders rolled forward and down, the head hung and the arms limp by the sides (the standing
+# pose's, hanging), with a slow sigh once a loop. Laid over the gait from the waist up (SAD_UPPER), the arms only SAD_ARMS of the way, so the walk
+# still swings them a little.
+SAD_SECONDS = 6.0    # one loop: two slow breaths and a sigh
+SAD_BREATHS = 2
+SAD_LEAN = 12.0      # the trunk leant forward from the waist (degrees), spine and chest half each
+SAD_SIGH = 4.0       # leant this much further, the shoulders dropping, at the sigh (degrees)
+SAD_HEAD = 16.0      # the head hung (degrees), the neck taking half and the head half
+SAD_SLUMP = 10.0     # the shoulders rolled forward and down (degrees)
+SAD_UPPER = {'spine.001': 1.0}   # in place of UPPER: from the waist up
+SAD_ARMS = 0.5       # share of the arms laid over the gait's swing
+
+# Drunk (drunk_at; drunk and drunk_arms: the AlcoholHigh hediff, by its severity, WalkFigures.DrunkOf): the trunk swaying
+# from the waist in a figure of eight (side to side once a loop, forward and back twice), turning a little with it, the
+# head lolling after it and nodding with the lurch. Made on the plain stance, every turn none at the loop's first frame,
+# as the game adds each bone's turn from that frame on top of whatever the figure is doing (SkinnedFigure.Nudge, as the
+# flinch), so it sways standing, walking, working or aiming alike. drunk takes the trunk, neck and head (DRUNK_UPPER, the
+# arms riding the chest, so a held weapon or load goes with it); drunk_arms the upper arms alone, hanging back against
+# the sway (DRUNK_HANG) so they stay hanging loose, added only with the hands free. On the move the game also weaves the
+# figure from side to side with the sway (WalkFigures.DrunkWeave).
+DRUNK_SECONDS = 4.0   # one loop: once to each side
+DRUNK_SWAY = 11.0     # degrees the trunk leans to each side from the waist (spine and chest half each)
+DRUNK_LURCH = 6.0     # degrees it lurches forward and back, twice a loop
+DRUNK_TWIST = 6.0     # degrees it turns about the vertical with the sway
+DRUNK_LOLL = 10.0     # degrees the head lolls sideways with the sway, late (neck and head half each)
+DRUNK_NOD = 5.0       # degrees the head nods forward and back with the lurch
+DRUNK_HANG = 0.8      # share of the trunk's lean the upper arms are turned back against, hanging (drunk_arms)
+DRUNK_UPPER = {'spine.001': 1.0}   # the bones drunk nudges: from the waist up, the arms riding the chest
+
+# Stirring (stir_at; work_stir, stood at a stove or any bench, work_stir_crouch, knelt on the ground work, and
+# work_stir_campfire, sat cross-legged at a campfire, below fire_at): a cooking
+# bill's work, now and then in place of the bench or ground work (WalkFigures.StirOf, in bouts). The figure as the bench
+# or ground work has it at STIR_FROM of its loop, the right fist round a wooden spoon (Models/tool_spoon.obj,
+# anim_scripts/make_spoon.py; a `tool stir tool_spoon R` line, stir_rest) circling over the pot, the spoon's bowl circling
+# less in it, the left hand on the pot's rim steadying it, the trunk turning a little after the spoon. The pot is where
+# that work's hands are on average over its loop (stir_pot); places from it in a level frame turned as the chest is,
+# leg lengths, x out to the figure's left, y back, z up. The fist's way round the handle is the straightest wrist
+# (stir_hold).
+STIR_SECONDS = 6.0     # one loop, the length of a bout
+STIR_TURNS = 5         # times round the pot a loop
+STIR_FROM = 0.0        # where in the bench or ground work's loop the figure is taken from
+STIR_DIP = 0.0         # the spoon's bowl over the pot's middle (z, leg lengths)
+STIR_BOWL = 0.06       # the bowl's circle's radius (leg lengths)
+STIR_FIST = 0.10       # the fist's circle's radius (leg lengths), wider, as the spoon is held slanted
+STIR_REACH = 0.175     # cells from the fist's middle to the bowl's (make_spoon.py's BOWL_AT)
+STIR_BACK = -0.08      # the pot's middle drawn this much back toward the figure from the work's hands (leg lengths;
+                       # - out from it, as the work's hands are close in and the rim's hand came out on the hip)
+STIR_RIM = (0.16, 0.0, 0.06)   # the left palm on the pot's rim, from its middle
+STIR_RIM_FINGERS = (-0.2, -1.0, -0.3)   # the left hand's fingers' way: forward, over the rim
+STIR_RIM_PALM = (-0.6, 0.0, -1.0)       # the left palm's facing: down and in onto the rim
+STIR_TWIST = 5.0       # degrees the trunk turns after the spoon round the pot
+STIR_LEAN = 4.0        # degrees the trunk leans in over the pot as the spoon goes round its far side
+
+# On fire, patting at the flames on itself (burn_at, burning: the game's pawns on fire that are not rolling it out, as when
+# fleeing or drafted). Both hands slap at the chest and the belly in turn, quickly, the trunk hunched over to look down
+# at itself and twisting from side to side. Each hand's places are the hurt loop's (HURT_CHEST, HURT_BELLY: the palm on
+# the body on its own side), its wrist drawn BURN_LIFT off the body between pats. Laid over the run from the waist up
+# (BURN_UPPER).
+BURN_SECONDS = 1.2   # one loop
+BURN_PATS = 3        # pats a loop by each hand, the hands half a pat apart
+BURN_LIFT = 0.12     # the wrist drawn off the body between pats (leg lengths, along the chest's forward way)
+BURN_LEAN = 16.0     # the trunk hunched forward (degrees), spine and chest half each
+BURN_LOOK = 14.0     # the head bowed to look at itself (degrees)
+BURN_TWIST = 10.0    # the trunk twisted from side to side once a loop (degrees each way)
+BURN_BREATHS = 4     # quick breaths a loop
+BURN_BREATH = 4.0    # the chest heaved on the in-breath (degrees), in place of BREATH
+BURN_UPPER = {'spine.001': 1.0}   # in place of UPPER: from the waist up
+
+# Reaching to something (reach_at, work_reach: the game's Flick and Open, a switch, a lamp or a lid stood at): stood, the
+# right hand out in front about the chest's height, palm forward and fingers up, pressed in once a loop. The whole
+# figure, in place of the idle, as a work kind. The wrist from the right shoulder in a level frame turned as the chest is,
+# shares of the arm's reach: x out (- is right), y forward (-), z up.
+REACH_SECONDS = 1.5   # one press
+REACH_HAND = (-0.15, -0.85, -0.1)   # out in front a little under the shoulder
+REACH_PUSH = 0.08     # the wrist pressed further in at the middle of the loop (shares of the reach)
+REACH_TIP = 30.0      # the fingers tipped forward from straight up (degrees)
+REACH_LEAN = 6.0      # the trunk leant forward toward it (degrees)
+REACH_LOOK = 8.0      # the head bowed to look at the hand (degrees)
+REACH_CURL = (0.15, 0.35)   # the fingers' curl, as it presses and between (shares of FIST)
+REACH_ELBOW = (-0.6, 0.3, -0.8)   # the elbow out and down (chest's frame)
 
 # Hip gear (GEAR's 'hip' mount: IsoRim's psychic lances, orbital targeters and tornado generator, apparel the game uses
 # through a verb of its own, as it does a weapon). The left hand takes it from its slot on the right shoulder (hip_draw;
@@ -2194,6 +2390,8 @@ ROLL_TUCK = 15.0     # the head tucked down toward the chest (degrees), out of t
 # getup, though there is only the one mocap clip for it so far. The falls a ragdoll starts from share theirs: downed or
 # dead, any of FALL_CLIPS.
 VARIANTS = {
+    # Asleep on the side, still (see SLEEP_HOLD).
+    'sleep': [dict(SLEEP_CLIP=DOWNED_SIDE_CLIP, SLEEP_HOLD=True)] if DOWNED_SIDE_CLIP is not None else [],
     'knockdown': [dict(KNOCKDOWN_CLIP=clip) for clip in FALL_CLIPS if clip is not KNOCKDOWN_CLIP],
     'die': [dict(DIE_CLIP=clip) for clip in FALL_CLIPS if clip is not DIE_CLIP],
     'flinch': [
@@ -2848,6 +3046,19 @@ def ragdoll_pose():
         close_hand(X, side, sign, RAGDOLL_HAND)
     return X, 0.0
 
+def caged_pose():
+    """A corpse slumped standing in a gibbet cage (see CAGED_DROP): one frame. Returns the pose and the worst overreach."""
+    X, clamp = posed_with(dict(STILL, DROP=CAGED_DROP, LEAN=0.0, NARROW=CAGED_NARROW, ARM_DOWN=ARM_DOWN + CAGED_ARMS,
+                               ELBOW=CAGED_ELBOW), 0.29)
+    turn_branch(X, CHEST_BONE, about(X[CHEST_BONE] @ head[CHEST_BONE], (1, 0, 0), CAGED_CURL))
+    neck = X[NECK] @ head[NECK]
+    turn_branch(X, NECK, about(neck, (0, 1, 0), -CAGED_LOLL) @ about(neck, (1, 0, 0), CAGED_NOD))
+    for side, sign in (('L', 1), ('R', -1)):
+        sh = 'shoulder.' + side
+        turn_branch(X, sh, about(X[sh] @ head[sh], (0, 0, 1), -CAGED_ROLL * sign))
+        close_hand(X, side, sign, CAGED_HAND)
+    return X, clamp
+
 def crawl_at(p):
     """The crawl at cycle phase p, upright: the mocap clip if there is one (see CRAWL_TIP), else the belly crawl. Returns
     the pose and the worst overreach."""
@@ -2931,6 +3142,36 @@ def meditate_at(t):
     """Sat cross-legged on the floor meditating at t (0 .. 1 round the loop; see MEDITATE_CLIP). Returns the pose and the worst
     overreach."""
     return moved_all(T(Vector((0, 0, MEDITATE_LIFT * LEG))), kneel_at(MEDITATE_CLIP, t)), 0.0
+
+def pray_sit_at(t):
+    """Praying sat on a seat at t (0 .. 1 round the loop, PRAY_SECONDS long; see PRAY_HANDS): the sit with the palms
+    pressed together in front of the chest and the head bowed, to be laid over the sit from the waist up (EAT_UPPER).
+    Returns the pose and the worst overreach."""
+    X, clamp = sit_at(t)
+    breath = 0.5 - 0.5 * math.cos(2 * math.pi * SIT_BREATHS * t)
+    for bone in (SPINE, CHEST_BONE):
+        pivot = X[bone] @ head[bone]
+        across = (X[bone].to_3x3() @ Vector((1, 0, 0))).normalized()
+        turn_branch(X, bone, about(pivot, across, PRAY_LEAN * 0.5))
+    bow = PRAY_BOW + PRAY_BOB * (breath - 0.5)
+    for bone in (NECK, HEAD):
+        pivot = X[bone] @ head[bone]
+        turn_branch(X, bone, about(pivot, (X[bone].to_3x3() @ Vector((1, 0, 0))).normalized(), bow * 0.5))
+    for name, leader in FOLLOW.items():
+        X[name] = X[leader]
+    side = X[CHEST_BONE].to_3x3() @ Vector((1, 0, 0))
+    side = Vector((side.x, side.y, 0.0)).normalized()
+    level = Matrix((side, Vector((0, 0, 1)).cross(side), Vector((0, 0, 1)))).transposed()
+    middle = (X['shoulder.L'] @ head['upper_arm.L'] + X['shoulder.R'] @ head['upper_arm.R']) * 0.5
+    palms = middle + level @ Vector(PRAY_HANDS) * LEG
+    for s, sign in (('R', -1), ('L', 1)):
+        m = lambda v: Vector((sign * v[0], v[1], v[2]))
+        facing = (level @ m(PRAY_PALM)).normalized()
+        fingers = level @ Vector(PRAY_FINGERS)
+        fingers = (fingers - fingers.dot(facing) * facing).normalized()
+        clamp = max(clamp, hand_on(s, sign, palms, fingers, facing, X, pole=m(PRAY_ELBOW)))
+        close_hand(X, s, sign, PRAY_CURL)
+    return X, clamp
 
 def toys_at(t):
     """Knelt by a baby on the floor, waving a hand over it, at t (0 .. 1 round the loop; see TOYS_WRIST). Returns the pose
@@ -3017,9 +3258,57 @@ def lying_at(clip, t):
     mean = sum((Vector(h) for h in clip['hips']), Vector()) / n
     return moved_all(T(-(up @ mean) * LEG), mocap_at(clip, t, up))
 
+def held_clip(clip, frame):
+    """The clip held on one frame all round its loop: every frame a copy of that one, so it plays as a still pose."""
+    n = clip['frames']
+    f = min(max(frame, 0), n - 1)
+    held = dict(clip)
+    held['turns'] = {b: [qs[f]] * n for b, qs in clip['turns'].items()}
+    held['hips'] = [clip['hips'][f]] * n
+    if 'trunk' in clip:
+        held['trunk'] = [clip['trunk'][f]] * n
+    return held
+
+def sleep_frames():
+    """The sleep loop's frames: the clip's own, or held still, enough for its breathing."""
+    return loop_frames(SLEEP_HOLD_SECONDS) if SLEEP_HOLD else SLEEP_CLIP['frames']
+
+def sleep_seconds():
+    """The sleep loop's length in game seconds: the clip's own, or held still, SLEEP_HOLD_SECONDS."""
+    return SLEEP_HOLD_SECONDS if SLEEP_HOLD else SLEEP_CLIP['frames'] / SLEEP_CLIP['fps']
+
 def sleep_at(t):
-    """Asleep at t (0 .. 1 round the loop; see SLEEP_CLIP). Returns the pose and the worst overreach."""
-    return lying_at(SLEEP_CLIP, t), 0.0
+    """Asleep at t (0 .. 1 round the loop; see SLEEP_CLIP), or with SLEEP_HOLD held still on SLEEP_HOLD_FRAME and
+    breathing. Returns the pose and the worst overreach."""
+    if not SLEEP_HOLD:
+        return lying_at(SLEEP_CLIP, t), 0.0
+    X = lying_at(held_clip(SLEEP_CLIP, SLEEP_HOLD_FRAME), t)
+    breath = 0.5 - 0.5 * math.cos(2 * math.pi * SLEEP_BREATHS * t)
+    chest = X['spine.003']
+    side = (chest.to_3x3() @ Vector((1, 0, 0))).normalized()
+    turn_branch(X, 'spine.003', about(chest @ head['spine.003'], side, -SLEEP_BREATH * breath))
+    turn_branch(X, NECK, about(X[NECK] @ head[NECK], side, SLEEP_BREATH_NECK * breath))
+    return X, 0.0
+
+def mirror_name(b):
+    """The bone's counterpart on the other side (.L for .R and back), or itself."""
+    return b[:-2] + ('.R' if b.endswith('.L') else '.L') if b.endswith(('.L', '.R')) else b
+
+def mirror_pose(X):
+    """The pose mirrored left for right across the figure's middle (x = 0): each bone takes its counterpart's
+    matrix seen in a mirror, as the rig is symmetric at rest."""
+    S = Matrix.Scale(-1.0, 4, Vector((1, 0, 0)))
+    return {b: S @ X[mirror_name(b)] @ S for b in X if mirror_name(b) in X}
+
+def lovin_at(t, side):
+    """At lovin on the side facing the partner, on the figure's side ('L' its left, +x; 'R' its right) at t (0 .. 1
+    round the loop; see LOVIN_SECONDS). Returns the pose and the worst overreach."""
+    with varied(dict(SLEEP_CLIP=DOWNED_SIDE_CLIP, SLEEP_HOLD=True, SLEEP_HOLD_SECONDS=LOVIN_SECONDS, SLEEP_BREATHS=LOVIN_BREATHS)):
+        X, _ = sleep_at(t)
+    face = X[HEAD].to_3x3() @ FWD
+    if (face.x > 0.0) != (side == 'L'):
+        X = mirror_pose(X)
+    return X, 0.0
 
 def downed_at(t):
     """Downed in bed at t (0 .. 1 round the loop; see DOWNED_CLIP). Returns the pose and the worst overreach."""
@@ -3436,8 +3725,14 @@ def sow_at(t):
     return X, clamp
 
 def bench_at(t):
-    """Stood at a bench working at t (0 .. 1 round the loop; see BENCH_CLIP). Returns the pose and the worst overreach."""
-    return kneel_at(BENCH_CLIP, t), 0.0
+    """Stood at a bench working at t (0 .. 1 round the loop; see BENCH_CLIP), the trunk stood up BENCH_RAISE and the head
+    lifted BENCH_LOOK, the hands kept where the clip has them. Returns the pose and the worst overreach."""
+    X = kneel_at(BENCH_CLIP, t)
+    clamp = raise_trunk(X, BENCH_RAISE)
+    turn_branch(X, NECK, about(X[NECK] @ head[NECK], (1, 0, 0), -BENCH_LOOK))
+    for name, leader in FOLLOW.items():
+        X[name] = X[leader]
+    return X, clamp
 
 def bench_sit_at(t):
     """Sat at a bench working at t (0 .. 1 round the loop; see BENCH_SIT_CLIP): the clip from the waist up on the sit's
@@ -3457,6 +3752,100 @@ def eat_stand_at(t):
     palm = X[CHEST_BONE] @ (head[HIPS] + Vector(EAT_MEAL) * LEG)
     clamp = max(clamp, hand_on('L', 1, palm, chest @ Vector(EAT_MEAL_FINGERS), chest @ Vector((0, 0, 1)), X))
     close_hand(X, 'L', 1, EAT_MEAL_CURL)
+    return X, clamp
+
+def hand_point_to(side, sign, at, target, fingers, facing, X, pole=None, curl=0.0, tries=4):
+    """Places one hand by hand_on so that the point at(X) on it (armature space, worked out from the pose, as a fingertip
+    is) lands on target, the fingers along fingers and the palm facing facing, curled curl of FIST. Returns how far
+    the wrist was out of reach."""
+    palm = target.copy()
+    clamp = 0.0
+    for _ in range(tries):
+        clamp = hand_on(side, sign, palm, fingers, facing, X, pole=pole)
+        close_hand(X, side, sign, curl)
+        palm += target - at(X)
+    clamp = hand_on(side, sign, palm, fingers, facing, X, pole=pole)
+    close_hand(X, side, sign, curl)
+    return clamp
+
+def head_point(X, v, sign):
+    """A place given from the head's joint in its rest frame (leg lengths, x out toward the side of sign, y back, z up),
+    in the pose X (armature space)."""
+    v = Vector(v)
+    v.x *= sign
+    return X[HEAD] @ (head[HEAD] + v * LEG)
+
+def bow_head(X, deg):
+    """The head bowed deg degrees (+ down) about the neck, in place."""
+    turn_branch(X, NECK, about(X[NECK] @ head[NECK], (X[NECK].to_3x3() @ Vector((1, 0, 0))).normalized(), deg))
+
+def smoke_rest():
+    """The joint in the right hand at rest: the matrix from its model's points (Blender's axes, model units, its filter
+    end at the origin and its lit end up +z) to the rest pose (armature space), which the hand's move takes to any pose
+    (the `tool smoke joint R` line); across the fingers (SMOKE_JOINT), through them from the palm's side."""
+    hn, fn = 'hand.R', 'hand.R.001'
+    d0, n0 = hand_rest_axes('R', -1)
+    t0 = d0.cross(n0)   # toward the thumb's side, as grip_handle's thumb for the right hand
+    t0 = (t0 - t0.dot(d0) * d0).normalized()
+    d1 = (tail[fn] - head[fn]).normalized()
+    flen = (tail[fn] - head[fn]).length + (tail['hand.R.002'] - head['hand.R.002']).length
+    cross = head[fn] + d1 * SMOKE_JOINT[0] * flen + t0 * SMOKE_JOINT[1] * flen
+    tip = math.radians(SMOKE_TIP)
+    a = (-n0 * math.cos(tip) + d1 * math.sin(tip)).normalized()   # from the palm's side out of the back of the fingers
+    x = (t0 - t0.dot(a) * a).normalized()
+    size = SMOKE_SIZE * LEG / MODEL_LEG
+    filter_end = cross - a * SMOKE_OUT * size
+    return T(filter_end) @ Matrix((x, a.cross(x), a)).transposed().to_4x4() @ Matrix.Scale(size, 4)
+
+SMOKE_OUT = 0.025   # how far the joint's filter end stands out on the palm's side of the fingers (its model's units)
+
+def smoke_at(t):
+    """Smoking at t (0 .. 1 round the loop; see SMOKE_KEYS): the joint in the right hand from by the shoulder to the lips
+    and back, to be laid over the idle or the sit from the waist up (EAT_UPPER). Returns the pose and the worst
+    overreach."""
+    k = {n: loop_key(SMOKE_AT, line, t) for n, line in SMOKE_KEYS.items()}
+    breath = min(max(0.5 * k['breath'] + 0.25 - 0.25 * math.cos(2 * math.pi * SMOKE_BREATHS * t), 0.0), 1.0)
+    X, _ = posed_with(dict(STILL, DROP=0.02), 0.29, breath=breath)
+    bow_head(X, k['bow'])
+    for name, leader in FOLLOW.items():
+        X[name] = X[leader]
+    level = read_level(X)
+    filter_rest = smoke_rest() @ Vector((0, 0, 0))
+    at = lambda Y: Y['hand.R'] @ filter_rest
+    m = min(max(k['mouth'], 0.0), 1.0)
+    rest = X['shoulder.R'] @ head['upper_arm.R'] + level @ (Vector(SMOKE_REST) - Vector((0, 0, k['drop']))) * wrist_reach('R')
+    lips = head_point(X, SMOKE_MOUTH, -1)
+    target = rest.lerp(lips, smooth(m))
+    facing = (level @ Vector(SMOKE_REST_FACING)).normalized().lerp((level @ Vector(SMOKE_MOUTH_FACING)).normalized(), smooth(m))
+    fingers = (level @ Vector(SMOKE_REST_FINGERS)).normalized().lerp((level @ Vector(SMOKE_MOUTH_FINGERS)).normalized(), smooth(m))
+    clamp = hand_point_to('R', -1, at, target, fingers, facing, X, pole=Vector(SMOKE_ELBOW), curl=k['curl'])
+    close_hand(X, 'L', 1, 0.3)
+    return X, clamp
+
+def pill_pinch(X):
+    """Where the right hand's fingertips and thumb tip meet in the pose X (armature space)."""
+    return (X['hand.R.002'] @ tail['hand.R.002'] + X['thumb.R.001'] @ tail['thumb.R.001']) * 0.5
+
+def pill_at(t):
+    """Taking a pill (or a powder) at t (0 .. 1, once through; see PILL_KEYS): the left palm holding it, the right
+    fingers pinching from it up to the mouth, the head tipped back to swallow; to be laid over the idle or the sit from
+    the waist up (EAT_UPPER). Returns the pose and the worst overreach."""
+    k = {n: toss_key(line, t, PILL_AT) for n, line in PILL_KEYS.items()}
+    X, _ = posed_with(dict(STILL, DROP=0.02), 0.29, breath=0.3)
+    bow_head(X, k['bow'])
+    for name, leader in FOLLOW.items():
+        X[name] = X[leader]
+    chest = X[CHEST_BONE].to_3x3()
+    palm = X[CHEST_BONE] @ (head[HIPS] + Vector(EAT_MEAL) * LEG)
+    clamp = hand_on('L', 1, palm, chest @ Vector(EAT_MEAL_FINGERS), chest @ Vector((0, 0, 1)), X)
+    close_hand(X, 'L', 1, EAT_MEAL_CURL)
+    level = read_level(X)
+    m = smooth(min(max(k['mouth'], 0.0), 1.0))
+    target = (palm + level @ Vector(PILL_PALM) * LEG).lerp(head_point(X, PILL_MOUTH, -1), m)
+    way = lambda v: (level @ Vector(v)).normalized()
+    facing = way(PILL_FACING[0]).lerp(way(PILL_FACING[1]), m)
+    fingers = way(PILL_FINGERS[0]).lerp(way(PILL_FINGERS[1]), m)
+    clamp = max(clamp, hand_point_to('R', -1, pill_pinch, target, fingers, facing, X, pole=Vector(PILL_ELBOW), curl=k['curl']))
     return X, clamp
 
 def read_level(X):
@@ -4233,6 +4622,297 @@ def teach_at(t):
         palm = wrist + facing * HAND_HALF * LEG + fingers * (tail[hn] - head[hn]).length * 0.5
         clamp = max(clamp, hand_on(s, sign, palm, fingers, facing, X, pole=Vector(elbow)))
         close_hand(X, s, sign, max(0.0, k['curl_' + s]))
+    return X, clamp
+
+def level_frame(X):
+    """A level frame turned as the chest is about the vertical (x the chest's left, y its back, z up)."""
+    side = X[CHEST_BONE].to_3x3() @ Vector((1, 0, 0))
+    side = Vector((side.x, side.y, 0.0)).normalized()
+    return Matrix((side, Vector((0, 0, 1)).cross(side), Vector((0, 0, 1)))).transposed()
+
+def wave_at(t):
+    """A wave in passing at t (0 .. 1 once through; see WAVE_KEYS): standing, the right hand up beside the head waved and
+    let fall, to be laid over anything on that arm only (WAVE_UPPER). Returns the pose and the worst overreach."""
+    breath = 0.5 - 0.5 * math.cos(2 * math.pi * t)
+    X, _ = posed_with(dict(STILL, DROP=0.02), 0.29, breath=breath)
+    k = {n: loop_key(WAVE_AT, line, t) for n, line in WAVE_KEYS.items()}
+    level = level_frame(X)
+    hn = 'hand.R'
+    wrist = X['shoulder.R'] @ head['upper_arm.R'] + level @ k['wrist'] * wrist_reach('R')
+    facing = (level @ k['palm']).normalized()
+    fingers = level @ k['fingers']
+    fingers = (fingers - fingers.dot(facing) * facing).normalized()
+    palm = wrist + facing * HAND_HALF * LEG + fingers * (tail[hn] - head[hn]).length * 0.5
+    clamp = hand_on('R', -1, palm, fingers, facing, X, pole=Vector(WAVE_ELBOW))
+    close_hand(X, 'R', -1, max(0.0, k['curl']))
+    return X, clamp
+
+def sad_at(t):
+    """Sad at t (0 .. 1 round the loop): slumped, the head hung and the arms limp, sighing once a loop, to be laid over the
+    gait from the waist up (SAD_UPPER). Returns the pose and the worst overreach."""
+    breath = 0.5 - 0.5 * math.cos(2 * math.pi * SAD_BREATHS * t)
+    sigh = max(0.0, math.sin(2 * math.pi * t)) ** 2   # once, in the loop's first half
+    X, _ = posed_with(dict(STILL, DROP=0.03), 0.29, breath=max(breath, sigh))
+    lean = SAD_LEAN + SAD_SIGH * sigh
+    for bone in (SPINE, CHEST_BONE):
+        pivot = X[bone] @ head[bone]
+        turn_branch(X, bone, about(pivot, (X[bone].to_3x3() @ Vector((1, 0, 0))).normalized(), lean * 0.5))
+    for bone in (NECK, HEAD):
+        pivot = X[bone] @ head[bone]
+        turn_branch(X, bone, about(pivot, (X[bone].to_3x3() @ Vector((1, 0, 0))).normalized(), SAD_HEAD * 0.5))
+    for name, leader in FOLLOW.items():
+        X[name] = X[leader]
+    for side, sign in (('L', 1), ('R', -1)):
+        sh = 'shoulder.' + side
+        chest = X[CHEST_BONE].to_3x3()
+        slump = SAD_SLUMP * (1.0 + 0.5 * sigh)
+        turn_branch(X, sh, about(X[sh] @ head[sh], chest @ Vector((1, 0, 0)), slump * 0.6)
+                    @ about(X[sh] @ head[sh], chest @ Vector((0, 1, 0)), slump * sign))
+    # The arms left hanging as the standing pose has them, the hands half closed.
+    for side, sign in (('L', 1), ('R', -1)):
+        close_hand(X, side, sign, 0.3)
+    return X, 0.0
+
+def drunk_at(t):
+    """Drunk at t (0 .. 1 round the loop): the trunk swaying from the waist in a figure of eight, the head lolling after
+    it, the upper arms hanging back against it; every turn none at t = 0, the plain stance the game nudges from (see
+    DRUNK_SECONDS). Returns the pose and the worst overreach."""
+    X, _ = posed_with(dict(STILL, DROP=0.02), 0.29)
+    once, twice = math.sin(2 * math.pi * t), math.sin(4 * math.pi * t)
+    side, lurch, twist = DRUNK_SWAY * once, DRUNK_LURCH * twice, DRUNK_TWIST * once
+    for bone in (SPINE, CHEST_BONE):
+        pivot = X[bone] @ head[bone]
+        turn_branch(X, bone, about(pivot, (0, 0, 1), twist * 0.5) @ about(pivot, (0, 1, 0), side * 0.5)
+                    @ about(pivot, (1, 0, 0), lurch * 0.5))
+    for name, leader in FOLLOW.items():
+        X[name] = X[leader]
+    # The head late after the sway (its second harmonic takes its peaks later), so it lolls rather than rides along.
+    loll = DRUNK_LOLL * (once - 0.4 * twice)
+    for bone in (NECK, HEAD):
+        pivot = X[bone] @ head[bone]
+        turn_branch(X, bone, about(pivot, (0, 1, 0), loll * 0.5) @ about(pivot, (1, 0, 0), DRUNK_NOD * twice * 0.5))
+    for name, leader in FOLLOW.items():
+        X[name] = X[leader]
+    for s in ('L', 'R'):
+        ua = 'upper_arm.' + s
+        pivot = X[ua] @ head[ua]
+        turn_branch(X, ua, about(pivot, (0, 1, 0), -side * DRUNK_HANG) @ about(pivot, (1, 0, 0), -lurch * DRUNK_HANG))
+    return X, 0.0
+
+STIR_KINDS = {'stir': 'bench', 'stir_crouch': 'crouch', 'stir_campfire': 'fire', 'stir_campfire_sit': 'fire_sit'}   # each stirring clip (work_<name>) and the work it is made on
+stir_made = {}   # by stirring clip: the figure it is made on, the pot's middle (at a campfire, the point over the fire the stick is aimed at) and the fist's way round the handle
+stir_numbers = {}   # by stirring clip: the numbers it was made with
+
+def stir_work(kind, t):
+    """The work a stirring clip (a STIR_KINDS key) is made on, at t round its loop."""
+    work = STIR_KINDS[kind]
+    return (bench_at(t)[0] if work == 'bench' else fire_base(t) if work == 'fire' else fire_base(t, True) if work == 'fire_sit'
+            else crouch_at(t)[0])
+
+# Cooking at a campfire (stir_at's stir_campfire and stir_campfire_sit, on fire_base; the game's work at a campfire the
+# whole time): sat cross-legged (work_stir_campfire), the meditation's hips and legs with the trunk leant forward
+# FIRE_LEAN from the waist, or on a chair (work_stir_campfire_sit), the sit hunched forward FIRE_SIT_LEAN and laid over
+# the sit from the waist up (EAT_UPPER; the game draws the chair where it stands, so nothing brings it nearer). Each holds
+# a roasting stick out over the fire (roast_frames; Models/tool_stick.obj, anim_scripts/make_stick.py, a
+# `tool stir_campfire tool_stick R` line), meat skewered near its tip, the right fist turning it slowly back and forth so
+# it cooks all round and bobbing it a little, the left hand left on the knee. They stirred a pot by the fire before, but
+# reached out that far the spoon had to lean back at the figure and the arm stuck out straight. The pawn sits on the
+# campfire's interaction cell, its middle a cell from the fire's (cross-legged, the game draws it FireCloser nearer). The
+# fist from the right shoulder and the point the stick is aimed at over the fire from the floor under the hips (the sit's
+# floor seated), in a level frame turned as the chest is, leg lengths: x to the figure's left, y back, z up.
+FIRE_LEAN = 20.0       # degrees the trunk is leant forward from the waist, cross-legged
+FIRE_LOOK = 14.0       # degrees the head is tipped back up from the lean, toward the fire
+FIRE_SIT_LEAN = 38.0   # degrees the trunk is hunched forward from the waist, on a chair
+ROAST_FIST = (0.32, -0.25, -0.20)      # cross-legged: the fist low in front of the chest, the forearm across the stick
+ROAST_AIM = (0.0, -1.8, 1.2)           # cross-legged: over the fire's middle, about 0.6 cells off the ground, over the flames
+ROAST_SIT_FIST = (0.32, -0.35, -0.10)  # on a chair: in front of the chest, the forearm across the stick
+ROAST_SIT_AIM = (0.0, -2.1, 0.96)      # on a chair: over the fire, about 0.6 cells off the ground (MUSIC_SEAT under the sit's floor)
+ROAST_LONG = 0.72      # cells from the fist to the stick's tip (make_stick.py's LONG)
+ROAST_SWING = 60.0     # degrees the elbow is swung out about the line from the shoulder to the wrist, cross-legged
+ROAST_SIT_SWING = 90.0   # the same on a chair
+ROAST_THUMB_BACK = True    # the thumb toward the butt rather than the fire: with the elbow out and the forearm across
+                           # the body the stick comes out of the little finger's side, so the wrist is near straight
+ROAST_TURNS = 2        # times a loop the stick is turned back and forth
+ROAST_ROLL = 20.0      # degrees the fist turns the stick each way about its line
+ROAST_BOB = 0.025      # leg lengths the fist rises and falls with each turn
+ROAST_DRIFT = 0.03     # leg lengths the fist slides along the stick's line and back, once a loop
+
+def fire_base(t, seated=False):
+    """Sat leant forward toward a campfire at t (0 .. 1 round its loop): cross-legged, the meditation with the trunk
+    leant FIRE_LEAN from the waist, or on a chair (seated), the sit hunched FIRE_SIT_LEAN; the head tipped back up
+    FIRE_LOOK, the hands still on the knees or thighs."""
+    X = sit_at(t)[0] if seated else meditate_at(t)[0]
+    turn_branch(X, SPINE, about(X[HIPS] @ head[SPINE], (1, 0, 0), FIRE_SIT_LEAN if seated else FIRE_LEAN))
+    turn_branch(X, NECK, about(X[NECK] @ head[NECK], (1, 0, 0), -FIRE_LOOK))
+    return X
+
+def fire_floor(X):
+    """The point on the floor under the hips in X and the level frame there (fire places' origin and axes)."""
+    hips = X[HIPS] @ head[HIPS]
+    return Vector((hips.x, hips.y, 0.0)), level_frame(X)
+
+def stir_frames(kind, t, wrap):
+    """Stirring at t (0 .. 1 round the loop), the fist turned wrap degrees about the handle from pointing forward:
+    the pose, the worst overreach and the spoon's place (the matrix from its model's points, Blender's axes, cells, its
+    grip at the origin and its handle's end up +z, to armature space)."""
+    if STIR_KINDS[kind] in ('fire', 'fire_sit'):
+        return roast_frames(kind, t, wrap)
+    base, pot = stir_made[kind][:2]
+    X = dict(base)
+    level = level_frame(X)
+    a = 2 * math.pi * STIR_TURNS * t
+    ring = level @ Vector((math.cos(a), math.sin(a), 0.0))
+    # The trunk turned after the spoon and leant in over the pot as it goes round the far side.
+    for bone in (SPINE, CHEST_BONE):
+        pivot = X[bone] @ head[bone]
+        turn_branch(X, bone, about(pivot, (0, 0, 1), STIR_TWIST * math.cos(a) * 0.5)
+                    @ about(pivot, level @ Vector((1, 0, 0)), STIR_LEAN * (0.5 - 0.5 * math.sin(a)) * 0.5))
+    for name, leader in FOLLOW.items():
+        X[name] = X[leader]
+    reach = STIR_REACH / MODEL_LEG * LEG
+    bowl = pot + Vector((0, 0, STIR_DIP * LEG)) + ring * STIR_BOWL * LEG
+    d = (pot + Vector((0, 0, STIR_DIP * LEG + reach)) + ring * STIR_FIST * LEG - bowl).normalized()
+    fist = bowl + d * reach
+    # The thumb up the handle, away from the bowl (grip_handle's d), the fingers round it.
+    edge = level @ Vector((0, -1, 0))
+    clamp = grip_handle('R', -1, fist, d, edge, wrap, X)
+    close_hand(X, 'R', -1, 1.0)
+    f = Matrix.Rotation(math.radians(wrap), 3, d) @ edge
+    f = (f - f.dot(d) * d).normalized()
+    spoon = T(fist) @ Matrix((f, d.cross(f), d)).transposed().to_4x4() @ Matrix.Scale(LEG / MODEL_LEG, 4)
+    # The left palm on the rim, steadying the pot.
+    palm = pot + level @ Vector(STIR_RIM) * LEG
+    clamp = max(clamp, hand_on('L', 1, palm, level @ Vector(STIR_RIM_FINGERS), level @ Vector(STIR_RIM_PALM), X,
+                               pole=Vector((1.0, 0.3, -0.6))))
+    close_hand(X, 'L', 1, 0.35)
+    return X, clamp, spoon
+
+def roast_frames(kind, t, wrap):
+    """Holding a roasting stick out over a campfire at t (0 .. 1 round the loop), sat cross-legged or on a chair, the fist
+    turned wrap degrees about the stick from fingers down, plus the slow turning back and forth: the pose, the worst
+    overreach and the stick's place (as stir_frames gives the spoon's: its grip at the origin, its tip up +z)."""
+    base, aim = stir_made[kind][:2]
+    X = dict(base)
+    level = level_frame(X)
+    sit = STIR_KINDS[kind] == 'fire_sit'
+    shoulder = X['upper_arm.R'] @ head['upper_arm.R']
+    a = 2 * math.pi * ROAST_TURNS * t
+    fist = shoulder + level @ Vector(ROAST_SIT_FIST if sit else ROAST_FIST) * LEG
+    d = (aim - fist).normalized()
+    fist += Vector((0, 0, ROAST_BOB * math.sin(2 * a) * LEG)) + d * ROAST_DRIFT * math.sin(2 * math.pi * t) * LEG
+    d = (aim - fist).normalized()
+    # The fingers round the stick, turned back and forth about it; the thumb toward the fire (grip_handle's d) or, with
+    # ROAST_THUMB_BACK, toward the butt, the stick coming out of the little finger's side.
+    hd = -d if ROAST_THUMB_BACK else d
+    edge = level @ Vector((0, 0, -1))
+    turn = wrap + ROAST_ROLL * math.sin(a)
+    clamp = grip_handle('R', -1, fist, hd, edge, turn, X, swing=ROAST_SIT_SWING if sit else ROAST_SWING)
+    close_hand(X, 'R', -1, 1.0)
+    f = Matrix.Rotation(math.radians(turn), 3, hd) @ edge
+    f = (f - f.dot(hd) * hd).normalized()
+    stick = T(fist) @ Matrix((f, d.cross(f), d)).transposed().to_4x4() @ Matrix.Scale(LEG / MODEL_LEG, 4)
+    return X, clamp, stick   # (the left hand stays on its knee)
+
+def stir_tool(kind):
+    """The model a stirring clip holds in its right fist: the spoon, or at a campfire the roasting stick."""
+    return 'tool_stick' if STIR_KINDS[kind] in ('fire', 'fire_sit') else 'tool_spoon'
+
+def stir_make(kind):
+    """Works out what a stirring clip is made on, once: the figure, the pot's middle (where that work's palms are on
+    average over its loop, moved STIR_BACK toward the figure) and the fist's way round the handle, the one with the
+    straightest wrist over the loop (as work_holds picks a tool's)."""
+    # (remade when any of its numbers has changed, as the preview's sliders change them in place)
+    numbers = tuple((k, v) for k, v in sorted(globals().items()) if k.startswith(('STIR_', 'FIRE_', 'ROAST_')))
+    if kind in stir_made and stir_numbers.get(kind) == numbers:
+        return
+    stir_numbers[kind] = numbers
+    base = stir_work(kind, STIR_FROM)
+    if STIR_KINDS[kind] in ('fire', 'fire_sit'):
+        # Sat at a campfire: the point over the fire the roasting stick is aimed at (ROAST_AIM, ROAST_SIT_AIM).
+        floor, level = fire_floor(base)
+        pot = floor + level @ Vector(ROAST_SIT_AIM if STIR_KINDS[kind] == 'fire_sit' else ROAST_AIM) * LEG
+    else:
+        clip = BENCH_CLIP if STIR_KINDS[kind] == 'bench' else CROUCH_CLIP
+        n = clip['frames']
+        total = Vector()
+        for i in range(n):
+            Y = stir_work(kind, i / n)
+            for s in ('L', 'R'):
+                total += Y['hand.' + s] @ ((head['hand.' + s] + tail['hand.' + s]) / 2)
+        pot = total / (2 * n) + level_frame(base) @ Vector((0, STIR_BACK * LEG, 0))
+    stir_made[kind] = (base, pot, 0.0)
+    best, best_cost = 0.0, None
+    for wrap in range(0, 360, 15):
+        cost = 0.0
+        for i in range(6):
+            X, clamp, _ = stir_frames(kind, i / 6, wrap)
+            flex, deviate = wrist_bend(X, 'R', -1)
+            cost += abs(flex) + abs(deviate) + 1000 * clamp
+        if best_cost is None or cost < best_cost:
+            best, best_cost = float(wrap), cost
+    stir_made[kind] = (base, pot, best)
+
+def stir_at(t, kind='stir'):
+    """Stirring a pot at t (0 .. 1 round the loop; see STIR_SECONDS), made on STIR_KINDS[kind]'s work. Returns the pose
+    and the worst overreach."""
+    stir_make(kind)
+    X, clamp, _ = stir_frames(kind, t, stir_made[kind][2])
+    return X, clamp
+
+def stir_rest(kind='stir'):
+    """The spoon in the right hand: its place in the hand bone's frame (the hand as posed, inverted, times the spoon's
+    place), the same all through the loop, as the fist holds it one way; for the `tool <kind> tool_spoon R` line."""
+    stir_make(kind)
+    X, _, spoon = stir_frames(kind, 0.0, stir_made[kind][2])
+    return X['hand.R'].inverted() @ spoon
+
+def burn_at(t):
+    """On fire at t (0 .. 1 round the loop): hunched, both hands patting at the chest and belly in turn, to be laid over
+    the run from the waist up (BURN_UPPER). Returns the pose and the worst overreach."""
+    breath = 0.5 - 0.5 * math.cos(2 * math.pi * BURN_BREATHS * t)
+    X, _ = posed_with(dict(STILL, DROP=0.03, BREATH=BURN_BREATH), 0.29, breath=breath)
+    twist = BURN_TWIST * math.sin(2 * math.pi * t)
+    for bone in (SPINE, CHEST_BONE):
+        pivot = X[bone] @ head[bone]
+        turn_branch(X, bone, about(pivot, (0, 0, 1), twist * 0.5) @ about(pivot, (X[bone].to_3x3() @ Vector((1, 0, 0))).normalized(), BURN_LEAN * 0.5))
+    turn_branch(X, NECK, about(X[NECK] @ head[NECK], (X[NECK].to_3x3() @ Vector((1, 0, 0))).normalized(), BURN_LOOK))
+    for name, leader in FOLLOW.items():
+        X[name] = X[leader]
+    clamp = 0.0
+    for side, s, offset in (('R', -1, 0.0), ('L', 1, 0.5)):
+        p = BURN_PATS * t + offset
+        lift = 0.5 - 0.5 * math.cos(2 * math.pi * p)   # on the body at each whole p
+        mix = 0.5 - 0.5 * math.cos(math.pi * p)       # the chest at even p, the belly at odd
+        chest_at = X[CHEST_BONE] @ (head[CHEST_BONE] + Vector((s * HURT_CHEST[0], HURT_CHEST[1], HURT_CHEST[2])) * LEG)
+        belly_at = X[SPINE] @ (head[SPINE] + Vector((s * HURT_BELLY[0], HURT_BELLY[1], HURT_BELLY[2])) * LEG)
+        forward = X[CHEST_BONE].to_3x3() @ Vector((0, -1, 0))
+        wrist = chest_at.lerp(belly_at, mix) + forward * BURN_LIFT * LEG * lift
+        turn = Vector(HURT_CHEST_TURN).lerp(Vector(HURT_BELLY_TURN), mix)
+        clamp = max(clamp, arm_to(side, s, wrist, X, pole=Vector((s * 0.8, 0.4, -0.8)), turn=(turn.x, s * turn.y, s * turn.z)))
+    return X, clamp
+
+def reach_at(t):
+    """Reaching to a switch or a lid at t (0 .. 1 round the loop): stood, the right hand out in front palm forward,
+    pressed in once a loop. The whole figure, in place of the idle. Returns the pose and the worst overreach."""
+    breath = 0.5 - 0.5 * math.cos(2 * math.pi * t)
+    X, _ = posed_with(dict(STILL, DROP=0.02), 0.29, breath=breath)
+    for bone in (SPINE, CHEST_BONE):
+        pivot = X[bone] @ head[bone]
+        turn_branch(X, bone, about(pivot, (X[bone].to_3x3() @ Vector((1, 0, 0))).normalized(), REACH_LEAN * 0.5))
+    turn_branch(X, NECK, about(X[NECK] @ head[NECK], (X[NECK].to_3x3() @ Vector((1, 0, 0))).normalized(), REACH_LOOK))
+    for name, leader in FOLLOW.items():
+        X[name] = X[leader]
+    level = level_frame(X)
+    hn = 'hand.R'
+    push = 0.5 - 0.5 * math.cos(2 * math.pi * t)   # in at the middle, back at the ends
+    v = Vector(REACH_HAND) + Vector((0, -REACH_PUSH * push, 0))
+    wrist = X['shoulder.R'] @ head['upper_arm.R'] + level @ v * wrist_reach('R')
+    tip = math.radians(REACH_TIP)
+    fingers = level @ Vector((0, -math.sin(tip), math.cos(tip)))
+    facing = level @ Vector((0, -math.cos(tip), -math.sin(tip)))
+    palm = wrist + facing * HAND_HALF * LEG + fingers * (tail[hn] - head[hn]).length * 0.5
+    clamp = hand_on('R', -1, palm, fingers, facing, X, pole=Vector(REACH_ELBOW))
+    close_hand(X, 'R', -1, REACH_CURL[1] + (REACH_CURL[0] - REACH_CURL[1]) * push)
     return X, clamp
 
 def cast_touch_at(t):

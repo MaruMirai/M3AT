@@ -13,6 +13,6 @@ Ideas that don't fit the apparel, gene or animation lists. Add to it freely.
 - [ ] integrate biotech patch style approach for mods
 
 ## Other mods
-- [ ] Romance on the Rim: animations for its dates, hangouts and other romance jobs. Find its `JobDef` names and fit them into the motion groups in [ANIMATION_TODO.md](ANIMATION_TODO.md) where they can share a motion.
+- [x] Romance on the Rim: animations for its dates, hangouts and other romance jobs. Find its `JobDef` names and fit them into the motion groups in [ANIMATION_TODO.md](ANIMATION_TODO.md) where they can share a motion.
 - [x] CE: Reloads, apparel
 - [x] animal cuddling

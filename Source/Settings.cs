@@ -22,22 +22,35 @@ namespace M3AT
         Off
     }
 
+    // What a pawn lying in a bed is drawn wearing (WalkFigures.SleepWearOf): under IsoRim's blanket where the bed shows
+    // only the head, else as dressed; always on top, dressed; on top without armour, headgear, packs or coats; in
+    // pajamas; or nothing. Kept in this order, as the menu lists them.
+    public enum SleepWear
+    {
+        Blankets,
+        Dressed,
+        NoEquipment,
+        Pajamas,
+        Nothing
+    }
+
     // The player's choices, saved with the game's mod settings (Options > Mod settings > M3AT).
     public class Settings : ModSettings
     {
         public const float DefaultShrink = 0f;   // the head shrink the options start at: the full chibi head
         public const float DefaultHeightSpread = 0.02f, DefaultBodySpread = 0.3f;   // the variety sliders' defaults
-        public const float DefaultHairDetail = 0.5f;   // the share of its triangles a hairstyle keeps
+        public const float DefaultHairDetail = 0.5f;
+        public const float DefaultGazeStrength = 1f;   // how far the eyes look about, of Facial Animation's own   // the share of its triangles a hairstyle keeps
         public float pawnSize = 1f;   // every pawn's size, of the standard (WalkFigures.PawnSize, in SizeOf)
         public float headShrink = DefaultShrink;   // 0 .. 1 of the Shrinkhead key: a smaller, less chibi head (skinned figure only)
         public bool genderSizes = true;   // grown males are drawn bigger than grown females, by WalkFigures.GenderGap (WalkFigures.GenderSize)
         public float heightSpread = DefaultHeightSpread;   // the standard deviation of pawns' own heights about their gender's, of the standard size (WalkFigures.HeightSize)
-        public bool variedBodies = false;   // each pawn's build spread about its body type's by the Thin, Fat and Hulk keys (WalkFigures.VariedBuild)
+        public bool variedBodies = true;    // each pawn's build spread about its body type's by the Thin, Fat and Hulk keys (WalkFigures.VariedBuild)
         public float bodySpread = DefaultBodySpread;   // and the standard deviation of that spread, in key amounts
         public bool ragdolls = true;   // pawns that go down where they stand fall limp (WalkFigures.Ragdolls)
         public float flingPower = 1f;   // how far blows throw bodies and weapons, of the standard distance (WalkFigures.FlingPower)
-        public bool flingBodies = false;   // a big enough blow throws a body across the map, the game moving it (WalkFigures.FlingBodies, Flings)
-        public bool flingWeapons = false;   // the weapon a pawn drops as it goes down flies from its hand (WalkFigures.FlingWeapons, Flings)
+        public bool flingBodies = true;   // a big enough blow throws a body across the map, the game moving it (WalkFigures.FlingBodies, Flings)
+        public bool flingWeapons = true;   // the weapon a pawn drops as it goes down flies from its hand (WalkFigures.FlingWeapons, Flings)
         public bool wornGear = true;   // packs, belts, headsets, masks and crowns a pawn wears are drawn on it (WalkFigures.WornGears)
         public bool muzzleFlash = true;   // a gun fired by a 3D pawn flashes at its barrel (WalkFigures.MuzzleFlashes)
         public bool hitFlash = true;   // a pawn hit flashes red, as the game's sprites do (HitFlash.On)
@@ -47,9 +60,14 @@ namespace M3AT
         public EarHiding earHiding = EarHiding.AnyHeadgear;   // which headgear leaves the gene ears off (WalkFigures.EarHiding)
         public BeardMode beardMode = BeardMode.Flat;   // how beards are drawn (WalkFigures.Beards, FlatBeards)
         public bool retexturedWeaponModels = true;   // the game's own weapons keep IsoRim's model though another mod redraws their art (WalkFigures.RetexturedWeaponModels)
-        public bool bedBlankets = true;    // in a bed that shows only the sleeper's head, IsoRim's blanket over the body (WalkFigures.BedBlankets); off: lying on top
+        public bool vatClothes = false;    // a pawn in a growth vat or biosculpter pod drawn in its clothes (WalkFigures.VatClothes); off: without them
+        public SleepWear sleepWear = SleepWear.Blankets;   // what a pawn in bed is drawn wearing (WalkFigures.SleepWearOf); Blankets: IsoRim's blanket over the body in a bed that shows only the head (WalkFigures.BedBlankets)
         public bool groundGarments = false;   // apparel lying on the map is drawn as the chibi's own garment for it (WalkFigures.GroundGarments); off: IsoRim's look
         public bool injuryAnims = true;   // pawns limp on a bad leg and hold where they are hurt (WalkFigures.InjuryAnims); a missing leg hops regardless
+        public bool prosthetics = true;   // a replaced limb is drawn as its prosthetic (WalkFigures.Prosthetics)
+        public float gazeStrength = DefaultGazeStrength;   // how far Facial Animation's eyes move on the chibi (FaceLayers.GazeStrength)
+        public bool prostheticEyes = true;   // and a bionic or archotech eye's iris; off: the pawn's own eye (WalkFigures.ProstheticEyesShow)
+        public bool archotechProsthetics = true;   // and an archotech one too; off: as flesh (WalkFigures.ArchotechShows)
         public bool visibleWounds = true;   // injuries, blood, bandages and scars are drawn on the pawn (WalkFigures.VisibleWounds)
         public bool outlines = true;   // the chibi is drawn with its dark outline (SkinnedFigure.Outlines)
         public bool silhouetteOutlines = true;   // only round the figure, never over its own body (SkinnedFigure.Silhouette); off: as IsoRim draws its figures' outlines
@@ -84,12 +102,12 @@ namespace M3AT
             Scribe_Values.Look(ref headShrink, "headShrink", DefaultShrink);
             Scribe_Values.Look(ref genderSizes, "genderSizes", true);
             Scribe_Values.Look(ref heightSpread, "heightSpread", DefaultHeightSpread);
-            Scribe_Values.Look(ref variedBodies, "variedBodies", false);
+            Scribe_Values.Look(ref variedBodies, "variedBodies", true);
             Scribe_Values.Look(ref bodySpread, "bodySpread", DefaultBodySpread);
             Scribe_Values.Look(ref ragdolls, "ragdolls", true);
             Scribe_Values.Look(ref flingPower, "flingPowerRescaled", 1f);   // not "flingPower": those were of a distance a sixth of this one
-            Scribe_Values.Look(ref flingBodies, "flingBodies", false);
-            Scribe_Values.Look(ref flingWeapons, "flingWeapons", false);
+            Scribe_Values.Look(ref flingBodies, "flingBodies", true);
+            Scribe_Values.Look(ref flingWeapons, "flingWeapons", true);
             Scribe_Values.Look(ref wornGear, "wornGear", true);
             Scribe_Values.Look(ref holsters, "holsters", true);
             Scribe_Values.Look(ref muzzleFlash, "muzzleFlash", true);
@@ -100,9 +118,24 @@ namespace M3AT
             Scribe_Values.Look(ref beardMode, "beardMode", BeardMode.Flat);
             Scribe_Values.Look(ref retexturedWeaponModels, "retexturedWeaponModels", true);
             Scribe_Values.Look(ref groundGarments, "groundGarments", false);
-            Scribe_Values.Look(ref bedBlankets, "bedBlankets", true);
+            Scribe_Values.Look(ref sleepWear, "sleepWear", SleepWear.Blankets);
+            if (Scribe.mode == LoadSaveMode.LoadingVars)
+            {
+                // The old blankets toggle (no longer written): off was lying on top, dressed.
+                bool bedBlankets = true;
+                Scribe_Values.Look(ref bedBlankets, "bedBlankets", true);
+                if (!bedBlankets)
+                {
+                    sleepWear = SleepWear.Dressed;
+                }
+            }
+            Scribe_Values.Look(ref vatClothes, "vatClothes", false);
             Scribe_Values.Look(ref injuryAnims, "injuryAnims", true);
             Scribe_Values.Look(ref visibleWounds, "visibleWounds", true);
+            Scribe_Values.Look(ref prosthetics, "prosthetics", true);
+            Scribe_Values.Look(ref archotechProsthetics, "archotechProsthetics", true);
+            Scribe_Values.Look(ref prostheticEyes, "prostheticEyes", true);
+            Scribe_Values.Look(ref gazeStrength, "gazeStrength", DefaultGazeStrength);
             Scribe_Values.Look(ref outlines, "outlines", true);
             Scribe_Values.Look(ref silhouetteOutlines, "silhouetteOutlines", true);
             Scribe_Values.Look(ref clothesOcclusion, "clothesOcclusion", true);
@@ -171,6 +204,8 @@ namespace M3AT
         private static float shownHeight;
 
         // The head's size at a shrink, of the full chibi head's.
+        private const float GazeMost = 4f, GazeStep = 0.25f;   // the eye movement slider's top and steps
+
         private static float HeadSize(float shrink)
         {
             return 1f - (1f - ShrunkSize) * shrink;
@@ -178,6 +213,7 @@ namespace M3AT
 
         public SettingsMod(ModContentPack content) : base(content)
         {
+            LoadTrail.Start(new HarmonyLib.Harmony("MaruMirai.M3AT.trail"));   // first, so the whole load is in it
             Settings = GetSettings<Settings>();
             HairDetail = Settings.hairDetail;
             groundGarmentsBaked = Settings.groundGarments;
@@ -271,6 +307,12 @@ namespace M3AT
             return mode == EarHiding.AnyHeadgear ? "Any headgear" : mode == EarHiding.Helmets ? "Helmets only" : "Never";
         }
 
+        private static string SleepName(SleepWear mode)
+        {
+            return mode == SleepWear.Blankets ? "Under blankets" : mode == SleepWear.Dressed ? "On top, dressed"
+                : mode == SleepWear.NoEquipment ? "No equipment" : mode == SleepWear.Pajamas ? "Pajamas" : "Nothing";
+        }
+
         private static string BeardName(BeardMode mode)
         {
             return mode == BeardMode.Flat ? "2D" : mode == BeardMode.ThreeD ? "3D" : "Off";
@@ -320,6 +362,8 @@ namespace M3AT
                 }
                 Find.WindowStack.Add(new FloatMenu(modes));
             }
+            Settings.gazeStrength = Mathf.Round(Slider(list, "Eye movement", Settings.gazeStrength.ToStringPercent(), Settings.gazeStrength, 0f, GazeMost,
+                "How far pawns' eyes glance and look about with Facial Animation, against how far they move on its 2D faces (default " + Settings.DefaultGazeStrength.ToStringPercent() + "). Its movements are small, a pixel or so, so higher makes them easier to see on the bigger 3D faces. 0%: the eyes stay still. Brows, eyelids and mouths move as Facial Animation moves them, whatever this is.") / GazeStep) * GazeStep;
             list.CheckboxLabeled("Shoes when dressed", ref Settings.shoes,
                 "A pawn whose clothes cover both the body and the legs (a shirt and trousers, or a duster, robe or suit) has plain shoes on. Off: bare feet unless a mod's shoes are worn.");
             list.CheckboxLabeled("Armour hides tails", ref Settings.armourHidesTail,
@@ -339,8 +383,19 @@ namespace M3AT
                 "Jump packs, shield belts and the other packs, belts and lances a pawn wears are shown on its back or waist, and headsets, masks, crowns, blindfolds and slave collars on its head and neck, with IsoRim's models of them. Off: they are not shown.");
             list.CheckboxLabeled("M3AT apparel on the ground", ref Settings.groundGarments,
                 "Clothes on the map will be drawn as the same 3D garment a pawn wears, squashed flat. Off (default): IsoRim's 3D models are used. Takes effect when this window closes.");
-            list.CheckboxLabeled("Sleep under IsoRim's blankets", ref Settings.bedBlankets,
-                "In beds that show only the sleeper's head, IsoRim's blanket is drawn over the body, raised by it. Off (default): the pawn lies on top of the bed.");
+            if (list.ButtonTextLabeledPct("In bed", SleepName(Settings.sleepWear), SliderLabelShare, TextAnchor.MiddleLeft, null,
+                "How pawns lying in a bed are drawn. Only how they look: nothing is taken off or put on in the game.\n\nUnder blankets (default): in beds that show only the sleeper's head, IsoRim's blanket is drawn over the body, raised by it. Other beds: on top, dressed.\n\nOn top, dressed: on top of the bed in what they wear.\n\nNo equipment: on top of the bed, without armour, helmets and hats, coats, belts, packs or shields; shirts, trousers and the like stay on.\n\nPajamas: on top of the bed in pastel pajamas; babies in their romper.\n\nNothing: on top of the bed with no clothes; babies keep their romper."))
+            {
+                List<FloatMenuOption> modes = new List<FloatMenuOption>();
+                foreach (SleepWear mode in new[] { SleepWear.Blankets, SleepWear.Dressed, SleepWear.NoEquipment, SleepWear.Pajamas, SleepWear.Nothing })
+                {
+                    SleepWear picked = mode;
+                    modes.Add(new FloatMenuOption(SleepName(mode), () => Settings.sleepWear = picked));
+                }
+                Find.WindowStack.Add(new FloatMenu(modes));
+            }
+            list.CheckboxLabeled("Clothes in vats", ref Settings.vatClothes,
+                "Pawns in growth vats and biosculpter pods are drawn in their clothes. Off (default): they are drawn without them. Babies never get their romper in a vat.");
 
             list.Gap();
             Header(list, "Injuries");
@@ -348,6 +403,15 @@ namespace M3AT
                 "Pawns limp on a bad leg, hold injured areas, etc. Off: they move as if unhurt. Off doesn't disable hit flinch animations, hopping for missing legs, or slowed movement.");
             list.CheckboxLabeled("Visible injuries", ref Settings.visibleWounds,
                 "Wounds, blood, bandages and scars are drawn on the pawn, where the injury is. Wounds and blood are visible through some clothing; bruises, bandages and scars go only on the skin. Off: none are drawn.");
+            list.CheckboxLabeled("Visible prosthetics", ref Settings.prosthetics,
+                "Peg legs, wooden hands and feet, and simple, bionic and archotech arms and legs are drawn as what they are made of, where clothes leave them bare. Off: a replaced limb looks like skin.");
+            if (Settings.prosthetics)
+            {
+                list.CheckboxLabeled("  Visible prosthetic eyes", ref Settings.prostheticEyes,
+                    "Bionic and archotech eyes are drawn with a mechanical iris. Off: they look like the pawn's own eyes.");
+                list.CheckboxLabeled("  Visible archotech prosthetics", ref Settings.archotechProsthetics,
+                    "Archotech limbs are drawn in the olive and yellow-circuit look of archotech machinery. Off: they look like natural flesh, as the game describes them.");
+            }
 
             tallest = Mathf.Max(tallest, list.CurHeight);
             list.NewColumn();
@@ -434,10 +498,13 @@ namespace M3AT
             list.CheckboxLabeled("Animate on the graphics card", ref Settings.gpuSkinning,
                 "Moves each pawn's body, clothes and hair into its pose on the graphics card, which is much faster with many pawns in view. Turn it off if pawns look broken or stretched, to animate them the old way.");
             list.CheckboxLabeled("Fewer updates with many pawns", ref Settings.fewerPoses,
-                "Runs the game faster when many pawns are in view: their limbs move every second or third frame, while they still walk and turn smoothly. Off: every pawn's limbs move every frame.");
+                "When many pawns are in view they are animated less often, giving a stop-motion like effect. Reduces M3AT's performance overhead around 6–9%. Off: Pawn animated as normal. (Default)");
 
             list.Gap();
             Header(list, "Freecam");
+            list.Label("Fly around with pan keys + mouselook, scrollwheel for altitude. Selections and orders still work with the crosshair. "
+                + "Use your set toggle button, or open any menu, to switch to pointer. Press again or close the open menu to return to freelook.");
+            list.Gap(6f);
             list.Label("Set keyboard keys in RimWorld's keybindings. Current settings:\n"
                 + KeyName(Freecam.ToggleKey) + ": freecam on/off\n"
                 + KeyName(Freecam.UpKey) + ": up\n"

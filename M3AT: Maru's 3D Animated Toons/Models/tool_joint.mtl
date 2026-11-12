@@ -1,0 +1,10 @@
+# M3AT joint colours (anim_scripts/make_joint.py); fixed (no stuff)
+
+newmtl joint_filter
+Kd 0.800 0.680 0.480
+
+newmtl joint_paper
+Kd 0.930 0.920 0.860
+
+newmtl joint_ember
+Kd 0.950 0.380 0.100

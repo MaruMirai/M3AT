@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace M3AT
 {
-    // Tucked in under IsoRim's blanket (the bedBlankets option, WalkFigures.DrawTuckedIn): only the head is drawn, as
+    // Tucked in under IsoRim's blanket (the sleepWear option's Blankets, WalkFigures.DrawTuckedIn): only the head is drawn, as
     // IsoRim draws only its own figure's head in a bed that hides the sleeper's body. The chibi's body is deeper than the
     // blanket's lump in places (the arms crossed on the chest, a coat), so hiding it by depth alone let it show through.
     // Every piece keeps only its triangles with at least two corners riding the head and neck (TuckHead of their weight on

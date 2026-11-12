@@ -189,11 +189,11 @@ namespace M3AT
         // included; a clip without any is not listed.
         private readonly Dictionary<string, int> variants = new Dictionary<string, int>();
         private readonly Dictionary<string, Shape> shapes = new Dictionary<string, Shape>();
-        private readonly Dictionary<GarmentMask, int[]> bodyTris = new Dictionary<GarmentMask, int[]>();   // by mask of garments worn (HideUnder)
+        private readonly Dictionary<(GarmentMask, int), int[]> bodyTris = new Dictionary<(GarmentMask, int), int[]>();   // by mask of garments worn and bare feet (HideUnder)
         private readonly Dictionary<long, bool[]> garmentUnder = new Dictionary<long, bool[]>();   // by garment under and over (UnderOf)
         private readonly Dictionary<(int, GarmentMask), int[]> garmentTris = new Dictionary<(int, GarmentMask), int[]>();   // by garment and mask of garments over it (HideGarments)
         private readonly Dictionary<(int, GarmentMask), int[]> garmentSolidTris = new Dictionary<(int, GarmentMask), int[]>();   // and less its glass (GarmentSolidTris)
-        private readonly Dictionary<KeyValuePair<GarmentMask, Piece>, int[]> outlineTris = new Dictionary<KeyValuePair<GarmentMask, Piece>, int[]>();   // and hair
+        private readonly Dictionary<(GarmentMask, Piece, int), int[]> outlineTris = new Dictionary<(GarmentMask, Piece, int), int[]>();   // and hair
         private string folder;
         private bool turnRound;   // the export's triangles are wound the wrong way out (Load), hair's too
         private readonly Dictionary<string, Piece> hairs = new Dictionary<string, Piece>();   // by style; null: none to be had
@@ -298,12 +298,16 @@ namespace M3AT
             public Color32 skin;   // a hair shell's: the skin colour its skin vertices are outlined in
             public bool[] scalp;   // the body's: the vertices coloured as the scalp (Scalp), null: none
             public Color32 scalpTint;
+            public Color32[] paint;   // the body's: its prosthetics' colours (PaintOf), alpha 0 where there is none; null: none
+            public int hiddenLimbs;   // the fur's: the prosthetics its tufts are left off (HideFur)
             public bool tinted;
             public int outlineMarkAt = -1;   // where the outline's light pass is in parts; -1: not added yet
             public bool textureMarked;   // a textured garment's light pass is in parts
             public int clearAt = -1;   // where its two stencil-clearing parts are in parts (SetSlot); -1: not added yet
             public int afterAt = -1;   // where its redraw after IsoRim's ambient occlusion is in parts (SetSlot); -1: not added yet
             public bool isSkin;   // the body or the fur on it, which never take the occlusion (ClothesOcclusion)
+            public bool dressed;  // a garment (or the fur): skinned by the pawn's dress bones while it has a pylon (Prosthetics.cs)
+            public int bare = -1;   // the bare feet its triangles were left out for (Unshod)
             public int posedAt = -1;   // the Posed.posedAt it was last posed at
             public PieceShape gpuShape;   // posed on the graphics card (GpuSkinning.cs): the shape whose rest pose its meshes hold; null: posed here
             public int cpuAt = -1;   // and the Posed.posedAt its verts and normals were last worked out here at for what reads them (PosedOnCpu)
@@ -362,6 +366,18 @@ namespace M3AT
             public float recline;   // degrees the trunk is bent forward over the hips, the thighs kept as they were (Recline)
             public Vector3[] pos;   // each bone's head as posed, cells
             public bool[] cut;   // the bones cut off at their head, with all below them (Cut): a missing limb
+            public int[] thin;   // the bone each bone is thinned about (Fit, Prosthetics.cs: a peg's or a pylon's); -1: not
+            public float[] thinBy;   // and to what share of its width
+            public bool[] thinAll;   // and whether the bones below it are thinned with it (a peg's foot), not left whole (a pylon's)
+            public bool pylons;   // some bone is thinned (a peg's or pylon's): the clothes are skinned by dress, not bones (Prosthetics.cs)
+            public int bare;   // the feet the shoes are off (1 left, 2 right): a prosthetic leg or foot (Fit, Unshod)
+            public Matrix4x4[] dress;   // bones as the clothes take them: a pylon left its full width, so a sleeve or trouser leg hangs as it would
+            public float[] dressRows;   // and as 12 numbers each, as boneRows
+            internal MaterialPropertyBlock dressBlock;   // and for the graphics card, as bonesBlock
+            internal Vector4[] dressVectors;
+            internal int dressAt = -1;
+            internal bool pylonsPosed;   // pylons as the meshes were last posed: a change poses them again
+            public int limbs;    // its prosthetic limbs (Fit), which the body is coloured by
             public bool tucked;   // under IsoRim's blanket in bed: only the head is drawn (BedTuck.cs); set before HideUnder
             public Matrix4x4[] bones;   // what the meshes are skinned by: a cut bone squashed to the joint it was cut at
             public Matrix4x4[] whole;   // the same uncut, for what rides a bone (BoneOf, JointOf)
@@ -374,6 +390,9 @@ namespace M3AT
             public int posedAt;   // counts each change to what the meshes are posed from (Finish, Wearing): the same, and nothing need be posed again
             public Shape posedShape;   // the shape it was last posed in
             public int extentAt = -1;   // the posedAt lowest and bodyTop were found at (Extent)
+            public int garmentsHiddenFor = -1;   // the worn answer (WalkFigures.WornGarments' version) HideGarments last hid for
+            public bool garmentsHiddenTucked;   // and whether it was tucked under a blanket then
+            public int garmentsHiddenBare;   // and its bare feet then
             public float lowest, bodyTop;
             public MaterialPropertyBlock bonesBlock;   // its bones for the meshes skinned on the graphics card (BlockOf), made when first drawn
             public Vector4[] boneVectors;
@@ -1524,6 +1543,7 @@ namespace M3AT
                 }
             }
             shapes[id] = s;
+            System.Threading.Interlocked.Increment(ref LoadTrail.shapesMade);
             return s;
         }
 
@@ -1661,6 +1681,11 @@ namespace M3AT
             p.nudge = new Quaternion[bones];
             p.pos = new Vector3[bones];
             p.cut = new bool[bones];
+            p.thin = new int[bones];
+            p.thinBy = new float[bones];
+            p.thinAll = new bool[bones];
+            p.dress = new Matrix4x4[bones];
+            p.dressRows = new float[12 * bones];
             p.bones = new Matrix4x4[bones];
             p.boneRows = new float[12 * bones];
             p.shownBones = new Matrix4x4[bones];
@@ -1732,7 +1757,10 @@ namespace M3AT
                 p.topWeight[b] = 0f;
                 p.nudge[b] = Quaternion.identity;
                 p.cut[b] = false;
+                p.thin[b] = -1;
+                p.thinAll[b] = false;
             }
+            p.pylons = false;
             p.total = 0f;
             p.twist = 0f;
             p.look = 0f;
@@ -2580,6 +2608,17 @@ namespace M3AT
                 Quaternion q = p.turn[b];
                 p.whole[b] = whole * Matrix4x4.TRS(p.pos[b] - q * shapedHead[b], q, Vector3.one);
                 p.bones[b] = p.whole[b];
+                if (p.thin[b] < 0 && parent >= 0 && p.thin[parent] >= 0 && p.thinAll[parent])
+                {
+                    p.thin[b] = p.thin[parent];   // a peg's foot goes with its shin
+                    p.thinBy[b] = p.thinBy[parent];
+                    p.thinAll[b] = true;
+                }
+                if (p.thin[b] >= 0)
+                {
+                    // A peg or pylon (Prosthetics.cs): drawn in at rest about the line of the bone it was thinned at, then posed.
+                    p.bones[b] = p.whole[b] * Thinned(shapedHead, p.thin[b], p.thinBy[b]);
+                }
                 if (p.cut[b] || (parent >= 0 && p.cut[parent]))
                 {
                     // Everything on it put at the joint it was cut at: its own head, or the one its parent was cut at.
@@ -2590,6 +2629,7 @@ namespace M3AT
                     p.bones[b] = squashed;
                     p.cut[b] = true;   // so its own children are cut too
                 }
+                p.dress[b] = p.thin[b] >= 0 && !p.cut[b] ? p.whole[b] : p.bones[b];
             }
         }
 
@@ -2637,15 +2677,25 @@ namespace M3AT
             p.posedTime = Time.realtimeSinceStartup;
             // Nothing moved (the game paused, a corpse): the meshes are right as they are. Setting a mesh's vertices costs far
             // more here than posing them, as the engine rebuilds the whole mesh and makes new buffers for it on the GPU.
-            bool moved = ReadBones(p.bones, p.boneRows) || p.shape != p.posedShape;
+            bool moved = ReadBones(p.bones, p.boneRows) | (p.pylons && ReadBones(p.dress, p.dressRows)) || p.shape != p.posedShape;
+            if (p.pylons != p.pylonsPosed)
+            {
+                moved = true;   // the clothes go over to the other bones
+                p.pylonsPosed = p.pylons;
+            }
             if (moved)
             {
                 p.posedAt++;
                 p.posedShape = p.shape;
             }
             Pose(p, 0);
-            if (p.face != null && moved)
+            if (p.face != null && GpuSkinning)
             {
+                FaceOnGpu(p);
+            }
+            else if (p.face != null && (moved || p.face.bones != null))
+            {
+                FaceLeaveGpu(p.face);
                 Piece piece = pieces[0];
                 Vector3[] faceShaped = p.shape.faceRest;
                 Vector3[] bodyNormal = ShapedPiece(p.shape, 0).normal;
@@ -2770,6 +2820,13 @@ namespace M3AT
             p.bodyTop = bodyTop;
         }
 
+        // The body's vertices as End left them (model units, before the figure's place, yaw and size), worked out on the CPU.
+        // The figure's own: don't keep or change them.
+        public Vector3[] BodyVerts(Posed p)
+        {
+            return PosedOnCpu(p, 0).verts;
+        }
+
         // How high the seat is under the figure as End left it (upright), model units: the lowest point of the body no
         // further forward than the hips, so the thighs, shins and feet held out in front are not sat on.
         public float SeatOf(Posed p)
@@ -2827,6 +2884,7 @@ namespace M3AT
                 m = NewPieceMeshes(pieces[index]);
                 p.pieces[index] = m;
             }
+            m.dressed = index != 0;
             PackRig rig = (PackMask & (index <= MaxHiding ? GarmentBit(index) : 0)) != 0 ? PackRigOf(index) : null;
             if (rig != null)
             {
@@ -2869,7 +2927,7 @@ namespace M3AT
         private static void Skin(Posed p, Piece piece, PieceShape shape, PieceMeshes m, bool hulls)
         {
             Vector3[] rest = shape.rest, hull = shape.hull, normal = shape.normal;
-            float[] f = p.boneRows;
+            float[] f = m.dressed && p.pylons ? p.dressRows : p.boneRows;
             int[] first = piece.firstWeight, boneOf = piece.weightBone;
             float[] weight = piece.weight;
             Vector3[] verts = m.verts, hulled = m.hulled, normals = m.normals;
@@ -2940,32 +2998,33 @@ namespace M3AT
             {
                 hair = null;
             }
-            if (m.hidden == mask && m.hiddenHair == hair && m.tucked == p.tucked)
+            if (m.hidden == mask && m.hiddenHair == hair && m.tucked == p.tucked && m.bare == p.bare)
             {
                 return;
             }
             // Without working out the bounds again: they were set once for culling (NewMesh), roomy enough for any pose.
-            if (m.hidden != mask || m.tucked != p.tucked)
+            if (m.hidden != mask || m.tucked != p.tucked || m.bare != p.bare)
             {
-                m.solid.SetTriangles(Tucked(p, BodyTris(mask), pieces[0]), 0, false);
+                m.solid.SetTriangles(Tucked(p, BodyTris(mask, p.bare), pieces[0]), 0, false);
             }
             m.hidden = mask;
             m.hiddenHair = hair;
             m.tucked = p.tucked;
-            m.outline.SetTriangles(Tucked(p, OutlineTris(mask, hair), pieces[0]), 0, false);
+            m.bare = p.bare;
+            m.outline.SetTriangles(Tucked(p, OutlineTris(mask, hair, p.bare), pieces[0]), 0, false);
         }
 
-        private int[] OutlineTris(GarmentMask mask, Piece hair)
+        private int[] OutlineTris(GarmentMask mask, Piece hair, int bare)
         {
             if (hair == null || hair.shell.hides.Length == 0)
             {
-                return BodyTris(mask);
+                return BodyTris(mask, bare);
             }
-            KeyValuePair<GarmentMask, Piece> key = new KeyValuePair<GarmentMask, Piece>(mask, hair);
+            (GarmentMask, Piece, int) key = (mask, hair, bare);
             int[] tris;
             if (!outlineTris.TryGetValue(key, out tris))
             {
-                bool[] hide = HiddenBy(mask);
+                bool[] hide = HiddenBy(mask, bare);
                 foreach (int k in hair.shell.hides)
                 {
                     hide[k] = true;
@@ -2976,32 +3035,34 @@ namespace M3AT
             return tris;
         }
 
-        private int[] BodyTris(GarmentMask mask)
+        private int[] BodyTris(GarmentMask mask, int bare)
         {
             int[] tris;
             if (mask == 0)
             {
                 return pieces[0].tris;
             }
-            if (!bodyTris.TryGetValue(mask, out tris))
+            if (!bodyTris.TryGetValue((mask, bare), out tris))
             {
-                tris = Kept(pieces[0].tris, HiddenBy(mask));
-                bodyTris[mask] = tris;
+                tris = Kept(pieces[0].tris, HiddenBy(mask, bare));
+                bodyTris[(mask, bare)] = tris;
             }
             return tris;
         }
 
-        // The body triangles under the garments in mask.
-        private bool[] HiddenBy(GarmentMask mask)
+        // The body triangles under the garments in mask; the shoes' not on a bare foot (bare, as Posed.bare).
+        private bool[] HiddenBy(GarmentMask mask, int bare = 0)
         {
             bool[] hide = new bool[pieces[0].tris.Length / 3];
             for (int g = 1; g < pieces.Length && g <= MaxHiding; g++)
             {
                 if ((mask & (GarmentBit(g))) != 0)
                 {
+                    bool[] on = bare != 0 && pieces[g].withLegwear ? OnBareLeg(pieces[0], bare) : null;
+                    int[] all = pieces[0].tris;
                     foreach (int k in pieces[g].hides)
                     {
-                        hide[k] = true;
+                        hide[k] |= on == null || !(on[all[3 * k]] || on[all[3 * k + 1]] || on[all[3 * k + 2]]);
                     }
                 }
             }
@@ -3036,8 +3097,17 @@ namespace M3AT
         // Leaves out of each worn garment in mask (bit g: garment g, worn as worn[g]) the triangles under the worn garments
         // that go over it (GoesOver), as HideUnder does for the body, so a shirt can't poke through a duster's back as the
         // two bend apart, but shows where the duster hangs open over it. Call after End and before drawing the garments.
-        public void HideGarments(Posed p, GarmentMask mask, Apparel[] worn)
+        // version: which answer of WalkFigures.WornGarments mask and worn are (the same number, the same mask and worn), so
+        // what they lead to here is left as it is; -1 always works it out.
+        public void HideGarments(Posed p, GarmentMask mask, Apparel[] worn, int version = -1)
         {
+            if (version >= 0 && p.garmentsHiddenFor == version && p.garmentsHiddenTucked == p.tucked && p.garmentsHiddenBare == p.bare)
+            {
+                return;
+            }
+            p.garmentsHiddenFor = version;
+            p.garmentsHiddenTucked = p.tucked;
+            p.garmentsHiddenBare = p.bare;
             for (int g = 1; g < pieces.Length && g <= MaxHiding; g++)
             {
                 if ((mask & (GarmentBit(g))) == 0 || worn[g] == null)
@@ -3051,13 +3121,14 @@ namespace M3AT
                     m = NewPieceMeshes(pieces[g]);
                     p.pieces[g] = m;
                 }
-                if (m.hidden != over || m.tucked != p.tucked)
+                if (m.hidden != over || m.tucked != p.tucked || m.bare != p.bare)
                 {
-                    int[] tris = Tucked(p, GarmentTris(g, over), pieces[g]);
-                    m.solid.SetTriangles(Tucked(p, GarmentSolidTris(g, over), pieces[g]), 0, false);
+                    int[] tris = Unshod(p, g, Tucked(p, GarmentTris(g, over), pieces[g]));
+                    m.solid.SetTriangles(Unshod(p, g, Tucked(p, GarmentSolidTris(g, over), pieces[g])), 0, false);
                     m.outline.SetTriangles(tris, 0, false);
                     m.hidden = over;
                     m.tucked = p.tucked;
+                    m.bare = p.bare;
                 }
             }
         }
@@ -3075,7 +3146,7 @@ namespace M3AT
 
         private const string FurDef = "Gene_Furskin";
         private readonly Dictionary<Piece, bool[]> furUnder = new Dictionary<Piece, bool[]>();   // by what lies over it (FurUnder)
-        private readonly Dictionary<(GarmentMask, Piece), int[]> furTris = new Dictionary<(GarmentMask, Piece), int[]>();   // by garments and hair over it
+        private readonly Dictionary<(GarmentMask, Piece, int), int[]> furTris = new Dictionary<(GarmentMask, Piece, int), int[]>();   // by garments and hair over it, and prosthetics under it
 
         // Leaves out of the fur the tufts under the garments in mask and the hair (WornHair's, null: none), as they stand off
         // the skin further than cloth does and would come through it. Call after End and before drawing it.
@@ -3083,11 +3154,11 @@ namespace M3AT
         {
             PieceMeshes m = Pose(p, fur);
             Piece hair = WornHair(Hair(hairStyle), mask, p);
-            if (m.hidden == mask && m.hiddenHair == hair && m.tucked == p.tucked)
+            if (m.hidden == mask && m.hiddenHair == hair && m.tucked == p.tucked && m.hiddenLimbs == p.limbs)
             {
                 return;
             }
-            (GarmentMask, Piece) key = (mask, hair);
+            (GarmentMask, Piece, int) key = (mask, hair, p.limbs);
             int[] tris;
             if (!furTris.TryGetValue(key, out tris))
             {
@@ -3103,6 +3174,16 @@ namespace M3AT
                 {
                     Hide(hide, FurUnder(fur, hair));
                 }
+                if (p.limbs != 0)
+                {
+                    // No fur on a prosthetic limb (Prosthetics.cs): a tuft with any corner on one goes.
+                    bool[] on = OnLimbs(pieces[fur], p.limbs);
+                    int[] all = pieces[fur].tris;
+                    for (int k = 0; k < hide.Length; k++)
+                    {
+                        hide[k] |= on[all[k * 3]] || on[all[k * 3 + 1]] || on[all[k * 3 + 2]];
+                    }
+                }
                 tris = Kept(pieces[fur].tris, hide);
                 furTris[key] = tris;
             }
@@ -3112,6 +3193,7 @@ namespace M3AT
             m.hidden = mask;
             m.hiddenHair = hair;
             m.tucked = p.tucked;
+            m.hiddenLimbs = p.limbs;
         }
 
         private static void Hide(bool[] hide, bool[] under)
@@ -3518,7 +3600,7 @@ namespace M3AT
                 Pose(p, visor, shape, m);
             }
             Matrix4x4 local = Matrix4x4.Scale(new Vector3(size, size, size));
-            DrawSubmesh(m.solid, 0, glass, position, yaw, local, m.gpuShape != null ? BlockOf(p) : null);
+            DrawSubmesh(m.solid, 0, glass, position, yaw, local, m.gpuShape != null ? BlockOf(p, m.dressed) : null);
         }
 
         // A garment's glass triangles as a piece of their own: their vertices with the garment's weights, keys and texture
@@ -3659,7 +3741,7 @@ namespace M3AT
             PieceMeshes body = Pose(p, 0);
             body.isSkin = true;
             DrawMeshes(p, body, pieces[0].rest.Length, SolidMaterial(), position, yaw, size, tint, null, default(Color),
-                scalp, hairTint);
+                scalp, hairTint, null, PaintOf(p.limbs));
         }
 
         // The face patch's triangles less those made from a scalp vertex.
@@ -3866,17 +3948,19 @@ namespace M3AT
         // lineTint (null: tint): the outline's colour, before it is shaded.
         // p: the pawn, whose bones a mesh skinned on the graphics card is drawn with.
         private static void DrawMeshes(Posed p, PieceMeshes m, int n, Material solid, Vector3 position, float yaw, float size, Color tint,
-            Piece shell = null, Color skin = default(Color), bool[] scalp = null, Color scalpTint = default(Color), Color? lineTint = null)
+            Piece shell = null, Color skin = default(Color), bool[] scalp = null, Color scalpTint = default(Color), Color? lineTint = null,
+            Color32[] paint = null)
         {
             Color32 t = Rounded(tint), sk = Rounded(skin), st = Rounded(scalpTint), lt = Rounded(lineTint ?? tint);
             if (!m.tinted || !Same(t, m.tint) || !Same(lt, m.lineTint) || (shell != null && !Same(sk, m.skin)) || m.scalp != scalp
-                || (scalp != null && !Same(st, m.scalpTint)))
+                || (scalp != null && !Same(st, m.scalpTint)) || m.paint != paint)
             {
                 m.tint = t;
                 m.lineTint = lt;
                 m.skin = sk;
                 m.scalp = scalp;
                 m.scalpTint = st;
+                m.paint = paint;
                 m.tinted = true;
                 Color32[] colours = Fill(Shade(t, 1f), n);
                 if (scalp != null)
@@ -3890,9 +3974,23 @@ namespace M3AT
                         }
                     }
                 }
+                for (int i = 0; paint != null && i < n && i < paint.Length; i++)
+                {
+                    if (paint[i].a != 0)
+                    {
+                        colours[i] = paint[i];   // a prosthetic limb (Prosthetics.cs)
+                    }
+                }
                 m.solid.colors32 = colours;
                 Color32 line = Shade(lt, LineShade);
                 Color32[] lines = Fill(line, m.hulled.Length);
+                for (int i = 0; paint != null && lines.Length == n && i < paint.Length; i++)
+                {
+                    if (paint[i].a != 0)
+                    {
+                        lines[i] = Shade((Color)paint[i], LineShade);
+                    }
+                }
                 if (shell != null && shell.skinVert != null)
                 {
                     Color32 skinLine = Shade(sk, LineShade);
@@ -3943,7 +4041,7 @@ namespace M3AT
             {
                 return;
             }
-            DrawParts(parts, position, yaw, local, m.gpuShape != null ? BlockOf(p) : null, p.flash);
+            DrawParts(parts, position, yaw, local, m.gpuShape != null ? BlockOf(p, m.dressed) : null, p.flash);
         }
 
         public static bool ClothesOcclusion   // true: IsoRim's ambient occlusion and screen-space shadows show on clothes and hair, never the skin (the mod's options set it)

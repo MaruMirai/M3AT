@@ -48,4 +48,84 @@
       </textureWrapOverrides>
     </shaderProgram>
   </ShaderDef>
+
+  <!-- Up to eight of those layers in one draw (FaceLayers.DrawStacked, Shaders\MarusFaceStack.frag.glsl), as each face
+       changes on few frames and drawn one at a time they took about ten draws a face. Set as MarusFaceLayer. -->
+  <ShaderDef>
+    <defName>MarusFaceStack</defName>
+    <shaderProgram>
+      <vertexShaderFileName>MarusFaceStack.vert.glsl</vertexShaderFileName>
+      <fragmentShaderFileName>MarusFaceStack.frag.glsl</fragmentShaderFileName>
+      <blendMode>Alpha</blendMode>
+      <depthWrite>false</depthWrite>
+      <cullMode>None</cullMode>
+      <renderQueue>2950</renderQueue>
+      <textureWrapOverrides>
+        <li>
+          <key>_T0</key>
+          <value>Clamp</value>
+        </li>
+        <li>
+          <key>_M0</key>
+          <value>Clamp</value>
+        </li>
+        <li>
+          <key>_T1</key>
+          <value>Clamp</value>
+        </li>
+        <li>
+          <key>_M1</key>
+          <value>Clamp</value>
+        </li>
+        <li>
+          <key>_T2</key>
+          <value>Clamp</value>
+        </li>
+        <li>
+          <key>_M2</key>
+          <value>Clamp</value>
+        </li>
+        <li>
+          <key>_T3</key>
+          <value>Clamp</value>
+        </li>
+        <li>
+          <key>_M3</key>
+          <value>Clamp</value>
+        </li>
+        <li>
+          <key>_T4</key>
+          <value>Clamp</value>
+        </li>
+        <li>
+          <key>_M4</key>
+          <value>Clamp</value>
+        </li>
+        <li>
+          <key>_T5</key>
+          <value>Clamp</value>
+        </li>
+        <li>
+          <key>_M5</key>
+          <value>Clamp</value>
+        </li>
+        <li>
+          <key>_T6</key>
+          <value>Clamp</value>
+        </li>
+        <li>
+          <key>_M6</key>
+          <value>Clamp</value>
+        </li>
+        <li>
+          <key>_T7</key>
+          <value>Clamp</value>
+        </li>
+        <li>
+          <key>_M7</key>
+          <value>Clamp</value>
+        </li>
+      </textureWrapOverrides>
+    </shaderProgram>
+  </ShaderDef>
 </Defs>

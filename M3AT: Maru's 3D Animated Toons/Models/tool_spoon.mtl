@@ -1,0 +1,4 @@
+# M3AT wooden spoon colours (anim_scripts/make_spoon.py); fixed (no stuff)
+
+newmtl spoon_wood
+Kd 0.720 0.520 0.300

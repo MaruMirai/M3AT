@@ -2,6 +2,9 @@
 # Runs the AutoTest scenarios (Source/AutoTest.cs) in the game, then puts the normal build back.
 #   ./autotest.sh [scenario,...|all] [--video] [--out folder]
 #   ./autotest.sh shots --load <save> [--from tick] [--ticks n] [--every n] [--out folder]   (stills of a save run on, from its view)
+#   ./autotest.sh perf --load <save> [--seconds s] [--rounds n] [--counts 0,5,10,20f] [--out folder]
+#       (frame times with the chibi, IsoRim's figures and none; or with the chibi on that many colonists, f: fewer poses on,
+#        n: a draw per face layer, as before FaceLayers.DrawStacked)
 # Pictures, the probe log and report.md go to <out>/<date-time>/ (default: the game's config folder, M3AT/autotest).
 set -e
 cd "$(dirname "$0")"
@@ -18,6 +21,10 @@ while [ $# -gt 0 ]; do
         --ticks) args+=("-m3atShotTicks=$2"); shift ;;
         --every) args+=("-m3atShotEvery=$2"); shift ;;
         --from) args+=("-m3atShotFrom=$2"); shift ;;
+        --seconds) args+=("-m3atPerfSeconds=$2"); shift ;;
+        --rounds) args+=("-m3atPerfRounds=$2"); shift ;;
+        --counts) args+=("-m3atPerfCounts=$2"); shift ;;
+        --stack) args+=("-m3atStackSize=$2"); shift ;;
     esac
     shift
 done
@@ -39,4 +46,10 @@ trap 'dotnet build Source/M3AT.csproj -v q -nologo 9>&- | grep -E " error |Build
 log="$HOME/.config/unity3d/Ludeon Studios/RimWorld by Ludeon Studios/Logs/Player.log"
 start=(-quicktest); [ -n "$load" ] && start=("-m3atTestLoad=$load")
 (cd ~/.local/share/Steam/steamapps/common/RimWorld && timeout 1800 ./RimWorld "${start[@]}" "-m3atTest=$which" "${args[@]}" -m3atTestQuit >/dev/null 2>&1) || true
+# The launcher can hand the game on to another process and return at once (Waylith's Vulkan fallback relaunch), which
+# would put the normal build back while the game still loads mods, so the test never runs: wait for the game itself.
+for _ in $(seq 1 1800); do
+    pgrep -f -- "^[^ ]*RimWorld[^ ]* .*-m3atTest=" >/dev/null || break
+    sleep 1
+done
 grep -a "\[AutoTest\]" "$log" | sed 's/^.*\[AutoTest\] //'

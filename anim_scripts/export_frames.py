@@ -1375,6 +1375,31 @@ if getattr(walk, 'TALK_CLIP', None) is not None:
 if hasattr(walk, 'teach_at'):
     pose_worst = max(pose_worst, export_loop('teach', walk.teach_at, walk.loop_frames(walk.TEACH_SECONDS), walk.TEACH_SECONDS))
     masks['teach'] = upper_mask('LR', walk.TEACH_UPPER)
+# A wave in passing (a social interaction): the right arm only, once through, its first and last frames hanging.
+if hasattr(walk, 'wave_at'):
+    wave_frames = walk.loop_frames(walk.WAVE_SECONDS)
+    pose_worst = max(pose_worst, export_loop('wave', lambda t: walk.wave_at(t * wave_frames / (wave_frames - 1)),
+                                             wave_frames, walk.WAVE_SECONDS))
+    masks['wave'] = upper_mask('R', walk.WAVE_UPPER)
+# Sad (a sad wander): slumped from the waist up over the gait, the arms only part of the way, so the walk still swings
+# them a little.
+if hasattr(walk, 'sad_at'):
+    pose_worst = max(pose_worst, export_loop('sad', walk.sad_at, walk.loop_frames(walk.SAD_SECONDS), walk.SAD_SECONDS))
+    masks['sad'] = {n: w * (walk.SAD_ARMS if n.split('.')[0] in ('shoulder', 'upper_arm', 'forearm', 'hand', 'thumb')
+                            else 1.0)
+                    for n, w in upper_mask('LR', walk.SAD_UPPER).items()}
+# Drunk: a sway on the plain stance, every turn none at the first frame, which the game adds on top of whatever the
+# figure does (SkinnedFigure.Nudge): drunk the trunk, neck and head (the arms riding the chest), drunk_arms the upper
+# arms hanging back against it, only with the hands free. One clip posed once, written twice with each one's bones.
+if hasattr(walk, 'drunk_at'):
+    pose_worst = max(pose_worst, export_loop('drunk', walk.drunk_at, walk.loop_frames(walk.DRUNK_SECONDS), walk.DRUNK_SECONDS),
+                     export_loop('drunk_arms', walk.drunk_at, walk.loop_frames(walk.DRUNK_SECONDS), walk.DRUNK_SECONDS))
+    masks['drunk'] = upper_mask('', walk.DRUNK_UPPER)
+    masks['drunk_arms'] = {n: 1.0 if n.split('.')[0] == 'upper_arm' else 0.0 for n in deform}
+# On fire: patting at the flames on itself, from the waist up over the run.
+if hasattr(walk, 'burn_at'):
+    pose_worst = max(pose_worst, export_loop('burning', walk.burn_at, walk.loop_frames(walk.BURN_SECONDS), walk.BURN_SECONDS))
+    masks['burning'] = upper_mask('LR', walk.BURN_UPPER)
 # Reloading: the same, over the drafted stance (the game stretches it over the reload's time).
 if getattr(walk, 'RELOAD_CLIP', None) is not None:
     pose_worst = max(pose_worst, export_loop('reload', walk.reload_at, walk.RELOAD_CLIP['frames'], walk.RELOAD_SECONDS))
@@ -1387,6 +1412,16 @@ for name, at in (('eat_sit', getattr(walk, 'eat_sit_at', None)), ('eat_stand', g
         pose_worst = max(pose_worst, export_loop(name, at, lambda n=name: getattr(walk, n.upper() + '_CLIP')['frames'],
                                                  lambda n=name: getattr(walk, n.upper() + '_SECONDS')))
         masks[name] = upper_mask('LR', walk.EAT_UPPER)
+# Taking drugs, the same way: smoking a joint (a loop, its joint on the right hand by its tool line, below; the left arm
+# left to the idle or the sit) and taking a pill or a powder (once through, the game playing it over the chew, as the
+# toss is played).
+if hasattr(walk, 'smoke_at'):
+    pose_worst = max(pose_worst, export_loop('smoke', walk.smoke_at, walk.loop_frames(walk.SMOKE_SECONDS), walk.SMOKE_SECONDS))
+    masks['smoke'] = upper_mask('R', walk.EAT_UPPER)
+if hasattr(walk, 'pill_at'):
+    pose_worst = max(pose_worst, export_loop('pill', lambda t: walk.pill_at(t * walk.PILL_FRAMES / (walk.PILL_FRAMES - 1)),
+                                             walk.PILL_FRAMES, walk.PILL_SECONDS))
+    masks['pill'] = upper_mask('LR', walk.EAT_UPPER)
 # Reading: the same, over the sit or the idle, the open book on the left hand (its tool line, below).
 if hasattr(walk, 'read_at'):
     pose_worst = max(pose_worst, export_loop('read', walk.read_at, walk.loop_frames(walk.READ_SECONDS), walk.READ_SECONDS))
@@ -1428,6 +1463,10 @@ if hasattr(walk, 'tame_at'):
     if getattr(walk, 'CROUCH_CLIP', None) is not None:
         pose_worst = max(pose_worst, export_loop('work_tame_kneel', walk.tame_kneel_at, walk.CROUCH_CLIP['frames'],
                                                  walk.CROUCH_SECONDS))
+# Reaching to a switch, a lamp or a lid (Flick, Open): the right hand pressed out in front, the whole figure in place of
+# the idle.
+if hasattr(walk, 'reach_at'):
+    pose_worst = max(pose_worst, export_loop('work_reach', walk.reach_at, walk.loop_frames(walk.REACH_SECONDS), walk.REACH_SECONDS))
 # Beating out a fire: stomping it out on the floor (work_stomp, and work_stomp~2 with the other foot) and patting it
 # out on a structure or furniture (work_pat), each a loop of one beat a foot or hand, the whole figure in place of the
 # idle; the game plays them by its beats (WalkFigures.BeatPhase), not the clock.
@@ -1541,6 +1580,27 @@ if hasattr(walk, 'hip_rest'):
 # The open book read (walk.read_rest), on the left hand; the game picks IsoRim's open book, map or schematic by the book.
 if hasattr(walk, 'read_rest'):
     tools.append(('read', 'open_book', 'L', Matrix.Scale(scale, 4) @ GAME @ rig.matrix_world @ walk.read_rest() @ GAME.inverted()))
+# The joint smoked (walk.smoke_rest), across the right hand's fingers: this mod's own Models/tool_joint.obj (make_joint.py).
+if hasattr(walk, 'smoke_rest'):
+    tools.append(('smoke', 'tool_joint', 'R', Matrix.Scale(scale, 4) @ GAME @ rig.matrix_world @ walk.smoke_rest() @ GAME.inverted()))
+# Stirring a pot (walk.stir_at), the whole figure, made on the bench work (work_stir) or the ground work
+# (work_stir_crouch), which the game plays now and then while cooking, with the wooden spoon (Models/tool_spoon.obj,
+# make_spoon.py); or at a campfire, sat cross-legged (work_stir_campfire) or on a chair (work_stir_campfire_sit, over the
+# sit from the waist up), played the whole time, holding a roasting stick out over the fire (Models/tool_stick.obj,
+# make_stick.py; walk.stir_tool). In the right fist, the same place in the hand all through.
+if hasattr(walk, 'stir_at'):
+    for kind, work in walk.STIR_KINDS.items():
+        if work != 'fire_sit' and (walk.BENCH_CLIP if work == 'bench' else walk.MEDITATE_CLIP if work == 'fire' else walk.CROUCH_CLIP) is None:
+            continue
+        pose_worst = max(pose_worst, export_loop('work_' + kind, lambda t, k=kind: walk.stir_at(t, k),
+                                                 walk.loop_frames(walk.STIR_SECONDS), walk.STIR_SECONDS))
+        if work == 'fire_sit':
+            masks['work_' + kind] = upper_mask('LR', walk.EAT_UPPER)   # (laid over the sit from the waist up, as seated work is)
+        held = [X['hand.R'].inverted() @ spoon for X, _, spoon in
+                (walk.stir_frames(kind, f / 8, walk.stir_made[kind][2]) for f in range(8))]
+        tool_drift = max(tool_drift, max((m.translation - held[0].translation).length for m in held) * rig.matrix_world.to_scale().x * scale)
+        tools.append((kind, walk.stir_tool(kind) if hasattr(walk, 'stir_tool') else 'tool_spoon', 'R', Matrix.Scale(scale, 4) @ GAME @ rig.matrix_world @ walk.stir_rest(kind) @ GAME.inverted()))
+        print('STIR %s: the fist turned %.0f degrees round the handle' % (kind, walk.stir_made[kind][2]))
 # Kneeling at work on the ground (walk.pluck_at), from the mocap clip, with bare hands; a kind of its own for the game.
 if walk.PLUCK_CLIP is not None:
     pose_worst = max(pose_worst, export_loop('work_pluck', walk.pluck_at, walk.PLUCK_CLIP['frames'], walk.PLUCK_SECONDS))
@@ -1559,6 +1619,11 @@ if getattr(walk, 'MEDITATE_CLIP', None) is not None and getattr(walk, 'TALK_CLIP
 # Sat cross-legged meditating (walk.meditate_at), the mocap sit as it is; a work kind for the game, as it sits at a spot.
 if getattr(walk, 'MEDITATE_CLIP', None) is not None:
     pose_worst = max(pose_worst, export_loop('work_meditate', walk.meditate_at, walk.MEDITATE_CLIP['frames'], walk.MEDITATE_SECONDS))
+# Praying sat on a chair or throne (walk.pray_sit_at, MeditatePray on a seat): the palms together and the head bowed,
+# from the waist up over the sit, as seated work is.
+if hasattr(walk, 'pray_sit_at'):
+    pose_worst = max(pose_worst, export_loop('work_meditate_sit', walk.pray_sit_at, walk.loop_frames(walk.PRAY_SECONDS), walk.PRAY_SECONDS))
+    masks['work_meditate_sit'] = upper_mask('LR', walk.EAT_UPPER)
 # Bent over vomiting (walk.vomit_at), the mocap pant with a heave; a work kind for the game, as it stands at a cell.
 if getattr(walk, 'VOMIT_CLIP', None) is not None:
     pose_worst = max(pose_worst, export_loop('work_vomit', walk.vomit_at, walk.VOMIT_CLIP['frames'], walk.VOMIT_SECONDS))
@@ -1583,10 +1648,18 @@ if hasattr(walk, 'roll_at'):
 # Lying from mocap clips, made upright as the lie is (the game lays them down the same way): asleep, downed in bed and
 # downed on the ground; a corpse (one frame); and the two falls from standing, once through, each ending as the loop it
 # falls into (walk.FALL_INTO) begins.
-for name, clip, at in (('sleep', walk.SLEEP_CLIP, walk.sleep_at), ('downed', walk.DOWNED_CLIP, walk.downed_at),
+if walk.SLEEP_CLIP is not None and hasattr(walk, 'sleep_frames'):
+    # By functions, so the still variant on the side (walk.SLEEP_HOLD) has its own length.
+    pose_worst = max(pose_worst, export_loop('sleep', walk.sleep_at, walk.sleep_frames, walk.sleep_seconds))
+for name, clip, at in ((('sleep', walk.SLEEP_CLIP, walk.sleep_at),) if not hasattr(walk, 'sleep_frames') else ()) + (('downed', walk.DOWNED_CLIP, walk.downed_at),
                        ('downed_side', walk.DOWNED_SIDE_CLIP, walk.downed_side_at)):
     if clip is not None:
         pose_worst = max(pose_worst, export_loop(name, at, clip['frames'], clip['frames'] / clip['fps']))
+# At lovin on the side, facing the partner on the figure's left or right (a bed with no blanket over it).
+if hasattr(walk, 'lovin_at') and walk.DOWNED_SIDE_CLIP is not None:
+    for side in ('L', 'R'):
+        pose_worst = max(pose_worst, export_loop('lovin_' + side, lambda t, s=side: walk.lovin_at(t, s),
+                                                 walk.loop_frames(walk.LOVIN_SECONDS), walk.LOVIN_SECONDS))
 # A baby awake on its back, waving and kicking (arms posed by hand and the crawl's legs on the lie).
 if hasattr(walk, 'baby_at') and walk.CRAWL_CLIP is not None:
     pose_worst = max(pose_worst, export_loop('baby', walk.baby_at, walk.loop_frames(walk.BABY_SECONDS), walk.BABY_SECONDS))
@@ -1595,6 +1668,8 @@ if walk.DIE_CLIP is not None:
 # The ragdoll's neutral pose (one frame): what a limp body's joints are pulled toward (Ragdoll.cs), by each bone's turn on
 # its parent's only.
 pose_worst = max(pose_worst, export_loop('ragdoll', lambda t: walk.ragdoll_pose(), 1, 1.0))
+# A corpse slumped in a gibbet cage (one frame, standing; WalkFigures.DrawCaged).
+pose_worst = max(pose_worst, export_loop('caged', lambda t: walk.caged_pose(), 1, 1.0))
 for name in ('knockdown', 'die'):
     if walk.fall_clip(name) is not None and (walk.FALL_INTO[name] != 'downed_side' or walk.DOWNED_SIDE_CLIP is not None):
         # By functions, so a variant with another mocap clip has its own length.
@@ -1674,6 +1749,9 @@ for name in ('eat_sit', 'eat_stand'):
         print('%s %d frames over %.2f s from %s (frames %d .. %d), laid over the %s from the waist up'
               % (name.upper(), clip['frames'], clip['frames'] / clip['fps'], clip['source'], clip['first'], clip['last'],
                  'sit' if name == 'eat_sit' else 'idle'))
+if hasattr(walk, 'smoke_at'):
+    print('SMOKE over %.1f s, a drag a loop, the joint on the right hand; PILL over %.2f s once through (the game plays it '
+          'over the chew), both laid over the sit or the idle from the waist up' % (walk.SMOKE_SECONDS, walk.PILL_SECONDS))
 if hasattr(walk, 'read_at'):
     print('READ over %.1f s, the book on the left hand, laid over the sit or the idle from the waist up' % walk.READ_SECONDS)
 print('CAST cast and cast_touch over %.1f s, laid over the gait with the left arm; FLINCH %s, %d frames each, added on top'

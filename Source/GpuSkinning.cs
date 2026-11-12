@@ -153,6 +153,81 @@ namespace M3AT
             m.outline.bounds = GpuBounds;
         }
 
+        // The face patch posed on the graphics card, as the body is (MarusFace.vert.glsl skins it), as setting its meshes'
+        // vertices at each new pose rebuilt the face, the mouth and the pig snout's mouth with new GPU buffers every frame
+        // for every pawn that moved. Each face vertex is moved by the bones of the body vertex it was made from (faceFrom),
+        // so it is posed exactly as the CPU poses it; its rest place and normal in the pawn's shape are set only when the
+        // shape changes, and the pawn's bones go to FaceLayers in the patch (FaceLayers.BlockFor).
+        private void FaceOnGpu(Posed p)
+        {
+            FaceLayers.Patch f = p.face;
+            if (f.gpuShape != p.shape)
+            {
+                if (f.gpuShape == null)
+                {
+                    Vector4[][] packed = FacePacked();
+                    SetPacked(f.face, packed);
+                    SetPacked(f.mouth, packed);
+                    SetPacked(f.mouthLow, packed);
+                }
+                f.gpuShape = p.shape;
+                Vector3[] bodyNormal = ShapedPiece(p.shape, 0).normal;
+                for (int i = 0; i < p.faceNormals.Length; i++)
+                {
+                    p.faceNormals[i] = bodyNormal[faceFrom[i]];
+                }
+                Bounds bounds = FaceLayers.PatchBounds;   // as NewPatch set them, which setting the vertices would undo
+                foreach (Mesh mesh in new[] { f.face, f.mouth, f.mouthLow })
+                {
+                    mesh.vertices = p.shape.faceRest;
+                    mesh.normals = p.faceNormals;
+                    mesh.bounds = bounds;
+                }
+            }
+            BlockOf(p);   // the pawn's bones as three rows each, set again only when they have changed
+            f.bones = p.boneVectors;
+            f.bonesAt = p.posedAt;
+            f.centre = p.bones[headBone].MultiplyPoint3x4(p.shape.faceCentre);
+        }
+
+        // Back to the CPU (the option turned off): the bones taken out of the patch's meshes, which Finish then poses.
+        private void FaceLeaveGpu(FaceLayers.Patch f)
+        {
+            if (f.bones == null && f.gpuShape == null)
+            {
+                return;
+            }
+            Vector4[] none = new Vector4[faceFrom.Length];
+            Vector4[][] empty = { none, none, none };
+            SetPacked(f.face, empty);
+            SetPacked(f.mouth, empty);
+            SetPacked(f.mouthLow, empty);
+            f.bones = null;
+            f.gpuShape = null;
+        }
+
+        private Vector4[][] facePacked;
+
+        // Each face vertex's bones for the graphics card: those of the body vertex it was made from.
+        private Vector4[][] FacePacked()
+        {
+            if (facePacked != null)
+            {
+                return facePacked;
+            }
+            Vector4[][] body = PackedOf(pieces[0]);
+            facePacked = new Vector4[3][];
+            for (int c = 0; c < 3; c++)
+            {
+                facePacked[c] = new Vector4[faceFrom.Length];
+                for (int i = 0; i < faceFrom.Length; i++)
+                {
+                    facePacked[c][i] = body[c][faceFrom[i]];
+                }
+            }
+            return facePacked;
+        }
+
         // Takes the bones back out of a mesh that was skinned on the graphics card (the option turned off), so the shader
         // draws it as Pose places it again.
         private static void LeaveGpu(PieceMeshes m)
@@ -181,8 +256,29 @@ namespace M3AT
 
         // The pawn's bones as the shader reads them (_MarusBones: the top three rows of each), in a block of its own, set
         // again only when they have changed, and its hit flash (_IsoFlash). Every draw of its meshes takes it.
-        private static MaterialPropertyBlock BlockOf(Posed p)
+        private static MaterialPropertyBlock BlockOf(Posed p, bool dressed = false)
         {
+            if (dressed && p.pylons)
+            {
+                // The clothes' bones (Prosthetics.cs): a pylon left its full width.
+                if (p.dressBlock == null)
+                {
+                    p.dressBlock = new MaterialPropertyBlock();
+                    p.dressVectors = new Vector4[p.dressRows.Length / 4];
+                    p.dressAt = -1;
+                }
+                if (p.dressAt != p.posedAt)
+                {
+                    float[] d = p.dressRows;
+                    for (int r = 0; r < p.dressVectors.Length; r++)
+                    {
+                        p.dressVectors[r] = new Vector4(d[4 * r], d[4 * r + 1], d[4 * r + 2], d[4 * r + 3]);
+                    }
+                    p.dressBlock.SetVectorArray(bonesId, p.dressVectors);
+                    p.dressAt = p.posedAt;
+                }
+                return p.dressBlock;
+            }
             if (p.bonesBlock == null)
             {
                 p.bonesBlock = new MaterialPropertyBlock();
@@ -218,6 +314,20 @@ namespace M3AT
         {
             return Api.FigureVisible(GpuBounds, TrueSpace(position, yaw, local));
         }
+
+        // Whether a figure IsoRim places at position (cells) at this size may be on screen at all: FigureOnScreen's test made
+        // before anything is posed, any way round, and MaybeMargin cells roomier, as the figure is drawn up to about that far
+        // from its placing (stepped up to a bench or an instrument, a kiss, a listener, a ragdoll's drift). The game offers
+        // every pawn in its view rectangle, which with IsoRim's tilted camera reaches well past the screen, so one that
+        // can't be seen is left out before it is posed (WalkFigures.DrawSkinned).
+        public static bool MaybeOnScreen(Vector3 position, float size)
+        {
+            float s = Mathf.Max(size, 0.05f);
+            Bounds roomy = new Bounds(GpuBounds.center, GpuBounds.size + Vector3.one * (2f * MaybeMargin / s));
+            return Api.FigureVisible(roomy, Matrix4x4.Translate(position) * Matrix4x4.Scale(new Vector3(s, s, s)));
+        }
+
+        private const float MaybeMargin = 1f;   // cells
 
         // Draws a piece's parts as a moving model's (Api.SubmitFigureMesh: another mod's figure scope, the floor it is drawn on
         // and its fade, IsoRim's outline option, the floor and hit flash in the block, each lit part with its light pass), not
