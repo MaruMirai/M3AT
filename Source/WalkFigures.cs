@@ -486,6 +486,8 @@ namespace M3AT
             public int pillTicks;   // game ticks the chew it is timed by takes (the most left of it seen)
             public float look;   // degrees the head is turned about the vertical, eased (LessonLookOf: at a lesson)
             public float talk;   // 0 .. 1: how far into talking it is (TalkOf: a board game, a speech)
+            public float speaking;   // 0 .. 1: how much of a talking clip it was posed with this frame (the mouth moves, FaceLayers)
+            public int speakingFrame = -1;   // the frame speaking was set on (Time.frameCount); other frames count as none
             public float toss;   // 0 .. 1: how far into pitching horseshoes or hoopstone it is (Tossing)
             public string tossClip;   // toss, or snowball for Romance on the Rim's snowball fight (kept while it eases out)
             public Vector3 kissWay;
@@ -5971,7 +5973,9 @@ namespace M3AT
             Wounds.Draw(pawn, skin, fig, mask, wornBuffer, at, yaw, size, skinColour);
             if (!skin.HidesFace(mask, wornBuffer) && !headless)
             {
-                FaceLayers.Draw(pawn, fig.face, at, yaw, size, Wounds.EyeWoundsOn(fig), HasGeneKey(pawn, NosePig));
+                Ease said;
+                float speaking = eases.TryGetValue(pawn.thingIDNumber, out said) && said.speakingFrame == Time.frameCount ? said.speaking : 0f;
+                FaceLayers.Draw(pawn, fig.face, at, yaw, size, Wounds.EyeWoundsOn(fig), HasGeneKey(pawn, NosePig), speaking);
             }
             FaceLayers.Flash = 0f;
             return mask;
@@ -7442,6 +7446,10 @@ namespace M3AT
                         skin.Over(fig, tossClip, tossPhase, tossing * sat * (1f - bend) * land);
                     }
                     float chat = BoutWeight(ease.chatAt);
+                    // The mouth talks along with the hands (FaceLayers.Draw's speaking): the talk clip, and sat by a
+                    // patient talking (work_visit).
+                    ease.speaking = Mathf.Max(skin.Has("talk") ? Mathf.Max(ease.talk, chat) * idleHands : 0f, ease.workKind == "visit" ? ease.shownWork : 0f);
+                    ease.speakingFrame = Time.frameCount;
                     if (skin.Has("talk") && (ease.talk > 0f || chat > 0f))
                     {
                         bool bout = chat > ease.talk;

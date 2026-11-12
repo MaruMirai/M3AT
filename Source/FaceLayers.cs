@@ -730,7 +730,9 @@ namespace M3AT
         // yaw degrees about the vertical, size the model's scale.
         // wounds: those on the eyes themselves (Wounds.cs), drawn in the stack under the lids. lowMouth: the mouth moved down
         // below the pig snout's nostrils (MouthRaisePig).
-        public static void Draw(Pawn pawn, Patch patch, Vector3 position, float yaw, float size, EyeWound[] wounds = null, bool lowMouth = false)
+        // speaking: 0 .. 1, how much of a talking clip the figure has on; past SpeakFrom the mouth opens and closes on
+        // syllables (MouthOpen), Facial Animation's "open" mouth shape swapped in for whatever mouth it shows.
+        public static void Draw(Pawn pawn, Patch patch, Vector3 position, float yaw, float size, EyeWound[] wounds = null, bool lowMouth = false, float speaking = 0f)
         {
             if (patch == null || !Available || !Api.ViewReady)
             {
@@ -766,6 +768,7 @@ namespace M3AT
                 // A moving patch poses mouthLow only once it has been asked for, so the first frame keeps the plain mouth.
                 Mesh mouth = lowMouth && patch.lowUsed && patch.mouthLow != null ? patch.mouthLow : patch.mouth;
                 patch.lowUsed |= lowMouth;
+                bool mouthOpen = speaking > SpeakFrom && MouthOpen(pawn.thingIDNumber);
                 int place = 0;
                 Texture iris = null, white = null;   // this frame's eye textures, the shape of the eye the wounds are cut to
                 bool woundsDrawn = wounds == null || wounds.Length == 0;
@@ -804,6 +807,14 @@ namespace M3AT
                         else if (kind == "EyeballControllerComp" && layer.EndsWith("Basic", StringComparison.Ordinal))
                         {
                             iris = LayerTexture(g);
+                        }
+                    }
+                    if (mouthOpen && kind == "MouthControllerComp")
+                    {
+                        Graphic open = ShapeGraphic(node, pawn, "open");
+                        if (open != null && !IsDummy(open))
+                        {
+                            g = open;
                         }
                     }
                     int cut = 0;
@@ -1598,9 +1609,56 @@ namespace M3AT
             return labels;
         }
 
+        // Talking: the mouth opens and closes on syllables of SyllableSeconds, about one in SyllableRest of them left shut,
+        // with a breath of PhraseRest seconds closing each phrase of PhraseSeconds. On a clock of real time that stops while
+        // the game is paused (talkClock), as by game ticks it flickers at the faster speeds. Each pawn has its own
+        // rhythm, from its id.
+        private const float SpeakFrom = 0.3f;   // the talking clip's weight from which the mouth moves
+        private const float SyllableSeconds = 0.16f;
+        private const float SyllableOpen = 0.6f;   // the share of a syllable the mouth is open for
+        private const int SyllableRest = 5;   // one syllable in this many (on average) is left shut
+        private const float PhraseSeconds = 2.4f;
+        private const float PhraseRest = 0.4f;
+        private static float talkClock;
+        private static int talkClockFrame = -1;
+
+        private static bool MouthOpen(int id)
+        {
+            if (talkClockFrame != Time.frameCount)
+            {
+                talkClockFrame = Time.frameCount;
+                if (!Find.TickManager.Paused)
+                {
+                    talkClock += Mathf.Min(Time.deltaTime, 0.1f);
+                }
+            }
+            uint seed = (uint)id * 2654435761u;
+            float t = talkClock + (seed % 1000u) * 0.001f * PhraseSeconds;
+            float phrase = t / PhraseSeconds;
+            if ((phrase - Mathf.Floor(phrase)) * PhraseSeconds > PhraseSeconds - PhraseRest)
+            {
+                return false;
+            }
+            float syllables = t / SyllableSeconds;
+            int syllable = Mathf.FloorToInt(syllables);
+            if (Gen.HashCombineInt(id, syllable) % SyllableRest == 0)
+            {
+                return false;
+            }
+            return syllables - syllable < SyllableOpen;
+        }
+
         // This lid layer as Facial Animation draws it closed (its "close" LidShapeDef, as when the pawn blinks), or null.
-        // Read from the controller's graphicList, by layer, with NLGraphic_Collection.GetSubGraphic.
         private static Graphic ClosedLid(PawnRenderNode node, Pawn pawn)
+        {
+            return ShapeGraphic(node, pawn, "close");
+        }
+
+        private static readonly Dictionary<Type, FieldInfo> graphicLists = new Dictionary<Type, FieldInfo>();
+
+        // This layer as Facial Animation draws it in the shape named (a LidShapeDef, MouthShapeDef, ... of the controller's
+        // own kind), or null. Read from the controller's graphicList, by layer, with NLGraphic_Collection.GetSubGraphic.
+        private static Graphic ShapeGraphic(PawnRenderNode node, Pawn pawn, string shape)
         {
             try
             {
@@ -1609,10 +1667,15 @@ namespace M3AT
                 {
                     return null;
                 }
-                FieldInfo list = null;
-                for (Type t = controller.GetType(); t != null && list == null; t = t.BaseType)
+                FieldInfo list;
+                if (!graphicLists.TryGetValue(controller.GetType(), out list))
                 {
-                    list = t.GetField("graphicList", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+                    list = null;
+                    for (Type t = controller.GetType(); t != null && list == null; t = t.BaseType)
+                    {
+                        list = t.GetField("graphicList", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+                    }
+                    graphicLists[controller.GetType()] = list;
                 }
                 System.Collections.IDictionary graphics = list != null ? list.GetValue(controller) as System.Collections.IDictionary : null;
                 object collection = graphics != null ? graphics[layerTypeField.GetValue(node)] : null;
@@ -1626,16 +1689,16 @@ namespace M3AT
                 {
                     return null;
                 }
-                Def close = GenDefDatabase.GetDefSilentFail(ps[1].ParameterType, "close", false);
-                if (close == null)
+                Def def = GenDefDatabase.GetDefSilentFail(ps[1].ParameterType, shape, false);
+                if (def == null)
                 {
                     return null;
                 }
-                return sub.Invoke(collection, new object[] { pawn, close, rotDrawModeField.GetValue(node) }) as Graphic;
+                return sub.Invoke(collection, new object[] { pawn, def, rotDrawModeField.GetValue(node) }) as Graphic;
             }
             catch (Exception e)
             {
-                Log.ErrorOnce(Tag + "reading Facial Animation's closed eyelid failed: " + e, 61938203);
+                Log.ErrorOnce(Tag + "reading Facial Animation's " + shape + " face shape failed: " + e, 61938203 + shape.GetHashCode() % 1000);
                 return null;
             }
         }
