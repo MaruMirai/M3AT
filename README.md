@@ -2,7 +2,7 @@
 
 *Animated 3D pawns for [IsoRim Waylith](https://steamcommunity.com/sharedfiles/filedetails/?id=3819577715).*
 
-![M3AT preview](<M3AT: Maru's 3D Animated Toons/About/Preview.png>)
+![M3AT preview](M3AT%3A%20Maru%27s%203D%20Animated%20Toons/About/Preview.png)
 
 **Early WIP and just launched**, so expect some janky or generic animations and other scuff.
 Screenshots use [Facial Animation - Retexture](https://steamcommunity.com/sharedfiles/filedetails/?id=3271240549).
