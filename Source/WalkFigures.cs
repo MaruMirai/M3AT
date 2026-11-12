@@ -6107,6 +6107,11 @@ namespace M3AT
                 {
                     DrawHeld(held, person);
                 }
+                else if (pet && Api.DrawFigure(held, hold, yaw - 90f, Matrix4x4.identity, false))
+                {
+                    // (the pet, facing exactly the carrier's left: drawn by the game, it faces its Rotation, a Rot4, so it
+                    // was up to 45 degrees off the forearm and flipped a quarter turn as the carrier turned past a diagonal)
+                }
                 else
                 {
                     Api.DrawCarried(pawn, hold, yaw);
