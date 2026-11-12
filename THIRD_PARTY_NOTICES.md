@@ -1,13 +1,13 @@
 # Third-party notices
 
-The licence above covers this repository's own work. These parts come from
+The MIT licence in LICENSE covers this repository's own work. These parts come from
 others and stay under their own terms:
 
 - The MarusSmooth shaders (Shaders/MarusSmooth*.glsl in the mod's folder) are
   adapted from IsoRim's shaders, used under IsoRim's MIT licence:
 
     Copyright (c) 2026 kndzio
-    (the full MIT licence text, as above, applies)
+    (under the same MIT licence text as LICENSE)
 
 - The chibi base body (in Models/pawnHumanRig.blend and the meshes made from
   it) is "Chibi Base Body" by monymensss, used under Creative Commons
