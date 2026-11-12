@@ -132,7 +132,7 @@ namespace M3AT
             }
         }
 
-        private static void Hide(Thing thing, bool hide)
+        internal static void Hide(Thing thing, bool hide)
         {
             lock (flying)
             {
@@ -430,6 +430,7 @@ namespace M3AT
         public override void MapComponentUpdate()
         {
             base.MapComponentUpdate();
+            WalkFigures.SweepDressing();   // (apparel hidden while put on, shown again once the pawn is no longer at it)
             if (Find.TickManager.TickRateMultiplier > 0f)
             {
                 since = Mathf.Min(since + Time.deltaTime * Find.TickManager.TickRateMultiplier, TickSeconds);

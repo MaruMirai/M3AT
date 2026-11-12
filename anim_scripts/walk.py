@@ -1006,6 +1006,34 @@ TOYS_WIGGLES = 8     # the fingers' wiggles a loop
 TOYS_CURL = (0.1, 0.5)   # the fingers' curl between (shares of FIST)
 TOYS_POINT = 25.0    # the hand pointed down from level (degrees), the palm to the baby
 TOYS_ROLL = 20.0     # the hand rolled with the sway (degrees either way), leading it
+# Drawing on the floor in chalk (chalk_at, work_chalk: Biotech's Floordrawing, a child knelt on its cell drawing on the
+# one in front): the pluck kneel (PLUCK_CLIP, on its clock), stooped further, the left palm propped on the floor and the
+# right hand holding a stick of chalk (Models/tool_chalk.obj, make_chalk.py) whose tip is kept on the floor, scribbling
+# loops while it sweeps from side to side, lifted once a loop to start again. Places on the floor from under the hips in
+# the figure's own frame (x out to the left, y back: the game faces it at the cell it draws on), as the clip's chest is
+# turned well to the left; the hands' ways in a level frame turned as the chest is (read_level). Leg lengths.
+CHALK_LEAN = 6.0      # degrees the trunk is leant from the waist to the right, toward the drawing hand
+CHALK_STOOP = 20.0    # and forward, on top of the clip's own stoop
+CHALK_LOOK = 14.0     # the head bowed further, to look at the drawing (degrees)
+CHALK_MIDDLE = (0.0, -0.88)   # the middle of the drawing: out in front
+CHALK_SWEEP = 0.1     # how far the hand sweeps either side of it, once a loop
+CHALK_LOOPS = 5       # loops scribbled a loop (a whole number, so it closes)
+CHALK_RADIUS = (0.045, 0.03)   # each loop's size across and along
+CHALK_LIFT = 0.06     # how far the tip is lifted off the floor once a loop
+CHALK_LIFT_AT = (0.42, 0.16)   # where in the loop it lifts, and for how long (shares of the loop)
+CHALK_FLOOR = 0.004   # the tip's height over the floor while it draws
+CHALK_FINGERS = (0.1, -1.0, -0.35)   # the right fist's fingers' way: forward and a little down
+CHALK_FACING = (1.0, 0.0, -0.15)   # the right palm's facing: in toward the middle, so the thumb is up
+CHALK_ELBOW = (-0.8, 0.4, -0.4)   # the right elbow out and back (chest's frame)
+CHALK_CURL = 0.95     # the right fingers' curl round the chalk (shares of FIST)
+CHALK_PROP = (0.3, -0.6)   # the left palm on the floor, out to the left in front
+CHALK_PROP_FINGERS = (-0.25, -1.0, 0.0)   # its fingers' way: forward, a little in
+CHALK_PROP_ELBOW = (0.8, 0.5, -0.3)   # the left elbow out and back (chest's frame)
+CHALK_GRIP = 0.0      # where the chalk crosses the palm: shares of the fingers' length from their joint (hand.R.001's head)
+CHALK_PALM = 0.045    # and out from the palm (leg lengths), inside the curled fingers
+CHALK_TIP = 10.0      # degrees its back end is tipped toward the wrist from straight across the fist
+CHALK_OUT = 0.05      # how far the tip stands out of the little finger's side (its model's units)
+CHALK_SIZE = 1.0      # the chalk model's size (its own units are cells at a grown pawn's size)
 
 # Vomiting (vomit_at, work_vomit: the Vomit job): vomit_clip.json beside this file (import_pluck.py --as vomit --planted:
 # the end of Meshy's Catching_Breath, bent over with the hands on the knees, panting), played on the clock and set on
@@ -2111,6 +2139,131 @@ SNOW_KEYS = dict(
     heel=(0.0, 0.0, 12.0, 10.0, 0.0),
 )
 SNOW_UPPER = {'spine.001': 1.0}   # seated: from the waist up
+
+# Dressing (dress_at: the game's Wear job, which stands facing the apparel for its EquipDelay, and RemoveApparel, which
+# the game plays backwards). One clip per kind of apparel, each once through, standing, the whole figure, its first and
+# last frames the idle's first:
+#   legs: trousers. Squatted and bent over with the hands holding the waistband open by the knees, one foot stepped in
+#     and then the other, then pulled up to the waist and tugged.
+#   over: a shirt pulled on over the head. Held out in front, raised up over the head with it ducked into it (the
+#     chibi's arms reach only beside the head, not over it), drawn down past the head and the hem tugged down.
+#   coat: a coat, jacket or vest swung on. Held up in front by the collar, the right arm back into its sleeve behind
+#     as the trunk turns, then the left, and the lapels tugged straight.
+#   head: a hat, helmet or mask. Held in front of the face, put on with a hand each side of the head, and settled.
+#   belt: a belt or pack. The hands round the back and to the buckle at the front, fastening it with the head bowed.
+# Each has a stretch, DRESS[kind]['loop'] (the tugging and settling), that the game keeps at its own pace in a long
+# EquipDelay (power armour), slowing the rest of the clip instead: written as a `dress_loop <clip> from to` line.
+# Keyed at 'at' and joined smoothly (toss_key). Keys:
+#   'hips': the hips moved (x to the figure's left, y back, z up; leg lengths); 'pitch' the body bent forward about
+#     the hip joints, 'lean' the spine curled further, 'twist' the trunk turned (+ to the left), 'look' the head bowed
+#     (+ down) and 'tilt' it tipped (+ to its left), degrees.
+#   'foot_<side>': that ankle moved from where the standing pose has it (x out, y back, z up; leg lengths).
+#   'hands' (both, mirrored) or '<side>': each palm's middle as (landmark, (x out, y back, z up)) from a landmark of
+#     the pose as bent (ankle, knee and hip of the hand's side, its shoulder joint, or the waist and head joints in
+#     the middle; leg lengths), None for where the standing pose hangs it; 'palm[_<side>]' the palm's facing and
+#     'fingers[_<side>]' the fingers' way (x out, y back, z up), 'curl[_<side>]' their curl (shares of FIST).
+DRESS_FPS = 20   # frames a game second of the clip's own length
+DRESS_HANG = ((-1.0, 0.0, 0.0), (0.0, 0.0, -1.0))   # the palm's facing and the fingers' way hanging (in, down)
+DRESS = dict(
+    legs=dict(
+        seconds=3.2,
+        at=(0.0, 0.13, 0.25, 0.36, 0.48, 0.59, 0.72, 0.8, 0.87, 0.94, 1.0),
+        loop=(7, 9),
+        keys=dict(
+            hips=((0, 0, 0), (0, 0.03, -0.22), (0.05, 0.02, -0.18), (0, 0.03, -0.22), (-0.05, 0.02, -0.18), (0, 0.03, -0.22),
+                  (0, 0.01, -0.06), (0, 0, -0.02), (0.015, 0, -0.03), (0, 0, -0.02), (0, 0, 0)),
+            pitch=(0.0, 45.0, 40.0, 45.0, 40.0, 45.0, 15.0, 4.0, 6.0, 4.0, 0.0),
+            lean=(0.0, 12.0, 10.0, 12.0, 10.0, 12.0, 5.0, 2.0, 4.0, 2.0, 0.0),
+            look=(0.0, 5.0, 5.0, 5.0, 5.0, 5.0, 8.0, 10.0, 14.0, 10.0, 0.0),
+            foot_R=((0, 0, 0), (0, 0, 0), (0.0, -0.14, 0.36), (0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)),
+            foot_L=((0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0), (0.0, -0.14, 0.36), (0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)),
+            hands=(None, ('knee', (0.05, -0.12, 0.06)), ('knee', (0.05, -0.12, 0.06)), ('knee', (0.05, -0.12, 0.06)), ('knee', (0.05, -0.12, 0.06)),
+                   ('knee', (0.05, -0.12, 0.06)), ('hip', (0.08, -0.12, -0.15)), ('hip', (0.1, -0.05, 0.0)), ('hip', (0.12, -0.02, 0.04)),
+                   ('hip', (0.1, -0.05, 0.0)), None),
+            palm=(DRESS_HANG[0],) + ((-0.5, 0.8, 0.0),) * 6 + ((-1.0, 0.3, 0.0),) * 3 + (DRESS_HANG[0],),
+            fingers=(DRESS_HANG[1],) + ((0.0, -0.3, -1.0),) * 6 + ((0.0, -0.4, -1.0),) * 3 + (DRESS_HANG[1],),
+            curl=(0.2, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.65, 0.6, 0.2),
+        )),
+    over=dict(
+        seconds=2.4,
+        at=(0.0, 0.15, 0.33, 0.47, 0.62, 0.72, 0.8, 0.88, 1.0),
+        loop=(5, 7),
+        keys=dict(
+            hips=((0, 0, 0), (0, 0, -0.02), (0, 0, -0.03), (0, 0, -0.02), (0, 0, -0.02), (0, 0, -0.02), (0, 0, -0.03), (0, 0, -0.02), (0, 0, 0)),
+            pitch=(0.0, 5.0, 8.0, 6.0, 4.0, 2.0, 4.0, 2.0, 0.0),
+            lean=(0.0, 5.0, 10.0, 6.0, 6.0, 4.0, 6.0, 4.0, 0.0),
+            look=(0.0, 10.0, 25.0, 0.0, 8.0, 12.0, 15.0, 12.0, 0.0),
+            hands=(None, ('shoulder', (-0.05, -0.3, -0.15)), ('head', (0.2, -0.12, 0.25)), ('head', (0.36, -0.05, 0.05)),
+                   ('shoulder', (0.02, -0.1, -0.45)), ('hip', (0.0, -0.12, -0.02)), ('hip', (0.04, -0.1, -0.07)),
+                   ('hip', (0.0, -0.12, -0.02)), None),
+            palm=(DRESS_HANG[0], (-0.7, -0.5, 0.2), (-0.7, 0.0, 0.5), (-1.0, 0.0, 0.0), (-1.0, 0.2, 0.0),
+                  (-0.4, 0.9, 0.0), (-0.4, 0.9, 0.0), (-0.4, 0.9, 0.0), DRESS_HANG[0]),
+            fingers=(DRESS_HANG[1], (0.0, -0.3, 1.0), (0.0, -0.6, 0.8), (0.0, 0.0, 1.0), (0.0, 0.0, -1.0),
+                     (0.0, -0.3, -1.0), (0.0, -0.3, -1.0), (0.0, -0.3, -1.0), DRESS_HANG[1]),
+            curl=(0.2, 0.6, 0.6, 0.5, 0.6, 0.6, 0.7, 0.6, 0.2),
+        )),
+    coat=dict(
+        seconds=3.0,
+        at=(0.0, 0.12, 0.26, 0.38, 0.52, 0.64, 0.74, 0.82, 0.9, 1.0),
+        loop=(6, 8),
+        keys=dict(
+            hips=((0, 0, 0),) + ((0, 0, -0.02),) * 8 + ((0, 0, 0),),
+            twist=(0.0, 0.0, -32.0, -10.0, 32.0, 10.0, 0.0, 0.0, 0.0, 0.0),
+            lean=(0.0, 4.0, 6.0, 4.0, 6.0, 4.0, 2.0, 4.0, 2.0, 0.0),
+            look=(0.0, 8.0, 0.0, 5.0, 0.0, 5.0, 10.0, 12.0, 10.0, 0.0),
+            R=(None, ('shoulder', (-0.15, -0.32, -0.2)), ('hip', (0.14, 0.24, 0.08)), ('shoulder', (0.05, -0.15, -0.42)),
+               ('shoulder', (-0.28, -0.12, 0.0)), ('shoulder', (-0.12, -0.2, -0.12)), ('shoulder', (-0.1, -0.18, -0.12)),
+               ('shoulder', (-0.1, -0.2, -0.25)), ('shoulder', (-0.1, -0.18, -0.12)), None),
+            L=(None, ('shoulder', (-0.15, -0.32, -0.2)), ('shoulder', (-0.28, -0.12, 0.0)), ('shoulder', (-0.12, -0.2, -0.12)),
+               ('hip', (0.14, 0.24, 0.08)), ('shoulder', (0.05, -0.15, -0.42)), ('shoulder', (-0.1, -0.18, -0.12)),
+               ('shoulder', (-0.1, -0.2, -0.25)), ('shoulder', (-0.1, -0.18, -0.12)), None),
+            palm_R=(DRESS_HANG[0], (-0.7, -0.5, 0.2), (-1.0, 0.0, 0.0), (-1.0, 0.0, 0.0), (-0.3, 0.9, 0.3),
+                    (-0.4, 0.9, 0.0), (-0.4, 0.9, 0.0), (-0.4, 0.9, 0.0), (-0.4, 0.9, 0.0), DRESS_HANG[0]),
+            fingers_R=(DRESS_HANG[1], (0.0, -0.3, 1.0), (0.0, 0.4, -1.0), (0.0, -0.3, -1.0), (0.0, 0.0, 1.0),
+                       (0.3, 0.0, 1.0), (0.3, 0.0, 1.0), (0.3, 0.0, 1.0), (0.3, 0.0, 1.0), DRESS_HANG[1]),
+            palm_L=(DRESS_HANG[0], (-0.7, -0.5, 0.2), (-0.3, 0.9, 0.3), (-0.4, 0.9, 0.0), (-1.0, 0.0, 0.0),
+                    (-1.0, 0.0, 0.0), (-0.4, 0.9, 0.0), (-0.4, 0.9, 0.0), (-0.4, 0.9, 0.0), DRESS_HANG[0]),
+            fingers_L=(DRESS_HANG[1], (0.0, -0.3, 1.0), (0.0, 0.0, 1.0), (0.3, 0.0, 1.0), (0.0, 0.4, -1.0),
+                       (0.0, -0.3, -1.0), (0.3, 0.0, 1.0), (0.3, 0.0, 1.0), (0.3, 0.0, 1.0), DRESS_HANG[1]),
+            curl=(0.2, 0.6, 0.4, 0.3, 0.6, 0.6, 0.7, 0.75, 0.7, 0.2),
+        )),
+    head=dict(
+        # Put on from the front, the right hand holding it by the front brim (the game draws the hat there, tipped up on
+        # edge, then flying the last of the way onto the head, as the chibi's arms don't reach a hat on its big head:
+        # WalkFigures' DressHat; HAT_HELD, HAT_RELEASE and HAT_LANDS are its shares), the left hand meeting it as it lands.
+        seconds=2.0,
+        at=(0.0, 0.18, 0.38, 0.5, 0.6, 0.7, 0.8, 1.0),
+        loop=(4, 6),
+        keys=dict(
+            look=(0.0, 10.0, -8.0, 6.0, 4.0, 8.0, 4.0, 0.0),
+            tilt=(0.0, 0.0, 0.0, 0.0, 0.0, -4.0, 0.0, 0.0),
+            lean=(0.0, 4.0, 0.0, 3.0, 2.0, 3.0, 2.0, 0.0),
+            R=(None, ('shoulder', (-0.05, -0.36, -0.18)), ('head', (0.1, -0.32, 0.1)), ('head', (0.1, -0.14, 0.34)),
+               ('head', (0.34, -0.14, 0.2)), ('head', (0.34, -0.18, 0.15)), ('head', (0.34, -0.14, 0.2)), None),
+            L=(None, None, None, ('shoulder', (0.02, -0.12, -0.3)), ('head', (0.36, -0.06, 0.15)), ('head', (0.36, -0.08, 0.12)),
+               ('head', (0.36, -0.06, 0.15)), None),
+            palm_R=(DRESS_HANG[0], (-0.6, 0.7, 0.2), (-0.3, 0.9, 0.2), (-0.2, 0.7, 0.6), (-1.0, 0.0, 0.0), (-1.0, 0.1, -0.1), (-1.0, 0.0, 0.0), DRESS_HANG[0]),
+            fingers_R=(DRESS_HANG[1], (0.0, -0.3, 1.0), (0.0, 0.0, 1.0), (0.0, 0.4, 1.0), (0.0, 0.0, 1.0), (0.0, -0.2, 1.0), (0.0, 0.0, 1.0), DRESS_HANG[1]),
+            palm_L=(DRESS_HANG[0], DRESS_HANG[0], DRESS_HANG[0], (-1.0, 0.0, 0.0), (-1.0, 0.0, 0.0), (-1.0, 0.1, -0.1), (-1.0, 0.0, 0.0), DRESS_HANG[0]),
+            fingers_L=(DRESS_HANG[1], DRESS_HANG[1], DRESS_HANG[1], (0.0, -0.3, -1.0), (0.0, 0.0, 1.0), (0.0, -0.2, 1.0), (0.0, 0.0, 1.0), DRESS_HANG[1]),
+            curl_R=(0.2, 0.7, 0.7, 0.6, 0.35, 0.5, 0.35, 0.2),
+            curl_L=(0.2, 0.2, 0.2, 0.3, 0.35, 0.5, 0.35, 0.2),
+        )),
+    belt=dict(
+        seconds=1.8,
+        at=(0.0, 0.2, 0.42, 0.55, 0.66, 0.77, 1.0),
+        loop=(3, 5),
+        keys=dict(
+            pitch=(0.0, 3.0, 8.0, 8.0, 8.0, 8.0, 0.0),
+            look=(0.0, 5.0, 25.0, 28.0, 25.0, 28.0, 0.0),
+            hands=(None, ('hip', (0.12, 0.12, 0.02)), ('waist', (0.05, -0.2, 0.02)), ('waist', (0.04, -0.21, 0.0)),
+                   ('waist', (0.07, -0.2, -0.02)), ('waist', (0.04, -0.21, 0.0)), None),
+            palm=(DRESS_HANG[0], (-1.0, 0.3, 0.0), (-0.2, 0.9, 0.0), (-0.2, 0.9, 0.0), (-0.2, 0.9, 0.0), (-0.2, 0.9, 0.0), DRESS_HANG[0]),
+            fingers=(DRESS_HANG[1], (0.0, 1.0, -0.3), (-1.0, 0.0, 0.0), (-1.0, 0.0, 0.0), (-1.0, 0.0, 0.0), (-1.0, 0.0, 0.0), DRESS_HANG[1]),
+            curl=(0.2, 0.5, 0.5, 0.6, 0.5, 0.6, 0.2),
+        )),
+)
+DRESS_UPPER = {'spine.001': 1.0}   # its over line, from the waist up (the game plays it whole, standing)
 
 # Kissing (kiss_at: Romance on the Rim's kiss, RomanceOnTheRim_InitiateKiss and _ReceiveKiss, the two a cell apart east
 # and west, facing each other; the game draws each KissCloser toward the other, WalkFigures.KissOf). Both play it: leant
@@ -3957,6 +4110,58 @@ def pluck_at(t):
     close_hand(X, 'R', -1, curl)
     return X, clamp
 
+def chalk_rest():
+    """The chalk in the right hand at rest: the matrix from its model's points (Blender's axes, model units, its tip at the
+    origin and its back end up +z) to the rest pose (armature space), which the hand's move takes to any pose (the `tool
+    chalk tool_chalk R` line). Held in the fist as a child holds it: across the palm (CHALK_PALM out from it, CHALK_GRIP
+    along the fingers' joint), its back end out of the thumb's side and its tip out of the little finger's
+    (CHALK_OUT), tipped CHALK_TIP toward the fingertips."""
+    fn = 'hand.R.001'
+    d0, n0 = hand_rest_axes('R', -1)
+    t0 = d0.cross(n0)   # toward the thumb's side
+    t0 = (t0 - t0.dot(d0) * d0).normalized()
+    flen = (tail[fn] - head[fn]).length + (tail['hand.R.002'] - head['hand.R.002']).length
+    cross = head[fn] + d0 * CHALK_GRIP * flen + n0 * CHALK_PALM * LEG
+    tip = math.radians(CHALK_TIP)
+    a = (t0 * math.cos(tip) - d0 * math.sin(tip)).normalized()   # from the tip out of the thumb's side
+    x = (n0 - n0.dot(a) * a).normalized()
+    size = CHALK_SIZE * LEG / MODEL_LEG
+    return T(cross - a * CHALK_OUT * size) @ Matrix((x, a.cross(x), a)).transposed().to_4x4() @ Matrix.Scale(size, 4)
+
+def chalk_tip(X):
+    """Where the chalk's tip is in the pose X (armature space)."""
+    return X['hand.R'] @ (chalk_rest() @ Vector((0, 0, 0)))
+
+def chalk_at(t):
+    """Drawing on the floor in chalk at t (0 .. 1 round the loop, PLUCK_SECONDS long; see CHALK_MIDDLE). Returns the pose
+    and the worst overreach."""
+    X = kneel_at(PLUCK_CLIP, t)
+    waist = X[HIPS] @ head[SPINE]
+    turn_branch(X, SPINE, about(waist, (0, -1, 0), CHALK_LEAN) @ about(waist, (1, 0, 0), CHALK_STOOP))
+    bow_head(X, CHALK_LOOK)
+    for name, leader in FOLLOW.items():
+        X[name] = X[leader]
+    level = read_level(X)
+    floor = min(head['toe.L'].z, head['toe.R'].z)
+    hips = X[HIPS] @ head[HIPS]
+    base = Vector((hips.x, hips.y, floor))
+    # The tip's path: loops scribbled while sweeping across and back, lifted off the floor once a loop.
+    w = 2 * math.pi * t
+    loop = 2 * math.pi * CHALK_LOOPS * t
+    flat = (Vector(CHALK_MIDDLE) + Vector((CHALK_SWEEP * math.sin(w), 0.0))
+            + Vector((CHALK_RADIUS[0] * math.cos(loop), CHALK_RADIUS[1] * math.sin(loop))))
+    s = ((t - CHALK_LIFT_AT[0]) % 1.0) / CHALK_LIFT_AT[1]
+    lift = CHALK_LIFT * math.sin(math.pi * s) if s < 1.0 else 0.0
+    target = base + Vector((flat.x, flat.y, CHALK_FLOOR + lift)) * LEG
+    way = lambda v: (level @ Vector(v)).normalized()
+    clamp = hand_point_to('R', -1, chalk_tip, target, way(CHALK_FINGERS), way(CHALK_FACING), X,
+                          pole=Vector(CHALK_ELBOW), curl=CHALK_CURL)
+    # The left palm propped flat on the floor, taking the lean.
+    palm = base + Vector((CHALK_PROP[0], CHALK_PROP[1], 0.01)) * LEG
+    clamp = max(clamp, hand_on('L', 1, palm, way(CHALK_PROP_FINGERS), Vector((0, 0, -1)), X, pole=Vector(CHALK_PROP_ELBOW)))
+    close_hand(X, 'L', 1, 0.15)
+    return X, clamp
+
 def belly_crawl_at(p):
     """The belly crawl at cycle phase p, upright (see CRAWL_REACH). Returns the pose and the worst overreach."""
     X, _ = posed_with(dict(STILL, DROP=0.005, LEAN=0.0, NARROW=LIE_NARROW), 0.29)
@@ -5426,6 +5631,76 @@ def toss_at(t, keys=None, at=None, look=None):
         palm = wrist + n_ * HAND_HALF * LEG + f * (tail[hn] - head[hn]).length * 0.5   # so hand_on puts the wrist there
         clamp = max(clamp, hand_on(side, sign, palm, fingers, facing, X))
         close_hand(X, side, sign, max(0.0, k['curl']))
+    return X, clamp
+
+def dress_frames(kind):
+    """How many frames the dress_<kind> clip has (DRESS_FPS of its own length)."""
+    return max(8, int(round(DRESS[kind]['seconds'] * DRESS_FPS)))
+
+def dress_at(t, kind):
+    """Putting on apparel of this DRESS kind at t (0 standing .. 1 standing; see DRESS), from the idle's first frame.
+    Returns the pose and the worst overreach."""
+    d = DRESS[kind]
+    at, K = d['at'], d['keys']
+    m = lambda v, sign: Vector((sign * v[0], v[1], v[2]))
+    def k(name, default):
+        return toss_key(K[name], t, at) if name in K else default
+    X, _ = stand_at(0.0)
+    ankles = {s: X['foot.' + s] @ head['foot.' + s] for s in ('L', 'R')}
+    toes = {s: X['foot.' + s] @ head['toe.' + s] for s in ('L', 'R')}
+    # Where the standing pose hangs each wrist from its shoulder joint, for a hand key of None.
+    hang = {s: X['hand.' + s] @ head['hand.' + s] - X['shoulder.' + s] @ head['upper_arm.' + s] for s in ('L', 'R')}
+    legs = set()
+    for side in ('L', 'R'):
+        legs.update(b.name for b in [bones['thigh.' + side]] + list(bones['thigh.' + side].children_recursive))
+    hips = k('hips', Vector((0, 0, 0)))
+    pivot = (X['thigh.L'] @ head['thigh.L'] + X['thigh.R'] @ head['thigh.R']) * 0.5
+    M = T(Vector(hips) * LEG) @ about(pivot, (1, 0, 0), k('pitch', 0.0))
+    X = {n: (v if n in legs else M @ v) for n, v in X.items()}
+    lean, twist = k('lean', 0.0), k('twist', 0.0)
+    for bone in (SPINE, CHEST_BONE):
+        p = X[bone] @ head[bone]
+        R = X[bone].to_3x3()
+        turn_branch(X, bone, about(p, (R @ Vector((0, 0, 1))).normalized(), twist * 0.5)
+                    @ about(p, (R @ Vector((1, 0, 0))).normalized(), lean * 0.5))
+    look, tilt = k('look', 0.0), k('tilt', 0.0)
+    for bone in (NECK, HEAD):
+        p = X[bone] @ head[bone]
+        across = (X[bone].to_3x3() @ Vector((1, 0, 0))).normalized()
+        turn_branch(X, bone, about(p, across.cross(Vector((0, 0, 1))), -tilt * 0.5) @ about(p, across, look * 0.5))
+    for name, leader in FOLLOW.items():
+        X[name] = X[leader]
+    clamp = 0.0
+    for side, sign in (('L', 1), ('R', -1)):
+        ankle = ankles[side] + m(k('foot_' + side, (0, 0, 0)), sign) * LEG
+        lifted = ankle.z - ankles[side].z
+        # A foot lifted is pointed down a little, as stepping into something; the knee forward and a little out.
+        clamp = max(clamp, leg_to(side, X[HIPS] @ head['thigh.' + side], ankle, FWD + Vector((sign * 0.15, 0, 0)), X,
+                                  pitch=-min(lifted / LEG, 0.3) * 60.0))
+    def landmark(name, side, sign):
+        if name == 'ankle':
+            return X['foot.' + side] @ head['foot.' + side]
+        if name == 'knee':
+            return X['shin.' + side] @ head['shin.' + side]
+        if name == 'hip':
+            return X['thigh.' + side] @ head['thigh.' + side]
+        if name == 'shoulder':
+            return X['shoulder.' + side] @ head['upper_arm.' + side]
+        if name == 'waist':
+            return X[HIPS] @ head[HIPS]
+        if name == 'head':
+            return X[HEAD] @ head[HEAD]
+        raise KeyError(name)
+    for side, sign in (('L', 1), ('R', -1)):
+        line = K.get(side, K.get('hands'))
+        shoulder = landmark('shoulder', side, sign)
+        points = [shoulder + hang[side] if key is None else landmark(key[0], side, sign) + m(key[1], sign) * LEG
+                  for key in line]
+        palm = toss_key(points, t, at)
+        facing = m(toss_key(K.get('palm_' + side, K.get('palm')), t, at), sign).normalized()
+        fingers = m(toss_key(K.get('fingers_' + side, K.get('fingers')), t, at), sign)
+        clamp = max(clamp, hand_on(side, sign, palm, fingers, facing, X))
+        close_hand(X, side, sign, max(0.0, toss_key(K.get('curl_' + side, K.get('curl')), t, at)))
     return X, clamp
 
 def loop_key(at, line, t):

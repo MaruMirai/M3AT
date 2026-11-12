@@ -113,6 +113,60 @@ namespace M3AT
             return Api.CreateModel(m);
         }
 
+        // The garment (piece) at rest in this shape as an IsoRim model (model space, as it is worn with every bone at rest,
+        // so placing it by a bone's move draws it where that bone takes it), coloured as Laid colours it; front: its
+        // front-most point (+z), where a hat is held by the brim (WalkFigures.DrawHeldApparel); min and max its box.
+        internal ModelHandle AtRest(int piece, Shape shape, out Vector3 front, out Vector3 min, out Vector3 max)
+        {
+            Piece g = pieces[piece];
+            PieceShape shaped = ShapedPiece(shape, piece);
+            front = Vector3.zero;
+            min = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
+            max = new Vector3(float.MinValue, float.MinValue, float.MinValue);
+            for (int i = 0; i < shaped.rest.Length; i++)
+            {
+                if (i == 0 || shaped.rest[i].z > front.z)
+                {
+                    front = shaped.rest[i];
+                }
+                min = Vector3.Min(min, shaped.rest[i]);
+                max = Vector3.Max(max, shaped.rest[i]);
+            }
+            bool textured = g.texture != null && g.uvs != null;
+            int[] tris = g.tris;
+            ModelData m = new ModelData
+            {
+                Positions = new Vector3[tris.Length],
+                Normals = new Vector3[tris.Length],
+                Hull = new Vector3[tris.Length],
+                Colours = new Color[tris.Length],
+                Tinted = new bool[tris.Length],
+                UVs = textured ? new Vector2[tris.Length] : null,
+                Material = textured ? new int[tris.Length] : null,
+                Materials = textured ? new[] { new ModelDataMaterial { Name = "stuff_" + g.name, Texture = g.texture, Tinted = true } } : null
+            };
+            Color corner = textured ? g.mean : Color.white;
+            for (int i = 0; i + 2 < tris.Length; i += 3)
+            {
+                Vector3 a = shaped.rest[tris[i]], b = shaped.rest[tris[i + 1]], c = shaped.rest[tris[i + 2]];
+                Vector3 normal = Vector3.Cross(b - a, c - a).normalized;
+                for (int k = 0; k < 3; k++)
+                {
+                    int v = tris[i + k];
+                    m.Positions[i + k] = shaped.rest[v];
+                    m.Normals[i + k] = normal;
+                    m.Hull[i + k] = shaped.hull[v];
+                    m.Colours[i + k] = corner;
+                    m.Tinted[i + k] = true;
+                    if (textured)
+                    {
+                        m.UVs[i + k] = g.uvs[v];
+                    }
+                }
+            }
+            return Api.CreateModel(m);
+        }
+
         private const float GroundFlatten = 0.5f;   // a laid garment's depth (front to back), as a share of the worn depth (GroundGear's Flatten)
     }
 

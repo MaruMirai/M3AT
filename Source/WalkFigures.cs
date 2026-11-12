@@ -272,6 +272,7 @@ namespace M3AT
         private const float KneelCameSpread = 50f;   // degrees: and the furthest round from that side it looks, to keep off the limbs
         private const float FeedCloser = 0.35f;   // cells: how far a pawn feeding a patient in a bed (tame) is drawn toward them from its cell's middle
         private const float BenchCloser = 0.3f;   // cells: how far a pawn stood at a bench (work_bench) is drawn toward it from its cell's middle
+        private const float ChalkCloser = 0.4f;   // cells: how far a child drawing on the floor (work_chalk) is drawn toward the cell it draws on, from its own cell's middle
         private const float FireCloser = 0.1f;   // cells: how far a pawn sat at a campfire (work_stir_campfire) is drawn toward it, its roasting stick out over the fire (walk.ROAST_AIM) and its head short of it
         // Playing music (InstrumentKind): how far a pawn is drawn toward the instrument from the middle of its
         // interaction cell, stood at it and sat on a seat there (cells; walk.MUSIC's 'closer', keep the two in step). The
@@ -729,9 +730,17 @@ namespace M3AT
 
         // The clip a WorkOf kind plays: work_<kind>, but playing with a baby on the floor on an export without work_play
         // sits as for meditating (with carry_play laid over it, PlayOver).
+        // Biotech's Floordrawing: a child stood on target A drawing on the floor of the cell beside it, B, in chalk (the
+        // game leaves a Filth_Floordrawing there every 2500 ticks). By defName, so a game without Biotech still loads.
+        private static bool Floordrawing(Pawn pawn)
+        {
+            JobDef job = pawn.CurJobDef;
+            return job != null && job.defName == "Floordrawing" && pawn.CurJob.targetB.IsValid;
+        }
+
         private static string WorkClipOf(string kind)
         {
-            return kind == "play" && !skin.Has("work_play") ? "work_meditate" : "work_" + kind;
+            return IsDressKind(kind) ? kind : kind == "play" && !skin.Has("work_play") ? "work_meditate" : "work_" + kind;
         }
 
         // Cuddling a small pet held in its arms: [DG]Lovly Animal Cuddling's AC_CuddleAnimal (local.animalcuddling), which
@@ -4150,11 +4159,18 @@ namespace M3AT
             beside = null;
             face = 0f;
             Job job = pawn.CurJob;
+            // Putting clothes on or taking them off: not work, so whatever IsoRim's work setting (Dressing.cs).
+            string dressing = coming ? null : DressWorkOf(pawn, out face);
+            if (dressing != null)
+            {
+                return dressing;
+            }
             bool vomit = job != null && job.def == JobDefOf.Vomit;
             bool meditate = job != null && pawn.jobs != null && (pawn.jobs.curDriver is JobDriver_Meditate || pawn.jobs.curDriver is JobDriver_VisitGrave);
             string play = job != null ? PlaysByBaby(pawn) : null;
             bool music = job != null && pawn.jobs != null && (pawn.jobs.curDriver is JobDriver_PlayMusicalInstrument || PlaysForLover(pawn));
-            if (job == null || job.def == null || (!vomit && !meditate && play == null && !music && !WorkAnimations) || (!coming && pawn.pather != null && pawn.pather.Moving))
+            bool chalk = Floordrawing(pawn);
+            if (job == null || job.def == null || (!vomit && !meditate && play == null && !music && !chalk && !WorkAnimations) || (!coming && pawn.pather != null && pawn.pather.Moving))
             {
                 return null;
             }
@@ -4172,6 +4188,11 @@ namespace M3AT
                     }
                 }
                 a = nearest;
+            }
+            if (chalk)
+            {
+                // (floordrawing: stood on target A, it draws on the cell beside it, B, which it faces)
+                a = job.targetB;
             }
             if (job.def == JobDefOf.FeedPatient && job.targetB.Thing is Pawn)
             {
@@ -4214,6 +4235,12 @@ namespace M3AT
             {
                 // (sat on the floor rocking the baby in its arms, HoldBabyPlayed; not knelt beside it as a patient is)
                 return skin.Has(WorkClipOf("play")) && skin.Has("carry_play") ? "play" : null;
+            }
+            else if (chalk)
+            {
+                // (not work, so whatever IsoRim's work setting: knelt drawing on the cell in front in chalk, drawn shuffled
+                // up to it, ChalkCloser; knelt at the ground on an export without the clip)
+                kind = skin.Has("work_chalk") ? "chalk" : skin.Has("work_pluck") ? "pluck" : "crouch";
             }
             else if (play == "PlayToys")
             {
@@ -4730,7 +4757,7 @@ namespace M3AT
         // hand bone as posed, sized with the figure as IsoRim's figure holds it.
         private static void DrawTool(Pawn pawn, string kind, SkinnedFigure.Posed fig, Vector3 at, float yaw, float size)
         {
-            SkinnedFigure.Tool tool = skin.ToolOf(kind);
+            SkinnedFigure.Tool tool = kind != null ? skin.ToolOf(kind) : null;
             Matrix4x4 hand;
             if (tool == null || !skin.BoneOf(fig, tool.bone, out hand))
             {
@@ -7276,7 +7303,7 @@ namespace M3AT
                     // Cooking: a bout of stirring now and then in its place (StirOf), the spoon in hand once it is half in.
                     float stir = ease.stirClip != null ? BoutWeight(ease.stirAt) : 0f;
                     ease.toolKind = stir >= 0.5f ? ease.stirClip.Substring("work_".Length)
-                        : workClip != null ? workClip.Substring("work_".Length) : null;
+                        : workClip != null && workClip.StartsWith("work_") ? workClip.Substring("work_".Length) : null;
                     float work = workClip != null && skin.Has(workClip) && sat <= 0f && !SeatedWork(ease.workKind) ? ease.work * (1f - ease.carry) * (1f - hunker) * (1f - reel) : 0f;
                     // Pitching horseshoes or hoopstone: one underhand toss round each throw, the whole figure in place of
                     // the idle (seated, from the waist up, below); between throws the idle.
@@ -7294,7 +7321,8 @@ namespace M3AT
                     skin.Add(fig, "hunker", LoopPhase(pawn, "hunker"), (1f - moving) * (1f - drafted) * (1f - sat) * hunker * up);
                     if (work > 0f)
                     {
-                        float workPhase = workClip == "work_pickaxe" ? PickPhase(pawn, ease, workClip)
+                        float workPhase = IsDressKind(ease.workKind) ? DressPhase(pawn, workClip)
+                            : workClip == "work_pickaxe" ? PickPhase(pawn, ease, workClip)
                             : ease.workKind == "stomp" ? BeatPhase(pawn, ease, workClip, StompHit, 1)
                             : ease.workKind == "pat" ? BeatPhase(pawn, ease, workClip, PatHit, PatHits)
                             : LoopPhase(pawn, workClip);
@@ -7654,6 +7682,12 @@ namespace M3AT
                     // it is drawn stepped up to it, as far as it has taken up the stance.
                     at += Quaternion.Euler(0f, ease.workFace, 0f) * Vector3.forward * (BenchCloser * ease.shownWork);
                 }
+                else if (ease.workKind == "chalk")
+                {
+                    // Drawing on the floor: the game keeps it in the middle of the cell beside the drawing, so it is drawn
+                    // shuffled up to it on its knees, the chalk on the drawing's near half.
+                    at += Quaternion.Euler(0f, ease.workFace, 0f) * Vector3.forward * (ChalkCloser * ease.shownWork);
+                }
                 else if (ease.workKind == "stir_campfire")
                 {
                     // Sat at a campfire: drawn shuffled up to it, so the hands reach its stone ring.
@@ -7805,6 +7839,10 @@ namespace M3AT
                 {
                     DrawWeapon(pawn, ease.stance, aiming, fig, at, yaw, size, mask, ease);
                     inHands = true;
+                }
+                else if (!forOther && !lying && !crawling && flight < 0f && load == null && DrawDressItem(pawn, ease, fig, at, yaw, size))
+                {
+                    // (apparel being put on, or just taken off, held between the hands: Dressing.cs)
                 }
                 else if (!forOther && !lying && !crawling && flight < 0f && ease.shownWork >= ToolShown)
                 {

@@ -38,7 +38,8 @@ namespace M3AT
             {
                 return null;
             }
-            List<Apparel> all = pawn.apparel.WornApparel;
+            // (a pawn dressing: with what it puts on once that is on the body, without what it takes off once that is off)
+            List<Apparel> all = DressingApparel(pawn, pawn.apparel.WornApparel);
             if (sleep != SleepWear.NoEquipment)
             {
                 return all;

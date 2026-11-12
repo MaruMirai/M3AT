@@ -569,11 +569,14 @@ namespace M3AT
                 case "eat": return EatTest();
                 case "drugs": return DrugsTest();
                 case "visit": return VisitTest();
+                case "talk": return TalkTest();
                 case "music": return MusicTest();
                 case "rolljoint": return RollJointTest();
                 case "drunk": return DrunkTest();
+                case "dress": return DressTest();
                 case "cook": return CookTest();
                 case "teach": return TeachTest();
+                case "floordraw": return FloordrawTest();
                 case "romance": return RomanceTest(null);
                 case "readroom": return ReadRoomTest();
                 case "bedcompare": return BedCompareTest();
@@ -1405,6 +1408,82 @@ namespace M3AT
             Note("Look: the teacher at the desk's left spot, explaining with the hands (palm up, beating a point, opened out to the pupil, both spread, patting the desk), its head turned part way toward the child on its right, which looks part way back; seated the same over the sit.");
         }
 
+        // Floordrawing (Biotech's learning job): a child stood on its cell drawing in chalk on the cell beside it, south (toward
+        // the camera's side) and then east, knelt with the chalk in its right fist (work_chalk, the tool chalk line) and drawn
+        // shuffled up to the drawing (WalkFigures.ChalkCloser).
+        private static IEnumerator FloordrawTest()
+        {
+            JobDef draw = DefDatabase<JobDef>.GetNamedSilentFail("Floordrawing");
+            if (draw == null || !ModsConfig.BiotechActive)
+            {
+                Check("floordraw", false, "no Floordrawing job (Biotech off?)");
+                yield break;
+            }
+            foreach (string way in new[] { "south", "east" })
+            {
+                ClearPatch();
+                IntVec3 from = middle, on = middle + (way == "south" ? IntVec3.South : IntVec3.East);
+                Pawn child = NewChild(from + new IntVec3(-1, 0, 1));
+                Job job = JobMaker.MakeJob(draw, from, on);
+                job.playerForced = true;
+                KeepDrawing(child);
+                child.jobs.StartJob(job, JobCondition.InterruptForced);
+                Look(child, way == "south" ? 330f : 30f);
+                string kind = null;
+                float shown = 0f;
+                bool lasted = true;
+                for (int i = 0; i < 40; i++)
+                {
+                    KeepDrawing(child);
+                    yield return Ticks(15, "floordraw_" + way, child);
+                    if (child.CurJobDef != draw)
+                    {
+                        lasted = false;
+                        break;
+                    }
+                    string k = Field<string>(child, "workKind");
+                    if (k != null && Field<float>(child, "work") > 0.5f)
+                    {
+                        kind = k;
+                    }
+                    shown = Mathf.Max(shown, Field<float>(child, "shownWork"));
+                    if (i % 8 == 7)
+                    {
+                        yield return Shot(way + "_t" + (i + 1) * 15);
+                    }
+                }
+                Check(way + ": the drawing goes on", lasted, "job " + (child.CurJobDef != null ? child.CurJobDef.defName : "none"));
+                Check(way + ": knelt drawing in chalk", kind == "chalk" && shown > 0.5f, "work kind " + (kind ?? "none") + ", shown " + shown.ToString("F2"));
+                if (child.jobs != null)
+                {
+                    child.jobs.EndCurrentJob(JobCondition.InterruptForced);
+                }
+            }
+            Note("Look: the child knelt on its cell edge facing the drawing, the left palm propped on the floor, the chalk upright in its right fist, the tip on the floor scribbling loops and sweeping side to side, lifted once a loop; the head bowed to it.");
+        }
+
+        // Kept from ending the floordrawing: the learning need kept low (the job ends once it is met) and the basic needs full
+        // (FailOnChildLearningConditions ends it when one will soon come up).
+        private static void KeepDrawing(Pawn child)
+        {
+            if (child.needs.learning != null)
+            {
+                child.needs.learning.CurLevel = 0.1f;
+            }
+            if (child.needs.food != null)
+            {
+                child.needs.food.CurLevel = child.needs.food.MaxLevel;
+            }
+            if (child.needs.rest != null)
+            {
+                child.needs.rest.CurLevel = 1f;
+            }
+            if (child.needs.joy != null)
+            {
+                child.needs.joy.CurLevel = 1f;
+            }
+        }
+
         // Kept from ending the lesson for a need (the game ends it when a basic need comes up, or the child has learnt enough).
         private static void KeepLearning(Pawn teacher, Pawn pupil)
         {
@@ -1545,6 +1624,89 @@ namespace M3AT
             }
             Check("drunk: weaving on the move", weave > 0.01f, "weave up to " + weave.ToString("F3") + " cells");
             Note("Look: drunk_stand_* leant to a side with the head lolling, the arms hanging; drunk_walk_* off its straight path.");
+        }
+
+        // Putting clothes on and taking them off (Dressing.cs): a stripped colonist puts on trousers, a shirt, a duster and a
+        // cowboy hat in turn from the ground beside it (dress_legs, dress_over, dress_coat, dress_head), then power armour
+        // (Royalty's; taking off the duster, trousers and shirt it replaces first, then dress_legs and dress_coat, the
+        // tugging repeated over its long EquipDelay), then takes the hat off (dress_head backwards). Each checked for the
+        // clips played, the garment drawn on the body partway (Dressing's onBody) and the apparel worn at the end.
+        private static IEnumerator DressTest()
+        {
+            ClearPatch();
+            Pawn pawn = NewPawn(middle, null);
+            pawn.apparel.DestroyAll();
+            Hold(pawn);
+            Look(pawn, 0f);
+            yield return WaitReal(2f);
+            foreach (string defName in new[] { "Apparel_Pants", "Apparel_BasicShirt", "Apparel_Duster", "Apparel_CowboyHat", "Apparel_PowerArmor", "-Apparel_CowboyHat" })
+            {
+                bool off = defName.StartsWith("-");
+                ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail(defName.TrimStart('-'));
+                if (def == null)
+                {
+                    Note("dress: no " + defName + ", left out");
+                    continue;
+                }
+                string name = def.defName.Substring("Apparel_".Length) + (off ? "_off" : "");
+                Job job;
+                Apparel apparel;
+                if (off)
+                {
+                    apparel = pawn.apparel.WornApparel.Find(a => a.def == def);
+                    if (apparel == null)
+                    {
+                        Check("dress " + name, false, "not worn");
+                        continue;
+                    }
+                    job = JobMaker.MakeJob(JobDefOf.RemoveApparel, apparel);
+                }
+                else
+                {
+                    apparel = (Apparel)ThingMaker.MakeThing(def, def.MadeFromStuff ? GenStuff.DefaultStuffFor(def) : null);
+                    Spawn(apparel, middle + new IntVec3(0, 0, -1));
+                    job = JobMaker.MakeJob(JobDefOf.Wear, apparel);
+                }
+                job.playerForced = true;
+                pawn.jobs.StartJob(job, JobCondition.InterruptForced);
+                HashSet<string> clips = new HashSet<string>();
+                bool onBody = false, inHands = false;
+                int shots = 0, ticks = 0;
+                for (int i = 0; i < 1200 && pawn.CurJob == job; i++)
+                {
+                    yield return Ticks(off || !def.apparel.layers.Contains(ApparelLayerDefOf.Overhead) ? 5 : 3, "dress_" + name, pawn);
+                    ticks += off || !def.apparel.layers.Contains(ApparelLayerDefOf.Overhead) ? 5 : 3;
+                    string kind = Field<string>(pawn, "workKind");
+                    if (kind != null && kind.StartsWith("dress_") && Field<float>(pawn, "work") > 0f)
+                    {
+                        clips.Add(kind);
+                    }
+                    Apparel dressed;
+                    bool body, hands;
+                    if (WalkFigures.DressingNow(pawn, out dressed, out body, out hands))
+                    {
+                        onBody |= body && dressed == apparel;
+                        inHands |= hands;
+                        if (i % (def.apparel.layers.Contains(ApparelLayerDefOf.Overhead) ? 2 : 6) == 0 && shots < 12)
+                        {
+                            yield return Shot("dress_" + name + "_" + shots++);
+                        }
+                    }
+                }
+                yield return Ticks(30, "dress_" + name + "_done", pawn);
+                bool worn = pawn.apparel.WornApparel.Contains(apparel);
+                Check("dress " + name, clips.Count > 0 && worn != off && (off ? inHands : onBody),
+                    "clips " + string.Join(", ", clips) + " over " + ticks + " ticks, seen on the body " + onBody + ", in the hands " + inHands
+                    + ", worn after " + worn);
+                Hold(pawn);
+                Look(pawn, 0f);
+                yield return WaitReal(1f);
+                yield return Shot("dress_" + name + "_after");
+            }
+            Note("Look: dress_Pants_* squatting with the waistband at the knees and stepping in, then pulled up; dress_BasicShirt_* "
+                + "raised beside the head and drawn down; dress_Duster_* an arm back into each sleeve; dress_CowboyHat_* the hat "
+                + "held up and set on; dress_PowerArmor_* the old clothes taken off first, backwards, then stepped into and the "
+                + "arms in, tugging meanwhile; the apparel in the hands before it is on, then on the body.");
         }
 
         // Stirring while cooking: a simple meal cooked at a fueled stove (stood at it, a bout of work_stir now and then
@@ -3101,6 +3263,77 @@ namespace M3AT
                 }
             }
             Note("Look: by the sleeping spot sat cross-legged beside the patient, upright, talking with the hands toward them; by the bed stood beside it, talking.");
+        }
+
+        // Talking mouth: a visitor stood talking to a patient in a bed (the talk clip) and sat by one on a sleeping spot
+        // (work_visit), watched for Ease.speaking and for the mouth swapping between Facial Animation's open and normal
+        // shapes (FaceLayers.TalkOpenDraws/TalkShutDraws), with close pictures of the face, and a pawn not talking for
+        // contrast, whose mouth must never open.
+        private static IEnumerator TalkTest()
+        {
+            foreach (string where in new[] { "bed", "spot" })
+            {
+                ClearPatch();
+                ThingDef bedDef = DefDatabase<ThingDef>.GetNamed(where == "spot" ? "SleepingSpot" : "Bed");
+                Thing made = ThingMaker.MakeThing(bedDef, bedDef.MadeFromStuff ? ThingDefOf.WoodLog : null);
+                made.SetFaction(Faction.OfPlayer);
+                Building_Bed bed = (Building_Bed)Spawn(made, middle + new IntVec3(1, 0, 0), Rot4.North);
+                Pawn patient = NewPawn(middle + new IntVec3(1, 0, -1), null);
+                Pawn visitor = NewPawn(middle + new IntVec3(-2, 0, 0), null);
+                Hold(visitor);
+                patient.jobs.Notify_TuckedIntoBed(bed);
+                yield return WaitReal(3f);
+                float speaking = 0f;
+                FaceLayers.TalkOpenDraws = FaceLayers.TalkShutDraws = FaceLayers.TalkNoOpen = 0;
+                FaceLayers.TalkTextures.Clear();
+                for (int i = 0; i < 24; i++)
+                {
+                    if (patient.needs.rest != null)
+                    {
+                        patient.needs.rest.CurLevel = 1f;
+                    }
+                    if (!patient.InBed())
+                    {
+                        patient.jobs.Notify_TuckedIntoBed(bed);
+                    }
+                    if (visitor.CurJobDef != JobDefOf.VisitSickPawn)
+                    {
+                        Job job = JobMaker.MakeJob(JobDefOf.VisitSickPawn, patient);
+                        job.playerForced = true;
+                        job.ignoreJoyTimeAssignment = true;
+                        visitor.jobs.StartJob(job, JobCondition.InterruptForced);
+                    }
+                    // Framed on the visitor's face, from the front of the way it faces.
+                    lookAt = visitor.DrawPos;
+                    lookYaw = 180f + visitor.Rotation.AsAngle;
+                    lookPitch = 15f;
+                    lookDistance = 1.3f;
+                    lookHeight = where == "spot" ? 0.7f : 1.0f;
+                    yield return Ticks(10, "talk_" + where, visitor);
+                    speaking = Mathf.Max(speaking, Field<float>(visitor, "speaking"));
+                    if (i % 4 == 3)
+                    {
+                        yield return Shot(where + "_face" + (i + 1));
+                    }
+                }
+                int open = FaceLayers.TalkOpenDraws, shut = FaceLayers.TalkShutDraws;
+                Check(where + ": speaking", speaking > 0.9f, "Ease.speaking reached " + speaking.ToString("F2"));
+                Check(where + ": mouth opens and shuts", open > 0 && shut > 0, open + " frames open, " + shut + " shut while talking");
+                float share = open + shut > 0 ? open / (float)(open + shut) : 0f;
+                Check(where + ": open about half the time", share > 0.25f && share < 0.75f, "open " + share.ToString("P0") + " of " + (open + shut) + " frames");
+                Note(where + " mouth layers: " + string.Join("; ", FaceLayers.TalkTextures));
+                Check(where + ": the open mouth is a picture of its own", open > 0 && FaceLayers.TalkNoOpen == 0, FaceLayers.TalkNoOpen + " of " + open + " open draws had no open mouth texture different from the normal one");
+                // The patient, not talking, keeps its mouth: no frame of it counted.
+                if (visitor.jobs != null)
+                {
+                    visitor.jobs.EndCurrentJob(JobCondition.InterruptForced);
+                }
+                yield return Ticks(60, "talk_" + where + "_after", visitor);
+                int before = FaceLayers.TalkOpenDraws + FaceLayers.TalkShutDraws;
+                yield return Ticks(30, "talk_" + where + "_quiet", visitor);
+                Check(where + ": quiet once it stops", FaceLayers.TalkOpenDraws + FaceLayers.TalkShutDraws == before, "talking frames counted after the visit ended: " + (FaceLayers.TalkOpenDraws + FaceLayers.TalkShutDraws - before));
+            }
+            Note("Look: the _face pictures, the visitor's mouth open in some and closed in others, never stuck either way.");
         }
 
         // Tending a patient (TendPatient): in a bed (stood at it, bench), on a sleeping spot and lying on the bare floor

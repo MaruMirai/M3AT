@@ -1129,6 +1129,11 @@ def write_anim(path, clips):
                 f.write('# hip_timing grab slide: walk.HIP_GRAB, where hip_draw\'s hand closes on the hip gear in its slot, and\n')
                 f.write('# walk.HIP_SLIDE, the share of the clip after that the game moves it from the slot into the hand over.\n')
                 f.write('hip_timing %.4f %.4f\n' % (walk.HIP_GRAB, walk.HIP_SLIDE))
+            if hasattr(walk, 'DRESS'):
+                f.write('# dress_loop clip from to: the stretch of a dress_<kind> clip (shares of it, walk.DRESS[kind][\'loop\']\'s\n')
+                f.write('# keys, the same pose at both ends) the game keeps at its own pace in a long EquipDelay, slowing the rest.\n')
+                for kind, d in walk.DRESS.items():
+                    f.write('dress_loop dress_%s %.4f %.4f\n' % (kind, d['at'][d['loop'][0]], d['at'][d['loop'][1]]))
             if hasattr(walk, 'SHIELD_GRAB'):
                 f.write('# shield_timing grab slide: walk.SHIELD_GRAB, where shield_draw\'s hand closes on a shield\'s edge on the back,\n')
                 f.write('# and walk.SHIELD_SLIDE, the share of the clip after that the game takes it from the back onto the hand over.\n')
@@ -1533,6 +1538,15 @@ if hasattr(walk, 'snowball_at'):
     pose_worst = max(pose_worst, export_loop('snowball', lambda t: walk.snowball_at(t * walk.SNOW_FRAMES / (walk.SNOW_FRAMES - 1)),
                                              walk.SNOW_FRAMES, walk.SNOW_SECONDS))
     masks['snowball'] = upper_mask('LR', walk.SNOW_UPPER)
+# Putting on apparel (the Wear job; taking it off, RemoveApparel, is the same played backwards): one clip per kind,
+# once through, its first and last frames the idle's first, the whole figure standing (WalkFigures.DressOf). Each with a
+# stretch the game keeps at its own pace in a long EquipDelay, its `dress_loop` line below.
+if hasattr(walk, 'dress_at'):
+    for kind in walk.DRESS:
+        n = walk.dress_frames(kind)
+        pose_worst = max(pose_worst, export_loop('dress_' + kind, lambda t, k=kind, n=n: walk.dress_at(t * n / (n - 1), k),
+                                                 n, walk.DRESS[kind]['seconds']))
+        masks['dress_' + kind] = upper_mask('LR', walk.DRESS_UPPER)
 # Kissing (Romance on the Rim's kiss): a loop laid over the idle from the waist up.
 if hasattr(walk, 'kiss_at'):
     pose_worst = max(pose_worst, export_loop('kiss', walk.kiss_at, walk.loop_frames(walk.KISS_SECONDS), walk.KISS_SECONDS))
@@ -1604,6 +1618,11 @@ if hasattr(walk, 'stir_at'):
 # Kneeling at work on the ground (walk.pluck_at), from the mocap clip, with bare hands; a kind of its own for the game.
 if walk.PLUCK_CLIP is not None:
     pose_worst = max(pose_worst, export_loop('work_pluck', walk.pluck_at, walk.PLUCK_CLIP['frames'], walk.PLUCK_SECONDS))
+    # Drawing on the floor in chalk (walk.chalk_at, Biotech's Floordrawing): the same kneel, the chalk's tip kept on the
+    # floor, in the right fist (Models/tool_chalk.obj, make_chalk.py; walk.chalk_rest).
+    if hasattr(walk, 'chalk_at'):
+        pose_worst = max(pose_worst, export_loop('work_chalk', walk.chalk_at, walk.PLUCK_CLIP['frames'], walk.PLUCK_SECONDS))
+        tools.append(('chalk', 'tool_chalk', 'R', Matrix.Scale(scale, 4) @ GAME @ rig.matrix_world @ walk.chalk_rest() @ GAME.inverted()))
 # Kneeling by a patient (walk.tend_at), the mocap kneel as it is.
 if walk.TEND_CLIP is not None:
     pose_worst = max(pose_worst, export_loop('work_tend', walk.tend_at, walk.TEND_CLIP['frames'], walk.TEND_SECONDS))

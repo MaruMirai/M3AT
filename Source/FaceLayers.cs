@@ -769,6 +769,12 @@ namespace M3AT
                 Mesh mouth = lowMouth && patch.lowUsed && patch.mouthLow != null ? patch.mouthLow : patch.mouth;
                 patch.lowUsed |= lowMouth;
                 bool mouthOpen = speaking > SpeakFrom && MouthOpen(pawn.thingIDNumber);
+#if AUTOTEST
+                if (speaking > SpeakFrom)
+                {
+                    if (mouthOpen) { TalkOpenDraws++; } else { TalkShutDraws++; }
+                }
+#endif
                 int place = 0;
                 Texture iris = null, white = null;   // this frame's eye textures, the shape of the eye the wounds are cut to
                 bool woundsDrawn = wounds == null || wounds.Length == 0;
@@ -812,6 +818,15 @@ namespace M3AT
                     if (mouthOpen && kind == "MouthControllerComp")
                     {
                         Graphic open = ShapeGraphic(node, pawn, "open");
+#if AUTOTEST
+                        string was = g != null && g.MatSouth != null && g.MatSouth.mainTexture != null ? g.MatSouth.mainTexture.name : "none";
+                        string now = open != null && open.MatSouth != null && open.MatSouth.mainTexture != null ? open.MatSouth.mainTexture.name : "none";
+                        TalkTextures.Add(f.layers[i] + ": " + was + " -> " + (open == null ? "no open graphic" : IsDummy(open) ? "dummy" : now + " (" + open.path + ")"));
+                        if (f.layers[i] == "Basic" && (open == null || IsDummy(open) || now == was))
+                        {
+                            TalkNoOpen++;
+                        }
+#endif
                         if (open != null && !IsDummy(open))
                         {
                             g = open;
@@ -1620,6 +1635,10 @@ namespace M3AT
         private const float PhraseSeconds = 2.4f;
         private const float PhraseRest = 0.4f;
         private static float talkClock;
+#if AUTOTEST
+        internal static int TalkOpenDraws, TalkShutDraws, TalkNoOpen;   // (NoOpen: open draws where the open shape is missing or the same picture)
+        internal static readonly HashSet<string> TalkTextures = new HashSet<string>();   // frames drawn talking with the mouth open / shut (the autotest's talk)
+#endif
         private static int talkClockFrame = -1;
 
         private static bool MouthOpen(int id)
@@ -1627,10 +1646,14 @@ namespace M3AT
             if (talkClockFrame != Time.frameCount)
             {
                 talkClockFrame = Time.frameCount;
+#if AUTOTEST
+                talkClock += Mathf.Min(Time.deltaTime, 0.1f);   // (the test steps the game paused)
+#else
                 if (!Find.TickManager.Paused)
                 {
                     talkClock += Mathf.Min(Time.deltaTime, 0.1f);
                 }
+#endif
             }
             uint seed = (uint)id * 2654435761u;
             float t = talkClock + (seed % 1000u) * 0.001f * PhraseSeconds;

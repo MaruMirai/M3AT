@@ -1191,6 +1191,10 @@ namespace M3AT
                 {
                     ReadGear(p);
                 }
+                else if (p[0] == "dress_loop" && p.Length > 3)
+                {
+                    ReadDressLoop(p);
+                }
                 else if (p[0] == "hip_timing" && p.Length > 2)
                 {
                     HipGrab = Num(p[1]);

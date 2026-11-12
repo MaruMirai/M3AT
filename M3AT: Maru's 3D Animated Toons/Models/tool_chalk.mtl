@@ -1,0 +1,7 @@
+# M3AT chalk colours (anim_scripts/make_chalk.py); fixed (no stuff)
+
+newmtl chalk
+Kd 0.960 0.720 0.800
+
+newmtl chalk_dust
+Kd 0.990 0.930 0.950
