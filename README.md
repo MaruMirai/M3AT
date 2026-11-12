@@ -1,66 +1,73 @@
 # M3AT: Maru's 3D Animated Toons
 
-Animated 3D pawns for [IsoRim](https://steamcommunity.com/sharedfiles/filedetails/?id=3819577715), the mod that shows RimWorld 1.7 in 3D.
+*Animated 3D pawns for [IsoRim Waylith](https://steamcommunity.com/sharedfiles/filedetails/?id=3819577715).*
 
 ![M3AT preview](<M3AT: Maru's 3D Animated Toons/About/Preview.png>)
 
-IsoRim draws your colonists as simple figures. M3AT replaces them with fully animated, skinned 3D characters: they walk, run, sit, sleep, fight, work, eat, read, play music, carry each other about, limp when hurt and fall limp when they're shot.
+**Early WIP and just launched**, so expect some janky or generic animations and other scuff.
+Screenshots use [Facial Animation - Retexture](https://steamcommunity.com/sharedfiles/filedetails/?id=3271240549).
 
-**This is an early version.** A lot already works, but expect rough edges. Bug reports are very welcome (see [Reporting a bug](#reporting-a-bug)).
+## Main features
 
-## Features
+- **Animations** for most things, including movement, combat, jobs, and recreation
+- **Apparel models** for everything in the base game, all DLCs and Combat Extended
+- **All hair mods supported**, with on-the-fly sprite-to-3D conversion; hair shows under hats
+- **Carrying, aiming and firing animations** for all of IsoRim's 3D weapons, or sprite-generated slab versions
+- **Holstered weapons** visible (several at once with CE), with draw and holster animations
+- **Body types**: one for each of RimWorld's, with gender differences and optional variation
+- **Equipment packs** visible when worn, using IsoRim's models
+- **Injuries**, bandages, scars and missing limbs; wounds match their type, location and severity
+- **Prosthetic limbs**: peg legs, wooden, simple, bionic and archotech parts
+- **Gene parts** modelled and animated
+- **Injury-reactive** idle and movement animations
+- **Ragdolls**, with optional physics flinging
+- **Smooth growth for Biotech**: smooth growth from baby to adult, and visible pregnancy
+- **Size and build sliders** for pawns and heads
+- **Animated faces** powered by [NL] Facial Animation: blinking, moods, expressions and more
+- **Full Combat Extended support**
+- **Freecam mode**: press **F6** for a WASD-mouselook freecam, designed for play with the more detailed pawns. Orders and selections work with the crosshair. The normal pointer comes back when a menu opens, or at the press of a button.
 
-**Animation**
-- Walking and running matched to each pawn's real speed
-- Sitting, lying in bed, sleeping, crawling, wading and swimming
-- Work: mining, chopping, building, crafting at a bench, planting, harvesting, fishing, research, tending patients, taming, firefighting and more
-- Eating at a table or standing, reading, playing piano, harp and drum, teaching, horseshoes and hoopstone
-- Carrying items, babies and people (the wounded in the arms, captives over the shoulder)
-- Chatting at parties, rubbing hands in the cold, getting up off the floor, jump packs
+## Performance
 
-**Combat**
-- A drafted stance per weapon type, with weapons held properly in the hands using IsoRim's 3D weapon models
-- Aiming, recoil, drawing a bow, melee swings, punches, grenade throws, flinches and muzzle flashes
-- Weapons not in use are worn on the body and drawn and holstered with an animation
-- Ragdolls, and optional flinging of bodies and dropped weapons by heavy hits
-
-**Looks**
-- 3D clothing, armour and headgear for the base game, all DLCs and Combat Extended, keeping RimWorld's material colours
-- Hair and beards generated in 3D from whatever hair textures you have loaded, hair mods included. Nothing is modelled by hand, and no other mod's art is shipped
-- Gene parts modelled, with animated tails and ears
-- Worn packs, belts and gear using IsoRim's models
-- Faces animated by [NL] Facial Animation: blinking, expressions and moods
-- Every body type, gender differences, optional varied builds and heights
-- Children grow smoothly from babies to adults, and pregnancy shows
-- Visible wounds, bandages, scars, missing limbs and prosthetics
-- Limping on an injured leg, hopping on one, holding a wounded arm, chest or head
-
-**Freecam**: press F6 for a WASD and mouselook camera. You can still select pawns and give orders.
-
-**Performance**: on a 10600KF and RTX 3060, each pawn on screen adds about 0.18 ms of frame time (about 3 ms for 20 pawns). Skinning runs on the GPU by default.
+Models have been kept as light as possible without looking poor, and various optimizations have been made to reduce impact.
+In benchmarks on a 10600KF and 3060, each pawn on screen currently adds about 0.18 ms of frame time (around 3 ms for 20 pawns on screen).
 
 ## Requirements
 
-Load M3AT after all of these:
-
 - [Harmony](https://steamcommunity.com/sharedfiles/filedetails/?id=2009463077)
-- [IsoRim](https://steamcommunity.com/sharedfiles/filedetails/?id=3819577715)
+- [IsoRim Waylith](https://steamcommunity.com/sharedfiles/filedetails/?id=3819577715)
 - [[NL] Facial Animation - WIP](https://steamcommunity.com/sharedfiles/filedetails/?id=1635901197)
 - [[NL] Facial Animation - Experimentals](https://steamcommunity.com/sharedfiles/filedetails/?id=2581693737)
 
+Load M3AT after all of them.
+
+## Mod integration
+
+- **[Combat Extended](https://steamcommunity.com/sharedfiles/filedetails/?id=3495749827)**: all apparel modelled, extra holstered weapons show, backpacks work around holsters and equipment, shields are worn and held, reload and hunker animations, and the webbing layer fits over armour. Also try [IsoRimWaylith-CEPack](https://github.com/peren717/IsoRimWaylith-CEPack) for the best integration.
+- **[Romance on the Rim](https://steamcommunity.com/sharedfiles/filedetails/?id=2654432921)**: various animations for the dates
+- **[[DG]Lovly Animal Cuddling](https://steamcommunity.com/sharedfiles/filedetails/?id=3823442009)**: petpetpet
+
+## Serving suggestions
+
+- **[Facial Animation - Retexture](https://steamcommunity.com/sharedfiles/filedetails/?id=3271240549)**: used in the screenshots; gives more face variety and a different style to FA
+- **[Pipette Tool](https://steamcommunity.com/sharedfiles/filedetails/?id=2787342464)**: a huge QoL improvement, and works fine in the freecam
+
 ## Compatibility
 
-M3AT is purely visual apart from the optional flinging, so it shouldn't have hard incompatibilities.
+M3AT is purely visual aside from the optional flinging, so it shouldn't have any hard incompatibilities.
+For mods that add content:
 
-- **Built-in support**: all DLCs, Combat Extended (reload and hunker animations, crouching behind cover, all apparel modelled, shields), Romance on the Rim (date animations), [DG]Lovly Animal Cuddling
-- **Hair and beard mods**: fully supported, as hair is built from the textures
-- **Weapon mods**: IsoRim thickens the sprite into a 3D weapon, and M3AT picks animations by weapon type
-- **Clothing mods**: drawn as the closest garment M3AT has, in the right colour. Hats and masks without a model don't show
-- **Alien races**: will likely show as ordinary humans
+- **Hair and beard mods**: all fully supported; the 3D hair is generated from the hair textures.
+- **Weapon mods**: fairly good support. IsoRim generates a 3D version by thickening the sprite, and M3AT guesses the animations from its type.
+- **Clothing mods**: falls back to drawing a similar garment M3AT has, in the right colour. Hats and masks won't show.
+- **Alien race mods**: will likely just show as ordinary humans.
 
-## Reporting a bug
+## Links and bug reports
 
-Select the pawn it's happening to, open the mod's options and press **Copy bug report**. It copies your settings, mod list, any errors and what that pawn is doing to the clipboard (and to `<RimWorld config>/M3AT/bug_report.txt`). Nothing is sent anywhere by itself. Paste it in an [issue](https://github.com/MaruMirai/M3AT/issues) or the `#bug-reports` channel on the [Discord](https://discord.gg/7t5Aav2f2e), ideally with a screenshot.
+- [Discord](https://discord.gg/7t5Aav2f2e): discussion, support and suggestions
+- [Issues](https://github.com/MaruMirai/M3AT/issues): bug reports
+
+To include some helpful info when you have an issue, select a pawn, then open the mod's options and press **Copy bug report**. This copies text to your clipboard for use on the Discord or GitHub. It won't send data anywhere.
 
 ## Building from source
 
@@ -90,12 +97,12 @@ blender -b Models/pawnHumanRig.blend --python anim_scripts/export_frames.py -- "
 
 ## Credits
 
-- Chibi base model: "Chibi Base Body" by monymensss on [Sketchfab](https://sketchfab.com/3d-models/chibi-base-body-96d80b8fd2f542999b11e94ef4ddd9fb) (CC BY 4.0), rigged and reshaped here
-- IsoRim by Peren, whose shaders the `MarusSmooth` shaders are adapted from
-- [NL] Facial Animation by Nals
+- **Peren717**: [IsoRim Waylith](https://steamcommunity.com/sharedfiles/filedetails/?id=3819577715), and for expanding its API to better support M3AT
+- **Kndzio**: the original [IsoRim](https://steamcommunity.com/sharedfiles/filedetails/?id=3819266222), whose shaders the `MarusSmooth` shaders are adapted from
+- **Nals**: [Facial Animation](https://steamcommunity.com/sharedfiles/filedetails/?id=1635901197)
+- **Monymensss** (Sketchfab): the chibi base model, ["Chibi Base Body"](https://sketchfab.com/3d-models/chibi-base-body-96d80b8fd2f542999b11e94ef4ddd9fb) (CC BY 4.0), rigged and reshaped here
+- **Claude**: nearly everything else
 
 ## Licence
 
 MIT, see [LICENSE](LICENSE). Third-party parts keep their own terms, listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). RimWorld and its art belong to Ludeon Studios; none of the game's art is in this repository.
-
-Join the [M3AT Discord](https://discord.gg/7t5Aav2f2e) for news, help and screenshots.
