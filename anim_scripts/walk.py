@@ -1106,7 +1106,9 @@ DOWNED_SIDE_CLIP = clip_file('downed_side')
 # side lying without its writhing, held on one frame of it (SLEEP_HOLD_FRAME, the frame nearest the clip's mean pose,
 # measured over every bone's turn) and breathing slowly from the chest (SLEEP_BREATHS a loop, the upper chest turned
 # SLEEP_BREATH degrees about its own side-to-side line, the neck SLEEP_BREATH_NECK back against it so the head stays).
+# sleep~3 is the same on the other side (SLEEP_MIRROR: mirrored left for right, mirror_pose).
 SLEEP_HOLD = False
+SLEEP_MIRROR = False
 SLEEP_HOLD_FRAME = 18
 SLEEP_BREATHS = 2
 SLEEP_HOLD_SECONDS = 8.0   # the held loop's length (2 breaths in 8 s: a sleeper's 15 a minute)
@@ -2548,8 +2550,9 @@ ROLL_TUCK = 15.0     # the head tucked down toward the chest (degrees), out of t
 # getup, though there is only the one mocap clip for it so far. The falls a ragdoll starts from share theirs: downed or
 # dead, any of FALL_CLIPS.
 VARIANTS = {
-    # Asleep on the side, still (see SLEEP_HOLD).
-    'sleep': [dict(SLEEP_CLIP=DOWNED_SIDE_CLIP, SLEEP_HOLD=True)] if DOWNED_SIDE_CLIP is not None else [],
+    # Asleep on the side, still (see SLEEP_HOLD), on one side and the other (SLEEP_MIRROR).
+    'sleep': [dict(SLEEP_CLIP=DOWNED_SIDE_CLIP, SLEEP_HOLD=True),
+              dict(SLEEP_CLIP=DOWNED_SIDE_CLIP, SLEEP_HOLD=True, SLEEP_MIRROR=True)] if DOWNED_SIDE_CLIP is not None else [],
     'knockdown': [dict(KNOCKDOWN_CLIP=clip) for clip in FALL_CLIPS if clip is not KNOCKDOWN_CLIP],
     'die': [dict(DIE_CLIP=clip) for clip in FALL_CLIPS if clip is not DIE_CLIP],
     'flinch': [
@@ -3446,7 +3449,7 @@ def sleep_at(t):
     side = (chest.to_3x3() @ Vector((1, 0, 0))).normalized()
     turn_branch(X, 'spine.003', about(chest @ head['spine.003'], side, -SLEEP_BREATH * breath))
     turn_branch(X, NECK, about(X[NECK] @ head[NECK], side, SLEEP_BREATH_NECK * breath))
-    return X, 0.0
+    return (mirror_pose(X) if SLEEP_MIRROR else X), 0.0
 
 def mirror_name(b):
     """The bone's counterpart on the other side (.L for .R and back), or itself."""

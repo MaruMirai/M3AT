@@ -837,7 +837,7 @@ namespace M3AT
             }
         }
 
-        // The sleep clip's variants (sleep~2: on the side, still, walk.SLEEP_HOLD): four pawns asleep on top of single beds
+        // The sleep clip's variants (sleep~2 and sleep~3: on either side, still, walk.SLEEP_HOLD, SLEEP_MIRROR): four pawns asleep on top of single beds
         // (the bedBlankets option off, so the body shows), each picking one by its job (WalkFigures.LieClip).
         private static IEnumerator SleepSideTest()
         {
@@ -887,10 +887,10 @@ namespace M3AT
                 for (int k = 0; k < 4; k++)
                 {
                     string clip = Field<string>(sleepers[k], "lieNow");
-                    side += clip == "sleep~2" ? 1 : 0;
+                    side += clip == "sleep~2" || clip == "sleep~3" ? 1 : 0;
                     Check("sleeper " + k + ": asleep in its bed", sleepers[k].InBed() && !sleepers[k].Awake(), "clip " + (clip ?? "none"));
                 }
-                Note(side + " of 4 on the side (sleep~2). Look: those on the side lie still on top of the bed, breathing, not writhing; none through the bed.");
+                Note(side + " of 4 on the side (sleep~2, sleep~3). Look: those on the side lie still on top of the bed, breathing, not writhing; none through the bed.");
                 lookYaw = 0f;
                 yield return Shot("side_foot");
             }

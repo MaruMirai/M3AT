@@ -2818,7 +2818,7 @@ namespace M3AT
         // (sleep, downed or not) or awake (the plain lie), as a bed's blanket covers it and the downed loops' groaning and
         // curling up are for the ground; downed and awake, on its back on a couch (downed) or curled on its side on the
         // ground (downed_side); downed and unconscious (under anaesthetic, a catatonic breakdown, psychic shock), as
-        // asleep (sleep: the downed loops writhe in pain); asleep (sleep), else the plain lie; the plain lie wherever the export has no such clip. A baby
+        // asleep (sleep: the downed loops writhe in pain); asleep (sleep, or a side-lying variant off a couch), else the plain lie; the plain lie wherever the export has no such clip. A baby
         // is always downed (its life stage's alwaysDowned), so unless in pain shock it sleeps, or awake waves and kicks (baby),
         // but lies still (the plain lie) while resting: awake in a lie-down job (LayDown, LayDownAwake, LayDownResting).
         private static string LieClip(Pawn pawn, bool dead, bool inBed, bool held)
@@ -2831,9 +2831,10 @@ namespace M3AT
             {
                 return "lie";
             }
-            // Asleep, one of the sleep clip's variants (sleep~2: on the side, still), picked per sleep by the job's id so it
-            // keeps one all night; on the back while someone tends it there.
-            if (clip == "sleep" && !OnBack(pawn) && !held)
+            // Asleep, one of the sleep clip's variants (sleep~2 and sleep~3: on one side or the other, still), picked per
+            // sleep by the job's id so it keeps one all night, in a bed too; on the back while someone tends it there, and
+            // on a couch (held but not in a bed: a growth vat or biosculpter pod's glass, a holding platform's chains).
+            if (clip == "sleep" && !OnBack(pawn) && !(held && !inBed))
             {
                 clip = skin.Variant(clip, Gen.HashCombineInt(pawn.thingIDNumber, pawn.CurJob != null ? pawn.CurJob.loadID : 0));
             }
