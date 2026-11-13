@@ -59,6 +59,7 @@ namespace M3AT
         public bool armourHidesTail = true;   // body armour (a garment with hide_clothes, not a vacsuit) leaves the gene tail off (WalkFigures.ArmourHidesTail)
         public EarHiding earHiding = EarHiding.AnyHeadgear;   // which headgear leaves the gene ears off (WalkFigures.EarHiding)
         public BeardMode beardMode = BeardMode.Flat;   // how beards are drawn (WalkFigures.Beards, FlatBeards)
+        public bool autoGrips = true;   // another mod's weapon held by its grip as found in its art (WalkFigures.AutoGrips, GripFinder)
         public bool retexturedWeaponModels = true;   // the game's own weapons keep IsoRim's model though another mod redraws their art (WalkFigures.RetexturedWeaponModels)
         public bool vatClothes = false;    // a pawn in a growth vat or biosculpter pod drawn in its clothes (WalkFigures.VatClothes); off: without them
         public SleepWear sleepWear = SleepWear.Blankets;   // what a pawn in bed is drawn wearing (WalkFigures.SleepWearOf); Blankets: IsoRim's blanket over the body in a bed that shows only the head (WalkFigures.BedBlankets)
@@ -117,6 +118,7 @@ namespace M3AT
             Scribe_Values.Look(ref earHiding, "earHiding", EarHiding.AnyHeadgear);
             Scribe_Values.Look(ref beardMode, "beardMode", BeardMode.Flat);
             Scribe_Values.Look(ref retexturedWeaponModels, "retexturedWeaponModels", true);
+            Scribe_Values.Look(ref autoGrips, "autoGrips", true);
             Scribe_Values.Look(ref groundGarments, "groundGarments", false);
             Scribe_Values.Look(ref sleepWear, "sleepWear", SleepWear.Blankets);
             if (Scribe.mode == LoadSaveMode.LoadingVars)
@@ -435,6 +437,8 @@ namespace M3AT
                 "A gun fired by a pawn flashes at the end of its barrel, a burst of fire along the shot as well as the game's own glow. Off: only the game's glow.");
             list.CheckboxLabeled("Flash red when hit", ref Settings.hitFlash,
                 "A pawn that takes damage flashes red for a moment, as the game's own pawns and IsoRim's 3D figures do. Off: no flash.");
+            list.CheckboxLabeled("Find grips on other mods' weapons", ref Settings.autoGrips,
+                "Guns and melee weapons from other mods are held by the grip or handle found in their art, rather than where the game's own weapon of that kind is held. Where the art doesn't show a clear grip, the usual hold is kept. Off: always the usual hold.");
             list.CheckboxLabeled("IsoRim models over weapon retextures", ref Settings.retexturedWeaponModels,
                 "The game's own weapons are shown as IsoRim's 3D models even when another mod (such as Combat Extended or a texture pack) gives them new art, or removes their models. The model is lined up with the new art but keeps its own shape, so a weapon redrawn very differently may not match it. Weapons from other mods are left to IsoRim. Off: IsoRim's choice, which shows a retextured weapon as its art. Needs IsoRim's \"Weapons as 3D models\" setting. Takes effect when this window closes for weapons on the ground.");
             List<KeyValuePair<string, float>> types = WalkFigures.TypeDefaults();

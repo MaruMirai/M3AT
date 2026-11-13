@@ -1,0 +1,1582 @@
+[
+ {
+  "name": "Bow_Great",
+  "kind": "Bow_Great",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponRanged/BowGreat.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "bow",
+  "hand": "L",
+  "u": 0.6922975091190684,
+  "v": 0.501279428926322,
+  "ku": 0.5376689741642826,
+  "kv": 0.49515931408032865,
+  "dkind": "bow",
+  "au": 1.0,
+  "av": -1.7229465736935887e-08
+ },
+ {
+  "name": "Bow_Great_Unique",
+  "kind": "bow",
+  "own": false,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Odyssey/WeaponRanged/UniqueWeapons/GreatBow/UniqueGreatBowA.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "L",
+  "u": 0.5452027723883105,
+  "v": 0.4941911761908607,
+  "ku": 0.5452027723883105,
+  "kv": 0.4941911761908607,
+  "dkind": "bow",
+  "au": 1.199999979078768,
+  "av": -4.224479044111154e-08
+ },
+ {
+  "name": "Bow_Recurve",
+  "kind": "Bow_Recurve",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponRanged/BowRecurve.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "bow",
+  "hand": "L",
+  "u": 0.637652473223521,
+  "v": 0.4945697807271647,
+  "ku": 0.5376689741642826,
+  "kv": 0.49515931408032865,
+  "dkind": "bow",
+  "au": 1.0,
+  "av": -1.7229465736935887e-08
+ },
+ {
+  "name": "Bow_Short",
+  "kind": "Bow_Short",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponRanged/BowShort.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "bow",
+  "hand": "L",
+  "u": 0.5911539828318674,
+  "v": 0.49806331111565577,
+  "ku": 0.5376689741642826,
+  "kv": 0.49515931408032865,
+  "dkind": "bow",
+  "au": 1.0,
+  "av": 2.677552336283181e-09
+ },
+ {
+  "name": "Flamebow",
+  "kind": "Flamebow",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Biotech/WeaponRanged/Flamebow.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "bow",
+  "hand": "L",
+  "u": 0.6164287364369934,
+  "v": 0.5041610978158716,
+  "ku": 0.5376689741642826,
+  "kv": 0.49515931408032865,
+  "dkind": "bow",
+  "au": 1.0,
+  "av": -9.313225243085004e-09
+ },
+ {
+  "name": "Gun_AssaultRifle",
+  "kind": "Gun_AssaultRifle",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponRanged/AssaultRifle.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.29486551797741456,
+  "v": 0.39840923282599827,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "Gun_AssaultRifle_Unique",
+  "kind": "rifle",
+  "own": false,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Odyssey/WeaponRanged/UniqueWeapons/AssaultRifle/UniqueAssaultRifleA.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.29486551797741456,
+  "v": 0.39840923282599827,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "Gun_Autopistol",
+  "kind": "Gun_Autopistol",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponRanged/Autopistol.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "handgun",
+  "hand": "R",
+  "u": 0.3142886426189788,
+  "v": 0.41601302700249454,
+  "ku": 0.3142886426189788,
+  "kv": 0.41601302700249454,
+  "dkind": "pistol",
+  "au": 1.8181818349750125,
+  "av": -3.694502181132489e-08
+ },
+ {
+  "name": "Gun_BeamGraser",
+  "kind": "Gun_BeamGraser",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Biotech/WeaponRanged/BeamGraser.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.25994973072796956,
+  "v": 0.439725043553197,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000472068737,
+  "av": 1.0728837713447603e-08
+ },
+ {
+  "name": "Gun_BeamRepeater",
+  "kind": "Gun_BeamRepeater",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Odyssey/WeaponRanged/BeamRepeater.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.29486551797741456,
+  "v": 0.39840923282599827,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "Gun_BeamRepeater_Unique",
+  "kind": "rifle",
+  "own": false,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Odyssey/WeaponRanged/UniqueWeapons/BeamRepeater/UniqueBeamRepeaterA.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.29486551797741456,
+  "v": 0.39840923282599827,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "Gun_BoltActionRifle",
+  "kind": "Gun_BoltActionRifle",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponRanged/BoltActionRifle.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.24597809591223663,
+  "v": 0.4933079505616782,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.1999999839067443,
+  "av": -2.1457673642721994e-08
+ },
+ {
+  "name": "Gun_BoltActionRifle_Unique",
+  "kind": "rifle",
+  "own": false,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Odyssey/WeaponRanged/UniqueWeapons/BoltActionRifle/UniqueBoltActionRifleA.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.29486551797741456,
+  "v": 0.39840923282599827,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "Gun_ChainShotgun",
+  "kind": "Gun_ChainShotgun",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponRanged/ChainShotgun.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.30441133758375905,
+  "v": 0.4506582423652699,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "Gun_ChainShotgun_Unique",
+  "kind": "rifle",
+  "own": false,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Odyssey/WeaponRanged/UniqueWeapons/ChainShotgun/UniqueChainShotgunA.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.29486551797741456,
+  "v": 0.39840923282599827,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "Gun_ChargeBlasterHeavy",
+  "kind": "rifle",
+  "own": false,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponRanged/ChargeBlasterHeavy.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.29486551797741456,
+  "v": 0.39840923282599827,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "Gun_ChargeBlasterHeavyTurret",
+  "kind": "rifle",
+  "own": false,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponRanged/ChargeBlasterLight.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.29486551797741456,
+  "v": 0.39840923282599827,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "Gun_ChargeBlasterTurret",
+  "kind": "rifle",
+  "own": false,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Biotech/WeaponRanged/ChargeBlasterTurret.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.29486551797741456,
+  "v": 0.39840923282599827,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "Gun_ChargeLance",
+  "kind": "Gun_ChargeLance",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponRanged/ChargeLance.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.2586936329342959,
+  "v": 0.4391808861244659,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000472068737,
+  "av": 1.0728837713447603e-08
+ },
+ {
+  "name": "Gun_ChargeLance_Unique",
+  "kind": "rifle",
+  "own": false,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Odyssey/WeaponRanged/UniqueWeapons/ChargeLance/UniqueChargeLanceA.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.29486551797741456,
+  "v": 0.39840923282599827,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "Gun_ChargeRifle",
+  "kind": "Gun_ChargeRifle",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponRanged/ChargeRifle.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.29486551797741456,
+  "v": 0.39840923282599827,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "Gun_ChargeRifle_Unique",
+  "kind": "rifle",
+  "own": false,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Odyssey/WeaponRanged/UniqueWeapons/ChargeRifle/UniqueChargeRifleA.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.29486551797741456,
+  "v": 0.39840923282599827,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "Gun_DoomsdayRocket",
+  "kind": "Gun_DoomsdayRocket",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponRanged/DoomsdayLauncher.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.19571607363650845,
+  "v": 0.7841240059341299,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000214576723,
+  "av": 3.2186507593579005e-08
+ },
+ {
+  "name": "Gun_EmpLauncher",
+  "kind": "Gun_EmpLauncher",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponRanged/EMPLauncher.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.10257834887856959,
+  "v": 0.3827093672545678,
+  "ku": 0.3264304952143254,
+  "kv": 0.444568594017148,
+  "dkind": "pistol",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "Gun_HeavySMG",
+  "kind": "Gun_HeavySMG",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponRanged/HeavySMG.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.3349441008787535,
+  "v": 0.46012814333526353,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "Gun_HeavySMG_Unique",
+  "kind": "rifle",
+  "own": false,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Odyssey/WeaponRanged/UniqueWeapons/HeavySMG/UniqueHeavySMGA.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.29486551797741456,
+  "v": 0.39840923282599827,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "Gun_HellcatRifle",
+  "kind": "Gun_HellcatRifle",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Anomaly/WeaponRanged/HellcatRifle.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.27844637637802866,
+  "v": 0.4077078975380426,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "Gun_HellcatRifle_Unique",
+  "kind": "rifle",
+  "own": false,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Odyssey/WeaponRanged/UniqueWeapons/HellcatRifle/UniqueHellcatRifleA.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.29486551797741456,
+  "v": 0.39840923282599827,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "Gun_HellsphereCannon",
+  "kind": "rifle",
+  "own": false,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Biotech/WeaponRanged/HellsphereCannon.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.29486551797741456,
+  "v": 0.39840923282599827,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "Gun_IncendiaryLauncher",
+  "kind": "Gun_IncendiaryLauncher",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponRanged/IncendiaryLauncher.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.265393089722023,
+  "v": 0.3891090285258795,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "Gun_Incinerator",
+  "kind": "Gun_Incinerator",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Anomaly/WeaponRanged/Incinerator.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.29486551797741456,
+  "v": 0.39840923282599827,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "Gun_InfernoCannon",
+  "kind": "rifle",
+  "own": false,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponRanged/InfernoCannon.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.29486551797741456,
+  "v": 0.39840923282599827,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "Gun_InfernoCannonTurret",
+  "kind": "rifle",
+  "own": false,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponRanged/InfernoCannon.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.29486551797741456,
+  "v": 0.39840923282599827,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "Gun_LMG",
+  "kind": "Gun_LMG",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponRanged/LMG.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.28048409359977367,
+  "v": 0.4217301083168875,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "Gun_LMG_Unique",
+  "kind": "rifle",
+  "own": false,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Odyssey/WeaponRanged/UniqueWeapons/LMG/UniqueLMGA.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.29486551797741456,
+  "v": 0.39840923282599827,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "Gun_MachinePistol",
+  "kind": "Gun_MachinePistol",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponRanged/MachinePistol.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "handgun",
+  "hand": "R",
+  "u": 0.3142886426189788,
+  "v": 0.41601302700249454,
+  "ku": 0.3142886426189788,
+  "kv": 0.41601302700249454,
+  "dkind": "pistol",
+  "au": 1.8181818349750125,
+  "av": -3.694502181132489e-08
+ },
+ {
+  "name": "Gun_MiniFlameblaster",
+  "kind": "rifle",
+  "own": false,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Biotech/WeaponRanged/MiniFlameblaster.png",
+  "size": [
+   0.65,
+   0.65
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.24902388454933538,
+  "v": 0.3437065001038745,
+  "ku": 0.24902388454933538,
+  "kv": 0.3437065001038745,
+  "dkind": "rifle",
+  "au": 1.8461537992731754,
+  "av": 3.1742119202342005e-08
+ },
+ {
+  "name": "Gun_MiniShotgun",
+  "kind": "rifle",
+  "own": false,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Biotech/WeaponRanged/MiniShotgun.png",
+  "size": [
+   0.65,
+   0.65
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.24902388454933538,
+  "v": 0.3437065001038745,
+  "ku": 0.24902388454933538,
+  "kv": 0.3437065001038745,
+  "dkind": "rifle",
+  "au": 1.8461537992731754,
+  "av": 3.1742119202342005e-08
+ },
+ {
+  "name": "Gun_Minigun",
+  "kind": "Gun_Minigun",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponRanged/Minigun.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.07979995696019498,
+  "v": 0.4700657920381059,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000600814906,
+  "av": -2.1457676189485458e-08
+ },
+ {
+  "name": "Gun_Minigun_Unique",
+  "kind": "rifle",
+  "own": false,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Odyssey/WeaponRanged/UniqueWeapons/Minigun/UniqueMinigunA.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.29486551797741456,
+  "v": 0.39840923282599827,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "Gun_Needle",
+  "kind": "rifle",
+  "own": false,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponRanged/NeedleGun.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.29486551797741456,
+  "v": 0.39840923282599827,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "Gun_NeedleLauncher",
+  "kind": "rifle",
+  "own": false,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Biotech/WeaponRanged/NeedleLauncher.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.29486551797741456,
+  "v": 0.39840923282599827,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "Gun_PumpShotgun",
+  "kind": "Gun_PumpShotgun",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponRanged/Shotgun.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.30516516109342245,
+  "v": 0.5143187198710248,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.1999999839067443,
+  "av": -2.1457673642721994e-08
+ },
+ {
+  "name": "Gun_Revolver",
+  "kind": "Gun_Revolver",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponRanged/Revolver.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "handgun",
+  "hand": "R",
+  "u": 0.2623889227156563,
+  "v": 0.4749248786577742,
+  "ku": 0.3142886426189788,
+  "kv": 0.41601302700249454,
+  "dkind": "pistol",
+  "au": 1.8181817767596982,
+  "av": -9.236256625822074e-09
+ },
+ {
+  "name": "Gun_Revolver_Unique",
+  "kind": "rifle",
+  "own": false,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Odyssey/WeaponRanged/UniqueWeapons/Revolver/UniqueRevolverA.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.29486551797741456,
+  "v": 0.39840923282599827,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "Gun_Scattergun",
+  "kind": "rifle",
+  "own": false,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Odyssey/WeaponRanged/SentryScattergun.png",
+  "size": [
+   0.85,
+   0.85
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.27984177825809314,
+  "v": 0.3804814382424653,
+  "ku": 0.27984177825809314,
+  "kv": 0.3804814382424653,
+  "dkind": "rifle",
+  "au": 1.4117647866816643,
+  "av": 7.42480102127247e-09
+ },
+ {
+  "name": "Gun_Slugthrower",
+  "kind": "rifle",
+  "own": false,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Biotech/WeaponRanged/Slugthrower.png",
+  "size": [
+   0.65,
+   0.65
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.24902388454933538,
+  "v": 0.3437065001038745,
+  "ku": 0.24902388454933538,
+  "kv": 0.3437065001038745,
+  "dkind": "rifle",
+  "au": 1.8461537992731754,
+  "av": 3.1742119202342005e-08
+ },
+ {
+  "name": "Gun_SmokeLauncher",
+  "kind": "Gun_SmokeLauncher",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponRanged/SmokeLauncher.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.2935276768603945,
+  "v": 0.41893063025977534,
+  "ku": 0.3264304952143254,
+  "kv": 0.444568594017148,
+  "dkind": "pistol",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "Gun_SniperRifle",
+  "kind": "Gun_SniperRifle",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponRanged/SniperRifle.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.24597809591223663,
+  "v": 0.4933079505616782,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.1999999839067443,
+  "av": -2.1457673642721994e-08
+ },
+ {
+  "name": "Gun_SniperRifle_Unique",
+  "kind": "rifle",
+  "own": false,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Odyssey/WeaponRanged/UniqueWeapons/SniperRifle/UniqueSniperRifleA.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.29486551797741456,
+  "v": 0.39840923282599827,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "Gun_Spiner",
+  "kind": "rifle",
+  "own": false,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Biotech/WeaponRanged/SpinerGun.png",
+  "size": [
+   0.65,
+   0.65
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.24902388454933538,
+  "v": 0.3437065001038745,
+  "ku": 0.24902388454933538,
+  "kv": 0.3437065001038745,
+  "dkind": "rifle",
+  "au": 1.8461537992731754,
+  "av": 3.1742119202342005e-08
+ },
+ {
+  "name": "Gun_ThumpCannon",
+  "kind": "rifle",
+  "own": false,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponRanged/ThumpCannon.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.29486551797741456,
+  "v": 0.39840923282599827,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "Gun_ToxbombLauncher",
+  "kind": "Gun_ToxbombLauncher",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Biotech/WeaponRanged/ToxbombLauncher.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.3342950571682086,
+  "v": 0.37342347019354,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "Gun_ToxicNeedle",
+  "kind": "rifle",
+  "own": false,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Biotech/WeaponRanged/ToxicNeedleGun.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.29486551797741456,
+  "v": 0.39840923282599827,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "Gun_TripleRocket",
+  "kind": "Gun_TripleRocket",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponRanged/RocketLauncher.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.46176398361287474,
+  "v": 0.32672088983028824,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.1999999914169324,
+  "av": 2.6822089877143187e-08
+ },
+ {
+  "name": "Gun_TurretFoam",
+  "kind": "rifle",
+  "own": false,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponRanged/TurretFoam_Top.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.29486551797741456,
+  "v": 0.39840923282599827,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "MeleeWeapon_Axe",
+  "kind": "MeleeWeapon_Axe",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Royalty/WeaponMelee/Axe.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": -65.0,
+  "type": "melee_1h",
+  "hand": "R",
+  "u": 0.3584760765634299,
+  "v": 0.5382120786245017,
+  "ku": 0.396723965687391,
+  "kv": 0.5436878120367976,
+  "dkind": "melee",
+  "au": 0.5071419436592428,
+  "av": -1.0875693828341142
+ },
+ {
+  "name": "MeleeWeapon_BreachAxe",
+  "kind": "MeleeWeapon_BreachAxe",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponMelee/BreachAxe.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": -65.0,
+  "type": "melee_2h",
+  "hand": "R",
+  "u": 0.3333439865154426,
+  "v": 0.5367015655438901,
+  "ku": 0.41763107596849874,
+  "kv": 0.5398804465693879,
+  "dkind": "melee",
+  "au": 0.3901091354149959,
+  "av": -0.8365917014866012
+ },
+ {
+  "name": "MeleeWeapon_Club",
+  "kind": "MeleeWeapon_Club",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponMelee/Club.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": -65.0,
+  "type": "melee_1h",
+  "hand": "R",
+  "u": 0.3584760765634299,
+  "v": 0.5382120786245017,
+  "ku": 0.396723965687391,
+  "kv": 0.5436878120367976,
+  "dkind": "melee",
+  "au": 0.5071419436592428,
+  "av": -1.0875693828341142
+ },
+ {
+  "name": "MeleeWeapon_Gladius",
+  "kind": "MeleeWeapon_Gladius",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponMelee/Gladius.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": -65.0,
+  "type": "melee_1h",
+  "hand": "R",
+  "u": 0.2918493018382228,
+  "v": 0.556006713617448,
+  "ku": 0.396723965687391,
+  "kv": 0.5436878120367976,
+  "dkind": "melee",
+  "au": 0.5071418421950579,
+  "av": -1.0875693393275554
+ },
+ {
+  "name": "MeleeWeapon_Ikwa",
+  "kind": "MeleeWeapon_Ikwa",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponMelee/Ikwa.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": -25.0,
+  "type": "melee_1h",
+  "hand": "R",
+  "u": 0.39813970143736066,
+  "v": 0.5507917750252891,
+  "ku": 0.39280397684186696,
+  "kv": 0.46708224192960573,
+  "dkind": "melee",
+  "au": 1.0875694034656924,
+  "av": -0.5071419980408528
+ },
+ {
+  "name": "MeleeWeapon_Knife",
+  "kind": "MeleeWeapon_Knife",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponMelee/Knife.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": -65.0,
+  "type": "melee_1h",
+  "hand": "R",
+  "u": 0.396723965687391,
+  "v": 0.5436878120367976,
+  "ku": 0.396723965687391,
+  "kv": 0.5436878120367976,
+  "dkind": "melee",
+  "au": 0.5071418421950579,
+  "av": -1.0875693393275554
+ },
+ {
+  "name": "MeleeWeapon_LongSword",
+  "kind": "MeleeWeapon_LongSword",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponMelee/Longsword.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": -65.0,
+  "type": "melee_2h",
+  "hand": "R",
+  "u": 0.2317548640902629,
+  "v": 0.5553092977501842,
+  "ku": 0.41763107596849874,
+  "kv": 0.5398804465693879,
+  "dkind": "melee",
+  "au": 0.39010909352233264,
+  "av": -0.8365917816398383
+ },
+ {
+  "name": "MeleeWeapon_Mace",
+  "kind": "MeleeWeapon_Mace",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponMelee/Mace.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": -65.0,
+  "type": "melee_1h",
+  "hand": "R",
+  "u": 0.3584760765634299,
+  "v": 0.5382120786245017,
+  "ku": 0.396723965687391,
+  "kv": 0.5436878120367976,
+  "dkind": "melee",
+  "au": 0.5071419436592428,
+  "av": -1.0875693828341142
+ },
+ {
+  "name": "MeleeWeapon_MonoSword",
+  "kind": "MeleeWeapon_MonoSword",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Royalty/WeaponMelee/Monosword.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": -65.0,
+  "type": "melee_2h",
+  "hand": "R",
+  "u": 0.23260478778380583,
+  "v": 0.5459701545769315,
+  "ku": 0.41763107596849874,
+  "kv": 0.5398804465693879,
+  "dkind": "melee",
+  "au": 0.39010909352233264,
+  "av": -0.8365917816398383
+ },
+ {
+  "name": "MeleeWeapon_MonoSwordBladelink",
+  "kind": "melee",
+  "own": false,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Royalty/WeaponMelee/Monosword.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": -65.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.396723965687391,
+  "v": 0.5436878120367976,
+  "ku": 0.396723965687391,
+  "kv": 0.5436878120367976,
+  "dkind": "melee",
+  "au": 0.5071418421950579,
+  "av": -1.0875693393275554
+ },
+ {
+  "name": "MeleeWeapon_PlasmaSword",
+  "kind": "MeleeWeapon_PlasmaSword",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Royalty/WeaponMelee/PlasmaSword.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": -65.0,
+  "type": "melee_2h",
+  "hand": "R",
+  "u": 0.23260478778380583,
+  "v": 0.5459701545769315,
+  "ku": 0.41763107596849874,
+  "kv": 0.5398804465693879,
+  "dkind": "melee",
+  "au": 0.39010909352233264,
+  "av": -0.8365917816398383
+ },
+ {
+  "name": "MeleeWeapon_PlasmaSwordBladelink",
+  "kind": "melee",
+  "own": false,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Royalty/WeaponMelee/PlasmaSword.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": -65.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.396723965687391,
+  "v": 0.5436878120367976,
+  "ku": 0.396723965687391,
+  "kv": 0.5436878120367976,
+  "dkind": "melee",
+  "au": 0.5071418421950579,
+  "av": -1.0875693393275554
+ },
+ {
+  "name": "MeleeWeapon_PsyfocusStaff",
+  "kind": "MeleeWeapon_PsyfocusStaff",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Royalty/WeaponMelee/PsyfocusStaff.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": -65.0,
+  "type": "melee_2h",
+  "hand": "R",
+  "u": 0.27450285232092175,
+  "v": 0.5404841495728724,
+  "ku": 0.41763107596849874,
+  "kv": 0.5398804465693879,
+  "dkind": "melee",
+  "au": 0.3901091714126311,
+  "av": -0.8365917722945775
+ },
+ {
+  "name": "MeleeWeapon_Spear",
+  "kind": "MeleeWeapon_Spear",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponMelee/Spear.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": -25.0,
+  "type": "melee_2h",
+  "hand": "R",
+  "u": 0.32291455575005923,
+  "v": 0.5325506333966851,
+  "ku": 0.4112670863956698,
+  "kv": 0.47760446865223255,
+  "dkind": "melee",
+  "au": 0.8365917384156383,
+  "av": -0.3901090591642096
+ },
+ {
+  "name": "MeleeWeapon_Warhammer",
+  "kind": "MeleeWeapon_Warhammer",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Royalty/WeaponMelee/Warhammer.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": -65.0,
+  "type": "melee_2h",
+  "hand": "R",
+  "u": 0.3333439865154426,
+  "v": 0.5367015655438901,
+  "ku": 0.41763107596849874,
+  "kv": 0.5398804465693879,
+  "dkind": "melee",
+  "au": 0.3901091354149959,
+  "av": -0.8365917014866012
+ },
+ {
+  "name": "MeleeWeapon_ZeusHammerBladelink",
+  "kind": "melee",
+  "own": false,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Royalty/WeaponMelee/ZeusHammer.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": -65.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.396723965687391,
+  "v": 0.5436878120367976,
+  "ku": 0.396723965687391,
+  "kv": 0.5436878120367976,
+  "dkind": "melee",
+  "au": 0.5071418421950579,
+  "av": -1.0875693393275554
+ },
+ {
+  "name": "MeleeWeapon_Zeushammer",
+  "kind": "MeleeWeapon_Zeushammer",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Royalty/WeaponMelee/ZeusHammer.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": -65.0,
+  "type": "melee_2h",
+  "hand": "R",
+  "u": 0.3333439865154426,
+  "v": 0.5367015655438901,
+  "ku": 0.41763107596849874,
+  "kv": 0.5398804465693879,
+  "dkind": "melee",
+  "au": 0.3901091354149959,
+  "av": -0.8365917014866012
+ },
+ {
+  "name": "NerveSpiker",
+  "kind": "NerveSpiker",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Anomaly/WeaponRanged/NerveSpiker.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.29486551797741456,
+  "v": 0.39840923282599827,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000053644189,
+  "av": -1.6093255134919172e-08
+ },
+ {
+  "name": "Pila",
+  "kind": "Pila",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponRanged/Pilum.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "rifle",
+  "hand": "R",
+  "u": 0.3936291152408385,
+  "v": 0.5546353696682117,
+  "ku": 0.29486551797741456,
+  "kv": 0.39840923282599827,
+  "dkind": "rifle",
+  "au": 1.2000000396966866,
+  "av": 6.169081565268298e-08
+ },
+ {
+  "name": "Weapon_GrenadeEMP",
+  "kind": "Weapon_GrenadeEMP",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponRanged/EMPGrenades.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "grenade",
+  "hand": "R",
+  "u": 0.5621112236607069,
+  "v": 0.6496706751198528,
+  "ku": 0.3142886426189788,
+  "kv": 0.41601302700249454,
+  "dkind": "pistol",
+  "au": 1.818181694471964,
+  "av": -6.15750427977335e-08
+ },
+ {
+  "name": "Weapon_GrenadeFrag",
+  "kind": "Weapon_GrenadeFrag",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponRanged/Grenades.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "grenade",
+  "hand": "R",
+  "u": 0.5621112236607069,
+  "v": 0.6496706751198528,
+  "ku": 0.3142886426189788,
+  "kv": 0.41601302700249454,
+  "dkind": "pistol",
+  "au": 1.818181694471964,
+  "av": -6.15750427977335e-08
+ },
+ {
+  "name": "Weapon_GrenadeMolotov",
+  "kind": "Weapon_GrenadeMolotov",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Core/WeaponRanged/Molotov.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "grenade",
+  "hand": "R",
+  "u": 0.5621112236607069,
+  "v": 0.6496706751198528,
+  "ku": 0.3142886426189788,
+  "kv": 0.41601302700249454,
+  "dkind": "pistol",
+  "au": 1.818181694471964,
+  "av": -6.15750427977335e-08
+ },
+ {
+  "name": "Weapon_GrenadeTox",
+  "kind": "Weapon_GrenadeTox",
+  "own": true,
+  "path": "/home/t/Programs/rimworld/M3AT/weapon_sprites/Biotech/WeaponRanged/ToxGrenades.png",
+  "size": [
+   1.0,
+   1.0
+  ],
+  "offset": 0.0,
+  "type": "grenade",
+  "hand": "R",
+  "u": 0.5621112236607069,
+  "v": 0.6496706751198528,
+  "ku": 0.3142886426189788,
+  "kv": 0.41601302700249454,
+  "dkind": "pistol",
+  "au": 1.818181694471964,
+  "av": -6.15750427977335e-08
+ }
+]

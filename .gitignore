@@ -57,3 +57,4 @@ discord/__pycache__/
 
 # Workshop description drafts
 workshop_description*.txt
+anim_scripts/grip_detect/out/

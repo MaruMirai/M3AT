@@ -5613,7 +5613,23 @@ namespace M3AT
                 kind = kind.Substring(0, kind.Length - Slab.Length);
             }
             bool slab = AsSlab(weapon);
-            SkinnedFigure.Hold hold = HoldOf(WeaponName(weapon.def), slab) ?? HoldOf(kind, slab) ?? HoldOf(KindOf(weapon.def), slab) ?? skin.HoldOf("rifle");
+            SkinnedFigure.Hold hold = HoldOf(WeaponName(weapon.def), slab);
+            string holdName = WeaponName(weapon.def);   // whose hold it is, for GripSlide
+            if (hold == null)
+            {
+                hold = HoldOf(kind, slab);
+                holdName = kind;
+            }
+            if (hold == null)
+            {
+                hold = HoldOf(KindOf(weapon.def), slab);
+                holdName = KindOf(weapon.def);
+            }
+            if (hold == null)
+            {
+                hold = skin.HoldOf("rifle");
+                holdName = "rifle";
+            }
             if (hold == null && !oldHolds.TryGetValue(kind, out hold))
             {
                 hold = oldHolds["rifle"];
@@ -5629,10 +5645,12 @@ namespace M3AT
             Vector3 hand = FistOf(wrist, elbow);
             Matrix4x4 turn;
             Vector3 grip, a, top;
+            Vector3 closed = hand;   // where the hand closes, before the hold's at moves the slab off it
             if (hold.line == "hand" && skin.BoneOf(fig, left ? "hand.L" : "hand.R", out turn) && skin.GripOf(hold.hand, out grip))
             {
-                hand = wrist + turn.MultiplyVector(grip).normalized * (skin.HandGrip >= 0f ? skin.HandGrip : HandGrip)
-                    + turn.MultiplyVector(hold.at);
+                hand = wrist + turn.MultiplyVector(grip).normalized * (skin.HandGrip >= 0f ? skin.HandGrip : HandGrip);
+                closed = hand;
+                hand += turn.MultiplyVector(hold.at);
                 Vector3 rest = (hold.aim.normalized + Vector3.down * hold.drop).normalized;
                 a = turn.MultiplyVector(rest).normalized;
                 top = turn.MultiplyVector(TopOf(rest, hold.roll));
@@ -5656,6 +5674,9 @@ namespace M3AT
                 a = (along.normalized + Vector3.down * hold.drop).normalized;
                 top = TopOf(a, hold.roll);
             }
+            // Another mod's weapon held by its kind's hold: slid along its own art so the grip found there is in the fist
+            // (GripSlide), in the art's own axes, so it goes with the weapon however it is laid down below.
+            Vector2 slide = GripSlide(weapon, holdName, slab, closed, hand, a, top, hold.behind, size);
             // Flat under fire: still in the hand, but brought round to lie along the ground the way the
             // figure faces, past its head. Whatever the hand's turn would make of this weapon's hold.
             float laid = drawing != null ? Mathf.SmoothStep(0f, 1f, (drawing.duck - WeaponLaidFrom) / (WeaponLaidTo - WeaponLaidFrom)) : 0f;
@@ -5687,6 +5708,12 @@ namespace M3AT
                 top = turned * Vector3.up;
                 hand = Vector3.Lerp(slotAt, hand, drawn);
                 behind = Mathf.Lerp(slotBehind, behind, drawn);
+            }
+            if (slide != Vector2.zero)
+            {
+                Vector3 sx, sy;
+                SpriteAxes(a, top, weapon.def.equippedAngleOffset, out sx, out sy);
+                hand -= (sx * slide.x + sy * slide.y) * drawn;   // none in the holster, all of it in the hand
             }
             Vector3 tip;
             Matrix4x4 world = DrawSlab(weapon, ScaleOf(weapon), hand, a, top, behind, at, yaw, size, out tip);

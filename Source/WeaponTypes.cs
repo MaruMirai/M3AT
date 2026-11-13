@@ -119,18 +119,98 @@ namespace M3AT
         // ever (the baked frames), so then anim.txt's type_scale lines stand in for its sizes.
         private static float ScaleOf(Thing weapon)
         {
-            ThingDef def = weapon.def;
-            string type = TypeOf(def);
+            float scale = TypeSize(TypeOf(weapon.def));
+            return scale < 0f ? (skin != null && skin.WeaponScale >= 0f ? skin.WeaponScale : WeaponScale) : scale / GroundRatio(weapon);
+        }
+
+        // A type's size against the weapon on the floor: the mod options', else the export's; -1 for neither.
+        private static float TypeSize(string type)
+        {
             float scale;
             if (SettingsMod.Settings == null || !SettingsMod.Settings.weaponScales.TryGetValue(type, out scale))
             {
                 scale = skin != null ? skin.TypeScale(type) : FileTypeScale(type);
-                if (scale < 0f)
-                {
-                    return skin != null && skin.WeaponScale >= 0f ? skin.WeaponScale : WeaponScale;
-                }
             }
-            return scale / GroundRatio(weapon);
+            return scale;
+        }
+
+        // ---- Grips found in the art (GripFinder), for a weapon with no hold of its own.
+
+        // The game's own weapon whose sprite each kind's hold is made on (preview.py's KIND_LOOK), to measure from.
+        private static readonly Dictionary<string, string> GripReference = new Dictionary<string, string>
+        {
+            { "rifle", "Gun_AssaultRifle" },
+            { "melee", "MeleeWeapon_Knife" },
+        };
+
+        public static bool AutoGrips   // false: a weapon with no hold of its own takes its kind's as it is (the mod's options set it)
+        {
+            get { return !NoAutoGrips && (SettingsMod.Settings == null || SettingsMod.Settings.autoGrips); }
+        }
+
+        // M3AT_NO_AUTOGRIP=1 turns it off for a run without touching the saved options (to compare autotest pictures).
+        private static readonly bool NoAutoGrips = Environment.GetEnvironmentVariable("M3AT_NO_AUTOGRIP") == "1";
+
+        // How far to slide the slab of a weapon with no hold of its own (held by its kind's) along its sprite's own
+        // axes (x along the art's right, y its up; the same units as the slab's draw size, DrawSlab's), so that the grip
+        // found in its art (GripFinder) comes to the fist as the grip found on the kind's own sprite does under that hold:
+        // the fist's place on the kind's sprite, from that sprite's grip, put on this one's grip. fist, hand, a and top:
+        // the fist and the hold's place and line as DrawWeapon has them (before the slab is laid down or holstered); size:
+        // the figure's. Zero when it doesn't apply or the grip isn't clear in either sprite.
+        private static Vector2 GripSlide(Thing weapon, string holdName, bool slab, Vector3 fist, Vector3 hand, Vector3 a, Vector3 top, float behind, float size)
+        {
+            ThingDef def = weapon.def;
+            if (!AutoGrips || Thrown(def) || HoldOf(WeaponName(def), slab) != null)
+            {
+                return Vector2.zero;
+            }
+            string kind = KindOf(def), refName;
+            if (holdName != kind || !GripReference.TryGetValue(kind, out refName))
+            {
+                return Vector2.zero;   // held by another kind's hold than its own (the rifle's, by default): nothing to measure against
+            }
+            ThingDef refDef = DefDatabase<ThingDef>.GetNamedSilentFail(refName);
+            Graphic g = weapon.Graphic;
+            Material mat = g != null ? g.MatSingleFor(weapon) : null;
+            if (refDef == null || refDef == def || refDef.graphicData == null || mat == null || mat.mainTexture == null)
+            {
+                return Vector2.zero;
+            }
+            string type = TypeOf(def);
+            string find = kind == "rifle" ? "gun" : type == "melee_2h" ? "melee2" : "melee";
+            Texture refArt = OwnArt(refDef.graphicData.texPath);
+            Vector2 grip, refGrip;
+            if (!GripFinder.Find(mat.mainTexture, find, def.equippedAngleOffset, out grip)
+                || !GripFinder.Find(refArt, kind == "rifle" ? "gun" : "melee", refDef.equippedAngleOffset, out refGrip))
+            {
+                return Vector2.zero;
+            }
+            float scale = ScaleOf(weapon), own = TypeSize(type), theirs = TypeSize(TypeOf(refDef));
+            Vector2 draw = g.drawSize * scale / size;
+            Vector2 refDraw = refDef.graphicData.drawSize * scale * (own > 0f && theirs > 0f ? theirs / own : 1f) / size;
+            // The fist's place from the slab's middle in each sprite's axes, as DrawSlab lays each out from this hold.
+            Vector2 here = FistOnSprite(fist, hand, a, top, behind, def.equippedAngleOffset, draw);
+            Vector2 there = FistOnSprite(fist, hand, a, top, behind, refDef.equippedAngleOffset, refDraw);
+            Vector2 want = Vector2.Scale(grip - new Vector2(0.5f, 0.5f), draw) + there - Vector2.Scale(refGrip - new Vector2(0.5f, 0.5f), refDraw);
+            return want - here;
+        }
+
+        // The fist from the slab's middle along a sprite's own axes (the slab's x and y, unit), as DrawSlab places a sprite
+        // drawn draw big with this angle offset from this hold.
+        private static Vector2 FistOnSprite(Vector3 fist, Vector3 hand, Vector3 a, Vector3 top, float behind, float offset, Vector2 draw)
+        {
+            Vector3 x, y;
+            SpriteAxes(a, top, offset, out x, out y);
+            Vector3 middle = hand + a * (behind * Mathf.Max(draw.x, draw.y));
+            return new Vector2(Vector3.Dot(fist - middle, x), Vector3.Dot(fist - middle, y));
+        }
+
+        // A sprite's own axes on its slab, unit (DrawSlab's x and y before their size).
+        private static void SpriteAxes(Vector3 a, Vector3 top, float offset, out Vector3 x, out Vector3 y)
+        {
+            float o = offset * Mathf.Deg2Rad, c = Mathf.Cos(o), sn = Mathf.Sin(o);
+            x = (a * c - top * sn).normalized;
+            y = (a * sn + top * c).normalized;
         }
 
         // A type's size from anim.txt's type_scale lines; -1 if it has none.
