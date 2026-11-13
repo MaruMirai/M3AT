@@ -25,6 +25,7 @@ namespace M3AT
     // than the head. The head's sprite outline (the head's Basic layer, and the skin layer when it is the whole sprite
     // skin) is left out, since it would wrap round the sides of the 3D head; the head's mood covers and highlights
     // (Experimentals' blush, hot and cold faces) and skin marks (freckles, moles) are kept.
+    [StaticConstructorOnStartup]
     public static partial class FaceLayers
     {
         private const string Tag = "[M3AT] ";

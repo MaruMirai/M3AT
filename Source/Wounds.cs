@@ -26,6 +26,7 @@ namespace M3AT
     // A bionic prosthetic's panel seams and lights, and an archotech one's circuit traces and inset panels, are laid on the
     // same way (LimbDecals), from DecalFile's rows of cells (anim_scripts/make_prosthetic_decals.py), stacked under the
     // wound sheet's rows as it is loaded.
+    [StaticConstructorOnStartup]
     public static class Wounds
     {
         private const string Tag = "[M3AT] ";

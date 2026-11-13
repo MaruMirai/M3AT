@@ -54,6 +54,7 @@ namespace M3AT
     // it is the silhouette alone, unless the mod's options turn that off, Silhouette), with its own light pass (MarusOutlineMark). IsoRim's outline has
     // none, so at night it takes the game's overlay pulled toward the camera: the light of the ground behind it on
     // screen, which changed along a line that moved as the camera tilted.
+    [StaticConstructorOnStartup]
     public sealed partial class SkinnedFigure
     {
         private const string Tag = "[M3AT] ";
