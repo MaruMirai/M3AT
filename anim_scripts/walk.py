@@ -107,7 +107,7 @@ DRAFTED = {
     'Gun_LMG': {'kind': 'rifle', 'R': (-0.2657, -0.353, 0.496), 'L': (0.1438, -0.2509, 0.1777)},
     'Gun_AssaultRifle': {'kind': 'rifle', 'R': (-0.2628, -0.3558, 0.457), 'L': (0.1168, -0.2704, 0.1386)},
     'Gun_SniperRifle': {'kind': 'rifle', 'R': (-0.301, -0.3231, 0.5345), 'L': (0.1822, -0.2854, 0.1602)},
-    'Gun_Minigun': {'kind': 'rifle', 'R': (0.0508, -0.3248, 0.3121), 'R_turn': (102.45, -202.0058, -50.1526), 'R_elbow': 30.0, 'L': (0.179, -0.2086, 0.4486), 'L_turn': (-3.0054, -36.9019, -84.7494), 'L_elbow': 12.0},
+    'Gun_Minigun': {'kind': 'rifle', 'R': (-0.1363, -0.4467, 0.4191), 'R_turn': (139.4665, -189.4024, -50.5031), 'R_elbow': 30.0, 'L': (0.13, -0.2651, 0.4852), 'L_turn': (-3.0054, -36.9019, -84.7494), 'L_elbow': 12.0},
     'Gun_IncendiaryLauncher': {'kind': 'rifle', 'R': (-0.3104, -0.4795, 0.3901), 'R_turn': (105.9551, -174.6567, 11.094), 'L': (0.2253, -0.3415, 0.1857)},
     'Gun_TripleRocket': {'kind': 'rifle', 'R': (-0.3166, -0.4663, 0.4572), 'R_turn': (105.9551, -174.6567, 11.094), 'L': (0.2253, -0.3415, 0.1857)},
     'Gun_DoomsdayRocket': {'kind': 'rifle', 'R': (-0.3166, -0.4663, 0.4572), 'R_turn': (105.9551, -174.6567, 11.094), 'L': (0.2423, -0.3174, 0.1642)},
@@ -149,16 +149,16 @@ DRAFTED = {
     'MeleeWeapon_Ikwa': {'kind': 'melee'},
     'MeleeWeapon_Gladius': {'kind': 'melee', 'R_elbow': 15.0},
     'MeleeWeapon_Mace': {'kind': 'melee'},
-    'MeleeWeapon_LongSword': {'kind': 'melee', 'R': (-0.2359, -0.3362, 0.222), 'R_elbow': 18.0, 'L': (-0.0837, -0.3377, 0.2735), 'L_turn': (-96.4636, -10.6086, -103.345), 'L_elbow': 54.0},
-    'MeleeWeapon_Spear': {'kind': 'melee', 'R': (-0.2074, -0.3251, 0.2293), 'R_turn': (-51.9769, 0.0469, 122.4149), 'R_elbow': 22.0, 'L': (0.0268, -0.314, 0.4077), 'L_turn': (-99.0584, -22.5664, -108.2994), 'L_elbow': 17.0},
+    'MeleeWeapon_LongSword': {'kind': 'melee', 'R': (-0.2211, -0.3225, 0.3411), 'R_elbow': 18.0, 'L': (-0.1073, -0.3189, 0.2228), 'L_turn': (-96.4636, -10.6086, -103.345), 'L_elbow': 54.0},
+    'MeleeWeapon_Spear': {'kind': 'melee', 'R': (-0.2074, -0.3251, 0.2293), 'R_turn': (-51.9769, 0.0469, 122.4149), 'R_elbow': 22.0, 'L': (0.0452, -0.3151, 0.4121), 'L_turn': (-99.0584, -22.5664, -108.2994), 'L_elbow': 17.0},
     'MeleeWeapon_BreachAxe': {'kind': 'melee', 'R': (-0.0983, -0.3345, 0.3432), 'R_turn': (-27.0989, 18.4927, 113.5556), 'R_elbow': 20.0, 'L': (0.1667, -0.288, 0.4641), 'L_turn': (-118.8454, -48.3207, -89.2827)},
     # Royalty
     'MeleeWeapon_Axe': {'kind': 'melee', 'R_elbow': 23.0},
     'MeleeWeapon_Warhammer': {'kind': 'melee', 'R': (-0.0718, -0.3395, 0.3338), 'R_turn': (-27.0989, 18.4927, 113.5556), 'R_elbow': 20.0, 'L': (0.1667, -0.288, 0.4641), 'L_turn': (-118.8454, -48.3207, -89.2827)},
-    'MeleeWeapon_MonoSword': {'kind': 'melee', 'R': (-0.0715, -0.4229, 0.3852), 'R_elbow': 51.0, 'L': (0.0876, -0.4249, 0.4605), 'L_turn': (-96.4636, -10.6086, -103.345), 'L_elbow': 51.0},
+    'MeleeWeapon_MonoSword': {'kind': 'melee', 'R': (-0.0912, -0.4089, 0.3033), 'R_elbow': 51.0, 'L': (0.0895, -0.4372, 0.4101), 'L_turn': (-96.4636, -10.6086, -103.345), 'L_elbow': 51.0},
     'MeleeWeapon_Zeushammer': {'kind': 'melee', 'R': (-0.0615, -0.3441, 0.3783), 'R_turn': (-27.0989, 18.4927, 113.5556), 'R_elbow': 27.0, 'L': (0.2532, -0.3124, 0.5119), 'L_turn': (-118.8193, -48.1725, -89.139), 'L_elbow': 10.0},
-    'MeleeWeapon_PlasmaSword': {'kind': 'melee', 'R': (-0.0715, -0.4229, 0.3852), 'R_elbow': 51.0, 'L': (0.0876, -0.4249, 0.4605), 'L_turn': (-96.4636, -10.6086, -103.345), 'L_elbow': 51.0},
-    'MeleeWeapon_PsyfocusStaff': {'kind': 'melee', 'R': (-0.0286, -0.3974, 0.3898), 'R_turn': (-27.0989, 18.4927, 113.5556), 'R_elbow': 20.0, 'L': (0.1817, -0.3299, 0.502), 'L_turn': (-118.8454, -48.3207, -89.2827)},
+    'MeleeWeapon_PlasmaSword': {'kind': 'melee', 'R': (-0.145, -0.4381, 0.2888), 'R_elbow': 51.0, 'L': (0.0346, -0.4366, 0.4008), 'L_turn': (-96.4636, -10.6086, -103.345), 'L_elbow': 51.0},
+    'MeleeWeapon_PsyfocusStaff': {'kind': 'melee', 'R': (-0.128, -0.4487, 0.3551), 'R_turn': (-29.4551, 9.7254, 111.6695), 'R_elbow': 20.0, 'L': (0.2073, -0.4172, 0.5695), 'L_turn': (-118.8454, -48.3207, -89.2827)},
 }
 SHIELD = 'shield_'   # the shield stances' names: SHIELD + a one-handed kind (DRAFTED), or + a weapon's defName (derived)
 ONE_HANDED = ('handgun', 'melee_1h', 'grenade')   # the weapon types (WEAPON_TYPES) that take the shield stances
@@ -378,10 +378,10 @@ WEAPONS = {
     # Royalty
     'MeleeWeapon_Axe': dict(hand='R', line='hand', aim=(-0.9088, 0.078, 0.4099), drop=0.0, behind=0.03, roll=82.2887, at=(-0.0676, -0.0923, -0.0013)),
     'MeleeWeapon_Warhammer': dict(hand='R', line='hand', aim=(0.766, -0.6423, 0.0266), drop=0.0, behind=0.03, roll=-68.4701, at=(-0.113, -0.1154, 0.0436)),
-    'MeleeWeapon_MonoSword': dict(hand='R', line='hand', aim=(-0.9197, -0.0774, 0.3848), drop=0.0, behind=0.03, roll=81.6481, at=(-0.0788, -0.2011, 0.034)),
+    'MeleeWeapon_MonoSword': dict(hand='R', line='hand', aim=(-0.9197, -0.0774, 0.3848), drop=0.0, behind=0.03, roll=81.6481, at=(-0.0973, -0.2719, 0.0591)),
     'MeleeWeapon_Zeushammer': dict(hand='R', line='hand', aim=(-0.9368, 0.0631, 0.3441), drop=0.0, behind=0.03, roll=78.3226, at=(-0.0422, -0.0941, -0.0142)),
-    'MeleeWeapon_PlasmaSword': dict(hand='R', line='hand', aim=(-0.9197, -0.0774, 0.3848), drop=0.0, behind=0.03, roll=81.6481, at=(-0.0788, -0.2011, 0.034)),
-    'MeleeWeapon_PsyfocusStaff': dict(hand='R', line='hand', aim=(0.766, -0.6423, 0.0266), drop=0.0, behind=0.03, roll=-68.4701, at=(-0.0729, -0.1021, 0.034)),
+    'MeleeWeapon_PlasmaSword': dict(hand='R', line='hand', aim=(-0.9197, -0.0774, 0.3848), drop=0.0, behind=0.03, roll=81.6481, at=(-0.0915, -0.272, 0.0583)),
+    'MeleeWeapon_PsyfocusStaff': dict(hand='R', line='hand', aim=(0.766, -0.6423, 0.0266), drop=0.0, behind=0.03, roll=-68.4701, at=(-0.0779, -0.1092, 0.0189)),
 }
 
 # Holstered weapons (WalkFigures.DrawHolstered): a weapon the pawn has but is not holding (the equipped one while it is
