@@ -37,21 +37,20 @@
   <description>
 Animated 3D pawns for IsoRim Waylith
 
-WIP, current features include:
-Anims for most actions (some currently basic)
-Wearable 3D apparel, Sprite-to-3D hairs
-Handling animations for IsoRim's weapons
+Early WIP, Main features:
+Animations for most actions (some currently basic)
+Wearable 3D apparel and sprite-to-3D hair
+Correct holds for IsoRim's 3D weapons, Mod weapon grip approximation
 Visible holstered weapons and IsoRim equipment
-Body types, Gene parts, Biotech growth, Prosthetics
-Visible injuries, Injury-reactive animations
+Body types, gene parts, Biotech growth, prosthetics
+Visible injuries and injury-reactive animations
 Ragdolls and flinging
-Freecam mode
 CE support
-Optimization where possible
+Freecam mode
 
 Discord: https://discord.gg/7t5Aav2f2e
 GitHub: https://github.com/MaruMirai/M3AT
 
-Chibi Base Body by monymensss (Sketchfab), CC BY 4.0, rigged and reshaped here. Licences: see LICENSE and THIRD_PARTY_NOTICES.md.
+Credits and licences: see LICENSE and THIRD_PARTY_NOTICES.md.
 </description>
 </ModMetaData>

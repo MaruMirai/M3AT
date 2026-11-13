@@ -4,33 +4,17 @@
 
 ![M3AT preview](M3AT%3A%20Maru%27s%203D%20Animated%20Toons/About/Preview.png)
 
-**Early WIP and just launched**, so expect some janky or generic animations and other scuff.
-Screenshots use [Facial Animation - Retexture](https://steamcommunity.com/sharedfiles/filedetails/?id=3271240549).
+Early WIP, Main features:
 
-## Main features
-
-- **Animations** for most things, including movement, combat, jobs, and recreation
-- **Apparel models** for everything in the base game, all DLCs and Combat Extended
-- **All hair mods supported**, with on-the-fly sprite-to-3D conversion; hair shows under hats
-- **Carrying, aiming and firing animations** for all of IsoRim's 3D weapons, or sprite-generated slab versions
-- **Holstered weapons** visible (several at once with CE), with draw and holster animations
-- **Body types**: one for each of RimWorld's, with gender differences and optional variation
-- **Equipment packs** visible when worn, using IsoRim's models
-- **Injuries**, bandages, scars and missing limbs; wounds match their type, location and severity
-- **Prosthetic limbs**: peg legs, wooden, simple, bionic and archotech parts
-- **Gene parts** modelled and animated
-- **Injury-reactive** idle and movement animations
-- **Ragdolls**, with optional physics flinging
-- **Smooth growth for Biotech**: smooth growth from baby to adult, and visible pregnancy
-- **Size and build sliders** for pawns and heads
-- **Animated faces** powered by [NL] Facial Animation: blinking, moods, expressions and more
-- **Full Combat Extended support**
-- **Freecam mode**: press **F6** for a WASD-mouselook freecam, designed for play with the more detailed pawns. Orders and selections work with the crosshair. The normal pointer comes back when a menu opens, or at the press of a button.
-
-## Performance
-
-Models have been kept as light as possible without looking poor, and various optimizations have been made to reduce impact.
-In benchmarks on a 10600KF and 3060, each pawn on screen currently adds about 0.18 ms of frame time (around 3 ms for 20 pawns on screen).
+- Animations for most actions (some currently basic)
+- Wearable 3D apparel and sprite-to-3D hair
+- Correct holds for IsoRim's 3D weapons, Mod weapon grip approximation
+- Visible holstered weapons and IsoRim equipment
+- Body types, gene parts, Biotech growth, prosthetics
+- Visible injuries and injury-reactive animations
+- Ragdolls and flinging
+- CE support
+- Freecam mode
 
 ## Requirements
 
@@ -41,31 +25,10 @@ In benchmarks on a 10600KF and 3060, each pawn on screen currently adds about 0.
 
 Load M3AT after all of them.
 
-## Mod integration
+## Links
 
-- **[Combat Extended](https://steamcommunity.com/sharedfiles/filedetails/?id=3495749827)**: all apparel modelled, extra holstered weapons show, backpacks work around holsters and equipment, shields are worn and held, reload and hunker animations, and the webbing layer fits over armour. Also try [IsoRimWaylith-CEPack](https://github.com/peren717/IsoRimWaylith-CEPack) for the best integration.
-- **[Romance on the Rim](https://steamcommunity.com/sharedfiles/filedetails/?id=2654432921)**: various animations for the dates
-- **[[DG]Lovly Animal Cuddling](https://steamcommunity.com/sharedfiles/filedetails/?id=3823442009)**: petpetpet
-
-## Serving suggestions
-
-- **[Facial Animation - Retexture](https://steamcommunity.com/sharedfiles/filedetails/?id=3271240549)**: used in the screenshots; gives more face variety and a different style to FA
-- **[Pipette Tool](https://steamcommunity.com/sharedfiles/filedetails/?id=2787342464)**: a huge QoL improvement, and works fine in the freecam
-
-## Compatibility
-
-M3AT is purely visual aside from the optional flinging, so it shouldn't have any hard incompatibilities.
-For mods that add content:
-
-- **Hair and beard mods**: all fully supported; the 3D hair is generated from the hair textures.
-- **Weapon mods**: fairly good support. IsoRim generates a 3D version by thickening the sprite, and M3AT guesses the animations from its type.
-- **Clothing mods**: falls back to drawing a similar garment M3AT has, in the right colour. Hats and masks won't show.
-- **Alien race mods**: will likely just show as ordinary humans.
-
-## Links and bug reports
-
-- [Discord](https://discord.gg/7t5Aav2f2e): discussion, support and suggestions
-- [Issues](https://github.com/MaruMirai/M3AT/issues): bug reports
+Discord: https://discord.gg/7t5Aav2f2e
+GitHub: https://github.com/MaruMirai/M3AT
 
 To include some helpful info when you have an issue, select a pawn, then open the mod's options and press **Copy bug report**. This copies text to your clipboard for use on the Discord or GitHub. It won't send data anywhere.
 

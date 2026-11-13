@@ -68,7 +68,7 @@ LAYOUT = [
          "messages": ["first_announcement.md"]},
     ]},
     {"category": "SUPPORT", "channels": [
-        {"name": "bug-reports", "type": FORUM, "access": "open",
+        {"name": "issues-and-bugs", "type": FORUM, "access": "open",
          "guidelines": "bug_guidelines.md",
          "tags": [("Crash or error", "💥"), ("Visual glitch", "👀"), ("Animation", "🏃"),
                   ("Clothes", "👕"), ("Hair", "💇"), ("Mod conflict", "🧩"),
@@ -290,7 +290,7 @@ def main():
             print(f"  #{spec['name']}: made")
             made_now.append((spec, made, kind))
 
-    # "#bug-reports" in the texts becomes a clickable link to that channel.
+    # "#issues-and-bugs" in the texts becomes a clickable link to that channel.
     ids = {name: c["id"] for (name, is_cat), c in by_name.items() if not is_cat}
     ids.update({s["name"]: m["id"] for s, m, k in made_now})
 
