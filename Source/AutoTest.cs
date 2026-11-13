@@ -604,6 +604,7 @@ namespace M3AT
                 case "hats": return HatsTest();
                 case "prosthetics": return ProstheticsTest();
                 case "faceab": return FaceAbTest();
+                case "beard": return BeardTest();
                 case "faceanim": return FaceAnimTest(null);
                 case "faceshapes": return FaceShapesTest(null);
             }
@@ -2378,6 +2379,73 @@ namespace M3AT
         // The red flash of a hit: the figure is flashed by HitFlash.Of, 16 game ticks from full to none, the outlines never.
         // The face drawn eight layers a draw (FaceLayers.DrawStacked) against a draw per layer, close up, the same frame each
         // time (paused, so Facial Animation's face is the same in both): the pictures in each pair should match.
+        // A bald man with nothing on in a few beards with a gap round the mouth, close up from the front, as the flat
+        // beard (on the face patch) and the 3D one, the mouth shut and forced open (FaceLayers.TestMouthOpen), the face's
+        // layers stacked and drawn one by one: Facial Animation's mouth should show in the beard's gap.
+        private static IEnumerator BeardTest()
+        {
+            Rand.PushState(20261113);
+            Pawn pawn;
+            try
+            {
+                pawn = NewPawn(middle, null);
+            }
+            finally
+            {
+                Rand.PopState();
+            }
+            pawn.apparel.DestroyAll();
+            Hold(pawn);
+            pawn.story.hairDef = DefDatabase<HairDef>.GetNamedSilentFail("Bald") ?? pawn.story.hairDef;
+            Note("Pawn: " + pawn.gender + ", head " + pawn.story.headType?.defName + ", body " + pawn.story.bodyType?.defName);
+            string widen = Environment.GetEnvironmentVariable("M3AT_WIDEN");   // HairBuilder.WidenEyes, to compare (the cache keeps the first built)
+            if (!string.IsNullOrEmpty(widen))
+            {
+                HairBuilder.WidenEyes = float.Parse(widen, System.Globalization.CultureInfo.InvariantCulture);
+            }
+            Note("Beards widened " + HairBuilder.WidenEyes + " at the eyes");
+            BeardMode mode = SettingsMod.Settings.beardMode;
+            float distance = lookDistance, pitch = lookPitch, height = lookHeight;
+            lookDistance = 1.0f;
+            lookHeight = 0.95f;
+            lookPitch = 10f;
+            Look(pawn, 0f);
+            foreach (string name in new[] { "Circle", "Anchor", "Full", "Moustache", "MuttonChops", "SideWhiskers", "Wizard" })
+            {
+                BeardDef def = DefDatabase<BeardDef>.GetNamedSilentFail(name);
+                if (def == null)
+                {
+                    Note("no " + name);
+                    continue;
+                }
+                pawn.style.beardDef = def;
+                pawn.Drawer.renderer.SetAllGraphicsDirty();
+                foreach (BeardMode m in new[] { BeardMode.Flat, BeardMode.ThreeD })
+                {
+                    SettingsMod.Settings.beardMode = m;
+                    yield return Ticks(3, "beard", pawn);
+                    yield return WaitReal(3f);   // the 3D beard built
+                    yield return Ticks(3, "beard", pawn);
+                    string tag = name + "_" + (m == BeardMode.Flat ? "flat" : "3d");
+                    FaceLayers.TestMouthOpen = false;
+                    yield return Shot(tag + "_shut");
+                    FaceLayers.TestMouthOpen = true;
+                    yield return Ticks(2, "beard", pawn);
+                    yield return Shot(tag + "_open");
+                    FaceLayers.StackLayers = false;
+                    yield return Ticks(2, "beard", pawn);
+                    yield return Shot(tag + "_open_layers");
+                    FaceLayers.StackLayers = true;
+                    FaceLayers.TestMouthOpen = false;
+                }
+            }
+            SettingsMod.Settings.beardMode = mode;
+            lookDistance = distance;
+            lookPitch = pitch;
+            lookHeight = height;
+            Note("Look: the mouth (shut, then open) in the gap between the moustache and the chin beard of Circle and Anchor, under Moustache, the same in _flat and _3d and in _open and _open_layers.");
+        }
+
         private static IEnumerator FaceAbTest()
         {
             List<Pawn> pawns = new List<Pawn>();

@@ -239,6 +239,11 @@ namespace M3AT
             HairBuilder builder = SkinnedFigure.HarnessBuilder(args[0], beard, out figure);
             HairBuilder.LineUpOn = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("M3AT_NO_LINEUP"));
             HairBuilder.Tapered = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("M3AT_NO_TAPER"));
+            string widen = Environment.GetEnvironmentVariable("M3AT_WIDEN");   // a beard's HairBuilder.WidenEyes
+            if (!string.IsNullOrEmpty(widen))
+            {
+                HairBuilder.WidenEyes = float.Parse(widen, System.Globalization.CultureInfo.InvariantCulture);
+            }
             HairBuilder.IslandsOn = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("M3AT_NO_ISLANDS"));
             if (float.TryParse(Environment.GetEnvironmentVariable("M3AT_CURTAIN_SLOPE"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float curtainSlope)) HairBuilder.CurtainSlope = curtainSlope;
             HairBuilder.CurtainOn = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("M3AT_NO_CURTAIN"));   // the side locks hung as sheets

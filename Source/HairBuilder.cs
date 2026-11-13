@@ -43,7 +43,7 @@ namespace M3AT
     {
         private const string Tag = "[M3AT] ";
         public const int Version = 40;   // raise when the build changes, so cached hair is made again
-        public const int BeardVersion = 5;   // and cached beards
+        public const int BeardVersion = 6;   // and cached beards
         internal static bool Tapered = true;    // the hull's flanks narrowing behind the head's middle (Hull; M3AT_NO_TAPER off)
         internal static bool ForeOn = true;     // the side sprites having no say over what the front one carried out (Textured; M3AT_NO_FORE off)
         // A lock the front sprite shows beside the face, over the head's edge columns where Carry's FringeTurn stops,
@@ -225,6 +225,7 @@ namespace M3AT
         // The head: its extent in the game's model space, and where the head the sprites are drawn over is in them.
         private float cx, half, top, chin, back, front;
         private float sx, sy, sz, midX;
+        private float[] widen;   // a beard's: per sprite row, how much wider than sx it is laid on the chibi (Widen); null for hair
         private float eyes, mouth;   // a beard's: where Facial Animation's eye line and mouth are drawn on the chibi, y (FaceRows)
         private int hx0, hx1, hy0, hy1, hz0, hz1;
         private bool west;   // the style being built has a west sprite of its own (Sprites.west): Side
@@ -580,7 +581,37 @@ namespace M3AT
             sz = (front - back) / (hz1 - hz0);
             midX = (hx0 + hx1) / 2f;
             FaceRows();
+            widen = beard ? Widen() : null;
             return true;
+        }
+
+        // A beard's width row by row. One scale across (sx) fits the sprite head's widest to the chibi's, but Facial
+        // Animation's eyes on the chibi reach nearly to the sides of its face (the lids out to about 0.15 cells, where the
+        // head's outline is), where the sprite head's are small and near its middle: the sideburns, drawn beside the
+        // sprite head's eyes, came out across the chibi's, far too narrow for its face. So the rows are widened from none
+        // at the mouth (MouthRow; the moustache and chin keep their fit) to WidenEyes at the eye line (EyeRow) and above,
+        // eased between, taking the sideburns' upper reaches out round the sides of the head. The 3D beard only: on the
+        // flat one (FlatFace) they went off the face patch or onto the ears (ClearEars) and were lost.
+        internal static float WidenEyes = 1.5f;
+        private float[] Widen()
+        {
+            float[] w = new float[Size];
+            for (int r = 0; r < Size; r++)
+            {
+                float t = Mathf.Clamp01((MouthRow - r) / (MouthRow - EyeRow));
+                w[r] = 1f + (WidenEyes - 1f) * t * t * (3f - 2f * t);
+            }
+            return w;
+        }
+
+        // The scale across of sprite row Y on the chibi.
+        private float AcrossAt(float Y)
+        {
+            if (widen == null)
+            {
+                return sx;
+            }
+            return sx * widen[Mathf.Clamp(Mathf.RoundToInt(Y), 0, Size - 1)];
         }
 
         // Where Facial Animation's eye line and mouth come out on the chibi's face, which a beard's rows are fitted to
@@ -781,7 +812,7 @@ namespace M3AT
 
         private Vector3 ToGame(float X, float Y, float Z)
         {
-            return new Vector3(cx - (X - midX) * sx, HeightOf(Y), back + (Z - hz0) * sz);
+            return new Vector3(cx - (X - midX) * AcrossAt(Y), HeightOf(Y), back + (Z - hz0) * sz);
         }
 
         // A sprite row's height on the chibi: down the head at one scale, a beard's by the eyes and the chin (the class
@@ -822,8 +853,8 @@ namespace M3AT
 
         private void ToSprite(Vector3 p, out float X, out float Y, out float Z)
         {
-            X = midX + (cx - p.x) / sx;
             Y = RowOf(p.y);
+            X = midX + (cx - p.x) / AcrossAt(Y);
             Z = hz0 + (p.z - back) / sz;
         }
 
@@ -863,7 +894,7 @@ namespace M3AT
                 for (int i = 0; i < texSize; i++)
                 {
                     float x = (0.5f - (i + 0.5f) / texSize) * span;
-                    int col = Mathf.RoundToInt(midX + (cx - x) / sx);
+                    int col = Mathf.RoundToInt(midX + (cx - x) / sx);   // not widened (Widen)
                     bool inside = col >= 0 && col < Size && row >= 0 && row < Size;
                     px[r * texSize + i] = inside ? south[row * Size + col] : new Color32(0, 0, 0, 0);
                 }

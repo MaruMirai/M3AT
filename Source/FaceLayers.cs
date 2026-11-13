@@ -679,7 +679,7 @@ namespace M3AT
         }
 
         private static readonly Dictionary<Material, Material[]> lit = new Dictionary<Material, Material[]>();
-        private const int MaxLayers = 48;
+        private const int MaxLayers = 47;   // queues 2950 to 2996, under the ridges and the flat beard (RidgeQueue, FlatQueue)
         private static readonly int faceModeId = Shader.PropertyToID("_FaceMode");
 
         private static Material LitFor(Material source, int mode, int place)
@@ -771,6 +771,7 @@ namespace M3AT
                 patch.lowUsed |= lowMouth;
                 bool mouthOpen = speaking > SpeakFrom && MouthOpen(pawn.thingIDNumber);
 #if AUTOTEST
+                mouthOpen |= TestMouthOpen;
                 if (speaking > SpeakFrom)
                 {
                     if (mouthOpen) { TalkOpenDraws++; } else { TalkShutDraws++; }
@@ -1495,12 +1496,14 @@ namespace M3AT
         }
 
         // ---- A beard laid flat on the patch (SkinnedFigure.DrawFlatBeard). Its texture is in the face's own layout
-        // (HairBuilder.FlatFace), so no Facial Animation is needed: the patch is the chibi's own. It is drawn just under the
-        // face layers, cut out as a plain layer is (mode 1), and tinted by the hair colour.
-        private const int FlatQueue = LayerQueue - 1;
+        // (HairBuilder.FlatFace), so no Facial Animation is needed: the patch is the chibi's own. It is drawn over the face
+        // layers (under them, the mouth showed through the moustache; the stacked layers are one draw, so it can't go just
+        // over the mouth alone) and the ridges, under the wounds (Wounds.Queue, 2999), cut out as a plain layer is (mode 1),
+        // and tinted by the hair colour.
+        private const int FlatQueue = 2998;
         // The gene's facial ridges go over the face layers, as the lid cover is skin-coloured and reaches past the eyes, and
-        // would hide them and change with each blink; under the wounds (Wounds.Queue, 2999).
-        private const int RidgeQueue = 2998;
+        // would hide them and change with each blink; under the flat beard.
+        private const int RidgeQueue = 2997;
         private static Shader flatShader;
         private static bool flatTried;
 
@@ -1637,6 +1640,7 @@ namespace M3AT
         private const float PhraseRest = 0.4f;
         private static float talkClock;
 #if AUTOTEST
+        internal static bool TestMouthOpen;   // the autotest's beard: the open mouth shape forced, to see it under a beard
         internal static int TalkOpenDraws, TalkShutDraws, TalkNoOpen;   // (NoOpen: open draws where the open shape is missing or the same picture)
         internal static readonly HashSet<string> TalkTextures = new HashSet<string>();   // frames drawn talking with the mouth open / shut (the autotest's talk)
 #endif
