@@ -73,8 +73,31 @@ if [ -n "$latest" ] && [ "$latest" != "$installed" ] && [ "$(cat "$STATE/told_la
 fi
 
 [ "$installed" = "$known" ] && exit 0
+
+# Steam may note the new manifest before it has finished writing the files (it stages them under
+# workshop/downloads and temp, then moves them in), so a check in between diffed the old files
+# against themselves. Wait while anything of the item is still staged or any of its files was
+# written in the last SETTLE_MINUTES; the hourly timer comes back.
+SETTLE_MINUTES=10
+for staged in "$WORKSHOP/downloads/294100/$ITEM" "$WORKSHOP/temp/294100/$ITEM"; do
+    if [ -e "$staged" ]; then echo "IsoRim still downloading ($staged); checking later."; exit 0; fi
+done
+if [ -n "$(find "$ISORIM" -newermt "-$SETTLE_MINUTES minutes" -print -quit 2>/dev/null)" ]; then
+    echo "IsoRim's files changed in the last $SETTLE_MINUTES minutes; checking later."; exit 0
+fi
+
 # Already reported this one and not acknowledged yet.
 [ -f "$REPORT" ] && grep -q "^installed manifest $installed\$" "$REPORT" && exit 0
+
+# Settled, and nothing this mod watches changed (only models, textures or Assets.zip): take it as
+# the baseline without a note.
+unchanged() {
+    local p
+    for p in "${PARTS[@]}"; do diff -rq "$BASE/$p" "$ISORIM/$p" >/dev/null 2>&1 || return 1; done
+}
+if unchanged; then
+    snapshot; echo "IsoRim manifest $installed changes nothing watched; taken as the baseline."; exit 0
+fi
 
 {
     echo "IsoRim has updated since the last acknowledged version."

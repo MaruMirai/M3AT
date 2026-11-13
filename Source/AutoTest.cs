@@ -149,6 +149,9 @@ namespace M3AT
             map = Find.CurrentMap;
             report.AppendLine("# M3AT autotest " + DateTime.Now.ToString("yyyy-MM-dd HH:mm")).AppendLine();
             report.AppendLine(video ? "Video mode: each scenario at normal speed, recorded." : "Stills mode: paused, one tick a frame.").AppendLine();
+            int? seed = IsoRim.Api.Version >= 72 ? HarnessSeedOrNull() : null;
+            report.AppendLine(seed.HasValue ? "Seed: " + seed.Value + " (IsoRim's -isorimseed: the world, colonists and every tick's random numbers the same each run)."
+                : "Seed: none (IsoRim older than Api 72, or no -isorimseed): the world and colonists differ each run.").AppendLine();
             probe = new StreamWriter(Path.Combine(outDir, "probe.txt"));
             if (wanted.Count == 1 && (wanted[0] == "shots" || wanted[0] == "perf"))
             {
@@ -553,6 +556,7 @@ namespace M3AT
             switch (name)
             {
                 case "hitflash": return HitFlashTest();
+                case "explode": return ExplodeTest();
                 case "lively": return LivelyTest(null);
                 case "lively_wave": return LivelyTest("wave");
                 case "lively_sad": return LivelyTest("sad");
@@ -585,7 +589,7 @@ namespace M3AT
                 case "sleepwear": return SleepWearTest();
                 case "sleepside": return SleepSideTest();
                 case "lovin": return LovinTest();
-                case "lovinbare": return LovinTest(SleepWear.Dressed);
+                case "lovinbare": return LovinTest(true);
                 case "kidbed": return KidBedTest();
                 case "gibbet": return GibbetTest();
                 case "vat": return VatTest();
@@ -627,13 +631,13 @@ namespace M3AT
 
         // ---- the scenarios ----
 
-        // Asleep under IsoRim's blanket (the sleepWear option's Blankets, turned on for the test): two in a double bed, each in its
+        // Asleep under IsoRim's blanket (the bedBlankets option, turned on for the test): two in a double bed, each in its
         // own half (its own lump, IsoRim's width kept to that half), and one alone in a single bed beside it to compare.
         // Each sleeper's figure tucked in (only the head drawn, BedTuck.cs) and IsoRim drawing its blanket (DrawTuckedIn).
         private static IEnumerator SharedBedTest()
         {
-            SleepWear was = SettingsMod.Settings.sleepWear;
-            SettingsMod.Settings.sleepWear = SleepWear.Blankets;
+            bool was = SettingsMod.Settings.bedBlankets;
+            SettingsMod.Settings.bedBlankets = true;
             try
             {
                 Building_Bed MakeBed(string def, IntVec3 at)
@@ -755,16 +759,18 @@ namespace M3AT
                 lookPitch = LookPitch;
                 lookDistance = LookDistance;
                 lookHeight = LookHeight;
-                SettingsMod.Settings.sleepWear = was;
+                SettingsMod.Settings.bedBlankets = was;
             }
         }
 
         // What pawns in bed are drawn wearing (the sleepWear option, SleepWear.cs): a grown pawn in a shirt, trousers, a
         // duster, a flak vest, a simple helmet and a utility belt, and a child in a shirt and trousers, each asleep in a
-        // single bed, through each choice but Blankets in turn.
+        // single bed, through each choice in turn.
         private static IEnumerator SleepWearTest()
         {
             SleepWear was = SettingsMod.Settings.sleepWear;
+            bool blanketsWere = SettingsMod.Settings.bedBlankets;
+            SettingsMod.Settings.bedBlankets = false;   // (on top of the bed, so the body shows)
             try
             {
                 Building_Bed MakeBed(IntVec3 at)
@@ -827,15 +833,16 @@ namespace M3AT
             finally
             {
                 SettingsMod.Settings.sleepWear = was;
+                SettingsMod.Settings.bedBlankets = blanketsWere;
             }
         }
 
         // The sleep clip's variants (sleep~2: on the side, still, walk.SLEEP_HOLD): four pawns asleep on top of single beds
-        // (the sleepWear option at Dressed, so the body shows), each picking one by its job (WalkFigures.LieClip).
+        // (the bedBlankets option off, so the body shows), each picking one by its job (WalkFigures.LieClip).
         private static IEnumerator SleepSideTest()
         {
-            SleepWear was = SettingsMod.Settings.sleepWear;
-            SettingsMod.Settings.sleepWear = SleepWear.Dressed;
+            bool was = SettingsMod.Settings.bedBlankets;
+            SettingsMod.Settings.bedBlankets = false;
             try
             {
                 Pawn[] sleepers = new Pawn[4];
@@ -889,17 +896,17 @@ namespace M3AT
             }
             finally
             {
-                SettingsMod.Settings.sleepWear = was;
+                SettingsMod.Settings.bedBlankets = was;
             }
         }
 
-        // Lovin beside sleeping, under IsoRim's blanket (the sleepWear option's Blankets, on for the test): two double beds side by side,
+        // Lovin beside sleeping, under IsoRim's blanket (the bedBlankets option, on for the test): two double beds side by side,
         // one couple at lovin (awake: the lie clip) and one asleep (sleep), to see whether the heads and lumps lie as far up
         // the bed (Ease.headAlong, blanketAlong: cells from IsoRim's head place toward the feet).
         private static IEnumerator BedCompareTest()
         {
-            SleepWear was = SettingsMod.Settings.sleepWear;
-            SettingsMod.Settings.sleepWear = SleepWear.Blankets;
+            bool was = SettingsMod.Settings.bedBlankets;
+            SettingsMod.Settings.bedBlankets = true;
             try
             {
                 Building_Bed MakeBed(IntVec3 at)
@@ -982,19 +989,18 @@ namespace M3AT
             }
             finally
             {
-                SettingsMod.Settings.sleepWear = was;
+                SettingsMod.Settings.bedBlankets = was;
             }
         }
 
-        // Lovin under IsoRim's blanket (the sleepWear option's Blankets, on for the test): two spouses in a double bed, each head and
+        // Lovin under IsoRim's blanket (the bedBlankets option, on for the test): two spouses in a double bed, each head and
         // lump drawn across toward the other and the heads turned to face each other (WalkFigures.LovinOf).
-        // lovinbare: the same with no blanket (the sleepWear option at Dressed): the two on their sides facing each other
+        // lovinbare: the same with no blanket (the bedBlankets option off): the two on their sides facing each other
         // (lovin_L, lovin_R), drawn toward each other (WalkFigures.LovinBareOf), the heads not turned.
-        private static IEnumerator LovinTest(SleepWear wear = SleepWear.Blankets)
+        private static IEnumerator LovinTest(bool bare = false)
         {
-            SleepWear was = SettingsMod.Settings.sleepWear;
-            SettingsMod.Settings.sleepWear = wear;
-            bool bare = wear != SleepWear.Blankets;
+            bool was = SettingsMod.Settings.bedBlankets;
+            SettingsMod.Settings.bedBlankets = !bare;
             try
             {
                 Thing made = ThingMaker.MakeThing(ThingDef.Named("DoubleBed"), ThingDefOf.WoodLog);
@@ -1082,11 +1088,11 @@ namespace M3AT
                 lookPitch = LookPitch;
                 lookDistance = LookDistance;
                 lookHeight = LookHeight;
-                SettingsMod.Settings.sleepWear = was;
+                SettingsMod.Settings.bedBlankets = was;
             }
         }
 
-        // Children and a baby asleep under IsoRim's blanket (the sleepWear option's Blankets, on for the test), each alone in a single
+        // Children and a baby asleep under IsoRim's blanket (the bedBlankets option, on for the test), each alone in a single
         // bed, beside a grown sleeper to compare: the lump's size (BlanketScaleOf, measured from the body in its shape) and where it starts
         // (the neck, BlanketNeck), and where the head lies against the pillow.
         // Corpses hung in Ideology's gibbet cages (a grown man, a grown woman, a child), which the chibi draws slumped upright
@@ -1238,8 +1244,8 @@ namespace M3AT
 
         private static IEnumerator KidBedTest()
         {
-            SleepWear was = SettingsMod.Settings.sleepWear;
-            SettingsMod.Settings.sleepWear = SleepWear.Blankets;
+            bool was = SettingsMod.Settings.bedBlankets;
+            SettingsMod.Settings.bedBlankets = true;
             try
             {
                 float[] ages = { 25f, 13f, 8f, 4f, 1f };
@@ -1331,7 +1337,7 @@ namespace M3AT
             }
             finally
             {
-                SettingsMod.Settings.sleepWear = was;
+                SettingsMod.Settings.bedBlankets = was;
             }
         }
 
@@ -2581,6 +2587,118 @@ namespace M3AT
                 if (p != null && !p.Destroyed)
                 {
                     p.Destroy();
+                }
+            }
+        }
+
+        // N of IsoRim's -isorimseed=N (Api 72), which autotest.sh passes; called only on version 72 or later.
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static int? HarnessSeedOrNull() => IsoRim.Api.HarnessSeed;
+
+        // IsoRim's 3D explosions (Api 74) beside the chibi: a frag-sized blast watched from a few cells off (the fireball
+        // through its life, pictures at set ticks), a shell-sized one on two colonists (the burst with the flings and
+        // ragdolls), and a flame blast, which IsoRim leaves flat. The bursts age on game ticks, so stepping holds each still.
+        private static IEnumerator ExplodeTest()
+        {
+            float distanceWas = lookDistance, heightWas = lookHeight, pitchWas = lookPitch;
+            lookDistance = 9f;
+            lookHeight = 0.8f;
+            lookPitch = 24f;
+            int madeBefore = IsoRim.Api.Dev.ExplosionBursts, heldBefore = IsoRim.Api.Dev.ExplosionFlecksHeld;
+
+            // 1. Watched: a frag grenade's blast (Bomb, 1.9 cells) four cells from a colonist standing, out of its reach.
+            IntVec3 blast = middle + new IntVec3(1, 0, 0);
+            Pawn watcher = NewPawn(middle + new IntVec3(-4, 0, 0), null);
+            Hold(watcher);
+            watcher.Rotation = Rot4.East;
+            lookAt = blast.ToVector3Shifted();
+            lookYaw = 0f;
+            yield return WaitReal(3f);   // its hair built
+            yield return Shot("watch_before");
+            GenExplosion.DoExplosion(blast, map, 1.9f, DamageDefOf.Bomb, null);
+            int born = Find.TickManager.TicksGame, live = 0, drawn = 0, lasted = -1;
+            int[] at = { 1, 4, 10, 20, 40, 70, 110 };
+            foreach (int t in at)
+            {
+                yield return Ticks(born + t - Find.TickManager.TicksGame, "explode", null);
+                live = Math.Max(live, IsoRim.Api.Dev.ExplosionBurstsLive);
+                yield return Shot("watch_t" + t.ToString("D3"));
+                drawn = Math.Max(drawn, IsoRim.Api.Dev.ExplosionPartsDrawn);
+                Note("tick " + t + ": " + IsoRim.Api.Dev.ExplosionBurstsLive + " burst(s) alive, " + IsoRim.Api.Dev.ExplosionPartsDrawn + " parts drawn");
+            }
+            for (int i = 0; i < 600 && IsoRim.Api.Dev.ExplosionBurstsLive > 0; i++)
+            {
+                yield return Ticks(1, "explode", null);
+            }
+            lasted = IsoRim.Api.Dev.ExplosionBurstsLive == 0 ? Find.TickManager.TicksGame - born : -1;
+            yield return Shot("watch_after");
+            int made = IsoRim.Api.Dev.ExplosionBursts - madeBefore;
+            Check("watched: a 3D burst made", made == 1, made + " made (0: IsoRim's \"3D explosions\" option is off, or it failed; see the log)");
+            Check("watched: the game's flash and dust flecks held back", IsoRim.Api.Dev.ExplosionFlecksHeld > heldBefore, (IsoRim.Api.Dev.ExplosionFlecksHeld - heldBefore) + " held");
+            Check("watched: drawn", drawn > 0, "most parts drawn in a frame " + drawn);
+            Check("watched: over", lasted > 0, lasted > 0 ? "gone after " + lasted + " ticks" : "still alive 600 ticks on");
+            Check("watched: the colonist unhurt", !watcher.Dead && !watcher.Downed, watcher.Dead ? "dead" : watcher.Downed ? "downed" : "standing");
+
+            // 2. Caught: a mortar shell's blast (Bomb, 2.9 cells) between two colonists, one a cell from it, one two cells.
+            ClearPatch();
+            ClearBodies();
+            Pawn near = NewPawn(blast + new IntVec3(-1, 0, 0), null);
+            Pawn far = NewPawn(blast + new IntVec3(0, 0, 2), null);
+            Hold(near);
+            Hold(far);
+            lookAt = blast.ToVector3Shifted();
+            yield return WaitReal(3f);
+            yield return Shot("caught_before");
+            IntVec3 nearFrom = near.Position, farFrom = far.Position;
+            madeBefore = IsoRim.Api.Dev.ExplosionBursts;
+            GenExplosion.DoExplosion(blast, map, 2.9f, DamageDefOf.Bomb, null, damAmount: 60);
+            born = Find.TickManager.TicksGame;
+            // Run at normal speed in short slices, paused for each picture: a ragdoll steps on frame time times the game's
+            // speed, so stepped ticks alone leave the bodies standing as they were hit. The pictures go by the tick reached.
+            foreach (int t in new[] { 2, 6, 14, 30, 60, 120, 240 })
+            {
+                int until = born + t;
+                yield return Unpaused(null, () => Find.TickManager.TicksGame >= until, 10f);
+                yield return Shot("caught_t" + (Find.TickManager.TicksGame - born).ToString("D3"));
+            }
+            Check("caught: a 3D burst made", IsoRim.Api.Dev.ExplosionBursts - madeBefore == 1, (IsoRim.Api.Dev.ExplosionBursts - madeBefore) + " made");
+            Check("caught: the near colonist went down", near.Dead || near.Downed, near.Dead ? "dead" : near.Downed ? "downed" : "standing");
+            IntVec3 nearNow = near.Dead && near.Corpse != null ? near.Corpse.Position : near.Position;
+            IntVec3 farNow = far.Dead && far.Corpse != null ? far.Corpse.Position : far.Position;
+            Note("near: " + (near.Dead ? "dead" : near.Downed ? "downed" : "standing") + ", " + nearFrom + " -> " + nearNow
+                + "; far: " + (far.Dead ? "dead" : far.Downed ? "downed" : "standing") + ", " + farFrom + " -> " + farNow
+                + " (flingBodies " + WalkFigures.FlingBodies + ", ragdolls " + WalkFigures.Ragdolls + ")");
+            if (WalkFigures.FlingBodies && (near.Dead || near.Downed))
+            {
+                Check("caught: the near colonist thrown", nearNow != nearFrom, nearFrom + " -> " + nearNow);
+            }
+
+            // 3. Flat: a flame blast, which IsoRim leaves as the game's.
+            ClearPatch();
+            ClearBodies();
+            lookAt = blast.ToVector3Shifted();
+            madeBefore = IsoRim.Api.Dev.ExplosionBursts;
+            GenExplosion.DoExplosion(blast, map, 1.9f, DamageDefOf.Flame, null, damAmount: 1);
+            yield return Ticks(6, "explode", null);
+            yield return Shot("flame_t006");
+            Check("flame: left flat", IsoRim.Api.Dev.ExplosionBursts == madeBefore, (IsoRim.Api.Dev.ExplosionBursts - madeBefore) + " 3D bursts made");
+            ClearBodies();
+            Note("Look: in watch_t* the fireball swells and cools, smoke rises from its top and a dust ring spreads, next to the chibi "
+                + "(outlines, light and sizes alike: the burst is about 1.9 cells across at most); in caught_t* the colonists thrown "
+                + "and falling limp through the fire; flame_t006 the game's flat flame.");
+            lookDistance = distanceWas;
+            lookHeight = heightWas;
+            lookPitch = pitchWas;
+        }
+
+        // Corpses and dropped things the patch's blasts left (ClearPatch moves pawns off and clears items, not corpses).
+        private static void ClearBodies()
+        {
+            foreach (Thing t in new List<Thing>(map.listerThings.ThingsInGroup(ThingRequestGroup.Corpse)))
+            {
+                if (t.Position.InHorDistOf(middle, Clear + 6))
+                {
+                    t.Destroy();
                 }
             }
         }
@@ -4333,8 +4451,8 @@ namespace M3AT
                 Check("romance: the mod loaded", false, "no RomanceOnTheRim.LordJob_Kiss");
                 yield break;
             }
-            SleepWear blankets = SettingsMod.Settings.sleepWear;
-            SettingsMod.Settings.sleepWear = SleepWear.Blankets;   // (pillow talk lies close under the blanket as lovin does)
+            bool blankets = SettingsMod.Settings.bedBlankets;
+            SettingsMod.Settings.bedBlankets = true;   // (pillow talk lies close under the blanket as lovin does)
             foreach (string date in only ?? new[] { "kiss", "skygaze", "music", "pillow", "snowball", "shareread" })
             {
                 ClearPatch();
@@ -4367,7 +4485,7 @@ namespace M3AT
                 }
                 CleanUp();
             }
-            SettingsMod.Settings.sleepWear = blankets;
+            SettingsMod.Settings.bedBlankets = blankets;
             Note("Look: what each figure does in each date; the romance mod moves only the sprite's head and body (AnimationDefs), which the chibi doesn't take.");
         }
 

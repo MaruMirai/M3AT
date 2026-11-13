@@ -1,6 +1,8 @@
 #!/bin/bash
 # Runs the AutoTest scenarios (Source/AutoTest.cs) in the game, then puts the normal build back.
-#   ./autotest.sh [scenario,...|all] [--video] [--out folder]
+#   ./autotest.sh [scenario,...|all] [--video] [--out folder] [--seed n|none]
+#       (--seed: IsoRim's -isorimseed (Api 72), so the quick test's world, colonists and every tick's random numbers are the
+#        same each run; 1 by default, none for a new world each time)
 #   ./autotest.sh shots --load <save> [--from tick] [--ticks n] [--every n] [--out folder]   (stills of a save run on, from its view)
 #   ./autotest.sh perf --load <save> [--seconds s] [--rounds n] [--counts 0,5,10,20f] [--out folder]
 #       (frame times with the chibi, IsoRim's figures and none; or with the chibi on that many colonists, f: fewer poses on,
@@ -13,11 +15,13 @@ shift || true
 args=()
 out=""
 load=""
+seed=1
 while [ $# -gt 0 ]; do
     case "$1" in
         --video) args+=(-m3atTestVideo) ;;
         --out) out="$2"; shift ;;
         --load) load="$2"; shift ;;
+        --seed) seed="$2"; shift ;;
         --ticks) args+=("-m3atShotTicks=$2"); shift ;;
         --every) args+=("-m3atShotEvery=$2"); shift ;;
         --from) args+=("-m3atShotFrom=$2"); shift ;;
@@ -29,6 +33,7 @@ while [ $# -gt 0 ]; do
     shift
 done
 [ -n "$out" ] && args+=("-m3atTestOut=$(realpath "$out")")
+[ "$seed" != none ] && args+=("-isorimseed=$seed")
 # One run at a time: the test build goes into the mod's own DLL and the results are read from the one Player.log,
 # so a second run (another session) waits here for the first to finish. The lock is held until the script exits,
 # after the trap below has put the normal build back.
