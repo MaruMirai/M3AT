@@ -42,9 +42,25 @@ namespace M3AT
     internal sealed class HairBuilder
     {
         private const string Tag = "[M3AT] ";
-        public const int Version = 38;   // raise when the build changes, so cached hair is made again
+        public const int Version = 40;   // raise when the build changes, so cached hair is made again
         public const int BeardVersion = 5;   // and cached beards
         internal static bool Tapered = true;    // the hull's flanks narrowing behind the head's middle (Hull; M3AT_NO_TAPER off)
+        internal static bool ForeOn = true;     // the side sprites having no say over what the front one carried out (Textured; M3AT_NO_FORE off)
+        // A lock the front sprite shows beside the face, over the head's edge columns where Carry's FringeTurn stops,
+        // is hung as a sheet in front of the cheek (Hull: filled from the cheek out to the depth of the head's front at
+        // the lock's inner edge, falling back CurtainSlope voxels per column out; Textured leaves its side faces off
+        // unless the side sprite has hair there). Left on the side of the head, as Morphs Assorted's side sprites put
+        // it, it was edge on from the front and didn't frame the face as the sprite does; carried further round the
+        // cheek instead (FringeTurn 0.25) its art was stretched along the cheek into blotches. The cost: from three
+        // quarters the far side's sheet stands out across the face (Draenei, Nagatoro, Taya), and sloped back enough
+        // not to, it is the lock on the side of the head again. The harness's M3AT_NO_CURTAIN turns it off.
+        internal static bool CurtainOn = true;
+        internal static int CurtainInside = 2;      // voxels inside the head's front the hair must be for a sheet to be hung in front of it
+        internal static float CurtainFaces = 0.7f;  // least forward share of the normal of a sheet's face that is kept
+        internal static float CurtainSlope = 0f;
+        private bool[] curtain;   // the sheets' voxels, grown by one (null: none)
+        internal static bool IslandsOn = true;  // small loose pieces dropped (WithoutIslands; M3AT_NO_ISLANDS off)
+        private const float IslandShare = 0.02f;   // least share of the kept hair's area a piece joined to nothing else must have
         internal static bool FringeOn = true;   // the fringe carried forward to the head's front (Hull; M3AT_NO_FRINGE off)
         internal static int FringeGap = 16;     // pixels short of the head's front from which hair over the face is left as the side sprite has it
         internal static float FringeTurn = 0.08f;   // share of the head's depth or width its surface may be in from its outermost in a row for hair to be carried to it there
@@ -218,6 +234,7 @@ namespace M3AT
         private bool[][] ink;       // the sprites' outline ink (InkEdges)
         private Color32[] crownPanel;   // the crown seen from above, rows top first (Crowned)
         private Color32[][] veto;   // the sprites' alpha as each has a say over a triangle another faces (Vetoes)
+        private bool[] fore;        // the voxels the front sprite carried out onto the head's front (Hull), grown by one
         private bool[] flank;       // the voxels the hull keeps behind the head's middle only by its taper (Hull), grown by one
 
         private readonly Queue<Job> waiting = new Queue<Job>();
@@ -1497,7 +1514,8 @@ namespace M3AT
         {
             int n = Size / Voxel;
             bool[] inside = new bool[n * n * n];   // [y, x, z]
-            bool[] tapered = null;
+            bool[] tapered = null, foreCarried = null;
+            curtain = null;
             bool[] hair = new bool[n * n * n];
             // Hair: the front or the back sprite (each leaves out what the body hides from it, as a braid down the back
             // is not drawn in the front one), and the side one. The head: its outline in the front and side ones.
@@ -1675,7 +1693,7 @@ namespace M3AT
             if (!beard && FringeOn)
             {
                 int gap = Mathf.CeilToInt(FringeGap / (float)Voxel);
-                bool[] sideCarried = new bool[hair.Length];
+                bool[] sideCarried = new bool[hair.Length], frontCarried = new bool[hair.Length], hung = new bool[hair.Length];
                 bool[] carried = (bool[])hair.Clone();   // as it was, so one side's carrying isn't taken for hair by the next
                 for (int y = 0; y < n; y++)
                 {
@@ -1717,7 +1735,7 @@ namespace M3AT
                         int line = y * n + k;
                         if (hs[line] && south[line])
                         {
-                            Carry(hair, carried, inside, n, line * n + n - 1, -1, n - 1 - e1, gap, n - 1 - he1 + deep);
+                            Carry(hair, carried, inside, n, line * n + n - 1, -1, n - 1 - e1, gap, n - 1 - he1 + deep, frontCarried);
                         }
                         if (hs[line] && north[line])
                         {
@@ -1732,6 +1750,62 @@ namespace M3AT
                             Carry(hair, carried, inside, n, y * n * n + k, n, s0, gap, hs0 + wide, sideCarried);
                         }
                     }
+                    if (CurtainOn)
+                    {
+                        int limit = n - 1 - he1 + deep;
+                        int[] headAt = new int[n], hairAt = new int[n];
+                        for (int x = 0; x < n; x++)
+                        {
+                            headAt[x] = hairAt[x] = -1;
+                            for (int k = 0; k < n && (headAt[x] < 0 || hairAt[x] < 0); k++)
+                            {
+                                int i = (y * n + x) * n + n - 1 - k;
+                                if (headAt[x] < 0 && inside[i])
+                                {
+                                    headAt[x] = k;
+                                }
+                                if (hairAt[x] < 0 && carried[i])
+                                {
+                                    hairAt[x] = k;
+                                }
+                            }
+                        }
+                        for (int x = 0; x < n; x++)
+                        {
+                            int line = y * n + x;
+                            if (!hs[line] || !south[line] || headAt[x] <= limit || (hairAt[x] >= 0 && hairAt[x] <= headAt[x] + CurtainInside))
+                            {
+                                continue;
+                            }
+                            int dir = x < midV ? 1 : -1, inner = -1;
+                            for (int c = x + dir; c >= 0 && c < n && hs[y * n + c] && south[y * n + c]; c += dir)
+                            {
+                                if (headAt[c] >= 0)
+                                {
+                                    inner = c;
+                                    if (headAt[c] <= limit)
+                                    {
+                                        break;
+                                    }
+                                }
+                            }
+                            int sheet = inner < 0 ? -1 : headAt[inner] + Mathf.RoundToInt(CurtainSlope * Math.Abs(x - inner));
+                            if (inner < 0 || sheet >= headAt[x])
+                            {
+                                continue;
+                            }
+                            for (int k = Math.Max(0, sheet - 1); k <= headAt[x]; k++)
+                            {
+                                int i = line * n + n - 1 - k;
+                                if (!hair[i])
+                                {
+                                    frontCarried[i] = true;
+                                    hung[i] = true;
+                                }
+                                hair[i] = true;
+                            }
+                        }
+                    }
                 }
                 // What the side sprites carried out behind the head's middle is flank (Textured), as the taper's is: it
                 // stands out past the back sprite's outline, which is narrower than the head there, and with the back
@@ -1744,6 +1818,8 @@ namespace M3AT
                         tapered[i] = true;
                     }
                 }
+                curtain = CurtainOn ? Grown(hung, n, 1) : null;
+                foreCarried = frontCarried;   // for Textured, where the side sprites have no say over it
             }
             for (int i = 0; i < inside.Length; i++)
             {
@@ -1751,6 +1827,7 @@ namespace M3AT
             }
             nearHair = Grown(beard ? Prisms(s, e, n) : hair, n, HairReach);
             flank = tapered != null ? Grown(tapered, n, 1) : null;
+            fore = foreCarried != null ? Grown(foreCarried, n, 1) : null;
             // Each block's share inside, with an empty block all round.
             int b = (n + Block - 1) / Block, g = b + 2;
             float[] share = new float[g * g * g];
@@ -2591,6 +2668,63 @@ namespace M3AT
         // triangle round the corner of the face takes the side sprite, whose hair covers the temple, but the front one
         // shows the face there. One wholly off the art is dropped, one wholly on it kept, and one across the edge cut
         // where the alpha crosses Cut, so the mesh ends where the hair is seen to end.
+        // The kept triangles without the small pieces joined to nothing else: each piece's area (pieces being triangles
+        // that share corners) must be IslandShare of all that is kept. A lock the front sprite shows hanging beside the
+        // face has no hull of its own on the cheek (Hull's carrying stops at FringeTurn), so only its tip and scraps
+        // of its edge were kept, flecks lying loose on the cheeks and chin (Morphs Assorted's Rem).
+        private static List<int[]> WithoutIslands(CutMesh cut, List<int[]> kept)
+        {
+            Dictionary<int, int> parent = new Dictionary<int, int>();
+            Func<int, int> find = null;
+            find = i =>
+            {
+                int r = i;
+                while (parent[r] != r)
+                {
+                    r = parent[r];
+                }
+                while (parent[i] != r)
+                {
+                    int next = parent[i];
+                    parent[i] = r;
+                    i = next;
+                }
+                return r;
+            };
+            foreach (int[] t in kept)
+            {
+                for (int k = 0; k < 3; k++)
+                {
+                    if (!parent.ContainsKey(t[k]))
+                    {
+                        parent[t[k]] = t[k];
+                    }
+                }
+                parent[find(t[1])] = find(t[0]);
+                parent[find(t[2])] = find(t[0]);
+            }
+            Dictionary<int, float> area = new Dictionary<int, float>();
+            float total = 0f;
+            foreach (int[] t in kept)
+            {
+                Vector3 a = cut.Co(t[0]);
+                float size = Vector3.Cross(cut.Co(t[1]) - a, cut.Co(t[2]) - a).magnitude / 2f;
+                int root = find(t[0]);
+                float sum;
+                area.TryGetValue(root, out sum);
+                area[root] = sum + size;
+                total += size;
+            }
+            List<int[]> left = new List<int[]>();
+            foreach (int[] t in kept)
+            {
+                if (area[find(t[0])] >= IslandShare * total)
+                {
+                    left.Add(t);
+                }
+            }
+            return left;
+        }
         private CutMesh Textured(Mesh m, Sprites sp, bool[] nearHair)
         {
             veto = Vetoes(sp);
@@ -2622,6 +2756,37 @@ namespace M3AT
                     {
                         view = crown ? 0 : side;
                         seen = SeenBy(m.fn[f], view, crown, side) & ~4;
+                    }
+                }
+                bool sideways = false;
+                if (curtain != null && m.fn[f].z < CurtainFaces && Mathf.Abs(m.fn[f].x) > m.fn[f].z && m.fn[f].y < Crown && NearHair(curtain, n, centre))
+                {
+                    for (int k = 0; k < 3; k++)
+                    {
+                        if (Alpha(sp.px[side], Where(edges, side, false, m.v[t[k]])) < Cut)
+                        {
+                            sideways = true;
+                        }
+                    }
+                    if (sideways)
+                    {
+                        continue;
+                    }
+                    sideways = true;
+                }
+                if (!sideways && ForeOn && fore != null && m.fn[f].z > 0f && NearHair(fore, n, centre))
+                {
+                    // What the front sprite carried out onto the head's front (Hull) is there on its word alone: the
+                    // side sprite's fringe stops short of it, and with the side sprite's say every part of the fringe
+                    // that faced a little sideways (the edges of the parting, the temples) was cut out where the side
+                    // sprite shows the face between its forelock and the hair over the ear, as holes through the
+                    // fringe to the forehead. So the side sprites have no say there, and a triangle facing more
+                    // sideways than forward takes the front sprite all the same.
+                    seen &= ~(2 | 8);
+                    if (!crown && view != 0)
+                    {
+                        view = 0;
+                        seen = SeenBy(m.fn[f], view, crown, side) & ~(2 | 8);
                     }
                 }
                 bool[] on = new bool[3];
@@ -2709,6 +2874,10 @@ namespace M3AT
                 {
                     kept.Add(new[] { ring[0], ring[k], ring[k + 1], view, c });
                 }
+            }
+            if (!beard && IslandsOn)
+            {
+                kept = WithoutIslands(cut, kept);
             }
             // The crown takes the panel seen from above (Crowned): its own sprite only had its say over where it is cut.
             crownPanel = beard ? null : Crowned(sp, edges, cut, kept);
