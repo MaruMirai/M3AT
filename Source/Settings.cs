@@ -72,6 +72,7 @@ namespace M3AT
         public bool visibleWounds = true;   // injuries, blood, bandages and scars are drawn on the pawn (WalkFigures.VisibleWounds)
         public bool outlines = true;   // the chibi is drawn with its dark outline (SkinnedFigure.Outlines)
         public bool silhouetteOutlines = true;   // only round the figure, never over its own body (SkinnedFigure.Silhouette); off: as IsoRim draws its figures' outlines
+        public bool firstPersonEye = true;   // IsoRim's first person looks out from the chibi's eyes (WalkFigures.FirstPersonEye); off: IsoRim's eye height option
         public bool clothesOcclusion = true;    // IsoRim's ambient occlusion and screen-space shadows on clothes and hair too, never the skin (SkinnedFigure.ClothesOcclusion)
         public bool fewerPoses = false;   // with many pawns on screen, each one's limbs move every second or third frame (SkinnedFigure.FewerPoses)
         public bool gpuSkinning = true;   // pawns' bodies, clothes and hair posed by the graphics card (SkinnedFigure.GpuSkinning); off: on the CPU
@@ -156,6 +157,7 @@ namespace M3AT
             Scribe_Values.Look(ref clothesOcclusion, "clothesOcclusion", true);
             Scribe_Values.Look(ref fewerPoses, "fewerPoses", false);
             Scribe_Values.Look(ref gpuSkinning, "gpuSkinning", true);
+            Scribe_Values.Look(ref firstPersonEye, "firstPersonEye", true);
             Scribe_Values.Look(ref hairDetail, "hairDetail", DefaultHairDetail);
             Scribe_Values.Look(ref freecamOn, "freecamOn", false);
             Scribe_Values.Look(ref freecam3D, "freecam3D", false);
@@ -524,6 +526,8 @@ namespace M3AT
                     "The outline goes only round the outside of the pawn, never over its own body. Off: as IsoRim draws its outlines, with lines over the body too where a part such as an arm is well in front of the rest.");
                 EndSubOptions(list);
             }
+            list.CheckboxLabeled("First person from the pawn's eyes", ref Settings.firstPersonEye,
+                "IsoRim's first person looks out from where the pawn's eyes are drawn, so lower for a child and higher for a tall adult, and lower when sitting, lying or swimming. Off: IsoRim's own eye height setting is used for everyone. Needs a recent IsoRim.");
             list.CheckboxLabeled("Occlusion and shadows on clothes", ref Settings.clothesOcclusion,
                 "With IsoRim's ambient occlusion or screen-space shadows on, clothes and hair are darkened in their creases and by shadows as the rest of the world is. It picks out their flat faces, so they look less smooth. Off: pawns are left out of both, though they still cast shadows. Skin and faces are always left out, as it spoils the eyes.");
         }

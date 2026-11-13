@@ -1249,6 +1249,10 @@ namespace M3AT
                 }
                 Api.AddFigureDrawer(DrawFigure, FigureKinds.People);
                 Api.AddFacingHold(CuddledAnimal);
+                if (Api.Version >= 77)
+                {
+                    AddEyeProvider();   // the first-person eye at the chibi's eyes (FirstPersonEye.cs)
+                }
                 Harmony harmony = new Harmony("MaruMirai.M3AT");
                 // Hits, for the flinch (the game's own jolt of the sprite is told the same way).
                 MethodInfo damaged = AccessTools.Method(typeof(Pawn_DrawTracker), nameof(Pawn_DrawTracker.Notify_DamageApplied));
@@ -8037,6 +8041,10 @@ namespace M3AT
                     ease.lovinShift = 0f;
                 }
                 GarmentMask mask = DrawDressed(pawn, fig, at, yaw, size, sat, tailFloor, onGround);
+                if (!ctx.ForOtherMod && eyeAdded)
+                {
+                    NoteEyes(pawn, fig, at, yaw, size, SituationOf(lying, crawling, seated, swim >= 0.5f));
+                }
                 fig.tucked = false;   // (only for this draw: carried out of bed, it is drawn by its carrier, DrawHeld)
                 if (blanketBed != null)
                 {

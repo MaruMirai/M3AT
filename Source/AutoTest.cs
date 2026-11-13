@@ -51,6 +51,7 @@ namespace M3AT
         private static readonly Stack<IEnumerator> stack = new Stack<IEnumerator>();
         private static bool started;
         private static IDisposable pose;
+        private static bool poseOff;   // the test's camera pose lets go of the view (Pose gives none)
         private static Vector3 lookAt;
         private static float lookYaw;
         private static float lookPitch = LookPitch;   // degrees down (a scenario may look down more steeply, and puts it back)
@@ -592,6 +593,7 @@ namespace M3AT
                 case "lovin": return LovinTest();
                 case "lovinbare": return LovinTest(true);
                 case "kidbed": return KidBedTest();
+                case "fpeye": return FirstPersonEyeTest();
                 case "gibbet": return GibbetTest();
                 case "vat": return VatTest();
                 case "tend": return TendTest(null);
@@ -1279,6 +1281,127 @@ namespace M3AT
             lookDistance = wasDistance;
             Note("Look at: who draws each occupant (the chibi or IsoRim's figure), how it lies or floats in the vat or pod, "
                 + "whether it shows through the glass, and its size against the vat.");
+        }
+
+        // IsoRim's first person from the chibi's eyes (Api 77, FirstPersonEye.cs): a grown pawn, a child and a grown pawn on
+        // a chair, each eye against IsoRim's own (the option off) while drawn, a photo through each one's eyes (Api 76), then
+        // first person in each in turn (IsoRim's FirstPerson.Toggle by reflection, with only it selected): it is no longer
+        // drawn, and the eye keeps the height last drawn for what it does.
+        private static IEnumerator FirstPersonEyeTest()
+        {
+            if (IsoRim.Api.Version < 77)
+            {
+                Check("IsoRim Api 77", false, "Api " + IsoRim.Api.Version);
+                yield break;
+            }
+            Thing chair = ThingMaker.MakeThing(DefDatabase<ThingDef>.GetNamed("DiningChair"), ThingDefOf.WoodLog);
+            chair.SetFaction(Faction.OfPlayer);
+            Spawn(chair, middle + new IntVec3(2, 0, 0), Rot4.South);
+            Pawn grown = NewPawn(middle + new IntVec3(-2, 0, 0), null);
+            Pawn child = NewChild(middle);
+            Pawn sitter = NewPawn(middle + new IntVec3(2, 0, 0), null);
+            Pawn[] who = { grown, child, sitter };
+            string[] names = { "grown", "child", "seated" };
+            foreach (Pawn p in who)
+            {
+                Hold(p);
+                p.Rotation = Rot4.South;
+            }
+            lookAt = middle.ToVector3Shifted();
+            lookYaw = 0f;
+            yield return WaitReal(2f);
+            yield return Ticks(30, "fpeye", grown);
+            yield return Shot("three");
+            Vector3[] ours = new Vector3[3];
+            for (int k = 0; k < 3; k++)
+            {
+                Vector3? mine = IsoRim.ViewPose.FirstPersonOf(who[k]).Eye;
+                SettingsMod.Settings.firstPersonEye = false;
+                Vector3? iso = IsoRim.ViewPose.FirstPersonOf(who[k]).Eye;
+                SettingsMod.Settings.firstPersonEye = true;
+                ours[k] = mine ?? Vector3.zero;
+                Check(names[k] + ": an eye of ours while drawn", mine.HasValue && WalkFigures.EyesFrame(who[k]) >= Time.frameCount - 1 && iso.HasValue && (mine.Value - iso.Value).sqrMagnitude > 1e-6f,
+                    "ours " + (mine.HasValue ? mine.Value.ToString("F3") : "null") + ", IsoRim's " + (iso.HasValue ? iso.Value.ToString("F3") : "null")
+                    + ", drawn at " + who[k].DrawPos.ToString("F3") + ", size " + WalkFigures.SizeOfForTest(who[k]).ToString("F3"));
+            }
+            Check("the child's eyes lower than the grown pawn's", ours[1].y < ours[0].y - 0.15f, ours[1].y.ToString("F3") + " against " + ours[0].y.ToString("F3"));
+            Check("the seated eyes lower than the standing", ours[2].y < ours[0].y - 0.1f, ours[2].y.ToString("F3") + " against " + ours[0].y.ToString("F3"));
+            // Photos through each one's eyes, the pawn itself left out.
+            for (int k = 0; k < 3; k++)
+            {
+                string file = Path.Combine(outDir, CurrentPrefix() + "eyes_" + names[k] + ".png");
+                bool done = false;
+                bool asked = IsoRim.Api.CaptureView(who[k].Map, IsoRim.ViewPose.FirstPersonOf(who[k], 15f),
+                    new IsoRim.CaptureViewOptions { Width = 960, Height = 540, FirstPersonPawn = who[k] }, tex =>
+                    {
+                        if (tex != null)
+                        {
+                            File.WriteAllBytes(file, tex.EncodeToPNG());
+                            UnityEngine.Object.Destroy(tex);
+                        }
+                        done = true;
+                    });
+                for (int i = 0; asked && i < 120 && !done; i++)
+                {
+                    yield return null;
+                }
+                if (asked)
+                {
+                    report.AppendLine("- picture `" + Path.GetFileName(file) + "`");
+                }
+            }
+            // First person in each: not drawn there, and the eye at the height last drawn (IsoRim's across the ground).
+            Type firstPerson = typeof(IsoRim.Api).Assembly.GetType("IsoRim.FirstPerson");
+            MethodInfo toggle = firstPerson != null ? firstPerson.GetMethod("Toggle", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static) : null;
+            MethodInfo leave = firstPerson != null ? firstPerson.GetMethod("Leave", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static) : null;
+            PropertyInfo viewing = firstPerson != null ? firstPerson.GetProperty("ViewingPawn", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static) : null;
+            if (toggle == null || leave == null || viewing == null)
+            {
+                Check("IsoRim's FirstPerson found", false, firstPerson == null ? "no type" : "no Toggle, Leave or ViewingPawn");
+                yield break;
+            }
+            poseOff = true;
+            for (int k = 0; k < 3; k++)
+            {
+                Find.Selector.ClearSelection();
+                Find.Selector.Select(who[k], false, false);
+                toggle.Invoke(null, null);
+                yield return Ticks(20, "fpeye", who[k]);
+                yield return WaitReal(0.5f);
+                Pawn on = viewing.GetValue(null) as Pawn;
+                int last = WalkFigures.EyesFrame(who[k]);
+                Vector3? mine = WalkFigures.EyeForTest(who[k]);
+                Check(names[k] + ": first person on", on == who[k], "viewing " + (on != null ? on.LabelShort : "nobody"));
+                Check(names[k] + ": not drawn in first person, the eye kept", Time.frameCount - last > 2 && mine.HasValue && Mathf.Abs(mine.Value.y - ours[k].y) < 0.03f,
+                    "last drawn " + (Time.frameCount - last) + " frames ago, eye " + (mine.HasValue ? mine.Value.ToString("F3") : "null") + ", drawn " + ours[k].ToString("F3"));
+                if (k == 0)
+                {
+                    // The shown first-person view, as the player sees it.
+                    string file = Path.Combine(outDir, CurrentPrefix() + "firstperson_" + names[k] + ".png");
+                    bool done = false;
+                    bool asked = IsoRim.Api.RequestSceneImage(tex =>
+                    {
+                        if (tex != null)
+                        {
+                            File.WriteAllBytes(file, tex.EncodeToPNG());
+                            UnityEngine.Object.Destroy(tex);
+                        }
+                        done = true;
+                    }, new IsoRim.SceneImageOptions { IncludeOverlays = false });
+                    for (int i = 0; asked && i < 120 && !done; i++)
+                    {
+                        yield return null;
+                    }
+                    if (asked)
+                    {
+                        report.AppendLine("- picture `" + Path.GetFileName(file) + "`");
+                    }
+                }
+                leave.Invoke(null, new object[] { null });
+                yield return Ticks(5, "fpeye", who[k]);
+            }
+            poseOff = false;
+            Find.Selector.ClearSelection();
         }
 
         private static IEnumerator KidBedTest()
@@ -5202,6 +5325,10 @@ namespace M3AT
 
         private static IsoRim.ViewPose? Pose()
         {
+            if (poseOff)
+            {
+                return null;   // (fpeye: IsoRim's first person has the view)
+            }
             float pitch = lookPitch * Mathf.Deg2Rad;
             float yaw = lookYaw * Mathf.Deg2Rad;
             Vector3 forward = new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw));
