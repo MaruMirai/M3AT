@@ -265,11 +265,11 @@ namespace M3AT
             }
             if (IsoRim.Api.View3DActive)
             {
-                Enter(false);
+                Enter(false, true);
             }
         }
 
-        private static void Enter(bool announce)
+        private static void Enter(bool announce, bool resuming)
         {
             Map current = Find.CurrentMap;
             if (current == null)
@@ -295,10 +295,11 @@ namespace M3AT
                 Vector3 f = Quaternion.Euler(pitch, yaw, 0f) * Vector3.forward;
                 eye = new Vector3(focus.x, 0f, focus.z) - f * (size / IsoRim.Api.PerspectiveTanHalf);
             }
-            // Where it was last flown on this map, if the game remembers.
+            // Coming back on by itself (a game loaded, back from first person, the 2D view or another map), where it was
+            // last flown on this map, if the game remembers. Turned on by the key, it takes over IsoRim's camera as it is.
             FreecamPlaces places = Current.Game.GetComponent<FreecamPlaces>();
             FreecamPlaces.Place last;
-            if (places != null && places.TryGet(current, out last))
+            if (resuming && places != null && places.TryGet(current, out last))
             {
                 eye = last.eye;
                 yaw = last.yaw;
@@ -480,7 +481,7 @@ namespace M3AT
                     else
                     {
                         Wanted = true;
-                        Enter(true);
+                        Enter(true, false);
                     }
                 }
                 // IsoRim's first person key while flying: IsoRim has just started first person (its keys are read before this),
