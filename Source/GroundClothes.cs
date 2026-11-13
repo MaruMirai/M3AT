@@ -258,8 +258,8 @@ namespace M3AT
             }
         }
 
-        // The garment a pawn wearing only this apparel would have on (WornGarments): its own, else the first it stands in
-        // for; -1 for none. A held one (a shield) is left to IsoRim: it was made upright in the hand, not to lie as clothes do.
+        // The garment a pawn wearing only this apparel would have on (WornGarments): its own, else the best that stands in
+        // for it; -1 for none. A held one (a shield) is left to IsoRim: it was made upright in the hand, not to lie as clothes do.
         private static int GroundGarmentOf(ThingDef def)
         {
             int g = skin.GarmentOf(def);
@@ -267,14 +267,7 @@ namespace M3AT
             {
                 return skin.IsHeld(g) ? -1 : g;
             }
-            for (g = 1; g < skin.Pieces; g++)
-            {
-                if (skin.Covers(g, def.apparel))
-                {
-                    return g;
-                }
-            }
-            return -1;
+            return skin.StandInFor(def);
         }
 
         // Apparel only children wear (as IsoRim's ground clothes tell it): laid out on a child's body, at a child's size.

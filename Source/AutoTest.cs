@@ -591,6 +591,7 @@ namespace M3AT
                 case "tend": return TendTest(null);
                 case "bows": return BowTest(null);
                 case "weaponkinds": return WeaponKindsTest();
+                case "standins": return StandInsTest();
                 case "tendbed": return TendBedTest();
                 case "feed": return FeedTest(null);
                 case "slicecap": return SlicecapTest();
@@ -4113,6 +4114,44 @@ namespace M3AT
             }
         }
 
+        // Every apparel loaded, with the garment drawn for it: its own, else its stand-ins (StandIns.cs), else none. No pawn;
+        // notes only, and checks that belts and shields get none and that the game's own body and head wear is all drawn.
+        private static IEnumerator StandInsTest()
+        {
+            yield return WaitReal(1f);
+            List<string> lines = new List<string>();
+            List<string> beltsDrawn = new List<string>();
+            List<string> undrawn = new List<string>();
+            foreach (ThingDef def in DefDatabase<ThingDef>.AllDefsListForReading)
+            {
+                if (def.apparel == null || def.apparel.layers == null || def.apparel.bodyPartGroups == null)
+                {
+                    continue;
+                }
+                string mod = def.modContentPack != null ? def.modContentPack.PackageId : "?";
+                string drawn = WalkFigures.AutoStandIns(def);
+                lines.Add(def.defName + " [" + mod + "] " + string.Join(",", def.apparel.layers.ConvertAll(l => l.defName)) + " / "
+                    + string.Join(",", def.apparel.bodyPartGroups.ConvertAll(g => g.defName)) + " -> " + drawn);
+                bool belt = def.apparel.layers.Exists(l => l.defName == "Belt" || l.defName.Contains("Shield")) || def.HasComp(typeof(CompShield));
+                if (belt && drawn.StartsWith("stand-in"))
+                {
+                    beltsDrawn.Add(def.defName + " " + drawn);
+                }
+                if (!belt && drawn == "none" && def.modContentPack != null && def.modContentPack.IsOfficialMod
+                    && def.apparel.bodyPartGroups.Exists(g => g.defName == "Torso" || g.defName == "Legs" || g.defName == "UpperHead" || g.defName == "FullHead"))
+                {
+                    undrawn.Add(def.defName);
+                }
+            }
+            lines.Sort(StringComparer.Ordinal);
+            foreach (string line in lines)
+            {
+                Note(line);
+            }
+            Check("no belt or shield drawn as clothes", beltsDrawn.Count == 0, string.Join(", ", beltsDrawn));
+            Check("the game's own body and head wear all drawn", undrawn.Count == 0, string.Join(", ", undrawn));
+        }
+
         // Combat Extended's arrows (or whatever ammo the weapon takes) put in the inventory, found by reflection so CE is
         // not referenced; null without it.
         private static string GiveAmmo(Pawn pawn)
@@ -5481,6 +5520,31 @@ namespace M3AT
         {
             Thing load = pawn.carryTracker != null ? pawn.carryTracker.CarriedThing : null;
             return load is Pawn animal ? " petBack=" + PetBackOf(animal).ToString("F3") + " size=" + SizeOf(pawn).ToString("F2") : "";
+        }
+
+        // The garment drawn for this apparel: "own <name>", "stand-in <name>+<name>" or "none".
+        internal static string AutoStandIns(ThingDef def)
+        {
+            if (!Ready() || skin == null)
+            {
+                return "no model";
+            }
+            int own = skin.GarmentOf(def);
+            if (own > 0)
+            {
+                return "own " + skin.PieceName(own);
+            }
+            int[] all = skin.StandInsFor(def);
+            if (all.Length == 0)
+            {
+                return "none";
+            }
+            List<string> names = new List<string>();
+            for (int i = 0; i < all.Length; i++)
+            {
+                names.Add(skin.PieceName(all[i]));
+            }
+            return "stand-in " + string.Join("+", names);
         }
 
         internal static string AutoOverHair(ThingDef def, HairDef style)

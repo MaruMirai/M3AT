@@ -98,7 +98,7 @@ namespace M3AT
         {
             public string name;
             public string[] defs;     // a garment's: the apparel (ThingDef names) it is drawn for
-            public string layer;      // and the apparel layer (ApparelLayerDef) it stands in on for apparel with no garment of its own, "" none
+            public string layer;      // and the apparel layer (ApparelLayerDef) it stands in on for apparel with no garment of its own, "" none (used only without a def the game has: StandIns.cs)
             public string[] groups;   // and the body part groups (BodyPartGroupDef) it stands in for, any of them
             public string textureFile;   // a garment's image, next to its file; null: none, drawn in the apparel's colour
             public int tint = -1;        // a textured garment's: 1 tinted by the apparel's colour, 0 not, -1 as the apparel is (Tinted)
@@ -686,34 +686,6 @@ namespace M3AT
         public Color? ColourOf(int piece)
         {
             return pieces[piece].colour;
-        }
-
-        // True if this garment stands in for apparel like ap, which has no garment of its own: worn on its layer and
-        // covering any of its body part groups.
-        public bool Covers(int piece, ApparelProperties ap)
-        {
-            Piece p = pieces[piece];
-            if (piece == 0 || p.layer == "" || ap == null || ap.layers == null || ap.bodyPartGroups == null)
-            {
-                return false;
-            }
-            bool layer = false;
-            for (int i = 0; i < ap.layers.Count; i++)
-            {
-                layer |= ap.layers[i].defName == p.layer;
-            }
-            if (!layer)
-            {
-                return false;
-            }
-            for (int i = 0; i < ap.bodyPartGroups.Count; i++)
-            {
-                if (Array.IndexOf(p.groups, ap.bodyPartGroups[i].defName) >= 0)
-                {
-                    return true;
-                }
-            }
-            return false;
         }
 
         // Reads skin.txt, the garments it lists and anim.txt from folder. Null (and a message) if one is missing or unreadable.

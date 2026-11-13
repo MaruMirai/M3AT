@@ -5192,7 +5192,8 @@ namespace M3AT
         }
 
         // Each garment the export has, for the worn apparel it is drawn for (by name), or else the first worn apparel with no
-        // garment of its own that it stands in for (on its layer, covering one of its groups), or null; worn is reused.
+        // garment of its own that it stands in for (the best match by layer, body part groups and kind, StandIns.cs), or
+        // null; worn is reused.
         // Returns the garments found as a mask (bit g: garment g), for SkinnedFigure.HideUnder.
         private static GarmentMask WornGarments(Pawn pawn, Apparel[] worn)
         {
@@ -5303,13 +5304,21 @@ namespace M3AT
                     worn[g] = all[i];
                 }
             }
-            for (int g = 1; g < skin.Pieces; g++)
+            // Apparel with no garment of its own takes the garments that stand in for it best (SkinnedFigure.StandInsFor,
+            // StandIns.cs), each one the first worn apparel's that wants it; not one IsoRim has a worn gear model for (a mod's
+            // pack on Combat Extended's Backpack layer), which DrawWornGear draws.
+            for (int i = 0; all != null && i < all.Count; i++)
             {
-                for (int i = 0; worn[g] == null && all != null && i < all.Count; i++)
+                if (skin.GarmentOf(all[i].def) >= 0 || GearMountOf(all[i]) != null)
                 {
-                    if (skin.GarmentOf(all[i].def) < 0 && skin.Covers(g, all[i].def.apparel))
+                    continue;
+                }
+                int[] standIns = skin.StandInsFor(all[i].def);
+                for (int k = 0; k < standIns.Length; k++)
+                {
+                    if (worn[standIns[k]] == null)
                     {
-                        worn[g] = all[i];
+                        worn[standIns[k]] = all[i];
                     }
                 }
             }
