@@ -2033,6 +2033,9 @@ SHIELD_APPROACH = 0.12   # leg lengths out to the left (and forward) of the edge
 SHIELD_RIM_PALM = (-1.0, 0.0, 0.0)   # the way the palm faces on the edge (chest's frame): in, toward the shield's middle
 SHIELD_DRAW_TWIST = 45.0   # degrees the trunk may turn to the left to bring the edge into reach, at most (searched)
 SHIELD_DRAW_LEAN = 10.0    # and lean forward
+SHIELD_DRAW_POLE = (0.8, 1.0, -0.8)   # the way the elbow points reaching for the edge and taking it (chest's frame: x left,
+                                      # y back, z up; arm_to's pole), eased in from hanging and back out into the guard:
+                                      # left to hang, it folded in behind the shoulder blade and then wrung round the side
 SHIELD_DRAW_UPPER = {'spine.001': 0.5, 'spine.002': 1.0}   # in place of UPPER: the trunk and the left arm
 
 # Flinching from a hit (flinch_at): one jolt, the trunk thrown the way the blow pushes it, the head held back up out of
@@ -5191,7 +5194,7 @@ def hip_hand(X, fist, d, palm, lift=None):
     close_hand(X, 'L', 1)
     return clamp
 
-def hip_hand_straight(X, fist, lift=None, palm=None):
+def hip_hand_straight(X, fist, lift=None, palm=None, pole=None):
     """Closes the left hand on the hip gear with its fist at fist, the hand lying on the forearm as it does at rest (so
     the wrist is straight, HAND_IN) and turned about the forearm so the palm faces HIP_PALM, or palm (chest's frame): the
     rod goes where the grip (hip_grip_rest) then takes it. Returns how far the wrist was out of reach."""
@@ -5204,7 +5207,7 @@ def hip_hand_straight(X, fist, lift=None, palm=None):
     for _ in range(12):   # the forearm's way depends on where the wrist goes, which depends on the hand's turn
         wrist = fist - R @ (rest_fist - head[hn])
         Y = dict(X)
-        clamp = arm_to('L', 1, wrist, Y, turn=[math.degrees(v) for v in (chest.inverted() @ R).to_euler('XYZ')], lift=lift)
+        clamp = arm_to('L', 1, wrist, Y, pole=pole, turn=[math.degrees(v) for v in (chest.inverted() @ R).to_euler('XYZ')], lift=lift)
         F = Y[fa].to_3x3().normalized()
         a = (F @ (tail[fa] - head[fa])).normalized()
         F = F @ rot((0, 1, 0), HAND_IN).to_3x3()   # the hand's own bend on the forearm, as arm_to hangs it
@@ -5212,7 +5215,7 @@ def hip_hand_straight(X, fist, lift=None, palm=None):
         p, w = (p - p.dot(a) * a).normalized(), (want - want.dot(a) * a).normalized()
         R = Matrix.Rotation(math.atan2(p.cross(w).dot(a), p.dot(w)), 3, a) @ F
     wrist = fist - R @ (rest_fist - head[hn])
-    clamp = arm_to('L', 1, wrist, X, turn=[math.degrees(v) for v in (chest.inverted() @ R).to_euler('XYZ')], lift=lift)
+    clamp = arm_to('L', 1, wrist, X, pole=pole, turn=[math.degrees(v) for v in (chest.inverted() @ R).to_euler('XYZ')], lift=lift)
     close_hand(X, 'L', 1)
     return clamp
 
@@ -5304,7 +5307,7 @@ def shield_draw_keys(rim):
     ('end'); 'come', where it comes in from beside the edge; 'gap', the leg lengths it was left out of reach."""
     rim = Vector(rim)
     cache = (tuple(round(v, 5) for v in rim), SHIELD_FIST, SHIELD_PALM, SHIELD_ELBOW, SHIELD_RIM_PALM, SHIELD_APPROACH,
-             SHIELD_DRAW_TWIST, SHIELD_DRAW_LEAN, DRAW_BEND_COST, DRAFT_DROP, DRAFT_LEAN, DRAFT_NARROW)
+             SHIELD_DRAW_TWIST, SHIELD_DRAW_LEAN, SHIELD_DRAW_POLE, DRAW_BEND_COST, DRAFT_DROP, DRAFT_LEAN, DRAFT_NARROW)
     if cache in shield_draw_cache:
         return shield_draw_cache[cache]
     hn, pack = 'hand.L', GEAR['pack']['bone']
@@ -5319,7 +5322,7 @@ def shield_draw_keys(rim):
         for lean in (0.0, SHIELD_DRAW_LEAN * 0.5, SHIELD_DRAW_LEAN):
             X, _ = hip_body(lean=lean, twist=twist)
             Y = dict(X)
-            over = hip_hand_straight(Y, X[pack] @ rim, lift=0.0, palm=SHIELD_RIM_PALM)
+            over = hip_hand_straight(Y, X[pack] @ rim, lift=0.0, palm=SHIELD_RIM_PALM, pole=Vector(SHIELD_DRAW_POLE))
             cost = (twist * twist + lean * lean) * DRAW_BEND_COST + (over / LEG) ** 2 * 1000.0
             if best is None or cost < best[0]:
                 best = (cost, twist, lean, Y, over)
@@ -5336,6 +5339,7 @@ def shield_draw_at(t, rim):
     SHIELD_GRAB, the trunk turning to meet it, then round again into the guard. The game plays it backwards to put the
     shield back. Returns the pose and the worst overreach."""
     g = shield_draw_keys(rim)
+    hang = Vector((ELBOW_OUT, 0.25, -1.0))   # arm_to's own pole
     t = min(1.0, t * SHIELD_DRAW_FRAMES / (SHIELD_DRAW_FRAMES - 1))
     if t <= SHIELD_GRAB:
         u = smooth(t / SHIELD_GRAB)
@@ -5344,6 +5348,7 @@ def shield_draw_at(t, rim):
         q0, q1, v = g['hang_turn'], g['grab_turn'], min(1.0, u / 0.8)
         fist = u * u
         lift = 0.0
+        pole = hang.lerp(Vector(SHIELD_DRAW_POLE), u)
     else:
         u = smooth((t - SHIELD_GRAB) / (1.0 - SHIELD_GRAB))
         share = 1.0 - u
@@ -5351,12 +5356,13 @@ def shield_draw_at(t, rim):
         q0, q1, v = g['grab_turn'], g['end_turn'], u
         fist = 1.0
         lift = SHIELD_ELBOW * u
+        pole = Vector(SHIELD_DRAW_POLE).lerp(hang, u)
     X, clamp = hip_body(lean=g['lean'] * share, twist=g['twist'] * share)
     wrist = X[CHEST_BONE] @ (head[HIPS] + place * LEG)
     if q0.dot(q1) < 0:
         q1 = -q1
     turn = q0.slerp(q1, v).to_euler('XYZ')
-    clamp = max(clamp, arm_to('L', 1, wrist, X, turn=[math.degrees(n) for n in turn], lift=lift))
+    clamp = max(clamp, arm_to('L', 1, wrist, X, pole=pole, turn=[math.degrees(n) for n in turn], lift=lift))
     close_hand(X, 'L', 1, fist)
     return X, clamp
 

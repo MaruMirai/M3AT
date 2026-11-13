@@ -11,7 +11,7 @@ held yes
 held_at 0.23388 -0.14848 0.96086 -0.21835 0.85968 -0.43005 -0.27570 0.93269 0.45415 0.89051 0.02707 -0.64252
 # held_grip: the same to its place at rest on hand.L as shield_draw_<name>'s hand takes it by its edge, and
 # held_rim the edge (model space), where the hand closes on it.
-held_grip 0.93217 0.23849 0.27235 -0.30523 -0.35844 0.71348 0.60206 0.16058 -0.05073 -0.65884 0.75057 0.43482
+held_grip 0.74726 0.42800 -0.50835 -0.53366 -0.63071 0.21585 -0.74540 0.32311 -0.20930 0.87763 0.43124 -0.64363
 held_rim -0.18896 0.66441 -0.08657
 # hide k ...: body triangles (skin.txt's f lines, from 0) left out while it is worn.
 v 0.11769 0.52864 -0.10622

@@ -574,6 +574,7 @@ namespace M3AT
                 case "rolljoint": return RollJointTest();
                 case "drunk": return DrunkTest();
                 case "dress": return DressTest();
+                case "shields": return ShieldTest();
                 case "cook": return CookTest();
                 case "teach": return TeachTest();
                 case "floordraw": return FloordrawTest();
@@ -1630,6 +1631,75 @@ namespace M3AT
             }
             Check("drunk: weaving on the move", weave > 0.01f, "weave up to " + weave.ToString("F3") + " cells");
             Note("Look: drunk_stand_* leant to a side with the head lolling, the arms hanging; drunk_walk_* off its straight path.");
+        }
+
+        // Combat Extended's shields (Shields.cs): each worn by a colonist with an autopistol, carried on the back undrafted,
+        // then drafted, taken off the back into the guard by its shield_draw clip, and undrafted, put back. The clip runs on
+        // frame time times the game's speed (StepShield), none while stepped paused, so it is played at normal speed and
+        // stopped part way for pictures: as the hand reaches the edge (SHIELD_GRAB, about 0.4) and as it comes round.
+        private static IEnumerator ShieldTest()
+        {
+            ClearPatch();
+            string[] shields = { "CE_Apparel_MeleeShield", "CE_Apparel_BallisticShield" };
+            int x = -3;
+            foreach (string defName in shields)
+            {
+                ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail(defName);
+                string name = defName.Substring("CE_Apparel_".Length);
+                if (def == null)
+                {
+                    Note("shields: no " + defName + " (Combat Extended not active?), left out");
+                    continue;
+                }
+                Pawn pawn = NewPawn(middle + new IntVec3(x, 0, 0), "Gun_Autopistol");
+                x += 3;
+                pawn.apparel.Wear((Apparel)ThingMaker.MakeThing(def, GenStuff.DefaultStuffFor(def)), false);
+                Hold(pawn);
+                Look(pawn, 0f);
+                yield return Ticks(30, "shield_" + name, pawn);
+                yield return WaitReal(2f);
+                Check(name + ": on the back undrafted", Field<float>(pawn, "shieldOut") <= 0f, "shieldOut " + Field<float>(pawn, "shieldOut").ToString("F2"));
+                yield return Shot("shield_" + name + "_back");
+
+                pawn.drafter.Drafted = true;
+                string clip = null;
+                float most = 0f;
+                foreach (float stop in new[] { 0.42f, 0.75f, 1f })
+                {
+                    yield return Unpaused(pawn, () =>
+                    {
+                        clip = clip ?? Field<string>(pawn, "shieldClip");
+                        most = Mathf.Max(most, Field<float>(pawn, "shieldOut"));
+                        return Field<float>(pawn, "shieldOut") >= stop;
+                    }, 4f);
+                    if (stop < 1f)
+                    {
+                        yield return Shot("shield_" + name + "_draw_" + (int)(stop * 100f));
+                    }
+                }
+                yield return Unpaused(pawn, () => Field<float>(pawn, "shield") >= 0.99f, 3f);
+                Check(name + ": taken off the back by its clip", clip != null && clip.StartsWith("shield_draw_"), "clip " + (clip ?? "none"));
+                Check(name + ": in the guard drafted", most >= 1f && Field<float>(pawn, "shield") > 0.9f,
+                    "shieldOut " + Field<float>(pawn, "shieldOut").ToString("F2") + ", guard " + Field<float>(pawn, "shield").ToString("F2"));
+                yield return Shot("shield_" + name + "_guard");
+
+                pawn.drafter.Drafted = false;
+                Hold(pawn);
+                foreach (float stop in new[] { 0.6f, 0f })
+                {
+                    yield return Unpaused(pawn, () => Field<float>(pawn, "shieldOut") <= stop, 4f);
+                    if (stop > 0f)
+                    {
+                        yield return Shot("shield_" + name + "_stow_" + (int)(stop * 100f));
+                    }
+                }
+                Check(name + ": put back undrafted", Field<float>(pawn, "shieldOut") <= 0f, "shieldOut " + Field<float>(pawn, "shieldOut").ToString("F2"));
+                yield return Shot("shield_" + name + "_back_again");
+                pawn.DeSpawn();
+            }
+            Note("Look: _back the shield on the back, clear of the pistol's holster; _draw_42 the left hand closed on the shield's"
+                + " left edge with the elbow out to the side (SHIELD_DRAW_POLE), not folded in behind the shoulder blade; _draw_75"
+                + " coming round the left side; _guard in the left fist out in front; _stow_60 on its way back the same way.");
         }
 
         // Putting clothes on and taking them off (Dressing.cs): a stripped colonist puts on trousers, a shirt, a duster and a
