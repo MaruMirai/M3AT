@@ -42,12 +42,19 @@ namespace M3AT
     internal sealed class HairBuilder
     {
         private const string Tag = "[M3AT] ";
-        public const int Version = 36;   // raise when the build changes, so cached hair is made again
+        public const int Version = 38;   // raise when the build changes, so cached hair is made again
         public const int BeardVersion = 5;   // and cached beards
         internal static bool Tapered = true;    // the hull's flanks narrowing behind the head's middle (Hull; M3AT_NO_TAPER off)
         internal static bool FringeOn = true;   // the fringe carried forward to the head's front (Hull; M3AT_NO_FRINGE off)
         internal static int FringeGap = 16;     // pixels short of the head's front from which hair over the face is left as the side sprite has it
         internal static float FringeTurn = 0.08f;   // share of the head's depth or width its surface may be in from its outermost in a row for hair to be carried to it there
+        internal static float SideTurn = 0.25f;     // the same for the sides and the back
+        internal static bool HugOn = true;      // Hugging (M3AT_NO_HUG off)
+        internal static int HugGap = 12;        // pixels inside the head's outline from which a hair edge is left as drawn
+        private const float HugShare = 0.15f;   // ... nor further inside it than this share of the head's width in that row
+        private const float HugRows = 0.6f;     // least share of the head's full width a row's outline must have
+        private const int HugPast = 3;          // pixels past the head's outline (grown by HeadGrow) it is moved to
+        internal int lastHug;                   // edges moved in the last build, for the harness
         internal static bool LineUpOn = true;   // LinedUp (the harness turns it off with M3AT_NO_LINEUP, to compare)
         private static bool pixelsFailed;   // IsoRim's pixel reading has thrown once (logged once)
         public const int Size = 256;    // pixels: every sprite is read at this size, as hair.py's SIZE
@@ -131,7 +138,9 @@ namespace M3AT
         private const float CrownMix = 0.5f;      // share of the head's depth about its middle over which the crown
                                                   // blends from the front sprite to the back one
         private const int CrownGrow = 4;          // texels the crown panel is grown past its triangles, for filtering
-        public const int Panels = 4;              // the atlas: the south, east and north sprites, then the crown panel
+        public const int Panels = 5;              // the atlas: the south, east, north and west sprites (the west one's panel clear without one), then the crown panel
+        private const int CrownPanel = 4;
+        private const float WestDiffers = 0.01f;  // share of the east sprite's solid pixels the mirrored west one must differ in (solid or not) for it to be read as the other side's
         private const float NearHead = 0.4f;      // head widths round the hair within which the body is looked at
         private const float EyeRow = 70.6f / 128f * Size;   // the eye line's row in the sprites, as Facial Animation's textures have it
         private const float MouthRow = 319.5f / 512f * Size;   // the mouth's row in the sprites (FaceLayers.MouthCentre)
@@ -157,10 +166,15 @@ namespace M3AT
         // The heads a beard is drawn over, as most are drawn for a man's.
         private static readonly string[] BeardHeadSprites = { HeadSprites[1], HeadSprites[0] };
 
-        // A hairstyle's south, east and north sprites, Size x Size, rows top first; hash names them for the cache.
+        // A hairstyle's south, east, north and west sprites, Size x Size, rows top first; hash names them for the cache.
+        // The west one is read as it is: the game draws a person's west sprite on a mirrored mesh, so hair mods draw it
+        // facing east, laid out as the east one is (the face to the right; Morphs Assorted's are). west: the style has
+        // a west sprite of its own that differs from its east one (WestDiffers), its hair being different on its two
+        // sides; without one px[3] is px[1] itself, and the east sprite stands for both sides.
         internal sealed class Sprites
         {
-            public readonly Color32[][] px = new Color32[3][];
+            public readonly Color32[][] px = new Color32[4][];
+            public bool west;
             public string hash;
         }
 
@@ -197,6 +211,7 @@ namespace M3AT
         private float sx, sy, sz, midX;
         private float eyes, mouth;   // a beard's: where Facial Animation's eye line and mouth are drawn on the chibi, y (FaceRows)
         private int hx0, hx1, hy0, hy1, hz0, hz1;
+        private bool west;   // the style being built has a west sprite of its own (Sprites.west): Side
         private bool[][] headMask;   // per view, Size x Size, top first: the drawn-over head's outline, grown by HeadGrow
         private int[] frontFrom, frontTo;   // a beard's: each row's first and last solid column in the front sprite (BeardAlpha), of the sprites being built
         private bool headTried;
@@ -378,6 +393,7 @@ namespace M3AT
         public static Sprites Read(string texPath, bool beard = false)
         {
             Texture2D s = Tex(texPath + "_south"), e = Tex(texPath + "_east"), n = beard ? null : Tex(texPath + "_north");
+            Texture2D w = beard || e == null ? null : Tex(texPath + "_west");
             bool mirror = false;
             if (e == null)
             {
@@ -396,17 +412,42 @@ namespace M3AT
             {
                 return null;
             }
+            TakeWest(sp, w != null ? Pixels(w, false) : null);
             sp.hash = Hash(sp.px, beard);
             return sp;
         }
 
+        // Gives the sprites their west one (null for none), if it differs from the east one.
+        private static void TakeWest(Sprites sp, Color32[] west)
+        {
+            sp.px[3] = sp.px[1];
+            sp.west = false;
+            if (west == null)
+            {
+                return;
+            }
+            int solid = 0, differ = 0;
+            for (int i = 0; i < west.Length; i++)
+            {
+                bool a = sp.px[1][i].a >= Solid, b = west[i].a >= Solid;
+                solid += a ? 1 : 0;
+                differ += a != b ? 1 : 0;
+            }
+            if (differ > WestDiffers * solid)
+            {
+                sp.px[3] = west;
+                sp.west = true;
+            }
+        }
+
         // Sprites from pixels already read (Size x Size, rows top first: south, east, north).
-        internal static Sprites From(Color32[] south, Color32[] east, Color32[] north, bool beard = false)
+        internal static Sprites From(Color32[] south, Color32[] east, Color32[] north, bool beard = false, Color32[] west = null)
         {
             Sprites sp = new Sprites();
             sp.px[0] = south;
             sp.px[1] = east;
             sp.px[2] = north;
+            TakeWest(sp, beard ? null : west);
             sp.hash = Hash(sp.px, beard);
             return sp;
         }
@@ -455,9 +496,13 @@ namespace M3AT
             ulong h = 14695981039346656037UL;
             Action<byte> add = b => { h ^= b; h *= 1099511628211UL; };
             add((byte)(beard ? BeardVersion : Version));
-            foreach (Color32[] v in views)
+            for (int k = 0; k < views.Length; k++)
             {
-                foreach (Color32 c in v)
+                if (k == 3 && views[3] == views[1])
+                {
+                    continue;
+                }
+                foreach (Color32 c in views[k])
                 {
                     add(c.r);
                     add(c.g);
@@ -493,8 +538,8 @@ namespace M3AT
         internal bool UseHead(Sprites head)
         {
             headTried = true;
-            bool[][] mask = new bool[3][];
-            for (int v = 0; v < 3; v++)
+            bool[][] mask = new bool[4][];
+            for (int v = 0; v < 4; v++)
             {
                 bool[] m = new bool[Size * Size];
                 for (int i = 0; i < m.Length; i++)
@@ -508,7 +553,7 @@ namespace M3AT
             {
                 return false;
             }
-            for (int v = 0; v < 3; v++)
+            for (int v = 0; v < 4; v++)
             {
                 mask[v] = Grow(mask[v], HeadGrow);
             }
@@ -979,10 +1024,11 @@ namespace M3AT
             // not the back onto the front, which left the head standing out past the hair on one side (LongE's left).
             // Its column c then takes what was at c + half.
             int half = d / 2;
-            Sprites lined = new Sprites { hash = sp.hash };
+            Sprites lined = new Sprites { hash = sp.hash, west = sp.west };
             lined.px[0] = Moved(sp.px[0], half);
             lined.px[1] = Moved(sp.px[1], lastSideBack);
             lined.px[2] = Moved(sp.px[2], d - half);
+            lined.px[3] = sp.west ? Moved(sp.px[3], lastSideBack) : lined.px[1];
             return lined;
         }
 
@@ -1052,14 +1098,116 @@ namespace M3AT
             return moved;
         }
 
+        // The sprites with their hair let out to the head's outline, where it stops a little short of it. Hair drawn tight
+        // to a smaller head than the one these are fitted to (Morphs Assorted's) ends inside this head's outline in
+        // every sprite, so the head's hull stood out past the hair's at the back corners and temples, where each
+        // sprite that sees the place shows it clear, and a strip of skin was left down each. In each row of the head,
+        // an outer edge of the hair that is inside the head's outline by no more than HugGap (and HugShare of the head's
+        // width there) is moved out to HugPast
+        // past it: the pixels from there to InkReach inside the old edge take the first hair pixel inside the edge's
+        // outline ink, so no ink is left standing in the hair. The front and back sprites at both edges, a side sprite
+        // only at the back of the head, as its front is the face. A copy.
+        private Sprites Hugging(Sprites sp)
+        {
+            Sprites hug = new Sprites { hash = sp.hash, west = sp.west };
+            lastHug = 0;
+            for (int v = 0; v < 4; v++)
+            {
+                if (v == 3 && sp.px[3] == sp.px[1])
+                {
+                    hug.px[3] = hug.px[1];
+                    continue;
+                }
+                Color32[] px = (Color32[])sp.px[v].Clone();
+                int full = v == 0 || v == 2 ? hx1 - hx0 + 1 : hz1 - hz0 + 1;
+                for (int r = Math.Max(0, hy0); r <= Math.Min(Size - 1, hy1); r++)
+                {
+                    int h0 = -1, h1 = -1, a0 = -1, a1 = -1;
+                    for (int c = 0; c < Size; c++)
+                    {
+                        if (headMask[v][r * Size + c])
+                        {
+                            h0 = h0 < 0 ? c : h0;
+                            h1 = c;
+                        }
+                        if (sp.px[v][r * Size + c].a >= Solid)
+                        {
+                            a0 = a0 < 0 ? c : a0;
+                            a1 = c;
+                        }
+                    }
+                    // Not over the top of the head, where its outline slants in (narrower than HugRows of its full
+                    // width): being inside it sideways there is being above it, as a mohawk's ends are.
+                    if (h0 < 0 || a0 < 0 || h1 - h0 + 1 < HugRows * full)
+                    {
+                        continue;
+                    }
+                    // No more than HugShare of the head's width in the row: near the head's top, where it is narrow, a
+                    // mohawk's or a spike's sides are as near its outline, and they were let out into a band over the scalp.
+                    int most = Math.Min(HugGap, Mathf.FloorToInt(HugShare * (h1 - h0 + 1)));
+                    lastHug += LetOut(px, sp.px[v], r, a0, h0, 1, most) ? 1 : 0;
+                    if (v == 0 || v == 2)
+                    {
+                        lastHug += LetOut(px, sp.px[v], r, a1, h1, -1, most) ? 1 : 0;
+                    }
+                }
+                hug.px[v] = px;
+            }
+            return hug;
+        }
+
+        // Moves row r's hair edge (column edge; inward: the way into the hair, 1 or -1) out past the head's (column head).
+        private static bool LetOut(Color32[] px, Color32[] was, int r, int edge, int head, int inward, int most)
+        {
+            int inside = (edge - head) * inward;   // how far inside the head's outline the hair's edge is
+            if (inside <= 0 || inside > most)
+            {
+                return false;
+            }
+            // The first hair pixel in from the edge that is not its outline ink.
+            int from = -1;
+            for (int k = 1; k <= 2 * InkReach && from < 0; k++)
+            {
+                int c = edge + k * inward;
+                if (c < 0 || c >= Size)
+                {
+                    break;
+                }
+                Color32 p = was[r * Size + c];
+                if (p.a >= 230 && (p.r + p.g + p.b) / (3f * 255f) > SkirtDark)
+                {
+                    from = c;
+                }
+            }
+            if (from < 0)
+            {
+                return false;
+            }
+            Color32 hair = was[r * Size + from];
+            hair.a = 255;
+            for (int c = head - HugPast * inward; c != from; c += inward)
+            {
+                if (c >= 0 && c < Size)
+                {
+                    px[r * Size + c] = hair;
+                }
+            }
+            return true;
+        }
+
         internal Built Build(string style, Sprites sp)
         {
             Built built = new Built();
+            west = sp.west && !beard;
             lastLineUp = 0;
             lastSideBack = 0;
             if (!beard && LineUpOn)
             {
                 sp = LinedUp(sp);
+            }
+            if (!beard && HugOn)
+            {
+                sp = Hugging(sp);
             }
             bool[] nearHair;
             if (beard)
@@ -1245,9 +1393,10 @@ namespace M3AT
             return a;
         }
 
-        // Marks the voxels of slice y inside both outlines (across: the front view's columns, deep: the side view's) and
-        // inside the superellipse that fits their width and depth.
-        private static void Slice(bool[] inside, int n, int y, bool[] across, bool[] deep)
+        // Marks the voxels of slice y inside both outlines (across: the front view's columns, deep: the side view's for
+        // the columns before mid, deepWest: for those from it on) and inside the superellipse that fits their width and
+        // depth.
+        private static void Slice(bool[] inside, int n, int y, bool[] across, bool[] deep, bool[] deepWest, int mid)
         {
             int x0 = -1, x1 = -1, z0 = -1, z1 = -1;
             for (int x = 0; x < n; x++)
@@ -1260,7 +1409,7 @@ namespace M3AT
                     }
                     x1 = x;
                 }
-                if (deep[y * n + x])
+                if (deep[y * n + x] || deepWest[y * n + x])
                 {
                     if (z0 < 0)
                     {
@@ -1281,9 +1430,10 @@ namespace M3AT
                     continue;
                 }
                 float dx = Mathf.Pow(Mathf.Abs(x - mx) / rx, Round);
+                bool[] side = x < mid ? deep : deepWest;
                 for (int z = z0; z <= z1; z++)
                 {
-                    if (deep[y * n + z] && dx + Mathf.Pow(Mathf.Abs(z - mz) / rz, Round) <= 1f)
+                    if (side[y * n + z] && dx + Mathf.Pow(Mathf.Abs(z - mz) / rz, Round) <= 1f)
                     {
                         inside[(y * n + x) * n + z] = true;
                     }
@@ -1296,7 +1446,7 @@ namespace M3AT
         // was: the hair before any carrying. A line the slice's rounding left without hair is taken to have it from
         // the row's own outermost hair that way (rowFrom steps in), or from the head's surface if that is further in.
         // headMost: the furthest in the head's surface may be on the line for it to be carried at all.
-        private static void Carry(bool[] hair, bool[] was, bool[] head, int n, int from, int step, int rowFrom, int gap, int headMost)
+        private static void Carry(bool[] hair, bool[] was, bool[] head, int n, int from, int step, int rowFrom, int gap, int headMost, bool[] mark = null)
         {
             int atHead = -1, atHair = -1;
             for (int k = 0; k < n && (atHead < 0 || atHair < 0); k++)
@@ -1325,7 +1475,12 @@ namespace M3AT
             }
             for (int k = Math.Max(0, atHead - 1); k <= atHair; k++)
             {
-                hair[from + k * step] = true;
+                int i = from + k * step;
+                if (mark != null && !hair[i])
+                {
+                    mark[i] = true;   // newly hair here
+                }
+                hair[i] = true;
             }
         }
 
@@ -1347,6 +1502,10 @@ namespace M3AT
             // Hair: the front or the back sprite (each leaves out what the body hides from it, as a braid down the back
             // is not drawn in the front one), and the side one. The head: its outline in the front and side ones.
             bool[] s = new bool[n * n], e = new bool[n * n], hs = new bool[n * n], he = new bool[n * n];
+            // The west sprite's hair, for the figure's left half (the front sprite's columns from the head's middle on:
+            // it shows the figure's right on its left, the side the east sprite is seen from); the east one's without it.
+            bool[] w = west ? new bool[n * n] : e;
+            int midV = Mathf.RoundToInt(midX / Voxel);
             bool[] south = new bool[n * n], north = new bool[n * n];
             for (int y = 0; y < n; y++)
             {
@@ -1358,78 +1517,18 @@ namespace M3AT
                     north[y * n + x] = sp.px[2][row * Size + Size - 1 - col].a >= Solid;
                     s[y * n + x] = south[y * n + x] || north[y * n + x];
                     e[y * n + x] = sp.px[1][i].a >= Solid;
+                    if (west)
+                    {
+                        w[y * n + x] = sp.px[3][i].a >= Solid;
+                    }
                     hs[y * n + x] = headMask[0][i];
                     he[y * n + x] = headMask[1][i];
                 }
             }
             for (int y = 0; y < n; y++)
             {
-                Slice(hair, n, y, s, e);
-                Slice(inside, n, y, hs, he);
-            }
-            // Hair a sprite shows over the head is outside the head on that sprite's side, whatever the other sprites'
-            // outlines say. Where the hair is drawn tight to a smaller or flatter head than the one these are fitted to
-            // (Morphs Assorted's: its side sprites' fringes stop up to 14 pixels short of the head's front, and its
-            // front ones are no wider than the head), the hull's hair was inside the head's own hull, the surface
-            // there was the head's, more than HairReach from any hair, and Textured dropped the whole fringe and the
-            // hair over the temples. So along each line into the head from the front (where the front sprite has hair
-            // over the head), either side (the side sprite) and the back (the back sprite), the hair is carried out to
-            // just past the head's surface, if it is no more than FringeGap short of it.
-            if (!beard && FringeOn)
-            {
-                int gap = Mathf.CeilToInt(FringeGap / (float)Voxel);
-                bool[] carried = (bool[])hair.Clone();   // as it was, so one side's carrying isn't taken for hair by the next
-                for (int y = 0; y < n; y++)
-                {
-                    int e0 = -1, e1 = -1, s0 = -1, s1 = -1, he0 = -1, he1 = -1, hs0 = -1, hs1 = -1;
-                    for (int k = 0; k < n; k++)
-                    {
-                        if (he[y * n + k])
-                        {
-                            he0 = he0 < 0 ? k : he0;
-                            he1 = k;
-                        }
-                        if (hs[y * n + k])
-                        {
-                            hs0 = hs0 < 0 ? k : hs0;
-                            hs1 = k;
-                        }
-                        if (e[y * n + k])
-                        {
-                            e0 = e0 < 0 ? k : e0;
-                            e1 = k;
-                        }
-                        if (s[y * n + k])
-                        {
-                            s0 = s0 < 0 ? k : s0;
-                            s1 = k;
-                        }
-                    }
-                    if (e0 < 0 || s0 < 0 || he0 < 0 || hs0 < 0)
-                    {
-                        continue;
-                    }
-                    // Only where the head's surface is within FringeTurn of its outermost in the row that way: further
-                    // round, a lock the front sprite shows beside the face was laid flat on the cheek and broke up.
-                    int deep = Mathf.RoundToInt(FringeTurn * (he1 - he0 + 1)), wide = Mathf.RoundToInt(FringeTurn * (hs1 - hs0 + 1));
-                    for (int k = 0; k < n; k++)
-                    {
-                        int line = y * n + k;
-                        if (hs[line] && south[line])
-                        {
-                            Carry(hair, carried, inside, n, line * n + n - 1, -1, n - 1 - e1, gap, n - 1 - he1 + deep);
-                        }
-                        if (hs[line] && north[line])
-                        {
-                            Carry(hair, carried, inside, n, line * n, 1, e0, gap, he0 + deep);
-                        }
-                        if (he[line] && e[line])
-                        {
-                            Carry(hair, carried, inside, n, y * n * n + (n - 1) * n + k, -n, n - 1 - s1, gap, n - 1 - hs1 + wide);
-                            Carry(hair, carried, inside, n, y * n * n + k, n, s0, gap, hs0 + wide);
-                        }
-                    }
-                }
+                Slice(hair, n, y, s, e, w, midV);
+                Slice(inside, n, y, hs, he, he, midV);
             }
             // The face hollowed out: in the columns where the front sprite shows the head with no hair over it, the head
             // and the hair are taken out from in front of the face to FaceHollow behind its front. Filled in, a lock
@@ -1561,6 +1660,88 @@ namespace M3AT
                             }
                             hair[(y * n + x) * n + z] = false;
                         }
+                    }
+                }
+            }
+            // Hair a sprite shows over the head is outside the head on that sprite's side, whatever the other sprites'
+            // outlines say. Where the hair is drawn tight to a smaller or flatter head than the one these are fitted to
+            // (Morphs Assorted's: its side sprites' fringes stop up to 14 pixels short of the head's front, and its
+            // front ones are no wider than the head), the hull's hair was inside the head's own hull, the surface
+            // there was the head's, more than HairReach from any hair, and Textured dropped the whole fringe and the
+            // hair over the temples. So along each line into the head from the front (where the front sprite has hair
+            // over the head), either side (the side sprite) and the back (the back sprite), the hair is carried out to
+            // just past the head's surface, if it is no more than FringeGap short of it. After the rules above, which
+            // would take it away again behind the head's middle where the back sprite is narrower than the head.
+            if (!beard && FringeOn)
+            {
+                int gap = Mathf.CeilToInt(FringeGap / (float)Voxel);
+                bool[] sideCarried = new bool[hair.Length];
+                bool[] carried = (bool[])hair.Clone();   // as it was, so one side's carrying isn't taken for hair by the next
+                for (int y = 0; y < n; y++)
+                {
+                    int e0 = -1, e1 = -1, s0 = -1, s1 = -1, he0 = -1, he1 = -1, hs0 = -1, hs1 = -1;
+                    for (int k = 0; k < n; k++)
+                    {
+                        if (he[y * n + k])
+                        {
+                            he0 = he0 < 0 ? k : he0;
+                            he1 = k;
+                        }
+                        if (hs[y * n + k])
+                        {
+                            hs0 = hs0 < 0 ? k : hs0;
+                            hs1 = k;
+                        }
+                        if (e[y * n + k] || w[y * n + k])
+                        {
+                            e0 = e0 < 0 ? k : e0;
+                            e1 = k;
+                        }
+                        if (s[y * n + k])
+                        {
+                            s0 = s0 < 0 ? k : s0;
+                            s1 = k;
+                        }
+                    }
+                    if (e0 < 0 || s0 < 0 || he0 < 0 || hs0 < 0)
+                    {
+                        continue;
+                    }
+                    // Only where the head's surface is within FringeTurn of its outermost in the row that way: further
+                    // round, a lock the front sprite shows beside the face was laid flat on the cheek and broke up. The
+                    // sides and back go further round (SideTurn), as the head's side falls away from its widest sooner,
+                    // and that near the front left the hair over and behind the ear off.
+                    int deep = Mathf.RoundToInt(FringeTurn * (he1 - he0 + 1)), behind = Mathf.RoundToInt(SideTurn * (he1 - he0 + 1)), wide = Mathf.RoundToInt(SideTurn * (hs1 - hs0 + 1));
+                    for (int k = 0; k < n; k++)
+                    {
+                        int line = y * n + k;
+                        if (hs[line] && south[line])
+                        {
+                            Carry(hair, carried, inside, n, line * n + n - 1, -1, n - 1 - e1, gap, n - 1 - he1 + deep);
+                        }
+                        if (hs[line] && north[line])
+                        {
+                            Carry(hair, carried, inside, n, line * n, 1, e0, gap, he0 + behind);
+                        }
+                        if (he[line] && w[line])
+                        {
+                            Carry(hair, carried, inside, n, y * n * n + (n - 1) * n + k, -n, n - 1 - s1, gap, n - 1 - hs1 + wide, sideCarried);
+                        }
+                        if (he[line] && e[line])
+                        {
+                            Carry(hair, carried, inside, n, y * n * n + k, n, s0, gap, hs0 + wide, sideCarried);
+                        }
+                    }
+                }
+                // What the side sprites carried out behind the head's middle is flank (Textured), as the taper's is: it
+                // stands out past the back sprite's outline, which is narrower than the head there, and with the back
+                // sprite's say a strip down each back corner was cut out. Not what the back sprite carried itself.
+                int carriedTo = Mathf.RoundToInt((hz0 + hz1) / 2f / Voxel);
+                for (int i = 0; i < hair.Length; i++)
+                {
+                    if (sideCarried[i] && i % n < carriedTo)
+                    {
+                        tapered[i] = true;
                     }
                 }
             }
@@ -2053,7 +2234,19 @@ namespace M3AT
 
         // ---- texturing and the cut along the art
 
-        // Which sprite faces a triangle with normal n at p most: 0 south (front), 1 east (either side), 2 north (back).
+        // The side sprite for a place: 1 east, or 3 west on the figure's left for a style with a west sprite of its own.
+        private int Side(Vector3 p)
+        {
+            if (!west)
+            {
+                return 1;
+            }
+            float X, Y, Z;
+            ToSprite(p, out X, out Y, out Z);
+            return X < midX ? 1 : 3;
+        }
+
+        // Which sprite faces a triangle with normal n at p most: 0 south (front), 1 east or 3 west (its side, Side), 2 north (back).
         // No sprite sees the top: the crown takes the front sprite over the front half of the head and the back one behind.
         private int ViewOf(Vector3 n, Vector3 p)
         {
@@ -2063,7 +2256,7 @@ namespace M3AT
             }
             if (Mathf.Abs(n.x) > (beard && n.z > 0f ? BeardFront : 1f) * Mathf.Abs(n.z))
             {
-                return 1;
+                return Side(p);
             }
             return n.z > 0f ? 0 : 2;
         }
@@ -2074,9 +2267,14 @@ namespace M3AT
         // came out as a black blotch over the top of the head.
         private static int[][] TopEdges(Sprites sp)
         {
-            int[][] edges = new int[3][];
-            for (int v = 0; v < 3; v++)
+            int[][] edges = new int[4][];
+            for (int v = 0; v < 4; v++)
             {
+                if (v == 3 && sp.px[3] == sp.px[1])
+                {
+                    edges[3] = edges[1];   // no west sprite of its own
+                    continue;
+                }
                 int[] first = new int[Size];
                 for (int c = 0; c < Size; c++)
                 {
@@ -2110,7 +2308,7 @@ namespace M3AT
         {
             float X, Y, Z;
             ToSprite(p, out X, out Y, out Z);
-            Vector2 uv = view == 0 ? new Vector2(X, Y) : view == 1 ? new Vector2(Z, Y) : new Vector2(Size - 1 - X, Y);
+            Vector2 uv = view == 0 ? new Vector2(X, Y) : view == 2 ? new Vector2(Size - 1 - X, Y) : new Vector2(Z, Y);
             if (crown)
             {
                 uv.y = Mathf.Max(uv.y, edges[view][Mathf.Clamp((int)uv.x, 0, Size - 1)] + Outline);
@@ -2147,7 +2345,7 @@ namespace M3AT
             public readonly List<int[]> kept = new List<int[]>();   // a, b, c, view, crown (0 or 1)
             public readonly List<Vector2[]> uvs = new List<Vector2[]>();   // atlas places of each kept triangle's corners
             public readonly List<Vector2[]> spriteUvs = new List<Vector2[]>();   // the same in its own sprite, the crown's too
-            // (kept[3] is 3 for a crown triangle on the crown panel)
+            // (kept[3] is CrownPanel for a crown triangle on the crown panel)
 
             public int Point(int i, int j, float t)
             {
@@ -2191,29 +2389,30 @@ namespace M3AT
             return x >= 0 && y >= 0 && z >= 0 && x < n && y < n && z < n && nearHair[(y * n + x) * n + z];
         }
 
-        // The sprites other than view that see a triangle with normal n, as bits (1 south, 2 east, 4 north). The crown is
-        // seen by none of them, so it has only its own sprite's say.
-        private static int SeenBy(Vector3 n, int view, bool crown)
+        // The sprites other than view that see a triangle with normal n, as bits (1 south, 2 east, 4 north, 8 west; side:
+        // its side's sprite, Side). The crown is seen by none of them, so it has only its own sprite's say.
+        private static int SeenBy(Vector3 n, int view, bool crown, int side)
         {
             if (crown)
             {
                 return 0;
             }
-            int seen = (n.z > Sees ? 1 : 0) | (Mathf.Abs(n.x) > Sees ? 2 : 0) | (n.z < -Sees ? 4 : 0);
+            int seen = (n.z > Sees ? 1 : 0) | (Mathf.Abs(n.x) > Sees ? 1 << side : 0) | (n.z < -Sees ? 4 : 0);
             return seen & ~(1 << view);
         }
 
         // The sprite other than view that most faces a triangle with normal n and sees it (Sees), or -1.
-        private static int OtherView(Vector3 n, int view)
+        private static int OtherView(Vector3 n, int view, int side)
         {
             int best = -1;
             float most = Sees;
             float[] share = { n.z, Mathf.Abs(n.x), -n.z };
-            for (int v = 0; v < 3; v++)
+            for (int k = 0; k < 3; k++)
             {
-                if (v != view && share[v] > most)
+                int v = k == 1 ? side : k;
+                if (v != view && share[k] > most)
                 {
-                    most = share[v];
+                    most = share[k];
                     best = v;
                 }
             }
@@ -2228,7 +2427,7 @@ namespace M3AT
                 return BeardAlpha(sp, edges, view, p);
             }
             float a = Alpha(sp.px[view], Where(edges, view, crown, p));
-            for (int v = 0; v < 3; v++)
+            for (int v = 0; v < 4; v++)
             {
                 if ((seen & 1 << v) != 0)
                 {
@@ -2241,9 +2440,14 @@ namespace M3AT
         // Each sprite's outline ink: solid dark pixels (SkirtDark) within InkReach of where the sprite is clear.
         private static bool[][] InkEdges(Sprites sp)
         {
-            bool[][] all = new bool[3][];
-            for (int v = 0; v < 3; v++)
+            bool[][] all = new bool[4][];
+            for (int v = 0; v < 4; v++)
             {
+                if (v == 3 && sp.px[3] == sp.px[1])
+                {
+                    all[3] = all[1];   // no west sprite of its own
+                    continue;
+                }
                 bool[] clear = new bool[Size * Size], near = new bool[Size * Size], ink = new bool[Size * Size];
                 for (int i = 0; i < clear.Length; i++)
                 {
@@ -2282,9 +2486,14 @@ namespace M3AT
         // the back sprite sees, were cut out as holes.
         private Color32[][] Vetoes(Sprites sp)
         {
-            Color32[][] all = new Color32[3][];
-            for (int v = 0; v < 3; v++)
+            Color32[][] all = new Color32[4][];
+            for (int v = 0; v < 4; v++)
             {
+                if (v == 3 && sp.px[3] == sp.px[1])
+                {
+                    all[3] = all[1];   // no west sprite of its own
+                    continue;
+                }
                 byte[] a = new byte[Size * Size], b = new byte[Size * Size];
                 for (int i = 0; i < a.Length; i++)
                 {
@@ -2401,9 +2610,9 @@ namespace M3AT
                     // of the face would be painted flat on the cheek, so close that they broke up through it.
                     continue;
                 }
-                int view = ViewOf(m.fn[f], centre);
+                int view = ViewOf(m.fn[f], centre), side = Side(centre);
                 bool crown = m.fn[f].y > Crown && !beard;
-                int seen = SeenBy(m.fn[f], view, crown);
+                int seen = SeenBy(m.fn[f], view, crown, side);
                 if (flank != null && NearHair(flank, n, centre))
                 {
                     // The taper's flank (Hull) stands out past the back sprite's outline by design: the back sprite has
@@ -2411,8 +2620,8 @@ namespace M3AT
                     seen &= ~4;
                     if (view == 2)
                     {
-                        view = crown ? 0 : 1;
-                        seen = SeenBy(m.fn[f], view, crown) & ~4;
+                        view = crown ? 0 : side;
+                        seen = SeenBy(m.fn[f], view, crown, side) & ~4;
                     }
                 }
                 bool[] on = new bool[3];
@@ -2422,7 +2631,7 @@ namespace M3AT
                     on[k] = AlphaAt(sp, edges, view, crown, seen, m.v[t[k]]) >= Cut;
                     count += on[k] ? 1 : 0;
                 }
-                int alt = crown || beard ? -1 : OtherView(m.fn[f], view);
+                int alt = crown || beard ? -1 : OtherView(m.fn[f], view, side);
                 if (alt >= 0)
                 {
                     // Where the triangle's own sprite runs out, another sprite that sees it may take it over:
@@ -2439,7 +2648,7 @@ namespace M3AT
                     bool bare = count < 3 && !headMask[view][here], inked = count > 0 && ink[view][here] && !ink[alt][there];
                     if (bare || inked)
                     {
-                        int altSeen = SeenBy(m.fn[f], alt, false) & (bare ? ~(1 << view) : ~0);
+                        int altSeen = SeenBy(m.fn[f], alt, false, side) & (bare ? ~(1 << view) : ~0);
                         bool[] altOn = new bool[3];
                         int altCount = 0;
                         for (int k = 0; k < 3; k++)
@@ -2516,7 +2725,7 @@ namespace M3AT
                         float X, Y, Z;
                         ToSprite(p, out X, out Y, out Z);
                         w = new Vector2(X, Z);
-                        uv[k] = new Vector2((3 * Size + w.x + 0.5f) / (Panels * Size), 1f - (w.y + 0.5f) / Size);
+                        uv[k] = new Vector2((CrownPanel * Size + w.x + 0.5f) / (Panels * Size), 1f - (w.y + 0.5f) / Size);
                     }
                     else
                     {
@@ -2525,7 +2734,7 @@ namespace M3AT
                 }
                 if (crownPanel != null && t[4] == 1)
                 {
-                    t[3] = 3;
+                    t[3] = CrownPanel;
                 }
                 cut.kept.Add(t);
                 cut.uvs.Add(uv);
@@ -2571,9 +2780,14 @@ namespace M3AT
         // The three sprites with their strand streaks, rows top first.
         private static Color32[][] Streaked(Sprites sp)
         {
-            Color32[][] all = new Color32[3][];
-            for (int v = 0; v < 3; v++)
+            Color32[][] all = new Color32[4][];
+            for (int v = 0; v < 4; v++)
             {
+                if (v == 3 && sp.px[3] == sp.px[1])
+                {
+                    all[3] = all[1];   // no west sprite of its own
+                    continue;
+                }
                 Color32[] px = new Color32[Size * Size];
                 for (int r = 0; r < Size; r++)
                 {
@@ -2582,7 +2796,7 @@ namespace M3AT
                         Color32 p = sp.px[v][r * Size + c];
                         if (p.a > 0 && (p.r + p.g + p.b) / (3f * 255f) > SkirtDark)
                         {
-                            float f = 1f + StrandStreak * Streak(v, c, r);
+                            float f = 1f + StrandStreak * Streak(v == 3 ? 1 : v, c, r);
                             p.r = (byte)Mathf.Clamp(p.r * f, 0f, 255f);
                             p.g = (byte)Mathf.Clamp(p.g * f, 0f, 255f);
                             p.b = (byte)Mathf.Clamp(p.b * f, 0f, 255f);
@@ -2595,7 +2809,8 @@ namespace M3AT
             return all;
         }
 
-        // The three sprites side by side, then the crown panel (clear without one), rows bottom first.
+        // The four sprites side by side (the west one's panel clear without one of its own), then the crown panel (clear
+        // without one), rows bottom first.
         private static Color32[] Atlas(Sprites sp, Color32[] crown)
         {
             int w = Panels * Size;
@@ -2603,7 +2818,7 @@ namespace M3AT
             Color32[][] streaked = Streaked(sp);
             for (int v = 0; v < Panels; v++)
             {
-                Color32[] px = v < 3 ? streaked[v] : crown;
+                Color32[] px = v == CrownPanel ? crown : v == 3 && !sp.west ? null : streaked[v];
                 if (px == null)
                 {
                     continue;
@@ -2675,8 +2890,8 @@ namespace M3AT
                         }
                         Vector3 p = b0 * at[t[0]] + b1 * at[t[1]] + b2 * at[t[2]];
                         Vector3 n = (b0 * normal[t[0]] + b1 * normal[t[1]] + b2 * normal[t[2]]).normalized;
-                        float[] w = new float[3];
-                        int below = Mathf.Abs(n.x) > Mathf.Abs(n.z) ? 1 : n.z > 0f ? 0 : 2;
+                        float[] w = new float[4];
+                        int below = Mathf.Abs(n.x) > Mathf.Abs(n.z) ? Side(p) : n.z > 0f ? 0 : 2;
                         float up = Mathf.Clamp01((n.y - Crown) / CrownBlend);
                         up = up * up * (3f - 2f * up);
                         float forward = Mathf.Clamp01(((p.z - mid) / band + 1f) / 2f);
@@ -2686,7 +2901,7 @@ namespace M3AT
                         w[2] += up * (1f - forward);
                         Color colour = new Color(0f, 0f, 0f, 0f);
                         float weight = 0f;
-                        for (int v = 0; v < 3; v++)
+                        for (int v = 0; v < 4; v++)
                         {
                             if (w[v] <= 0f)
                             {
@@ -2822,7 +3037,7 @@ namespace M3AT
         private static List<Vector2> WallColours(Sprites sp)
         {
             List<Vector2> out_ = new List<Vector2>();
-            for (int v = 0; v < 3; v++)
+            for (int v = 0; v < (sp.west ? 4 : 3); v++)
             {
                 Color32[] px = sp.px[v];
                 for (int r = 0; r < Size; r++)
@@ -2961,7 +3176,7 @@ namespace M3AT
                 int[] t = cut.kept[f];
                 for (int k = 0; k < 3; k++)
                 {
-                    long key = (long)t[k] * 8 + t[3] * 2 + t[4];
+                    long key = (long)t[k] * 16 + t[3] * 2 + t[4];
                     int copy;
                     if (!copies.TryGetValue(key, out copy))
                     {

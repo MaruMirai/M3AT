@@ -240,8 +240,11 @@ namespace M3AT
             HairBuilder.LineUpOn = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("M3AT_NO_LINEUP"));
             HairBuilder.Tapered = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("M3AT_NO_TAPER"));
             HairBuilder.FringeOn = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("M3AT_NO_FRINGE"));
+            HairBuilder.HugOn = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("M3AT_NO_HUG"));
+            if (int.TryParse(Environment.GetEnvironmentVariable("M3AT_HUG_GAP"), out int hugGap)) HairBuilder.HugGap = hugGap;
             if (int.TryParse(Environment.GetEnvironmentVariable("M3AT_FRINGE_GAP"), out int fringeGap)) HairBuilder.FringeGap = fringeGap;
             if (float.TryParse(Environment.GetEnvironmentVariable("M3AT_FRINGE_TURN"), out float fringeTurn)) HairBuilder.FringeTurn = fringeTurn;
+            if (float.TryParse(Environment.GetEnvironmentVariable("M3AT_SIDE_TURN"), out float sideTurn)) HairBuilder.SideTurn = sideTurn;
             if (!builder.UseHead(Sprites(args[1], false)))
             {
                 Console.Error.WriteLine("hairbuild: the head sprites are empty");
@@ -299,6 +302,10 @@ namespace M3AT
                 {
                     Console.WriteLine("LINEUP " + style + ": front and back sprites " + builder.lastLineUp + " px apart, each moved half way onto the head");
                 }
+                if (builder.lastHug != 0)
+                {
+                    Console.WriteLine("HUG " + style + ": " + builder.lastHug + " hair edges let out to the head's outline");
+                }
                 Console.WriteLine("BUILD " + style + ": " + built.triangles + " triangles in " + watch.ElapsedMilliseconds + " ms"
                     + (built.shell != null ? ", its shell hides " + built.hidden + " of the body's" : "") + " -> " + path + ".txt");
                 figure.HarnessDecimate(path + ".txt", detail, beard);
@@ -324,7 +331,23 @@ namespace M3AT
                     px[v][i] = new Color32(b[4 * i], b[4 * i + 1], b[4 * i + 2], b[4 * i + 3]);
                 }
             }
-            return HairBuilder.From(px[0], px[1], px[2], beard);
+            // The west sprite (hair_sprites.py writes it only for a style that has both side sprites).
+            Color32[] west = null;
+            if (File.Exists(prefix + "_west.rgba"))
+            {
+                byte[] b = File.ReadAllBytes(prefix + "_west.rgba");
+                west = new Color32[b.Length / 4];
+                for (int i = 0; i < west.Length; i++)
+                {
+                    west[i] = new Color32(b[4 * i], b[4 * i + 1], b[4 * i + 2], b[4 * i + 3]);
+                }
+            }
+            HairBuilder.Sprites sprites = HairBuilder.From(px[0], px[1], px[2], beard, west);
+            if (sprites.west)
+            {
+                Console.WriteLine("WEST " + Path.GetFileName(prefix) + ": its own west sprite, read for the figure's left side");
+            }
+            return sprites;
         }
 
         // An RGBA PNG of pixels given rows bottom first (as Texture2D.SetPixels32 takes them, and EncodeToPNG writes them).

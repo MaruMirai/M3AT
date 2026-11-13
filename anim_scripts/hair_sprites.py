@@ -9,7 +9,7 @@ path; in the active mods' Textures folders (ModsConfig.xml, the last loaded firs
 over its own; each mod's folders as its LoadFolders.xml picks them); in the game's and the expansions' Assets.zip (game_sprite.py's
 decoding). --head reads the head the builder fits hair to (HairBuilder's
 HeadSprites, the first found). Writes <out prefix>_south.rgba, _east.rgba and _north.rgba: SIZE x SIZE RGBA, rows top
-first, as HairBuilder.Pixels has them. A missing east sprite is the west one mirrored, and a beard's north one is left
+first, as HairBuilder.Pixels has them (and _west.rgba, as it is, for a style with both side sprites). A missing east sprite is the west one mirrored, and a beard's north one is left
 empty, as HairBuilder.Read does. Each is resampled as IsoRim's SpritePixels.Sample does: the mip level nearest the size
 (each level a 2x2 box of the one above), then bilinear with clamped edges and 8-bit weights, so the alpha cut lands
 where the game's does to within a pixel. Prints the files the sprites came from."""
@@ -147,7 +147,10 @@ def read_views(base, beard):
         mirror = True
     if south is None or east is None or (north is None and not beard):
         return None
-    return south, east, north, mirror
+    # A west sprite beside an east one: the style's other side, written as it is (the game draws it on a mirrored mesh,
+    # so it is drawn facing east, laid out as the east one is).
+    west = None if mirror or beard else one('west')
+    return south, east, north, mirror, west
 
 def mips(a):
     """Each level a 2x2 box of the one above, rounded as IsoRim's Halve."""
@@ -203,13 +206,17 @@ def main():
             break
     else:
         raise SystemExit('no sprites for %s (looked for %s)' % (args[-1], ', '.join(t + '_south' for t in tries)))
-    south, east, north, mirror = got
+    south, east, north, mirror, west = got
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     for view, item, flip in (('south', south, False), ('east', east, mirror), ('north', north, False)):
         px = sample(item[0], flip) if item else np.zeros((SIZE, SIZE, 4), np.uint8)
         with open(out + '_' + view + '.rgba', 'wb') as f:
             f.write(px.tobytes())
         print('SPRITE %s %s' % (view, (item[1] + (' (west, mirrored)' if flip else '')) if item else '(empty)'))
+    if west:
+        with open(out + '_west.rgba', 'wb') as f:
+            f.write(sample(west[0], False).tobytes())
+        print('SPRITE west %s' % west[1])
 
 if __name__ == '__main__':
     main()
