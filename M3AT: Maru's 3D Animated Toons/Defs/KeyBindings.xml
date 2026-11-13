@@ -39,7 +39,7 @@
     <defName>M3AT_FreecamPointer</defName>
     <label>freecam - toggle pointer</label>
     <category>M3AT</category>
-    <defaultKeyCodeA>LeftControl</defaultKeyCodeA>
+    <defaultKeyCodeA>None</defaultKeyCodeA>
   </KeyBindingDef>
 
 </Defs>

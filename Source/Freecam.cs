@@ -21,7 +21,7 @@ namespace M3AT
     // the architect) goes into pointer mode: the pointer stays free, left clicks on the map go through to it (the
     // architect kept open, though selecting something swaps it for the inspect pane), and a right click that opens no
     // menu of orders goes back to looking, closing the architect; with a designator in hand, a right click first drops
-    // it, as in the game. The pointer key and button (Left Ctrl and the middle button by default) also go in and out of
+    // it, as in the game. The pointer key and button (the middle button by default; the key is unbound until the player picks one) also go in and out of
     // pointer mode, whatever is selected.
     //
     // Only the camera changes. While flying, the eye is a camera pose pushed to IsoRim (Api 66, Api.PushViewPose), from
@@ -111,7 +111,8 @@ namespace M3AT
         // A menu of orders opened while looking (a right click under the cross with something selected) is kept in
         // looking: pinned to the place it was opened over, it moves on screen as the view turns or flies, so its options
         // are picked by turning the cross onto them, and looking away from it closes it as the game closes one the
-        // pointer leaves (FloatMenu.UpdateBaseColor, 95 px off it).
+        // pointer leaves (FloatMenu.UpdateBaseColor, 95 px off it). The freecamMenuFreesPointer option (off by default)
+        // puts back the old way instead: the menu frees the pointer, in the middle of the screen, while it is up.
         private static FloatMenu pinned;
         private static Vector3 pinnedAt;   // the place under the cross when it opened, in the eye's (unsquashed) space
         private static Vector2 pinnedOffset;   // the menu's corner from that place on screen, UI pixels
@@ -169,6 +170,13 @@ namespace M3AT
                 if (gui != null)
                 {
                     harmony.Patch(gui, postfix: new HarmonyMethod(typeof(Freecam), nameof(GuiPostfix)));
+                }
+                // The cross drawn again from inside the pinned orders menu, so it shows over the menu: windows are drawn
+                // after the rest of the interface, and a window of our own over the middle would take the clicks there.
+                MethodInfo menuContents = AccessTools.Method(typeof(FloatMenu), nameof(FloatMenu.DoWindowContents));
+                if (menuContents != null)
+                {
+                    harmony.Patch(menuContents, postfix: new HarmonyMethod(typeof(Freecam), nameof(MenuContentsPostfix)));
                 }
                 MethodInfo windowEvents = AccessTools.Method(typeof(WindowStack), nameof(WindowStack.HandleEventsHighPriority));
                 if (windowEvents != null)
@@ -608,7 +616,7 @@ namespace M3AT
         private static void Look(bool typing)
         {
             Settings s = Options;
-            // The pointer key or button (Left Ctrl and the middle button by default) flips pointer mode whatever is
+            // The pointer key or button (the middle button by default, the key unbound until the player picks one) flips pointer mode whatever is
             // selected, for when a right click would give an order rather than free the pointer. A button press over a
             // window with the pointer free is the window's.
             int button = s.freecamButton;
@@ -723,7 +731,9 @@ namespace M3AT
                     sel.dragBox.active = false;
                 }
             }
-            if (pinned != null || pointerMode || !lockedLast || Find.WindowStack == null)
+            // With freecamMenuFreesPointer a new menu is not taken up, so it frees the pointer as any window wanting
+            // it does (WindowWantsPointer), and looking comes back once it closes.
+            if (pinned != null || pointerMode || !lockedLast || Find.WindowStack == null || Options.freecamMenuFreesPointer)
             {
                 return;
             }
@@ -1259,7 +1269,23 @@ namespace M3AT
             {
                 return;
             }
-            float x = UI.screenWidth * 0.5f, y = UI.screenHeight * 0.5f;
+            DrawCross(UI.screenWidth * 0.5f, UI.screenHeight * 0.5f);
+        }
+
+        // Over the pinned menu: its contents are drawn in a group at its window's corner (a float menu has no margin).
+        public static void MenuContentsPostfix(FloatMenu __instance)
+        {
+            if (!on || !looking || __instance != pinned || Event.current.type != EventType.Repaint)
+            {
+                return;
+            }
+            Rect r = __instance.windowRect;
+            DrawCross(UI.screenWidth * 0.5f - r.x, UI.screenHeight * 0.5f - r.y);
+        }
+
+        // The cross at (x, y), UI px in the current group.
+        private static void DrawCross(float x, float y)
+        {
             Color shade = new Color(0f, 0f, 0f, 0.5f), line = new Color(1f, 1f, 1f, 0.85f);
             Widgets.DrawBoxSolid(new Rect(x - Crosshair - 1f, y - CrosshairThick * 0.5f - 1f, Crosshair * 2f + 2f, CrosshairThick + 2f), shade);
             Widgets.DrawBoxSolid(new Rect(x - CrosshairThick * 0.5f - 1f, y - Crosshair - 1f, CrosshairThick + 2f, Crosshair * 2f + 2f), shade);

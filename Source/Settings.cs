@@ -82,6 +82,7 @@ namespace M3AT
         public bool freecam3D = false;   // the 3D view was on with it, so a loaded game starts in 3D (Freecam.Resume)
         public bool freecamClickOffLooks = false;   // in pointer mode, a left click on nothing goes back to looking
         public bool freecamPointerBack = true;   // the pointer freed for pointer mode goes back where it was when looking began
+        public bool freecamMenuFreesPointer = false;   // a menu of orders opened while looking frees the pointer, rather than being pinned in the view
         public int freecamButton = 2;   // the mouse button that toggles pointer mode (2 middle, 3 and 4 the side buttons, -1 none)
         public float freecamSensitivity = DefaultFreecamSensitivity;
         public bool freecamInvertY = false;
@@ -160,6 +161,7 @@ namespace M3AT
             Scribe_Values.Look(ref freecam3D, "freecam3D", false);
             Scribe_Values.Look(ref freecamClickOffLooks, "freecamClickOffLooks", false);
             Scribe_Values.Look(ref freecamPointerBack, "freecamPointerBack", true);
+            Scribe_Values.Look(ref freecamMenuFreesPointer, "freecamMenuFreesPointer", false);
             Scribe_Values.Look(ref freecamButton, "freecamButton", 2);
             Scribe_Values.Look(ref freecamSensitivity, "freecamSensitivity", DefaultFreecamSensitivity);
             Scribe_Values.Look(ref freecamInvertY, "freecamInvertY", false);
@@ -664,6 +666,8 @@ namespace M3AT
                 "In pointer mode, a left click that selects nothing goes back to looking, as a right click does. Off (default): it only clears the selection, as in the game.");
             list.CheckboxLabeled("Pointer mode returns the pointer", ref Settings.freecamPointerBack,
                 "Going into pointer mode puts the pointer back where it was when looking began (default). Off: it starts in the middle of the screen, under the cross.");
+            list.CheckboxLabeled("Orders menu frees the pointer", ref Settings.freecamMenuFreesPointer,
+                "A menu of orders opened while looking frees the pointer to pick from it, going back to looking once it closes. Off (default): the menu is pinned where it opened and you pick by turning the view onto an option.");
             Settings.freecamSensitivity = Mathf.Round(Slider(list, "Look speed", Settings.freecamSensitivity.ToString("0.00"), Settings.freecamSensitivity, 0.02f, 0.6f,
                 "How far the view turns for the mouse's movement, in degrees per pixel (default " + Settings.DefaultFreecamSensitivity.ToString("0.00") + ").") * 100f) / 100f;
             list.CheckboxLabeled("Invert mouse look", ref Settings.freecamInvertY, "Moving the mouse up looks down.");
