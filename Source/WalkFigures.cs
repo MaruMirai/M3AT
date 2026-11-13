@@ -454,6 +454,8 @@ namespace M3AT
             public string fromStance;   // the one it is changing from, when it swaps weapons
             public float swap = 1f;   // 0 still in fromStance .. 1 in stance
             public float aim;   // 0 .. 1: how far its weapon is brought up to aim (AimName's clips)
+            public int bowFullTick = -99999;   // the game tick a bow was last seen at full draw (DrawOf)
+            public int bowHeldFrom = -99999;   // the start of the warm-up it holds the draw through (DrawOf)
             public string aimName;   // the weapon or kind its aim clips are for (kept while it lowers it)
             public float carry;   // 0 empty-handed .. 1 in the carrying pose
             public string carryClip;   // the carry loop for what it holds, or last held while it eases out of it
@@ -804,7 +806,10 @@ namespace M3AT
 
         // How a weapon is held drafted: the export has a drafted_<kind> clip for each (walk.DRAFTED). By ThingDef, so
         // modded weapons are sorted by the same signs: melee, a bow by name (not a crossbow, held like a rifle), a pistol,
-        // revolver or grenade one-handed, any other gun two-handed; nothing equipped, fists.
+        // revolver or thrown grenade one-handed (a launcher may carry a grenade tag: Combat Extended's GrenadeEMP), as is a gun Combat Extended marks one-handed (OneHandedTag, which it gives the
+        // weapons it lets a shield go with) or one not of the game's RangedHeavy class whose art is drawn shorter than
+        // PistolLongest (a sidearm with no telling name or tag: Spacer Arsenal's sonic stunner; the class keeps a short
+        // SMG two-handed), any other gun two-handed; nothing equipped, fists.
         private static string KindOf(ThingDef weapon)
         {
             if (weapon == null || (!weapon.IsMeleeWeapon && !weapon.IsRangedWeapon))
@@ -824,9 +829,97 @@ namespace M3AT
             for (int i = 0; !oneHanded && weapon.weaponTags != null && i < weapon.weaponTags.Count; i++)
             {
                 string tag = weapon.weaponTags[i];
-                oneHanded = tag.Contains("Pistol") || tag.Contains("Revolver") || tag.StartsWith("Grenade");
+                oneHanded = tag.Contains("Pistol") || tag.Contains("Revolver") || tag.StartsWith("Grenade") && Thrown(weapon) || tag == OneHandedTag;
+            }
+            if (!oneHanded && !HeavyRanged(weapon))
+            {
+                float length = ArtLength(weapon);
+                oneHanded = length > 0f && length < PistolLongest;
             }
             return oneHanded ? "pistol" : "rifle";
+        }
+
+        private const string OneHandedTag = "CE_OneHandedWeapon";   // Combat Extended's (Apparel_Shield.OneHandedTag)
+
+        // Cells: a gun whose art is drawn shorter than this along its barrel is held as a pistol. Between the game's
+        // longest sidearm (the revolver, 0.66; CE's flare gun 0.67) and the shortest long gun a pawn holds (Spacer
+        // Arsenal's photon SMG, 0.75; the game's own from the beam repeater, 0.85), as the autotest's weaponkinds
+        // scenario measures them.
+        private const float PistolLongest = 0.7f;
+
+        // The game's RangedHeavy weapon class (SMGs, rifles and up; never a sidearm).
+        private static bool HeavyRanged(ThingDef weapon)
+        {
+            for (int i = 0; weapon.weaponClasses != null && i < weapon.weaponClasses.Count; i++)
+            {
+                if (weapon.weaponClasses[i].defName == "RangedHeavy")
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // Whether Combat Extended marks the weapon one-handed (a shield may go with it).
+        private static bool OneHandedByTag(ThingDef weapon)
+        {
+            return weapon.weaponTags != null && weapon.weaponTags.Contains(OneHandedTag);
+        }
+
+        private static readonly Dictionary<ThingDef, float> artLengths = new Dictionary<ThingDef, float>();
+
+        // How long a weapon's art is drawn, in cells, along the way its barrel points (equippedAngleOffset from the
+        // sprite's +x): the solid pixels' extent that way, scaled by its drawSize. The game's own art for an official
+        // weapon (FitArt); a unique weapon's the plain one's. 0 when the art can't be read (yet: not kept, so it is read
+        // again).
+        private static float ArtLength(ThingDef weapon)
+        {
+            float length;
+            if (artLengths.TryGetValue(weapon, out length))
+            {
+                return length;
+            }
+            ThingDef plain = DefDatabase<ThingDef>.GetNamedSilentFail(OwnName(weapon));
+            if (plain != null && plain != weapon)
+            {
+                length = ArtLength(plain);   // a unique or persona weapon, measured as the plain one, as its art varies
+                if (length > 0f)
+                {
+                    artLengths[weapon] = length;
+                }
+                return length;
+            }
+            Graphic g = weapon.graphicData != null ? weapon.graphicData.Graphic : null;
+            Material mat = g != null ? g.MatSingle : null;
+            mat = mat != null ? FitArt(weapon, mat) : null;
+            if (mat == null || mat.mainTexture == null)
+            {
+                return 0f;
+            }
+            const int n = 128;
+            Color32[] px = Api.ReadSpritePixels(mat.mainTexture, n);
+            if (px == null || px.Length < n * n)
+            {
+                return 0f;
+            }
+            Vector3 d3 = Quaternion.AngleAxis(-weapon.equippedAngleOffset, Vector3.up) * Vector3.right;
+            Vector2 way = new Vector2(d3.x, d3.z).normalized;
+            float least = float.MaxValue, most = float.MinValue;
+            for (int j = 0; j < n; j++)
+            {
+                for (int i = 0; i < n; i++)
+                {
+                    if (px[j * n + i].a > 128)
+                    {
+                        float along = (i + 0.5f) / n * g.drawSize.x * way.x + (j + 0.5f) / n * g.drawSize.y * way.y;
+                        least = Mathf.Min(least, along);
+                        most = Mathf.Max(most, along);
+                    }
+                }
+            }
+            length = most > least ? most - least : 0f;
+            artLengths[weapon] = length;
+            return length;
         }
 
         // A weapon that is itself thrown: the vanilla verb's throw log (as IsoRim marks one), or Combat
@@ -5367,15 +5460,40 @@ namespace M3AT
         }
 
         // How far a bow is drawn (0 nocked .. 1 at full draw): through the warm-up; between shots it is nocked again.
-        private static float DrawOf(Pawn pawn)
+        // Combat Extended runs a second warm-up straight after the first (its aiming) before the shot: a warm-up begun
+        // within DrawHoldGap ticks of the bow last being at full draw, with no shot since, holds it there rather than
+        // letting the string go forward to be drawn again.
+        private const int DrawHoldGap = 10;
+
+        private static float DrawOf(Pawn pawn, Ease ease)
         {
             Stance_Warmup warmup = pawn.stances != null ? pawn.stances.curStance as Stance_Warmup : null;
             if (warmup == null)
             {
                 return 0f;
             }
-            int done = Find.TickManager.TicksGame - warmup.startedTick;
-            return Mathf.SmoothStep(0f, 1f, (float)done / Mathf.Max(1, done + warmup.ticksLeft));
+            int now = Find.TickManager.TicksGame;
+            int lastShot = warmup.verb != null ? warmup.verb.LastShotTick : -99999;
+            float drawn;
+            if (ease != null && ease.bowHeldFrom != warmup.startedTick && warmup.startedTick >= ease.bowFullTick - 1
+                && warmup.startedTick - ease.bowFullTick <= DrawHoldGap && lastShot < ease.bowFullTick)
+            {
+                ease.bowHeldFrom = warmup.startedTick;   // (a warm-up begun as the last left off, the bow drawn and not shot)
+            }
+            if (ease != null && ease.bowHeldFrom == warmup.startedTick)
+            {
+                drawn = 1f;
+            }
+            else
+            {
+                int done = now - warmup.startedTick;
+                drawn = Mathf.SmoothStep(0f, 1f, (float)done / Mathf.Max(1, done + warmup.ticksLeft));
+            }
+            if (ease != null && drawn >= 0.99f)
+            {
+                ease.bowFullTick = now;
+            }
+            return drawn;
         }
 
         // The blow or throw the pawn is in, while it fights hand to hand or throws (its stance is busy with such a verb):
@@ -5512,7 +5630,7 @@ namespace M3AT
             }
             bool bow = skin.Has(nock);
             float kick = skin.Has(fire) ? KickOf(pawn, bow) : 0f;
-            float drawn = bow ? DrawOf(pawn) : 1f;
+            float drawn = bow ? DrawOf(pawn, ease) : 1f;
             Lay(fig, aim, phase, w * (1f - kick) * drawn, whole);
             if (bow)
             {
@@ -5646,10 +5764,18 @@ namespace M3AT
             Matrix4x4 turn;
             Vector3 grip, a, top;
             Vector3 closed = hand;   // where the hand closes, before the hold's at moves the slab off it
+#if AUTOTEST
+            Vector3 fist = hand;   // the fist itself, before the hold's at and the weapon shift move the slab off it
+            Matrix4x4 handTurn = Matrix4x4.zero;   // the holding hand's bone, for the hold's at (zero: the hold isn't on the hand)
+#endif
             if (hold.line == "hand" && skin.BoneOf(fig, left ? "hand.L" : "hand.R", out turn) && skin.GripOf(hold.hand, out grip))
             {
                 hand = wrist + turn.MultiplyVector(grip).normalized * (skin.HandGrip >= 0f ? skin.HandGrip : HandGrip);
                 closed = hand;
+#if AUTOTEST
+                fist = hand;
+                handTurn = turn;
+#endif
                 hand += turn.MultiplyVector(hold.at);
                 Vector3 rest = (hold.aim.normalized + Vector3.down * hold.drop).normalized;
                 a = turn.MultiplyVector(rest).normalized;
@@ -5677,6 +5803,9 @@ namespace M3AT
             // Another mod's weapon held by its kind's hold: slid along its own art so the grip found there is in the fist
             // (GripSlide), in the art's own axes, so it goes with the weapon however it is laid down below.
             Vector2 slide = GripSlide(weapon, holdName, slab, closed, hand, a, top, hold.behind, size);
+#if AUTOTEST
+            AutoGripSlide[pawn.thingIDNumber] = slide * size;
+#endif
             // Flat under fire: still in the hand, but brought round to lie along the ground the way the
             // figure faces, past its head. Whatever the hand's turn would make of this weapon's hold.
             float laid = drawing != null ? Mathf.SmoothStep(0f, 1f, (drawing.duck - WeaponLaidFrom) / (WeaponLaidTo - WeaponLaidFrom)) : 0f;
@@ -5717,6 +5846,13 @@ namespace M3AT
             }
             Vector3 tip;
             Matrix4x4 world = DrawSlab(weapon, ScaleOf(weapon), hand, a, top, behind, at, yaw, size, out tip);
+#if AUTOTEST
+            if (slab && drawn >= 1f && world != Matrix4x4.zero)
+            {
+                NoteSlabFist(pawn, world, Matrix4x4.Translate(at) * Matrix4x4.Rotate(Quaternion.AngleAxis(yaw, Vector3.up))
+                    * Matrix4x4.Scale(new Vector3(size, size, size)), fist, handTurn, hold.at);
+            }
+#endif
             Ease ease = null;
             if (world != Matrix4x4.zero && eases.TryGetValue(pawn.thingIDNumber, out ease))
             {

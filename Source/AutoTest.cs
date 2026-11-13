@@ -590,6 +590,7 @@ namespace M3AT
                 case "vat": return VatTest();
                 case "tend": return TendTest(null);
                 case "bows": return BowTest(null);
+                case "weaponkinds": return WeaponKindsTest();
                 case "tendbed": return TendBedTest();
                 case "feed": return FeedTest(null);
                 case "slicecap": return SlicecapTest();
@@ -606,6 +607,10 @@ namespace M3AT
             if (name.StartsWith("tend_"))
             {
                 return TendTest(name.Substring("tend_".Length));
+            }
+            if (name.StartsWith("weapons_"))
+            {
+                return BowRun(WeaponsNamed(name.Substring("weapons_".Length).Split('+')), false);
             }
             if (name.StartsWith("bows_"))
             {
@@ -3800,21 +3805,103 @@ namespace M3AT
         // Each bow (Bow_Short, Bow_Recurve, Bow_Great, Biotech's Flamebow): drafted holding it, then shooting at a wall
         // (AttackStatic, as a forced attack), drawn from nock_ to aim_ over the warm-up and loosed into fire_. Under
         // Combat Extended the bow is given its arrows. bows_<defName> for one, bows_parka for all of them in a parka. One archer shoots them all.
+        // bows_slab: all of them drawn as their sprites' slabs (IsoRim's "Weapons as 3D models" off for the run, not saved),
+        // checking the left fist closes on the stave about its middle (WalkFigures.AutoSlabGrip) held and drawn.
         private static IEnumerator BowTest(string only)
+        {
+            bool slab = only == "slab";
+            if (!slab)
+            {
+                return BowRun(BowList(only), false, only == "parka");
+            }
+            return WithoutWeaponModels(BowRun(BowList(null), true));
+        }
+
+        private static List<string> BowList(string only)
+        {
+            List<string> bows = new List<string>();
+            foreach (string bow in new[] { "Bow_Short", "Bow_Recurve", "Bow_Great", "Flamebow" })
+            {
+                if (only == null || only == "parka" || only == "slab" || only == bow)
+                {
+                    bows.Add(bow);
+                }
+            }
+            return bows;
+        }
+
+        // weapons_<name>+<name>...: each a weapon's defName, or a mod's packageId for every weapon that mod adds (a mod's
+        // weapons, sorted by WalkFigures.KindOf and TypeOf as the export doesn't name them). Run as the bows are: held
+        // drafted, then a ranged one shot at the wall (a thrown one thrown), a melee one only held.
+        private static List<string> WeaponsNamed(string[] names)
+        {
+            List<string> found = new List<string>();
+            foreach (string name in names)
+            {
+                bool mod = false;
+                foreach (ThingDef def in DefDatabase<ThingDef>.AllDefsListForReading)
+                {
+                    if (def.IsWeapon && !def.destroyOnDrop && def.equipmentType == EquipmentType.Primary && def.modContentPack != null
+                        && string.Equals(def.modContentPack.PackageId, name, StringComparison.OrdinalIgnoreCase) && !found.Contains(def.defName))
+                    {
+                        found.Add(def.defName);
+                        mod = true;
+                    }
+                }
+                if (!mod)
+                {
+                    found.Add(name);
+                }
+            }
+            return found;
+        }
+
+        // Runs a scenario with IsoRim's weapon models off (its setting, put back after; never written to disk).
+        private static IEnumerator WithoutWeaponModels(IEnumerator inner)
+        {
+            IsoRim.IsoRimSettings st = IsoRim.IsoRimMod.Settings;
+            bool was = st.weaponModels3D;
+            st.weaponModels3D = false;
+            Note("IsoRim's weapon models off for this run (was " + (was ? "on" : "off") + ").");
+            try
+            {
+                while (inner.MoveNext())
+                {
+                    yield return inner.Current;
+                }
+            }
+            finally
+            {
+                st.weaponModels3D = was;
+            }
+        }
+
+        // The slab's grip, checked: the fist on the art (within SlabGripPixels of a solid pixel of a 128 px read) and within
+        // SlabGripAlong of the art's middle along its length.
+        private const float SlabGripPixels = 3f;
+        private const float SlabGripAlong = 0.25f;
+
+        private static void CheckSlabGrip(Pawn pawn, string what)
+        {
+            float nearest, along, across;
+            string text;
+            bool read = WalkFigures.AutoSlabGrip(pawn, out nearest, out along, out across, out text);
+            Check(what + ": fist on the art", read && nearest <= SlabGripPixels, text);
+            Check(what + ": fist near the middle", read && Mathf.Abs(along) <= SlabGripAlong, text);
+        }
+
+        private static IEnumerator BowRun(List<string> weapons, bool slab, bool parka = false)
         {
             Pawn pawn = null;
             Thing wall = null;
-            bool parka = only == "parka", parkaOn = false;
-            if (parka)
+            bool parkaOn = false;
+            bool bows = weapons.Count > 0 && weapons[0].StartsWith("Bow_");
+            if (weapons.Count == 0)
             {
-                only = null;
+                Check("weapons found", false, "no weapon by those names or mods");
             }
-            foreach (string bow in new[] { "Bow_Short", "Bow_Recurve", "Bow_Great", "Flamebow" })
+            foreach (string bow in weapons)
             {
-                if (only != null && only != bow)
-                {
-                    continue;
-                }
                 if (DefDatabase<ThingDef>.GetNamedSilentFail(bow) == null)
                 {
                     Note(bow + ": not loaded, skipped.");
@@ -3839,6 +3926,16 @@ namespace M3AT
                     wall = ThingMaker.MakeThing(ThingDefOf.Wall, ThingDefOf.BlocksGranite);
                     wall.SetFaction(Faction.OfPlayer);
                     wall = Spawn(wall, middle + new IntVec3(0, 0, -7));   // (south, so the shooter faces the camera's side)
+                }
+                if (wall != null && (wall.Destroyed || !wall.Spawned))
+                {
+                    wall = ThingMaker.MakeThing(ThingDefOf.Wall, ThingDefOf.BlocksGranite);   // (shot or blown down by the last one)
+                    wall.SetFaction(Faction.OfPlayer);
+                    wall = Spawn(wall, middle + new IntVec3(0, 0, -7));
+                }
+                else if (wall != null)
+                {
+                    wall.HitPoints = wall.MaxHitPoints;
                 }
                 if (parka && !parkaOn)
                 {
@@ -3867,8 +3964,15 @@ namespace M3AT
                     drafted = Mathf.Max(drafted, Field<float>(pawn, "drafted"));
                     stance = Field<string>(pawn, "stance") ?? stance;
                 }
+                WalkFigures.AutoSlabFist.Remove(pawn.thingIDNumber);
+                yield return Ticks(2, bow + "_hold", pawn);
                 yield return Shot(bow + "_hold");
                 Note(bow + ": " + WalkFigures.AutoWeapon(pawn));
+                if (slab)
+                {
+                    Check(bow + ": drawn as a slab", WalkFigures.AutoWeapon(pawn).StartsWith("slab True"), WalkFigures.AutoWeapon(pawn));
+                    CheckSlabGrip(pawn, bow + " held");
+                }
                 lookDistance = 2.2f;
                 lookHeight = 0.75f;
                 lookYaw = 90f;
@@ -3878,6 +3982,13 @@ namespace M3AT
                 lookYaw = 0f;
                 Check(bow + ": drafted stance", drafted >= 0.99f && stance != null && stance.StartsWith("drafted_"),
                     "drafted " + drafted.ToString("F2") + ", stance " + (stance ?? "none") + ", held " + (pawn.equipment.Primary != null ? pawn.equipment.Primary.def.defName : "nothing"));
+                ThingDef held = ThingDef.Named(bow);
+                if (held.IsMeleeWeapon)
+                {
+                    pawn.drafter.Drafted = false;
+                    continue;   // (only held: a blow at a wall wants a target to walk to)
+                }
+                bool thrown = WalkFigures.AutoThrown(held);
                 Verb verb = pawn.equipment.PrimaryEq != null ? pawn.equipment.PrimaryEq.PrimaryVerb : null;
                 int lastShot = verb != null ? verb.LastShotTick : -1;
                 int shots = 0;
@@ -3909,8 +4020,13 @@ namespace M3AT
                     if (!warmShot && pawn.stances.curStance is Stance_Warmup warm && warm.ticksLeft < 20)
                     {
                         warmShot = true;
+                        WalkFigures.AutoSlabFist.Remove(pawn.thingIDNumber);
                         yield return Shot(bow + "_drawn");
                         Note(bow + " aiming: " + WalkFigures.AutoWeapon(pawn));
+                        if (slab)
+                        {
+                            CheckSlabGrip(pawn, bow + " drawn");
+                        }
                         lookDistance = 2.2f;
                         lookHeight = 0.75f;
                         lookYaw = 90f;
@@ -3919,18 +4035,82 @@ namespace M3AT
                         lookHeight = LookHeight;
                         lookYaw = 0f;
                     }
-                    if (shots >= 3)
+                    if (shots >= 3 || thrown && shots >= 1)
                     {
                         break;
                     }
                 }
-                Check(bow + ": aimed", aim >= 0.99f && aimName != null, "aim " + aim.ToString("F2") + ", aim clips " + (aimName ?? "none"));
-                Check(bow + ": shooting", shots >= 2, shots + " shots, job " + (pawn.CurJobDef != null ? pawn.CurJobDef.defName : "none")
+                Check(bow + ": aimed", thrown || aim >= 0.99f && aimName != null, "aim " + aim.ToString("F2") + ", aim clips " + (aimName ?? "none"));
+                Check(bow + ": shooting", shots >= (thrown ? 1 : 2), shots + " shots, job " + (pawn.CurJobDef != null ? pawn.CurJobDef.defName : "none")
                     + ", stance " + pawn.stances.curStance?.GetType().Name + (ammo != null ? ", ammo " + ammo : ""));
                 pawn.drafter.Drafted = false;
                 pawn.jobs.StopAll();
             }
+            if (!bows)
+            {
+                Note("Look: each weapon held in its kind's drafted stance, the model (or slab) in the fist the right way round and about the size of the kind's own; aimed along the barrel at the wall.");
+                yield break;
+            }
             Note("Look: drafted the bow held low in front in the left hand; shooting side on, the string drawn back to the face (drawn), the arrow loosed (loosed); the bow model in the left fist throughout.");
+        }
+
+        // Every gun loaded (not thrown), with how long its art is drawn and the kind it is sorted as, to set
+        // WalkFigures.PistolLongest between the sidearms and the long guns. No pawn; notes only, and one check that
+        // the game's own pistols and long guns fall either side of it.
+        private static IEnumerator WeaponKindsTest()
+        {
+            yield return WaitReal(1f);
+            List<string> lines = new List<string>();
+            List<string> wrong = new List<string>();
+            float longestPistol = 0f, shortestLong = float.MaxValue;
+            foreach (ThingDef def in DefDatabase<ThingDef>.AllDefsListForReading)
+            {
+                if (!def.IsRangedWeapon || def.equipmentType != EquipmentType.Primary || WalkFigures.AutoThrown(def) || def.graphicData == null
+                    || def.destroyOnDrop)   // (turret and mechanoid guns: no pawn holds them)
+                {
+                    continue;
+                }
+                string mod = def.modContentPack != null ? def.modContentPack.PackageId : "?";
+                float length;
+                string kind, named;
+                WalkFigures.AutoKind(def, out length, out kind, out named);
+                string classes = def.weaponClasses != null ? string.Join(",", def.weaponClasses.ConvertAll(c => c.defName)) : "";
+                lines.Add(length.ToString("F2") + " " + kind + (named != null ? " (" + named + ")" : "") + " " + def.defName + " [" + mod + "] "
+                    + def.GetStatValueAbstract(StatDefOf.Mass).ToString("F1") + " kg, " + classes
+                    + ", tags " + (def.weaponTags != null ? string.Join(",", def.weaponTags) : ""));
+                if (def.modContentPack != null && def.modContentPack.IsOfficialMod && named != "bow")
+                {
+                    string want = named ?? "rifle";
+                    if (kind != want)
+                    {
+                        wrong.Add(def.defName + " " + kind + " (" + length.ToString("F2") + ")");
+                    }
+                    if (want == "pistol")
+                    {
+                        longestPistol = Mathf.Max(longestPistol, length);
+                    }
+                    else
+                    {
+                        shortestLong = Mathf.Min(shortestLong, length);
+                    }
+                }
+            }
+            lines.Sort(StringComparer.Ordinal);
+            foreach (string line in lines)
+            {
+                Note(line);
+            }
+            Check("the game's guns sorted as their names say", wrong.Count == 0,
+                (wrong.Count > 0 ? "wrong: " + string.Join(", ", wrong) + "; " : "") + "longest sidearm " + longestPistol.ToString("F2")
+                + ", shortest long gun " + shortestLong.ToString("F2") + ", PistolLongest " + WalkFigures.AutoPistolLongest.ToString("F2"));
+            ThingDef stunner = DefDatabase<ThingDef>.GetNamedSilentFail("DV_Gun_SonicStunner");
+            if (stunner != null)
+            {
+                float length;
+                string kind, named;
+                WalkFigures.AutoKind(stunner, out length, out kind, out named);
+                Check("Spacer Arsenal's sonic stunner held as a pistol", kind == "pistol", kind + ", art " + length.ToString("F2"));
+            }
         }
 
         // Combat Extended's arrows (or whatever ammo the weapon takes) put in the inventory, found by reflection so CE is
@@ -4732,7 +4912,9 @@ namespace M3AT
 
         private static string CurrentPrefix()
         {
-            return current + "_" + (shotCount++).ToString("D2") + "_";
+            // (a scenario named by a list, weapons_<a>+<b>+..., keeps only its first part, as a file name has 255 bytes)
+            string scenario = current != null && current.Length > 40 ? current.Substring(0, 40).Split('+')[0] : current;
+            return scenario + "_" + (shotCount++).ToString("D2") + "_";
         }
 
         // Game ticks moved on: one a frame while paused (stills), or at normal speed (video). Each tick probed.
@@ -5011,6 +5193,188 @@ namespace M3AT
         internal static int PerfDraws;
 
         // The figure's state as AutoTest probes it: one line of the Ease fields the scenarios look at.
+        // Where the holding fist was in the last slab drawn for each pawn: its place in the sprite (u, v from 0 to 1, v up, as
+        // SpriteBarrelEnd reads it) and its depth off the picture's plane (the slab's own z, model cells), by pawn id. Set by
+        // DrawWeapon whenever the weapon is drawn as its sprite's slab and fully in the hand.
+        internal static readonly Dictionary<int, SlabFist> AutoSlabFist = new Dictionary<int, SlabFist>();
+
+        internal class SlabFist
+        {
+            public Vector3 uv;          // u, v and the depth off the picture (the slab's z)
+            public Matrix4x4 world;     // the slab's picture space to true cells
+            public Matrix4x4 figure;    // the figure's model space to true cells
+            public Matrix4x4 turn;      // the holding hand's bone (model space), zero if the hold isn't on the hand
+            public Vector3 at;          // the hold's at (game model space, the hand's frame)
+        }
+
+        private static void NoteSlabFist(Pawn pawn, Matrix4x4 world, Matrix4x4 figure, Vector3 fist, Matrix4x4 turn, Vector3 at)
+        {
+            Vector3 l = world.inverse.MultiplyPoint3x4(figure.MultiplyPoint3x4(fist));
+            AutoSlabFist[pawn.thingIDNumber] = new SlabFist { uv = new Vector3(l.x + 0.5f, l.y + 0.5f, l.z), world = world, figure = figure, turn = turn, at = at };
+        }
+
+        // How the fist sits on the slab's sprite: on its art (the alpha there, else how far the nearest solid pixel is, in
+        // pixels of a 128 px read), and along the art's long axis from its middle (a share of its half length, so 0 is the
+        // middle and 1 an end: a bow's grip is about its middle) and across it (a share of its half width: a bow's stave is
+        // to one side and its string the other). False if nothing was recorded.
+        internal static bool AutoSlabGrip(Pawn pawn, out float nearestPx, out float along, out float across, out string text)
+        {
+            nearestPx = float.MaxValue;
+            along = across = 0f;
+            text = "no slab drawn";
+            ThingWithComps w = pawn.equipment != null ? pawn.equipment.Primary : null;
+            SlabFist rec;
+            if (w == null || !AutoSlabFist.TryGetValue(pawn.thingIDNumber, out rec))
+            {
+                return false;
+            }
+            Vector3 f = rec.uv;
+            Graphic g = w.Graphic;
+            Material mat = g != null ? g.MatSingleFor(w) : null;
+            const int n = 128;
+            Color32[] px = mat != null && mat.mainTexture != null ? IsoRim.Api.ReadSpritePixels(mat.mainTexture, n) : null;
+            if (px == null || px.Length < n * n)
+            {
+                text = "fist at uv (" + f.x.ToString("F3") + ", " + f.y.ToString("F3") + "), sprite unreadable";
+                return false;
+            }
+            // The solid pixels' middle and long axis, in cells as drawn (the sprite's drawSize), so a long thin sprite's axis
+            // is its length whatever its picture's shape.
+            Vector2 cells = g.drawSize;
+            float sx = 0f, sy = 0f, count = 0f;
+            for (int j = 0; j < n; j++)
+            {
+                for (int i = 0; i < n; i++)
+                {
+                    if (px[j * n + i].a >= 128)
+                    {
+                        sx += (i + 0.5f) / n * cells.x;
+                        sy += (j + 0.5f) / n * cells.y;
+                        count++;
+                    }
+                }
+            }
+            if (count < 1f)
+            {
+                text = "sprite has no solid pixels";
+                return false;
+            }
+            Vector2 mid = new Vector2(sx / count, sy / count);
+            float cxx = 0f, cyy = 0f, cxy = 0f;
+            for (int j = 0; j < n; j++)
+            {
+                for (int i = 0; i < n; i++)
+                {
+                    if (px[j * n + i].a >= 128)
+                    {
+                        float dx = (i + 0.5f) / n * cells.x - mid.x, dy = (j + 0.5f) / n * cells.y - mid.y;
+                        cxx += dx * dx;
+                        cyy += dy * dy;
+                        cxy += dx * dy;
+                    }
+                }
+            }
+            float angle = 0.5f * Mathf.Atan2(2f * cxy, cxx - cyy);
+            Vector2 axis = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)), side = new Vector2(-axis.y, axis.x);
+            float lo = float.MaxValue, hi = float.MinValue, sLo = float.MaxValue, sHi = float.MinValue;
+            int fi = Mathf.FloorToInt(f.x * n), fj = Mathf.FloorToInt(f.y * n);
+            for (int j = 0; j < n; j++)
+            {
+                for (int i = 0; i < n; i++)
+                {
+                    if (px[j * n + i].a < 128)
+                    {
+                        continue;
+                    }
+                    Vector2 d = new Vector2((i + 0.5f) / n * cells.x, (j + 0.5f) / n * cells.y) - mid;
+                    float t = Vector2.Dot(d, axis), s = Vector2.Dot(d, side);
+                    lo = Mathf.Min(lo, t);
+                    hi = Mathf.Max(hi, t);
+                    sLo = Mathf.Min(sLo, s);
+                    sHi = Mathf.Max(sHi, s);
+                    nearestPx = Mathf.Min(nearestPx, Mathf.Sqrt((i - fi) * (i - fi) + (j - fj) * (j - fj)));
+                }
+            }
+            Vector2 fc = new Vector2(f.x * cells.x, f.y * cells.y) - mid;
+            float ft = Vector2.Dot(fc, axis), fs = Vector2.Dot(fc, side);
+            along = (ft - 0.5f * (lo + hi)) / Mathf.Max(1e-4f, 0.5f * (hi - lo));
+            across = (fs - 0.5f * (sLo + sHi)) / Mathf.Max(1e-4f, 0.5f * (sHi - sLo));
+            byte alpha = fi >= 0 && fi < n && fj >= 0 && fj < n ? px[fj * n + fi].a : (byte)0;
+            // The stave at the fist: the runs of solid pixels across the art at the fist's place along it, the widest taken
+            // as the stave (a string is a pixel or two), and the shift that puts its middle, on the picture's plane, at the
+            // fist, as a change to the hold's at in the hand's frame (walk.py's at is (-x, -z, y) of the game's).
+            string stave = "";
+            if (rec.turn != Matrix4x4.zero)
+            {
+                float step = Mathf.Min(cells.x, cells.y) / n * 0.5f;
+                float bestFrom = 0f, bestTo = -1f, runFrom = 0f;
+                bool inRun = false;
+                List<string> runs = new List<string>();
+                for (float s = sLo - step; s <= sHi + 2f * step; s += step)
+                {
+                    Vector2 c = mid + axis * ft + side * s;
+                    int i = Mathf.FloorToInt(c.x / cells.x * n), j = Mathf.FloorToInt(c.y / cells.y * n);
+                    bool solid = i >= 0 && i < n && j >= 0 && j < n && px[j * n + i].a >= 128;
+                    if (solid && !inRun)
+                    {
+                        runFrom = s;
+                        inRun = true;
+                    }
+                    else if (!solid && inRun)
+                    {
+                        inRun = false;
+                        runs.Add(runFrom.ToString("F3") + ".." + s.ToString("F3"));
+                        if (s - runFrom > bestTo - bestFrom)
+                        {
+                            bestFrom = runFrom;
+                            bestTo = s;
+                        }
+                    }
+                }
+                if (bestTo > bestFrom)
+                {
+                    float target = 0.5f * (bestFrom + bestTo);
+                    Vector2 tc = mid + axis * ft + side * target;
+                    Vector3 local = new Vector3(tc.x / cells.x - 0.5f, tc.y / cells.y - 0.5f, 0f);
+                    Vector3 fl = new Vector3(f.x - 0.5f, f.y - 0.5f, f.z);
+                    Vector3 model = rec.figure.inverse.MultiplyVector(rec.world.MultiplyVector(fl - local));
+                    Vector3 dAt = rec.turn.inverse.MultiplyVector(model);
+                    Vector3 na = rec.at + dAt;
+                    stave = "; runs across at the fist (cells from the art's middle) " + string.Join(", ", runs) + ", fist at " + fs.ToString("F3")
+                        + ", stave " + bestFrom.ToString("F3") + ".." + bestTo.ToString("F3") + "; off the stave's middle by "
+                        + (model.magnitude).ToString("F3") + " model cells; at would be game (" + na.x.ToString("F4") + ", " + na.y.ToString("F4") + ", " + na.z.ToString("F4")
+                        + "), walk.py at=(" + (-na.x).ToString("F4") + ", " + (-na.z).ToString("F4") + ", " + na.y.ToString("F4") + ")";
+                }
+            }
+            text = "fist at uv (" + f.x.ToString("F3") + ", " + f.y.ToString("F3") + "), " + f.z.ToString("F3") + " off the picture; alpha there "
+                + alpha + ", nearest solid pixel " + nearestPx.ToString("F1") + " px of " + n + "; along the art " + along.ToString("F2")
+                + " of its half length from the middle, across " + across.ToString("F2") + " of its half width (axis "
+                + (angle * Mathf.Rad2Deg).ToString("F0") + " deg in the picture, drawSize " + cells.x.ToString("F2") + "x" + cells.y.ToString("F2") + ")" + stave;
+            return true;
+        }
+
+        internal const float AutoPistolLongest = PistolLongest;
+
+        // A gun's art length, its kind and, if the name or a tag already made it one-handed or a bow, that ("pistol",
+        // "bow"); null when only the art length decides.
+        internal static void AutoKind(ThingDef def, out float length, out string kind, out string named)
+        {
+            length = ArtLength(def);
+            kind = KindOf(def);
+            string name = (def.defName + " " + def.label).ToLowerInvariant();
+            bool tagged = OneHandedByTag(def);
+            for (int i = 0; def.weaponTags != null && i < def.weaponTags.Count; i++)
+            {
+                tagged |= def.weaponTags[i].Contains("Pistol") || def.weaponTags[i].Contains("Revolver");
+            }
+            named = kind == "bow" ? "bow" : name.Contains("pistol") || name.Contains("revolver") || tagged ? "pistol" : null;
+        }
+
+        internal static bool AutoThrown(ThingDef def)
+        {
+            return Thrown(def);
+        }
+
         internal static string AutoWeapon(Pawn pawn)
         {
             ThingWithComps w = pawn.equipment != null ? pawn.equipment.Primary : null;
@@ -5019,8 +5383,34 @@ namespace M3AT
                 return "no weapon";
             }
             SkinnedFigure.Hold hold = HoldOf(WeaponName(w.def), AsSlab(w));
-            return "slab " + AsSlab(w) + ", name " + WeaponName(w.def) + ", kind " + KindOf(w.def) + ", drafted clip " + DraftedClip(pawn)
-                + ", aim clips " + AimName(pawn) + ", own hold " + (hold != null) + ", fitted to " + FitArtOf(w);
+            return "slab " + AsSlab(w) + ", name " + WeaponName(w.def) + ", kind " + KindOf(w.def) + ", type " + TypeOf(w.def) + ", drafted clip " + DraftedClip(pawn)
+                + ", aim clips " + AimName(pawn) + ", own hold " + (hold != null) + ", fitted to " + FitArtOf(w) + ", " + AutoGripOf(pawn, w);
+        }
+
+        // The last grip slide DrawWeapon gave this pawn's weapon (GripSlide, in cells of the art's own axes, before the
+        // figure's size), and the grips found in its art and the kind's.
+        internal static readonly Dictionary<int, Vector2> AutoGripSlide = new Dictionary<int, Vector2>();
+
+        private static string AutoGripOf(Pawn pawn, ThingWithComps w)
+        {
+            Vector2 slide;
+            string text = AutoGripSlide.TryGetValue(pawn.thingIDNumber, out slide) && slide != Vector2.zero
+                ? "grip slide (" + slide.x.ToString("F3") + ", " + slide.y.ToString("F3") + ")" : "no grip slide";
+            Material mat = w.Graphic != null ? w.Graphic.MatSingleFor(w) : null;
+            string kind = KindOf(w.def);
+            string find = kind == "rifle" ? "gun" : kind == "melee" ? (TypeOf(w.def) == "melee_2h" ? "melee2" : "melee") : null;
+            Vector2 grip;
+            if (find != null && mat != null)
+            {
+                text += GripFinder.Find(mat.mainTexture, find, w.def.equippedAngleOffset, out grip)
+                    ? ", grip found at (" + grip.x.ToString("F2") + ", " + grip.y.ToString("F2") + ")" : ", no clear grip";
+            }
+            SlabFist rec;
+            if (AutoSlabFist.TryGetValue(pawn.thingIDNumber, out rec))
+            {
+                text += ", fist on the sprite at (" + rec.uv.x.ToString("F3") + ", " + rec.uv.y.ToString("F3") + ")";
+            }
+            return text;
         }
 
         private static string FitArtOf(ThingWithComps w)
@@ -5065,7 +5455,25 @@ namespace M3AT
                 + " eatClip=" + (e.eatClip ?? "-") + " eat=" + e.eat.ToString("F2") + " look=" + e.look.ToString("F1")
                 + " share=" + e.share.ToString("F2") + " readShow=" + e.readShow.ToString("F2") + " rot=" + pawn.Rotation.AsInt
                 + " at=" + pawn.Position + " toil=" + (pawn.jobs != null && pawn.jobs.curDriver != null ? pawn.jobs.curDriver.CurToilString : "-")
-                + PetProbe(pawn);
+                + PetProbe(pawn) + BowProbe(pawn, e);
+        }
+
+        // A bow's draw as LayAim plays it: the game's stance (a warm-up's ticks done of its whole), DrawOf, KickOf and the
+        // last shot's tick.
+        private static string BowProbe(Pawn pawn, Ease e)
+        {
+            if (e.aimName == null || !skin.Has("nock_" + e.aimName))
+            {
+                return "";
+            }
+            Stance st = pawn.stances != null ? pawn.stances.curStance : null;
+            Stance_Warmup warm = st as Stance_Warmup;
+            Stance_Busy busy = st as Stance_Busy;
+            Verb verb = busy != null && busy.verb != null ? busy.verb : pawn.equipment?.PrimaryEq?.PrimaryVerb;
+            return " gameStance=" + (st != null ? st.GetType().Name : "-")
+                + (warm != null ? " warm=" + (Find.TickManager.TicksGame - warm.startedTick) + "/" + (Find.TickManager.TicksGame - warm.startedTick + warm.ticksLeft) : "")
+                + " bowDrawn=" + DrawOf(pawn, e).ToString("F2") + " kick=" + KickOf(pawn, true).ToString("F2")
+                + " lastShot=" + (verb != null ? verb.LastShotTick : -1) + " verb=" + (verb != null ? verb.GetType().Name : "-");
         }
 
         // A carried animal's drawn back (IsoRim's Api.ReadHost), cells, for fitting the cuddle.

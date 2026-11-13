@@ -639,10 +639,12 @@ SLAB_WEAPONS = {
     'MeleeWeapon_PsyfocusStaff': dict(hand='R', line='hand', aim=(-0.9376, 0.0912, 0.3357), drop=0.0, behind=0.03, roll=77.9541, at=(-0.1312, -0.2002, 0.0171)),
     # The bows: their model holds with the grip's place along and across the bow scaled by how much bigger the slab is
     # drawn than the model (the model's fit to the sprite, 1.22 to 1.36), its depth into the palm kept; checked on renders.
+    # Bow_Recurve and Bow_Great moved onto their staves as measured by ./autotest.sh bows_slab (WalkFigures.AutoSlabGrip:
+    # the fist sat near the string), for Combat Extended's 256 px sprites of them.
     'bow': dict(hand='L', line='hand', drop=0.0, behind=0.0, roll=-88.0681, aim=(0.9286, 0.337, 0.1554), at=(-0.0278, -0.0165, -0.0405)),
     'Bow_Short': dict(hand='L', line='hand', drop=0.0, behind=0.0, roll=-90.1989, aim=(0.8942, 0.3639, 0.2609), at=(-0.074, -0.0321, -0.051)),
-    'Bow_Recurve': dict(hand='L', line='hand', drop=0.0, behind=0.0, roll=-88.0681, aim=(0.9286, 0.337, 0.1554), at=(-0.0278, -0.0165, -0.0405)),
-    'Bow_Great': dict(hand='L', line='hand', drop=0.0, behind=0.0, roll=-88.0681, aim=(0.9286, 0.337, 0.1554), at=(-0.0517, -0.0192, -0.0391)),
+    'Bow_Recurve': dict(hand='L', line='hand', drop=0.0, behind=0.0, roll=-88.0681, aim=(0.9286, 0.337, 0.1554), at=(-0.126, -0.0515, -0.0212)),
+    'Bow_Great': dict(hand='L', line='hand', drop=0.0, behind=0.0, roll=-88.0681, aim=(0.9286, 0.337, 0.1554), at=(-0.179, -0.0636, -0.0299)),
     'Flamebow': dict(hand='L', line='hand', drop=0.0, behind=0.0, roll=-80.5073, aim=(0.9286, 0.3554, 0.107), at=(-0.1029, -0.0424, -0.0543)),
 }
 SLAB_AIMED = {

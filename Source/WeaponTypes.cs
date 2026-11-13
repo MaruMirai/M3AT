@@ -67,8 +67,8 @@ namespace M3AT
         private static readonly Dictionary<ThingDef, string> typeOf = new Dictionary<ThingDef, string>();
 
         // A weapon's type: its own in the export (by WeaponName), else a grenade if it is thrown, else by its drafted kind
-        // (KindOf): a melee weapon one-handed below HeavyMelee kg and two-handed from it, any other its kind's in the
-        // export (a pistol a handgun). Cached per ThingDef once the export is loaded (before, the options read anim.txt).
+        // (KindOf): a melee weapon one-handed if Combat Extended marks it so (OneHandedByTag) or below HeavyMelee kg, else
+        // two-handed, any other its kind's in the export (a pistol a handgun). Cached per ThingDef once the export is loaded (before, the options read anim.txt).
         private static string TypeOf(ThingDef def)
         {
             string type;
@@ -86,7 +86,7 @@ namespace M3AT
                 }
                 else if (kind == "melee")
                 {
-                    type = def.GetStatValueAbstract(StatDefOf.Mass) >= HeavyMelee ? "melee_2h" : "melee_1h";
+                    type = !OneHandedByTag(def) && def.GetStatValueAbstract(StatDefOf.Mass) >= HeavyMelee ? "melee_2h" : "melee_1h";
                 }
                 else
                 {
