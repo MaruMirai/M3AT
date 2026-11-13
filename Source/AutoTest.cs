@@ -588,6 +588,7 @@ namespace M3AT
                 case "sharedbed": return SharedBedTest();
                 case "sleepwear": return SleepWearTest();
                 case "sleepside": return SleepSideTest();
+                case "bedin": return BedInTest();
                 case "lovin": return LovinTest();
                 case "lovinbare": return LovinTest(true);
                 case "kidbed": return KidBedTest();
@@ -835,6 +836,43 @@ namespace M3AT
                 SettingsMod.Settings.sleepWear = was;
                 SettingsMod.Settings.bedBlankets = blanketsWere;
             }
+        }
+
+        // Getting into bed (WalkFigures.BedDownOf: the getup backwards): a pawn walks from two cells off to its bed and lies
+        // down in it, watched from the side at stages of the lay-down (Ease.bedded), with the blankets option as it is set.
+        private static IEnumerator BedInTest()
+        {
+            Thing made = ThingMaker.MakeThing(ThingDef.Named("Bed"), ThingDefOf.WoodLog);
+            made.SetFaction(Faction.OfPlayer);
+            Building_Bed bed = (Building_Bed)Spawn(made, middle, Rot4.North);
+            Pawn sleeper = NewPawn(middle + new IntVec3(0, 0, -3), null);
+            bed.TryGetComp<CompAssignableToPawn>().TryAssignPawn(sleeper);
+            lookAt = middle.ToVector3Shifted();
+            lookYaw = 90f;
+            yield return WaitReal(2f);
+            sleeper.jobs.StartJob(JobMaker.MakeJob(JobDefOf.LayDown, bed), JobCondition.InterruptForced);
+            int waited = 0;
+            while (!sleeper.InBed() && waited < 600)
+            {
+                yield return Ticks(1, "bedin", sleeper);
+                waited++;
+            }
+            Check("walked to its bed and got in", sleeper.InBed(), "after " + waited + " ticks");
+            float least = Field<float>(sleeper, "bedded");
+            int shot = 0;
+            for (int i = 0; i < 60 && shot < 5; i++)
+            {
+                yield return Ticks(1, "bedin", sleeper);
+                float bedded = Field<float>(sleeper, "bedded");
+                least = Mathf.Min(least, bedded);
+                if (bedded >= shot * 0.25f || bedded >= 1f)
+                {
+                    yield return Shot("bedin_" + (int)(shot * 25));
+                    shot++;
+                }
+            }
+            Check("lay down by the getup backwards", least < 0.5f, "least Ease.bedded seen " + least.ToString("0.00"));
+            Note("Look: bedin_0 standing by or on the bed, then going down onto its back (the getup backwards) over the bed, bedin_100 lying in it as before.");
         }
 
         // The sleep clip's variants (sleep~2 and sleep~3: on either side, still, walk.SLEEP_HOLD, SLEEP_MIRROR): four pawns asleep on top of single beds

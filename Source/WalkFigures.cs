@@ -286,6 +286,7 @@ namespace M3AT
         private const float TakeOff = 0.15f;   // of the flight: springing up out of the warm-up's crouch
         private const float RiseHurry = 2.5f;   // how much faster than the export's getup a pawn gets up (the game stands it up at once)
         private const float RiseOut = 0.75f;   // of the getup: from here it is eased into the standing pose
+        private const float BedDownHurry = 2f;   // how much faster than the export's getup, played backwards, a pawn gets into bed
         private const float DropRise = 1.2f;   // how much faster than the dive (backwards) a pawn gets up
         // Taking cover (CoverOf): crouched low (SkinnedFigure.Crouch) while standing still in one of Combat Extended's crouching jobs
         // (or, without it, waiting or holding fire drafted) with an awake enemy in sight within the weapon's range, as deep as
@@ -571,6 +572,10 @@ namespace M3AT
             public float risen = 1f;   // how far through getting up, 0 .. 1; 1: done (RiseOf)
             public int risenTick;   // the game tick it was last moved on
             public int risenRoll;   // picks the getup's variant, new each time it gets up
+            public float bedded = 1f;   // how far through getting into bed (the getup backwards), 0 .. 1; 1: done (BedDownOf)
+            public int beddedTick;   // the game tick it was last moved on
+            public float bedFromYaw;   // the way it faced, standing, as it began to get into bed
+            public Vector3 upAt;   // where it was last drawn on its feet (getting into bed starts from there)
             public float duck;   // 0 .. 1: how far down in the crouch under fire it is (DuckOf)
             public float cover;   // 0 .. 1: how far down in the crouch behind cover it is (CoverOf)
             public float coverWant;   // how far down it would be: by the cover beside it, 0 with no enemy in sight
@@ -2563,6 +2568,22 @@ namespace M3AT
         // How much of the getup is shown (0 .. 1) and how far through it the pawn is (phase, 0 lying .. 1 standing): played
         // RiseHurry times faster than the export has it, as the game stands a pawn up at once, and eased into the standing
         // pose from RiseOut of the way. Game time, so it waits while paused.
+        // How far through getting into bed: the getup backwards, from its last frame (standing) to its first (on its back),
+        // its phase in the getup's own terms, and the getup's weight over the standing pose it eases in from (over the
+        // getup's last RiseOut, as getting up eases out). BedDownHurry times faster than the export has it; game time.
+        private static float BedDownOf(Ease e, out float phase)
+        {
+            float seconds = skin.SecondsOf(skin.Variant("getup", e.risenRoll));
+            int now = Find.TickManager.TicksGame;
+            if (e.bedded < 1f && seconds > 0f)
+            {
+                e.bedded = Mathf.Min(1f, e.bedded + (now - e.beddedTick) / 60f / seconds * BedDownHurry);
+            }
+            e.beddedTick = now;
+            phase = 1f - e.bedded;
+            return e.bedded < 1f ? 1f - Mathf.SmoothStep(0f, 1f, (phase - RiseOut) / (1f - RiseOut)) : 0f;
+        }
+
         private static float RiseOf(Ease e, out float phase)
         {
             float seconds = skin.SecondsOf(skin.Variant("getup", e.risenRoll));
@@ -7018,8 +7039,13 @@ namespace M3AT
             {
                 return -1f;   // IsoRim's own
             }
-            float tall = (depth + BlanketRoom) / BlanketPeak;
-            float wide = halfWidth * BlanketSides / BlanketHalf;
+            // Measured as the body lies on its back, whichever way it sleeps: on its side (sleep~2, ~3) the depth is the
+            // shoulders' width, which made the lump half again as tall as on the back (most plain on a bedroll, on the floor),
+            // though only the head is drawn and IsoRim's lump is the shape of a body on its back.
+            float thick = Mathf.Min(depth, 2f * halfWidth);
+            float half = Mathf.Max(halfWidth, 0.5f * depth);
+            float tall = (thick + BlanketRoom) / BlanketPeak;
+            float wide = half * BlanketSides / BlanketHalf;
             float scale = Mathf.Clamp(Mathf.Max(tall, wide), BlanketLeast, BlanketMost);
             return Mathf.Round(scale / BlanketStep) * BlanketStep;
         }
@@ -7197,6 +7223,26 @@ namespace M3AT
                 ease.risen = 1f;
             }
             ease.lay = laid;
+            // Into bed from its feet (not carried in, downed or dead): the getup backwards, drawn on the standing path
+            // though the game already has it lying, until it is down on its back, where the lying loop takes over.
+            bool intoBed = lying && !dead && !crawling && !pawn.Downed && placed.Situation == FigureSituation.InBed && lift <= 0f
+                && flight < 0f && !ctx.ForOtherMod && skin.Has("getup");
+            if (intoBed && ease.bedded >= 1f && Time.frameCount - ease.upFrame <= 2)
+            {
+                ease.bedded = 0f;
+                ease.beddedTick = Find.TickManager.TicksGame;
+                ease.risenRoll = Gen.HashCombineInt(pawn.thingIDNumber, ease.beddedTick);
+                ease.bedFromYaw = ease.upYaw;
+            }
+            if (!intoBed)
+            {
+                ease.bedded = 1f;
+            }
+            bool bedding = intoBed && ease.bedded < 1f;
+            if (bedding)
+            {
+                lying = false;
+            }
             // Gone down where it stood (downed, or killed): a fall from standing into the lying loop, on the ground only.
             bool onGround = lying && !crawling && lift <= 0f && (dead || (pawn.CurrentBed() == null && !(pawn.ParentHolder is IThingHolderWithDrawnPawn)));
             if (onGround && Time.frameCount - ease.upFrame <= 2)
@@ -7232,7 +7278,7 @@ namespace M3AT
                 ease.dollNew = false;
             }
             float risePhase = 1f;
-            float rise = !lying && flight < 0f && skin.Has("getup") ? RiseOf(ease, out risePhase) : 0f;
+            float rise = bedding ? BedDownOf(ease, out risePhase) : !lying && flight < 0f && skin.Has("getup") ? RiseOf(ease, out risePhase) : 0f;
             // A ragdoll lies where it fell until the body is moved off the ground or out of its cell (carried, put in a
             // bed, hauled) or crawls; getting up, the getup is eased out of it, and then it is done with.
             if (ease.doll != null && (!Ragdolls || (lying ? !onGround || ease.doll.Cell != pawn.PositionHeld : rise <= 0f || risePhase >= RiseFromDoll)))
@@ -7323,6 +7369,21 @@ namespace M3AT
                     skin.Balance(fig, standOn, ease.balance);
                 }
                 ease.balanceFrame = Time.frameCount;
+                if (bedding)
+                {
+                    // Getting into bed: the getup's moves along the figure, its yaw and floor, worked out as the lying
+                    // branch below will lie it (in a bed its place is its head's, its middle where the sleep's is), so the
+                    // getup backwards ends where that begins.
+                    string lieClip = LieClip(pawn, false, true, true);
+                    float along = headHeight;
+                    if (lieClip != BedMiddleClip && skin.Has(BedMiddleClip))
+                    {
+                        along += skin.LaidMiddleOf(shape, BedMiddleClip) - skin.LaidMiddleOf(shape, lieClip);
+                    }
+                    ease.lieAlong = along - skin.RootOf(lieClip).y;
+                    ease.lieYaw = placed.Yaw;
+                    ease.lieFloor = lyingFloor;
+                }
                 if (crawling)
                 {
                     // Face down, head first the way they go, tipped up by the game's crawl angle; the game's lurch is in
@@ -7739,7 +7800,7 @@ namespace M3AT
                     if (rise > 0f)
                     {
                         whole = Matrix4x4.Translate(new Vector3(0f, 0f, ease.lieAlong * (1f - Mathf.SmoothStep(0f, 1f, risePhase)))) * whole;
-                        yaw = Mathf.LerpAngle(yaw, ease.lieYaw, rise);
+                        yaw = Mathf.LerpAngle(bedding ? ease.bedFromYaw : yaw, ease.lieYaw, rise);
                     }
                 }
                 // Flinching from a hit, added on top of whatever it is doing (not a corpse).
@@ -7821,7 +7882,10 @@ namespace M3AT
                 else if (rise > 0f)
                 {
                     // Getting up: on its lowest point, coming down off the bed it lay on.
-                    y = Mathf.Lerp(y, ease.lieFloor * (1f - Mathf.SmoothStep(0f, 1f, risePhase)) - lowest * size + Lift * size, rise);
+                    // Getting into bed, up onto the bed's top as it sits down (by the getup's middle), so it doesn't sink
+                    // through the bed on the way down.
+                    float onBed = bedding ? 1f - Mathf.SmoothStep(0f, 1f, (risePhase - 0.5f) / 0.5f) : 1f - Mathf.SmoothStep(0f, 1f, risePhase);
+                    y = Mathf.Lerp(y, ease.lieFloor * onBed - lowest * size + Lift * size, rise);
                 }
                 else if (sat > 0f)
                 {
@@ -7844,6 +7908,14 @@ namespace M3AT
                     y = Mathf.Lerp(wading, WaterLine - neck.y * size, swim);
                 }
                 Vector3 at = new Vector3(drawLoc.x, y + lift, drawLoc.z) + underGlass;
+                if (bedding)
+                {
+                    // Getting into bed: from where it stood (the game puts it on its place in the bed at once), its hips
+                    // coming over to the bed as it lies down.
+                    float stood = Mathf.SmoothStep(0f, 1f, risePhase);
+                    at.x = Mathf.Lerp(at.x, ease.upAt.x, stood);
+                    at.z = Mathf.Lerp(at.z, ease.upAt.z, stood);
+                }
                 if (!lying && ease.weave != 0f)
                 {
                     // Weaving drunk on the move, to either side of its path.
@@ -7921,11 +7993,12 @@ namespace M3AT
                     at.x = Mathf.Lerp(at.x, beside.x, ease.shownWork);
                     at.z = Mathf.Lerp(at.z, beside.z, ease.shownWork);
                 }
-                if (!lying && !seated && flight < 0f && swim <= 0f && lift <= 0f && duck <= 0f)
+                if (!lying && !bedding && !seated && flight < 0f && swim <= 0f && lift <= 0f && duck <= 0f)
                 {
                     ease.upFrame = Time.frameCount;   // on its feet: it can fall from here
                     ease.onBack = false;
                     ease.upYaw = yaw;
+                    ease.upAt = at;
                 }
                 // What the tail stays above: what it lies on, or getting up, the lowest of the body. Under a blanket it is hidden,
                 // and pushed up to the blanket it would show through it.
