@@ -239,6 +239,9 @@ namespace M3AT
             HairBuilder builder = SkinnedFigure.HarnessBuilder(args[0], beard, out figure);
             HairBuilder.LineUpOn = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("M3AT_NO_LINEUP"));
             HairBuilder.Tapered = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("M3AT_NO_TAPER"));
+            HairBuilder.FringeOn = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("M3AT_NO_FRINGE"));
+            if (int.TryParse(Environment.GetEnvironmentVariable("M3AT_FRINGE_GAP"), out int fringeGap)) HairBuilder.FringeGap = fringeGap;
+            if (float.TryParse(Environment.GetEnvironmentVariable("M3AT_FRINGE_TURN"), out float fringeTurn)) HairBuilder.FringeTurn = fringeTurn;
             if (!builder.UseHead(Sprites(args[1], false)))
             {
                 Console.Error.WriteLine("hairbuild: the head sprites are empty");

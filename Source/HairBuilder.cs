@@ -42,9 +42,12 @@ namespace M3AT
     internal sealed class HairBuilder
     {
         private const string Tag = "[M3AT] ";
-        public const int Version = 35;   // raise when the build changes, so cached hair is made again
+        public const int Version = 36;   // raise when the build changes, so cached hair is made again
         public const int BeardVersion = 5;   // and cached beards
         internal static bool Tapered = true;    // the hull's flanks narrowing behind the head's middle (Hull; M3AT_NO_TAPER off)
+        internal static bool FringeOn = true;   // the fringe carried forward to the head's front (Hull; M3AT_NO_FRINGE off)
+        internal static int FringeGap = 16;     // pixels short of the head's front from which hair over the face is left as the side sprite has it
+        internal static float FringeTurn = 0.08f;   // share of the head's depth or width its surface may be in from its outermost in a row for hair to be carried to it there
         internal static bool LineUpOn = true;   // LinedUp (the harness turns it off with M3AT_NO_LINEUP, to compare)
         private static bool pixelsFailed;   // IsoRim's pixel reading has thrown once (logged once)
         public const int Size = 256;    // pixels: every sprite is read at this size, as hair.py's SIZE
@@ -1288,6 +1291,44 @@ namespace M3AT
             }
         }
 
+        // Carries the hair out to one past the head's surface along a line of n voxels into the head (from: its outermost
+        // voxel, step: to the next one in), if the hair's outermost voxel on it is no more than gap inside the head's.
+        // was: the hair before any carrying. A line the slice's rounding left without hair is taken to have it from
+        // the row's own outermost hair that way (rowFrom steps in), or from the head's surface if that is further in.
+        // headMost: the furthest in the head's surface may be on the line for it to be carried at all.
+        private static void Carry(bool[] hair, bool[] was, bool[] head, int n, int from, int step, int rowFrom, int gap, int headMost)
+        {
+            int atHead = -1, atHair = -1;
+            for (int k = 0; k < n && (atHead < 0 || atHair < 0); k++)
+            {
+                int i = from + k * step;
+                if (atHead < 0 && head[i])
+                {
+                    atHead = k;
+                }
+                if (atHair < 0 && was[i])
+                {
+                    atHair = k;
+                }
+            }
+            if (atHead < 0 || atHead > headMost)
+            {
+                return;
+            }
+            if (atHair < 0)
+            {
+                atHair = Math.Max(rowFrom, atHead);
+            }
+            if (atHair < atHead || atHair - atHead > gap)
+            {
+                return;
+            }
+            for (int k = Math.Max(0, atHead - 1); k <= atHair; k++)
+            {
+                hair[from + k * step] = true;
+            }
+        }
+
         // The voxels of the hair's own visual hull and of the head it is drawn over, each cut slice by slice to a
         // superellipse, meshed by surface nets on blocks of Block voxels: each block's share of voxels inside is the
         // field, and the surface runs where it crosses a half.
@@ -1325,6 +1366,70 @@ namespace M3AT
             {
                 Slice(hair, n, y, s, e);
                 Slice(inside, n, y, hs, he);
+            }
+            // Hair a sprite shows over the head is outside the head on that sprite's side, whatever the other sprites'
+            // outlines say. Where the hair is drawn tight to a smaller or flatter head than the one these are fitted to
+            // (Morphs Assorted's: its side sprites' fringes stop up to 14 pixels short of the head's front, and its
+            // front ones are no wider than the head), the hull's hair was inside the head's own hull, the surface
+            // there was the head's, more than HairReach from any hair, and Textured dropped the whole fringe and the
+            // hair over the temples. So along each line into the head from the front (where the front sprite has hair
+            // over the head), either side (the side sprite) and the back (the back sprite), the hair is carried out to
+            // just past the head's surface, if it is no more than FringeGap short of it.
+            if (!beard && FringeOn)
+            {
+                int gap = Mathf.CeilToInt(FringeGap / (float)Voxel);
+                bool[] carried = (bool[])hair.Clone();   // as it was, so one side's carrying isn't taken for hair by the next
+                for (int y = 0; y < n; y++)
+                {
+                    int e0 = -1, e1 = -1, s0 = -1, s1 = -1, he0 = -1, he1 = -1, hs0 = -1, hs1 = -1;
+                    for (int k = 0; k < n; k++)
+                    {
+                        if (he[y * n + k])
+                        {
+                            he0 = he0 < 0 ? k : he0;
+                            he1 = k;
+                        }
+                        if (hs[y * n + k])
+                        {
+                            hs0 = hs0 < 0 ? k : hs0;
+                            hs1 = k;
+                        }
+                        if (e[y * n + k])
+                        {
+                            e0 = e0 < 0 ? k : e0;
+                            e1 = k;
+                        }
+                        if (s[y * n + k])
+                        {
+                            s0 = s0 < 0 ? k : s0;
+                            s1 = k;
+                        }
+                    }
+                    if (e0 < 0 || s0 < 0 || he0 < 0 || hs0 < 0)
+                    {
+                        continue;
+                    }
+                    // Only where the head's surface is within FringeTurn of its outermost in the row that way: further
+                    // round, a lock the front sprite shows beside the face was laid flat on the cheek and broke up.
+                    int deep = Mathf.RoundToInt(FringeTurn * (he1 - he0 + 1)), wide = Mathf.RoundToInt(FringeTurn * (hs1 - hs0 + 1));
+                    for (int k = 0; k < n; k++)
+                    {
+                        int line = y * n + k;
+                        if (hs[line] && south[line])
+                        {
+                            Carry(hair, carried, inside, n, line * n + n - 1, -1, n - 1 - e1, gap, n - 1 - he1 + deep);
+                        }
+                        if (hs[line] && north[line])
+                        {
+                            Carry(hair, carried, inside, n, line * n, 1, e0, gap, he0 + deep);
+                        }
+                        if (he[line] && e[line])
+                        {
+                            Carry(hair, carried, inside, n, y * n * n + (n - 1) * n + k, -n, n - 1 - s1, gap, n - 1 - hs1 + wide);
+                            Carry(hair, carried, inside, n, y * n * n + k, n, s0, gap, hs0 + wide);
+                        }
+                    }
+                }
             }
             // The face hollowed out: in the columns where the front sprite shows the head with no hair over it, the head
             // and the hair are taken out from in front of the face to FaceHollow behind its front. Filled in, a lock
