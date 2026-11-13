@@ -15,6 +15,10 @@
 # numbers get sliders too. Each weapon's sprite, draw size and angle offset start as its def has them (SPRITE_ROOTS). A weapon
 # IsoRim has a 3D model for shows that model instead (IsoRim models), fitted to the sprite as IsoRim's WeaponModels fits it.
 # The slab and models are taken out of the scene while the .blend is saved.
+# "Slab holds" previews and edits the stances, holds and aims for a weapon drawn as its sprite's slab (IsoRim's weapon
+# models off, or none for it): walk.SLAB_DRAFTED, SLAB_WEAPONS and SLAB_AIMED laid over the tables as export_frames.py
+# lays them for the slab clips (walk.slab_numbers), every weapon drawn as its slab; Write puts what changed into those
+# tables (an entry for each weapon whose stance, hold or aim then differs from its plain one), never the plain tables.
 # Worn gear (walk.GEAR: IsoRim's packs, belts and hip tools) shows on any clip too: each mount with one of IsoRim's models
 # for it, its numbers as sliders and a handle (MaruGearGrip: G moves its place, R turns the model) on the mount picked.
 # Holstered weapons (walk.HOLSTERS: where a weapon not held is drawn on the body) show on any clip: each slot with a
@@ -26,7 +30,7 @@
 # "Mirror from" takes another slot of its size's place across the figure's middle, a handgun's spun for a cross draw.
 # "Write to walk.py" puts the numbers back into the file; "Reload walk.py" picks up hand edits to it, code included.
 # Nothing is keyed, and the settings are not saved in the .blend.
-import ast, bpy, contextlib, glob, importlib, math, os, re, sys
+import ast, bpy, contextlib, copy, glob, importlib, math, os, re, sys
 import xml.etree.ElementTree as ET
 import numpy as np
 from mathutils import Euler, Matrix, Quaternion, Vector
@@ -103,6 +107,26 @@ LINES = [('hands', 'Through both fists', 'From the holding fist through the othe
 state = {'clamp': 0.0, 'error': '', 'timer': False, 'chest': None, 'handles': {}, 'grip': None, 'holster': None, 'gear': None, 'quiet': set(),
          'busy': False}
 registered = {}
+# Slab holds: whether walk's tables are the slab's (SLAB_TABLES laid over the plain ones), set before walk is read again.
+SLAB_TABLES = ('DRAFTED', 'WEAPONS', 'AIMED')
+slab_mode = {'on': False}
+
+def slab_tables():
+    """Puts walk's plain DRAFTED, WEAPONS and AIMED back, or with Slab holds on their slab entries laid over them, as
+    walk.slab_numbers() has them; the plain ones are kept on the module (_plain_tables) for Write."""
+    if not all(hasattr(walk, 'SLAB_' + t) for t in SLAB_TABLES):
+        slab_mode['on'] = False
+        return
+    if not hasattr(walk, '_plain_tables'):
+        walk._plain_tables = {t: copy.deepcopy(getattr(walk, t)) for t in SLAB_TABLES}
+    for t in SLAB_TABLES:
+        table = copy.deepcopy(walk._plain_tables[t])
+        if slab_mode['on']:
+            table.update(copy.deepcopy(getattr(walk, 'SLAB_' + t)))
+        setattr(walk, t, table)
+
+def slab_on():
+    return slab_mode['on']
 
 def read_tuned():
     """walk.py's hand-set numbers and (x, y, z) places in file order: (name, comment, is_tuple), which of them the run
@@ -923,7 +947,7 @@ def place_slab(p, obj, kind, hand, a, top, behind):
     if problem:
         state['error'] = 'Sprite: ' + problem
     shown = None
-    if rel is not None and p.weapon_models:
+    if rel is not None and p.weapon_models and not slab_on():
         try:
             shown = place_model(obj.name + MODEL, rel, img, tuple(size), getattr(p, 'wp_%s_offset' % kind), x, y,
                                 scale * k, middle, isorim_scales().get(KIND_LOOK.get(kind, kind), 1.0)
@@ -1697,7 +1721,7 @@ def weapon_depth(p, kind):
     cells = holster_push.SLAB_HALF_DEPTH
     look = KIND_LOOK.get(kind, kind)
     rel = isorim_models().get(look)
-    if rel is not None and p.weapon_models:
+    if rel is not None and p.weapon_models and not slab_on():
         try:
             img = sprite(getattr(p, 'wp_%s_image' % kind))[0]
             size, offset = tuple(getattr(p, 'wp_%s_size' % kind)), getattr(p, 'wp_%s_offset' % kind)
@@ -3031,6 +3055,10 @@ def build_props():
                                                 description="Show a weapon IsoRim has a 3D model for as that model, fitted "
                                                             "to the sprite as IsoRim fits it (its 'Weapons as 3D models' "
                                                             "setting), in place of the sprite's slab"),
+        'slab_holds': bpy.props.BoolProperty(name='Slab holds', default=False, update=slab_toggled,
+                                             description="Preview and edit the stances, holds and aims for a weapon drawn "
+                                                         "as its sprite's slab (SLAB_DRAFTED, SLAB_WEAPONS, SLAB_AIMED), "
+                                                         "every weapon as its slab. Reads walk.py again: write first"),
         'load': bpy.props.BoolProperty(name='Show load', default=True, update=repose,
                                        description='Draw what a carry clip holds where the game puts it: an item or the carried person'),
         'load_size': bpy.props.FloatVectorProperty(name='Item size', default=(1.0, 1.0), size=2, min=0.05, soft_max=3.0,
@@ -3290,6 +3318,72 @@ def entries(src, table, entry=None):
         out.append((e.group(1), e.start(), e.end() - 1, end))
         pos = end + 1
 
+def stance_text(new):
+    """A stance entry written whole on one line, {...}."""
+    parts = ['%r: %r' % kv for kv in new.items() if kv[0] == 'kind']
+    parts += ["'%s': %s" % (s, 'None' if new[s] is None else fmt(new[s]) if s.endswith('_elbow') else fmt_tuple(new[s]))
+              for s in SIDE_KEYS if s in new]
+    parts += ['%r: %r' % kv for kv in new.items() if kv[0] not in SIDE_KEYS + ('body', 'kind')]
+    if new.get('body'):
+        parts.append("'body': dict(%s)" % ', '.join('%s=%s' % (k, fmt(v)) for k, v in new['body'].items()))
+    return '{%s}' % ', '.join(parts)
+
+def alike(u, v):
+    """Whether two of walk.py's table values write the same (numbers to the sliders' precision, dicts key by key)."""
+    if u is None or v is None:
+        return u is v
+    if isinstance(u, dict) or isinstance(v, dict):
+        return isinstance(u, dict) and isinstance(v, dict) and u.keys() == v.keys() and all(alike(u[k], v[k]) for k in u)
+    if isinstance(u, str) or isinstance(v, str):
+        return u == v
+    return same(list(u) if isinstance(u, (tuple, list)) else [u], list(v) if isinstance(v, (tuple, list)) else [v])
+
+def slab_split():
+    """With Slab holds on, before Write: each SLAB_ table made the entries of its table that are the slab's (those it
+    had, and any that now differ from the plain table's), and walk's tables put back to the plain ones, so the plain
+    tables are written unchanged."""
+    plain = walk._plain_tables
+    for t in SLAB_TABLES:
+        merged, had = getattr(walk, t), getattr(walk, 'SLAB_' + t)
+        slab = {}
+        for k, v in merged.items():
+            if k in had or (v and not alike(v, plain[t].get(k))):   # (an empty aim entry is none)
+                slab[k] = v
+        setattr(walk, 'SLAB_' + t, slab)
+        setattr(walk, t, copy.deepcopy(plain[t]))
+
+def write_slab(src, changed):
+    """walk.py with the SLAB_ tables written: their entries in place, new ones added at the end of each."""
+    for t in SLAB_TABLES:
+        name = 'SLAB_' + t
+        table = getattr(walk, name)
+        stance = t == 'DRAFTED'
+        found = {e[0] for e in entries(src, name)}   # (an entry written {}, as SLAB_AIMED's 'not aimed apart' ones are)
+        for kind, key, open_at, close_at in reversed(entries(src, name)) if not stance else []:
+            if kind in table and table[kind]:   # one written {} now with numbers of its own: written as dict(...)
+                src = src[:open_at] + 'dict(%s)' % ', '.join('%s=%s' % (n, value_text(v)) for n, v in table[kind].items()) + src[close_at + 1:]
+                changed.append('%s %s' % (name, kind))
+        for kind, key, open_at, close_at in reversed(entries(src, name, None if stance else WEAPON_IN)):
+            found.add(kind)
+            if kind not in table:
+                continue
+            if stance:
+                text, hoisted = write_entry(name, kind, src[open_at:close_at + 1], changed)
+                indent = src[src.rfind('\n', 0, key) + 1:key]
+                src = src[:key] + ''.join(c + '\n' + indent for c in hoisted) + src[key:open_at] + text + src[close_at + 1:]
+            else:
+                src = src[:open_at + 1] + write_weapon(kind, src[open_at + 1:close_at], changed, name) + src[close_at:]
+        added = [k for k, v in table.items() if k not in found and isinstance(v, dict)]
+        m = re.search(r'^%s\s*=\s*\{' % name, src, re.M)
+        if added and m is not None:
+            close = match_close(src, m.end() - 1)
+            lines = ''.join("    '%s': %s,\n" % (k, stance_text(table[k]) if stance
+                                                  else 'dict(%s)' % ', '.join('%s=%s' % (n, value_text(v)) for n, v in table[k].items()))
+                            for k in added)
+            src = src[:close] + lines + src[close:]
+            changed += ['%s %s (new)' % (name, k) for k in added]
+    return src
+
 def write_entry(table, kind, text, changed):
     """One stance entry's text ({...}) with the walk module's values written in: numbers changed in place, comments
     kept, or the whole entry rewritten on one line when a hand or the body is added or taken away (or a weapon's hand
@@ -3301,14 +3395,8 @@ def write_entry(table, kind, text, changed):
     body_file = BODY_IN.search(text)
     sides_new = {(s, new[s] is None) for s in SIDE_KEYS if s in new}
     if sides_file != sides_new or bool(body_file) != bool(body_new):
-        parts = ['%r: %r' % kv for kv in new.items() if kv[0] == 'kind']
-        parts += ["'%s': %s" % (s, 'None' if new[s] is None else fmt(new[s]) if s.endswith('_elbow') else fmt_tuple(new[s]))
-                  for s in SIDE_KEYS if s in new]
-        parts += ['%r: %r' % kv for kv in new.items() if kv[0] not in SIDE_KEYS + ('body', 'kind')]
-        if body_new:
-            parts.append("'body': dict(%s)" % ', '.join('%s=%s' % (k, fmt(v)) for k, v in body_new.items()))
         changed.append('%s %s' % (table, kind))
-        return '{%s}' % ', '.join(parts), re.findall(r'#[^\n]*', text)
+        return stance_text(new), re.findall(r'#[^\n]*', text)
 
     def side(m):
         old = numbers(m.group(3))
@@ -3345,14 +3433,6 @@ def write_weapon(kind, inner, changed, table='WEAPONS'):
     call = ast.parse('dict(%s)' % inner, mode='eval').body
     old = {kw.arg: literal(kw.value) for kw in call.keywords}
     new = getattr(walk, table)[kind]
-    def alike(u, v):
-        if u is None or v is None:
-            return u is v
-        if isinstance(u, dict) or isinstance(v, dict):
-            return isinstance(u, dict) and isinstance(v, dict) and u.keys() == v.keys() and all(alike(u[k], v[k]) for k in u)
-        if isinstance(u, str) or isinstance(v, str):
-            return u == v
-        return same(list(u) if isinstance(u, tuple) else [u], list(v) if isinstance(v, tuple) else [v])
     if old.keys() == new.keys() and all(alike(old[k], new[k]) for k in old):
         return inner
     changed.append('%s %s' % (table, kind))
@@ -3565,6 +3645,8 @@ class MARU_OT_write(bpy.types.Operator):
     def execute(self, context):
         p = props()
         push_settings(p)
+        if slab_on():
+            slab_split()
         names, run, _ = tuned()
         with open(WALK_PY) as f:
             src = f.read()
@@ -3613,6 +3695,8 @@ class MARU_OT_write(bpy.types.Operator):
             if kind in getattr(walk, 'WEAPONS', {}):
                 src = src[:open_at + 1] + write_weapon(kind, src[open_at + 1:close_at], changed) + src[close_at:]
         src = write_aimed(src, changed)
+        if slab_on():
+            src = write_slab(src, changed)
         for slot, key, open_at, close_at in reversed(entries(src, 'HOLSTERS', WEAPON_IN)):
             if slot in getattr(walk, 'HOLSTERS', {}):
                 src = src[:open_at + 1] + write_weapon(slot, src[open_at + 1:close_at], changed, 'HOLSTERS') + src[close_at:]
@@ -3969,6 +4053,11 @@ class MARU_PT_gait(bpy.types.Panel):
         col.prop(p, pre + 'offset')
         rel = isorim_models().get(KIND_LOOK.get(kind, kind))
         row = box.row()
+        row.prop(p, 'slab_holds')
+        if slab_on():
+            row.label(text='Writes SLAB_ tables')
+        row = box.row()
+        row.active = not slab_on()
         row.prop(p, 'weapon_models')
         held = bpy.data.objects.get(SLAB + MODEL)
         if rel is None:
@@ -4050,9 +4139,44 @@ class MARU_PT_gait(bpy.types.Panel):
 
 CLASSES = (MARU_OT_copy, MARU_OT_aim_turn_reset, MARU_OT_aim_numbers_reset, MARU_OT_holster_mirror, MARU_OT_write, MARU_OT_reload, MARU_OT_rest, MARU_OT_grab, MARU_OT_view, MARU_PT_gait)
 
+def slab_viewports(on):
+    """The sprite on a slab is an image texture, which a Solid view shows only with its Color set to Texture (with
+    Material it draws each material's flat viewport colour: a grey square). Slab holds puts the 3D views in Solid
+    shading on Texture, and back to what they had when it is turned off."""
+    was = state.setdefault('slab_colour', {})
+    for window in bpy.context.window_manager.windows:
+        for area in window.screen.areas:
+            if area.type != 'VIEW_3D':
+                continue
+            for space in area.spaces:
+                if space.type != 'VIEW_3D':
+                    continue
+                shading = space.shading
+                if on and shading.type == 'SOLID' and shading.color_type != 'TEXTURE':
+                    was[space.as_pointer()] = shading.color_type
+                    shading.color_type = 'TEXTURE'
+                elif not on and space.as_pointer() in was:
+                    shading.color_type = was.pop(space.as_pointer())
+                area.tag_redraw()
+
+def slab_toggled(self, _context):
+    """Slab holds ticked or not: walk.py read again with the slab's tables laid over, or without."""
+    if self.slab_holds != slab_on():
+        slab_mode['on'] = self.slab_holds
+        slab_viewports(self.slab_holds)
+        reload_walk()
+        # Blender keeps a slider's value across the settings being made again, so the stances' and holds' are put back
+        # to their defaults, the tables now in use (a weapon's sprite settings stay).
+        p = props()
+        for k in p.bl_rna.properties.keys():
+            if k.startswith('st_') or (k.startswith('wp_') and not k.endswith(('_image', '_size', '_offset'))):
+                p.property_unset(k)
+        repose()
+
 def reload_walk():
     global walk
     walk = importlib.reload(walk)
+    walk.__dict__.pop('_plain_tables', None)   # (a reload keeps old attributes: the plain tables are read from the file again)
     importlib.reload(holster_push)
     registered.pop('figure', None)
     keep = props()
@@ -4062,7 +4186,7 @@ def reload_walk():
              if n.startswith('wp_') and n.endswith(('_image', '_size', '_offset'))}
     # Copied now: an array read off the old settings is gone once swap_props has taken them away.
     looks = {n: v if isinstance(v, (str, bool, float)) else tuple(v) for n, v in looks.items()}
-    looks['weapon'], looks['weapon_models'] = keep.weapon, keep.weapon_models
+    looks['weapon'], looks['weapon_models'], looks['slab_holds'] = keep.weapon, keep.weapon_models, slab_on()
     looks['load'], looks['load_size'], looks['load_thick'] = keep.load, tuple(keep.load_size), keep.load_thick
     state.pop('carried_key', None)   # walk.py's numbers may have changed
     looks['copy_from'] = keep.copy_from
@@ -4105,6 +4229,7 @@ def swap_props():
     if old is not None:
         del bpy.types.WindowManager.maru_gait
         bpy.utils.unregister_class(old)
+    slab_tables()
     registered['names'] = read_tuned()
     registered['stances'] = read_stances()
     registered['props'] = build_props()
