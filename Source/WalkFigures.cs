@@ -346,7 +346,7 @@ namespace M3AT
         }
         public static bool BedBlankets   // IsoRim's blanket over a sleeper in a head-only bed (DrawTuckedIn); false: lying on top of the bed
         {
-            get { return SettingsMod.Settings != null && SettingsMod.Settings.sleepWear == SleepWear.Blankets; }
+            get { return SettingsMod.Settings == null || SettingsMod.Settings.bedBlankets; }
         }
         public static bool VatClothes   // a pawn in a growth vat or biosculpter pod is drawn in its clothes; false: without them (InVat)
         {
@@ -5225,7 +5225,7 @@ namespace M3AT
             // In a vat (a growth vat, a biosculpter pod): no baby romper, and the clothes only with the vatClothes option.
             // In a bed, what the sleepWear option has it wear (SleepWear.cs): pajamas in the romper's place, or nothing.
             bool inVat = InVat(pawn);
-            SleepWear sleep = inVat ? SleepWear.Blankets : SleepWearOf(pawn);
+            SleepWear sleep = inVat ? SleepWear.Dressed : SleepWearOf(pawn);
             List<Apparel> all = DressedIn(pawn, inVat, sleep);
             bool shieldShows = ShieldShows(pawn);
             bool shoes = Shoes;
@@ -5398,7 +5398,7 @@ namespace M3AT
 
         public static EarHiding EarHiding   // which headgear leaves the gene ears off (the mod's options set it)
         {
-            get { return SettingsMod.Settings == null ? EarHiding.AnyHeadgear : SettingsMod.Settings.earHiding; }
+            get { return SettingsMod.Settings == null ? EarHiding.Helmets : SettingsMod.Settings.earHiding; }
         }
 
         public static bool Shoes   // false: the shoes are drawn only for apparel named for them, not once dressed (the mod's options set it)
@@ -6190,7 +6190,7 @@ namespace M3AT
                 return null;
             }
             bool inVat = InVat(pawn);
-            List<Apparel> worn = DressedIn(pawn, inVat, inVat ? SleepWear.Blankets : SleepWearOf(pawn));
+            List<Apparel> worn = DressedIn(pawn, inVat, inVat ? SleepWear.Dressed : SleepWearOf(pawn));
             if (worn != null)
             {
                 for (int i = 0; i < worn.Count; i++)
@@ -7023,7 +7023,7 @@ namespace M3AT
             return Mathf.Round(scale / BlanketStep) * BlanketStep;
         }
 
-        // Lovin under the blanket (the sleepWear option's Blankets): the two lie side by side in a double bed, a cell apart, staring up.
+        // Lovin under the blanket (the bedBlankets option): the two lie side by side in a double bed, a cell apart, staring up.
         // Each is drawn LovinCloser across the bed toward the other, head and lump together, its head turned LovinLook
         // toward them, so they lie close facing each other. LovinOf: which side of the figure the partner is (+1 its +x,
         // which a look of + degrees turns the face toward, as the lying clips are laid down about x), scaled by how far
@@ -7042,7 +7042,7 @@ namespace M3AT
             return LovinSideOf(pawn, placed, yaw);
         }
 
-        // Lovin with no blanket over the bed (the sleepWear option not Blankets, a bed that shows the body, or an IsoRim
+        // Lovin with no blanket over the bed (the bedBlankets option off, a bed that shows the body, or an IsoRim
         // without the blanket): the two lie on their sides facing each other (lovin_L, lovin_R: still, breathing, from the
         // downed side lying), each drawn LovinSideCloser across the bed toward the other. The partner's side as LovinOf
         // gives it; 0 for anyone else, or where the blanket is drawn.

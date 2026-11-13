@@ -7,7 +7,7 @@
 // (HairBuilder.HeadSprites). The body is skin.txt and anim.txt from the chibi folder, read by SkinnedFigure's own reader
 // as the game reads them, and the builder is made as SkinnedFigure.Builder makes it. Each style is written as the game
 // writes it into its cache (<style>.txt, .shell.txt, .png), then, as SkinnedFigure.LoadHair does with built hair, cut
-// down by Decimate to --detail of its triangles (the mod options' hairDetail, 0.5 by default; 1 keeps them all), with
+// down by Decimate to --detail of its triangles (the mod options' hairDetail, 0.3 by default; 1 keeps them all), with
 // the uncut ones kept as <style>.full.txt and <style>.full.shell.txt. Run by anim_scripts/hairbuild/run.sh, which sets
 // up the folder of links to the game's install it has to be run from.
 using System;
@@ -214,7 +214,7 @@ namespace M3AT
         {
             List<string> args = new List<string>();
             bool beard = false;
-            float detail = 0.5f;
+            float detail = 0.3f;
             for (int i = 0; i < argv.Length; i++)
             {
                 if (argv[i] == "--beard")

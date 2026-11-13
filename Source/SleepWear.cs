@@ -5,26 +5,26 @@ using Verse;
 
 namespace M3AT
 {
-    // What a pawn lying in a bed is drawn wearing (the sleepWear option): as it is (Blankets, under IsoRim's blanket where the
-    // bed shows only the head, else on top; Dressed, always on top), its clothes without its armour, headgear, packs, belts
+    // What a pawn lying in a bed is drawn wearing (the sleepWear option, apart from IsoRim's blanket, the bedBlankets
+    // option, which hides all but the head where the bed has one): as it is (Dressed), its clothes without its armour, headgear, packs, belts
     // and coats (NoEquipment), pajamas (the kid romper's garment in a pastel colour, a baby its romper) or nothing (Nothing; a baby keeps its romper,
     // which would otherwise come and go each nap).
     // Only drawn: the game is not given or told anything, so the pawn wakes up wearing what it went to bed in.
     public static partial class WalkFigures
     {
-        public static SleepWear SleepWearSetting   // the option as set; Blankets with no settings yet
+        public static SleepWear SleepWearSetting   // the option as set; NoEquipment with no settings yet
         {
-            get { return SettingsMod.Settings == null ? SleepWear.Blankets : SettingsMod.Settings.sleepWear; }
+            get { return SettingsMod.Settings == null ? SleepWear.NoEquipment : SettingsMod.Settings.sleepWear; }
         }
 
         // What the pawn is drawn wearing now: the option while it lies in a bed (any bed: a sleeping spot, a bedroll, a
-        // hospital bed, so a patient too), else Blankets, which leaves its clothes as they are.
+        // hospital bed, so a patient too), else Dressed, which leaves its clothes as they are.
         private static SleepWear SleepWearOf(Pawn pawn)
         {
             SleepWear wear = SleepWearSetting;
-            if (wear == SleepWear.Blankets || wear == SleepWear.Dressed || pawn.Dead || !pawn.Spawned || !pawn.InBed())
+            if (wear == SleepWear.Dressed || pawn.Dead || !pawn.Spawned || !pawn.InBed())
             {
-                return SleepWear.Blankets;
+                return SleepWear.Dressed;
             }
             return wear;
         }

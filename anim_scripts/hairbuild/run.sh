@@ -2,7 +2,7 @@
 # Builds hairstyles (or beards) from their sprites outside the game, with the mod's own HairBuilder.cs (Main.cs).
 #   anim_scripts/hairbuild/run.sh <out folder> [--beard] [--detail share] <style> [...]
 # A style is as hair_sprites.py takes it (Bob, Hair/AFUf044, a texPath, or a sprite path less _south.png). Each is
-# written to <out folder>/<style>.txt, .shell.txt and .png as the game writes its cache, cut down to --detail (0.5,
+# written to <out folder>/<style>.txt, .shell.txt and .png as the game writes its cache, cut down to --detail (0.3,
 # the mod options' default) as the game cuts built hair, the uncut ones beside them as .full.txt. The harness is
 # compiled into ~/.cache/m3at-hairbuild/bin and run from ~/.cache/m3at-hairbuild/run, a folder of links to the game's
 # install with its own RimWorld.dll (and a copied launcher, as a linked one could start the real game).

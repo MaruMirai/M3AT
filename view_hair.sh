@@ -6,7 +6,7 @@
 # (anim_scripts/hairbuild/run.sh), so a change to the builder can be looked at without starting the game: Bob,
 # Hair/AFUf044 (as the game's cache names it), a texPath, or a sprite path less _south.png. The sprites are the ones
 # the game would use (an active retexture mod's over the game's own). It is cut down as the game cuts built hair, to
-# the mod options' default hair detail (0.5); --detail sets another share, and --full shows it uncut.
+# the mod options' default hair detail (0.3); --detail sets another share, and --full shows it uncut.
 # A <style>.txt path is put on as it is. With --cached, a name is looked up in the game's newest hair cache instead.
 #   ./view_hair.sh [--cached] [--beard] [--detail share] [--full] Bob [Hair/AFUf044 ...]
 # --keep <folder> builds into that folder (kept) instead of a temporary one.
