@@ -17,12 +17,39 @@ namespace M3AT
         private readonly Dictionary<string, float> typeScales = new Dictionary<string, float>();
         private readonly Dictionary<string, string> typeHolsters = new Dictionary<string, string>();
         private readonly List<string> typeOrder = new List<string>();
+        private readonly Dictionary<string, string> holsterWeapons = new Dictionary<string, string>();   // by type
+
+        // The weapon a type's holster slots and draw clips are posed for (walk.HOLSTER_WEAPON, anim.txt's holster_weapon
+        // lines; an older export's are walk.py's as they were); null for none.
+        public string HolsterWeapon(string type)
+        {
+            string name;
+            if (type == null)
+            {
+                return null;
+            }
+            if (holsterWeapons.Count == 0)
+            {
+                return OldHolsterWeapons.TryGetValue(type, out name) ? name : null;
+            }
+            return holsterWeapons.TryGetValue(type, out name) ? name : null;
+        }
+
+        private static readonly Dictionary<string, string> OldHolsterWeapons = new Dictionary<string, string>
+        {
+            { "handgun", "Gun_Autopistol" }, { "rifle", "Gun_AssaultRifle" }, { "bow", "Bow_Recurve" },
+            { "grenade", "Weapon_GrenadeFrag" }, { "melee_1h", "MeleeWeapon_Gladius" }, { "melee_2h", "MeleeWeapon_LongSword" },
+        };
 
         private void ReadType(string[] p)
         {
             if (p[0] == "weapon_type" && p.Length > 2)
             {
                 weaponTypes[p[1]] = p[2];
+            }
+            else if (p[0] == "holster_weapon" && p.Length > 2)
+            {
+                holsterWeapons[p[1]] = p[2];
             }
             else if (p[0] == "type_scale" && p.Length > 3)
             {

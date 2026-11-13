@@ -1080,6 +1080,10 @@ def write_anim(path, clips):
                 f.write('weapon_type %s %s\n' % (name, kind))
             for kind, scale in walk.TYPE_SCALE.items():
                 f.write('type_scale %s %.4f %s\n' % (kind, scale, walk.TYPE_HOLSTER.get(kind, 'big')))
+            # holster_weapon type name: the weapon each type's holster slots and draw clips are posed for
+            # (walk.HOLSTER_WEAPON); WalkFigures.AsHeld lays another of its type in a slot by its hold against this one's.
+            for kind, name in getattr(walk, 'HOLSTER_WEAPON', {}).items():
+                f.write('holster_weapon %s %s\n' % (kind, name))
         if hasattr(walk, 'HOLSTERS'):
             f.write('# holster slot size bone x y z ax ay az roll behind ox oy oz: walk.HOLSTERS, where a\n')
             f.write('# weapon not held is drawn: its place at rest (model space, model units) and its line, out the way the game\n')

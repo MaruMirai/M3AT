@@ -4245,6 +4245,15 @@ namespace M3AT
                 string ammo = GiveAmmo(pawn);
                 pawn.jobs.StopAll();
                 yield return Ticks(30, bow + "_swap", pawn);
+                // (holstered, close up: from the side and the front)
+                Look(pawn, 0f);
+                lookDistance = 2.2f;
+                lookHeight = 0.75f;
+                lookYaw = 90f;
+                yield return Shot(bow + "_holstered_close");
+                lookDistance = LookDistance;
+                lookHeight = LookHeight;
+                lookYaw = 0f;
                 pawn.drafter.Drafted = true;
                 Look(pawn, 0f);
                 yield return WaitReal(1f);

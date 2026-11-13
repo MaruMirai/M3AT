@@ -5858,11 +5858,9 @@ namespace M3AT
             int slot = drawn < 1f ? EquippedSlot(weapon.def, OnPackSides(pawn), OnBeltSlots(pawn)) : -1;
             if (slot >= 0)
             {
-                Vector3 slotAt, slotAim, fromAim, fromTop;
-                Matrix4x4 slotTurn;
-                float slotRoll, slotBehind, slotSpin;
-                skin.HolsterAt(fig, slot, mask, IsMelee(weapon.def), weapon.def.equippedAngleOffset, out slotAt, out slotTurn, out slotAim, out slotRoll, out slotBehind, out slotSpin, PackClear(weapon, slot, mask, fig, size));
-                SlotLine(slotTurn, slotAim, slotRoll, slotSpin, out fromAim, out fromTop);
+                Vector3 slotAt, fromAim, fromTop;
+                float slotBehind;
+                SlotPlace(weapon, fig, slot, mask, PackClear(weapon, slot, mask, fig, size), size, out slotAt, out fromAim, out fromTop, out slotBehind);
                 Quaternion turned = Quaternion.Slerp(Quaternion.LookRotation(fromAim, fromTop), Quaternion.LookRotation(a, top), drawn);
                 a = turned * Vector3.forward;
                 top = turned * Vector3.up;

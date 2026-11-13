@@ -914,10 +914,50 @@ def draw_weapon(p, kind, drawn=None):
         fig = figure()
         at, a0, top0 = holster_frame(p, drawn[0], kind, fig.holster_clear(worn_now(p, fig), fig.slot(drawn[0], walk.HOLSTERS[drawn[0]]),
                                                                            weapon_depth(p, kind) + holster_push.STACK_GAP))
+        at, a0, top0, slot_behind = as_held(p, kind, at, a0, top0, walk.HOLSTERS[drawn[0]].get('behind', 0.0))
         q = Matrix((a0, top0, a0.cross(top0))).transposed().to_quaternion().slerp(Matrix((a, top, a.cross(top))).transposed().to_quaternion(), drawn[1])
         a, top = q @ Vector((1, 0, 0)), q @ Vector((0, 1, 0))
-        hand, behind = at.lerp(hand, drawn[1]), walk.HOLSTERS[drawn[0]].get('behind', 0.0) * (1.0 - drawn[1]) + behind * drawn[1]
+        hand, behind = at.lerp(hand, drawn[1]), slot_behind * (1.0 - drawn[1]) + behind * drawn[1]
     place_slab(p, obj, kind, hand, a, top, behind)
+
+# The weapon types whose weapons lie in a slot as held (WalkFigures.HolsterAsHeld).
+HOLSTER_AS_HELD = ('grenade',)
+
+def as_held(p, kind, grip, a, top, behind):
+    """WalkFigures.AsHeld: a slot is posed for its type's placeholder (walk.HOLSTER_WEAPON); another weapon of a type in
+    HOLSTER_AS_HELD with a hold of its own is put where the fist that would hold the placeholder as it lies there holds it
+    by its own hold. grip, a, top, behind as holster_frame gives them (world) and the slot's behind; gives the same, the
+    behind then 0. Both holds on the 'hand' line from the same hand, else as they were."""
+    t = walk.weapon_type(kind)
+    holder = getattr(walk, 'HOLSTER_WEAPON', {}).get(t) if t in HOLSTER_AS_HELD else None
+    weapons = getattr(walk, 'WEAPONS', {})
+    own, its = weapons.get(kind), weapons.get(holder)
+    if holder is None or holder == kind or own is None or its is None or own['line'] != 'hand' or its['line'] != 'hand' \
+            or own['hand'] != its['hand']:
+        return grip, a, top, behind
+    k = 1.0 / model_scale()   # Blender units per model unit
+    img = sprite(getattr(p, 'wp_%s_image' % kind))[0]
+    size = tuple(getattr(p, 'wp_%s_size' % kind))
+    rel = isorim_models().get(KIND_LOOK.get(kind, kind))
+    # place_slab's size, the placeholder's at this weapon's, as it is of the same type
+    scale = walk.weapon_scale(kind) / ground_ratio(kind, rel, img, size, getattr(p, 'wp_%s_offset' % kind)) / walk.GAME_SCALE * k
+    its_size = tuple(getattr(p, 'wp_%s_size' % holder, size))
+    q0 = walk.arm.matrix_world.to_quaternion()   # the hand at rest
+    def line(w, long):
+        rest = (Vector(w.get('aim', (0.0, -1.0, 0.0))).normalized() + Vector((0, 0, -w['drop']))).normalized()
+        la = (q0 @ rest).normalized()
+        lt = q0 @ top_of(rest, w['roll'], Vector((0, -1, 0)))
+        lt = (lt - la * lt.dot(la)).normalized()
+        middle = q0 @ Vector(w.get('at', (0.0, 0.0, 0.0))) * k + la * (w['behind'] * long)
+        return la, lt, middle
+    def turn(x, y):
+        return Matrix((x, y, x.cross(y))).transposed().to_quaternion()
+    own_long, its_long = max(size) * scale, max(its_size) * scale
+    own_a, own_top, own_middle = line(own, own_long)
+    its_a, its_top, its_middle = line(its, its_long)
+    hand = turn(a, top) @ turn(its_a, its_top).inverted()
+    fist = grip + a * (behind * its_long) - hand @ its_middle
+    return fist + hand @ own_middle, (hand @ own_a).normalized(), (hand @ own_top).normalized(), 0.0
 
 def place_slab(p, obj, kind, hand, a, top, behind):
     """Puts a slab on the line a from hand (world), its top toward top, its middle behind (a share of its length) on
@@ -1908,8 +1948,8 @@ def draw_holsters(p, drawn=None):
                 kind = drawn[2]
             obj = slab_object(HOLSTER + slot)
             obj.hide_viewport = False
-            grip, a, top = holster_frame(p, slot, kind, extras[slot])
-            held = place_slab(p, obj, kind, grip, a, top, walk.HOLSTERS[slot].get('behind', 0.0))
+            grip, a, top, behind = as_held(p, kind, *holster_frame(p, slot, kind, extras[slot]), walk.HOLSTERS[slot].get('behind', 0.0))
+            held = place_slab(p, obj, kind, grip, a, top, behind)
             shown.add(obj.name)
             if held:
                 shown.add(held)

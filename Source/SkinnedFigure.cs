@@ -1184,7 +1184,7 @@ namespace M3AT
                     ShieldGrab = Num(p[1]);
                     ShieldSlide = Num(p[2]);
                 }
-                else if (p[0] == "weapon_type" || p[0] == "type_scale")
+                else if (p[0] == "weapon_type" || p[0] == "type_scale" || p[0] == "holster_weapon")
                 {
                     ReadType(p);
                 }

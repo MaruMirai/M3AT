@@ -799,13 +799,77 @@ namespace M3AT
             {
                 return;
             }
-            Vector3 grip, aim, a, top;
-            Matrix4x4 turn;
-            float roll, behind, spin;
-            skin.HolsterAt(fig, slot, mask, IsMelee(weapon.def), weapon.def.equippedAngleOffset, out grip, out turn, out aim, out roll, out behind, out spin, slotExtra[slot]);
-            SlotLine(turn, aim, roll, spin, out a, out top);
+            Vector3 grip, a, top;
+            float behind;
+            SlotPlace(weapon, fig, slot, mask, slotExtra[slot], size, out grip, out a, out top, out behind);
             Vector3 tip;
             DrawSlab(weapon, ScaleOf(weapon), grip, a, top, behind, at, yaw, size, out tip);   // as big as it is held
+        }
+
+        // Where a weapon lies in a slot, as DrawSlab takes it: the place its slab's middle is measured from, the way it runs,
+        // its top and how far along it the middle is (HolsterAt, SlotLine), as its type's placeholder would lie (AsHeld).
+        private static void SlotPlace(Thing weapon, SkinnedFigure.Posed fig, int slot, GarmentMask mask, float extra, float size,
+            out Vector3 grip, out Vector3 a, out Vector3 top, out float behind)
+        {
+            Matrix4x4 turn;
+            Vector3 aim;
+            float roll, spin;
+            skin.HolsterAt(fig, slot, mask, IsMelee(weapon.def), weapon.def.equippedAngleOffset, out grip, out turn, out aim, out roll, out behind, out spin, extra);
+            SlotLine(turn, aim, roll, spin, out a, out top);
+            AsHeld(weapon, size, ref grip, ref a, ref top, ref behind);
+        }
+
+        // The types whose weapons lie in a slot as held (AsHeld): a grenade's model sits in its sprite (a heap of a few) at
+        // whatever angle and place the art gives it, so the molotov laid along the frag grenade's line stood out of the
+        // slot tilted, though held it sat in the fist by its own hold. Guns and blades lie along their sprites, and keep
+        // the slot's line.
+        private static readonly HashSet<string> HolsterAsHeld = new HashSet<string> { "grenade" };
+
+        // A slot is posed (in the preview, walk.HOLSTERS) for its type's placeholder weapon (walk.HOLSTER_WEAPON), which
+        // its draw clip's hand reaches for. Another weapon of the type with a hold of its own is put where that hand would
+        // hold it: the fist that would hold the placeholder as it lies here, and this weapon in that fist by its own hold,
+        // so it lies as it is held and the draw's hand still closes on it. Both holds on the "hand" line from the same
+        // hand, in the hand's rest frame (DrawWeapon's), else the slot's line is kept. The middle is then the place itself
+        // (behind 0). The preview's as_held is the same.
+        private static void AsHeld(Thing weapon, float size, ref Vector3 grip, ref Vector3 a, ref Vector3 top, ref float behind)
+        {
+            string type = TypeOf(weapon.def);
+            string name = WeaponName(weapon.def), placeholder = HolsterAsHeld.Contains(type) ? skin.HolsterWeapon(type) : null;
+            Graphic g = weapon.Graphic;
+            if (placeholder == null || placeholder == name || g == null)
+            {
+                return;
+            }
+            bool slab = AsSlab(weapon);
+            SkinnedFigure.Hold own = HoldOf(name, slab), its = HoldOf(placeholder, slab);
+            if (own == null || its == null || own.line != "hand" || its.line != "hand" || own.hand != its.hand)
+            {
+                return;
+            }
+            // Lengths as DrawSlab sizes the slab (model units: its cells over the pawn's size), the placeholder at this
+            // weapon's scale, as it is of the same type.
+            float scale = ScaleOf(weapon) / size;
+            ThingDef pd = DefDatabase<ThingDef>.GetNamedSilentFail(placeholder);
+            Vector2 pDraw = pd != null && pd.graphicData != null ? pd.graphicData.drawSize : g.drawSize;
+            float ownLong = Mathf.Max(g.drawSize.x, g.drawSize.y) * scale, itsLong = Mathf.Max(pDraw.x, pDraw.y) * scale;
+            Vector3 ownA, ownTop, itsA, itsTop;
+            HeldLine(own, out ownA, out ownTop);
+            HeldLine(its, out itsA, out itsTop);
+            Vector3 ownMiddle = own.at + ownA * (own.behind * ownLong), itsMiddle = its.at + itsA * (its.behind * itsLong);
+            Quaternion hand = Quaternion.LookRotation(a, top) * Quaternion.Inverse(Quaternion.LookRotation(itsA, itsTop));
+            Vector3 fist = grip + a * (behind * itsLong) - hand * itsMiddle;
+            grip = fist + hand * ownMiddle;
+            a = (hand * ownA).normalized;
+            top = (hand * ownTop).normalized;
+            behind = 0f;
+        }
+
+        // A "hand" hold's line and top with the hand at rest (DrawWeapon's).
+        private static void HeldLine(SkinnedFigure.Hold hold, out Vector3 a, out Vector3 top)
+        {
+            a = (hold.aim.normalized + Vector3.down * hold.drop).normalized;
+            top = TopOf(a, hold.roll);
+            top = (top - a * Vector3.Dot(top, a)).normalized;
         }
 
         // The way a weapon in a slot runs and its top, in the pose (HolsterAt's), spin degrees from the aim toward the top.
