@@ -3216,7 +3216,13 @@ namespace M3AT
             {
                 return clip;
             }
-            // A variant per meal (eat_sit~2: knife and fork), by the job, so it keeps the one it sat down with.
+            // A meal at a table is always eaten with a knife and fork (eat_sit~2); the drink it was once picked
+            // against by the meal is kept for the drugs above. An export without the variant keeps the drink.
+            if (table && skin.Has("eat_sit~2"))
+            {
+                return "eat_sit~2";
+            }
+            // Any other variant per meal, by the job, so it keeps the one it began with.
             return skin.Variant(clip, Gen.HashCombineInt(pawn.thingIDNumber, job.loadID));
         }
 
