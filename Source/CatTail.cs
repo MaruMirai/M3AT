@@ -22,6 +22,7 @@ namespace M3AT
         private const float TailLieOut = 50f;         // degrees it is swung out from the legs lying on the ground
         private const float TailOutEither = 0.25f;    // of that: the pawn's own side, all there is to go by flat on the back
         private const float TailOutBack = 1.5f;       // and per sine of the angle to the way its back faces: on its side, toward its back
+        private const int TailRootSkin = 4;           // body vertices nearest the root whose weights it takes (RootWeights)
 
         // One pawn's tail as it is now.
         public sealed class TailState
@@ -53,6 +54,8 @@ namespace M3AT
             public float[] weight;
             public PieceShape baseShape;
             public Matrix4x4[] bones;
+            public int[] rootBone;     // the body's weights at the root (RootWeights), which it is skinned by as the skin
+            public float[] rootWeight; // there is, so it stays on it when the hips bend from the thighs and the back
             public readonly Dictionary<Shape, TailFit> fits = new Dictionary<Shape, TailFit>();
         }
 
@@ -185,7 +188,93 @@ namespace M3AT
             t.piece.uvs = StrandUvsTube(t.piece.rest, t.joints);   // the hair's strand grain (StrandGrain.cs)
             Grain(t.piece);
             t.bones = new Matrix4x4[t.joints.Length - 1];
+            RootWeights(t);
             return t;
+        }
+
+        // The body's weights where the tail's root is: those of the nearest few body vertices at rest, nearer ones counting
+        // more. The skin over the tailbone is only about three quarters the hips bone's (the rest the thighs and the back),
+        // so a tail riding the hips bone alone came away from it bending over, as in a kneel.
+        private void RootWeights(Tail t)
+        {
+            Piece body = pieces[0];
+            Vector3 root = t.joints[0];
+            int count = Mathf.Min(TailRootSkin, body.rest.Length);
+            int[] near = new int[count];
+            float[] far = new float[count];
+            for (int k = 0; k < count; k++)
+            {
+                far[k] = float.MaxValue;
+                near[k] = -1;
+            }
+            for (int i = 0; i < body.rest.Length; i++)
+            {
+                float d = (body.rest[i] - root).sqrMagnitude;
+                if (d >= far[count - 1])
+                {
+                    continue;
+                }
+                int at = count - 1;
+                while (at > 0 && far[at - 1] > d)
+                {
+                    far[at] = far[at - 1];
+                    near[at] = near[at - 1];
+                    at--;
+                }
+                far[at] = d;
+                near[at] = i;
+            }
+            Dictionary<int, float> sum = new Dictionary<int, float>();
+            float total = 0f;
+            for (int k = 0; k < count; k++)
+            {
+                if (near[k] < 0)
+                {
+                    continue;
+                }
+                float share = 1f / (Mathf.Sqrt(far[k]) + 0.002f);
+                for (int w = body.firstWeight[near[k]]; w < body.firstWeight[near[k] + 1]; w++)
+                {
+                    float had;
+                    sum.TryGetValue(body.weightBone[w], out had);
+                    sum[body.weightBone[w]] = had + body.weight[w] * share;
+                    total += body.weight[w] * share;
+                }
+            }
+            if (total <= 0f)
+            {
+                return;   // no body weights: the root rides the hips bone alone
+            }
+            t.rootBone = new int[sum.Count];
+            t.rootWeight = new float[sum.Count];
+            int n = 0;
+            foreach (KeyValuePair<int, float> b in sum)
+            {
+                t.rootBone[n] = b.Key;
+                t.rootWeight[n] = b.Value / total;
+                n++;
+            }
+        }
+
+        // The hips bone moved so the tail's root is where the skin there is posed: its turn stays the hips', so the tail
+        // still points as the pelvis does.
+        public static float TailRootGap;   // the most the root has been moved onto the skin since last cleared (model units; the autotest's tail scenario)
+
+        private static Matrix4x4 OnSkin(Matrix4x4[] bones, int hips, Tail t, TailFit f)
+        {
+            Matrix4x4 chain = bones[hips];
+            if (t.rootBone == null)
+            {
+                return chain;
+            }
+            Vector3 root = f.joints[0], skinned = Vector3.zero;
+            for (int k = 0; k < t.rootBone.Length; k++)
+            {
+                skinned += bones[t.rootBone[k]].MultiplyPoint3x4(root) * t.rootWeight[k];
+            }
+            Vector3 gap = skinned - chain.MultiplyPoint3x4(root);
+            TailRootGap = Mathf.Max(TailRootGap, gap.magnitude);
+            return Matrix4x4.Translate(gap) * chain;
         }
 
         // How many bones this pawn's tail turns about, 0 if the export has none.
@@ -266,7 +355,8 @@ namespace M3AT
         {
             PieceMeshes m = p.tail;
             TailFit f = TailFitOf(t, p.shape);
-            Matrix4x4 chain = p.bones[hipsBone];
+            Matrix4x4 hips = OnSkin(p.bones, hipsBone, t, f);
+            Matrix4x4 chain = hips;
             if (s.laid > 0f)
             {
                 chain = LaidOut(chain, f, s);
@@ -277,7 +367,7 @@ namespace M3AT
                 chain = chain * TurnAbout(f.joints[j], turn);
                 if (s.laid > 0f || !float.IsNegativeInfinity(floor))
                 {
-                    chain = OnFloor(chain, p.bones[hipsBone], f.joints[j], f.joints[j + 1], floor, s.laid);
+                    chain = OnFloor(chain, hips, f.joints[j], f.joints[j + 1], floor, s.laid);
                 }
                 t.bones[j] = chain;
             }

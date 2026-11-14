@@ -585,6 +585,7 @@ namespace M3AT
                 case "cook": return CookTest();
                 case "teach": return TeachTest();
                 case "floordraw": return FloordrawTest();
+                case "tail": return TailTest();
                 case "romance": return RomanceTest(null);
                 case "readroom": return ReadRoomTest();
                 case "bedcompare": return BedCompareTest();
@@ -1637,6 +1638,61 @@ namespace M3AT
                 }
             }
             Note("Look: the child knelt on its cell edge facing the drawing, the left palm propped on the floor, the chalk upright in its right fist, the tip on the floor scribbling loops and sweeping side to side, lifted once a loop; the head bowed to it.");
+        }
+
+        // A child with each cat tail gene knelt stooped over its chalk drawing (the pluck kneel, bent forward from the hips),
+        // seen from behind and the side, to see the tail stays on the skin over the tailbone (CatTail.cs, OnSkin).
+        private static IEnumerator TailTest()
+        {
+            JobDef draw = DefDatabase<JobDef>.GetNamedSilentFail("Floordrawing");
+            if (draw == null || !ModsConfig.BiotechActive)
+            {
+                Check("tail", false, "no Floordrawing job (Biotech off?)");
+                yield break;
+            }
+            foreach (string geneName in new[] { "Tail_Furry", "Tail_Smooth" })
+            {
+                GeneDef gene = DefDatabase<GeneDef>.GetNamedSilentFail(geneName);
+                if (gene == null)
+                {
+                    Note(geneName + ": skipped, no such gene");
+                    continue;
+                }
+                ClearPatch();
+                IntVec3 from = middle, on = middle + IntVec3.South;
+                Pawn child = NewChild(from + new IntVec3(-1, 0, 1));
+                child.genes.AddGene(gene, true);
+                child.apparel.DestroyAll();   // bare, so the root shows
+                Job job = JobMaker.MakeJob(draw, from, on);
+                job.playerForced = true;
+                KeepDrawing(child);
+                child.jobs.StartJob(job, JobCondition.InterruptForced);
+                Look(child, 150f);
+                lookDistance = 1.6f;
+                lookHeight = 0.25f;
+                lookPitch = 15f;
+                SkinnedFigure.TailRootGap = 0f;
+                for (int i = 0; i < 24; i++)
+                {
+                    KeepDrawing(child);
+                    yield return Ticks(15, "tail_" + geneName, child);
+                    if (i % 8 == 7)
+                    {
+                        yield return Shot(geneName + "_t" + (i + 1) * 15);
+                    }
+                }
+                Note(geneName + ": the root moved onto the skin by at most " + SkinnedFigure.TailRootGap.ToString("F3") + " model units");
+                Check(geneName + ": knelt drawing", Field<string>(child, "workKind") == "chalk", "work kind " + (Field<string>(child, "workKind") ?? "none"));
+                if (child.jobs != null)
+                {
+                    child.jobs.EndCurrentJob(JobCondition.InterruptForced);
+                }
+                child.Destroy();
+            }
+            lookDistance = LookDistance;
+            lookHeight = LookHeight;
+            lookPitch = LookPitch;
+            Note("Look: the tail's root on the skin over the tailbone in every picture, no gap between it and the body as the child stoops.");
         }
 
         // Kept from ending the floordrawing: the learning need kept low (the job ends once it is met) and the basic needs full

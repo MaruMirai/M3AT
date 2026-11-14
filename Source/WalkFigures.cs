@@ -8110,9 +8110,11 @@ namespace M3AT
                     ease.upYaw = yaw;
                     ease.upAt = at;
                 }
-                // What the tail stays above: what it lies on, or getting up, the lowest of the body. Under a blanket it is hidden,
+                // What the tail stays above: what it lies on, or getting up, the lowest of the body; on its feet on dry ground,
+                // the ground its feet are on (model 0), as kneeling or stooping it hung into it. Under a blanket it is hidden,
                 // and pushed up to the blanket it would show through it.
-                float tailFloor = lying ? (floor - at.y) / size : rise > 0f || duck > 0f ? lowest : float.NegativeInfinity;
+                float tailFloor = lying ? (floor - at.y) / size : rise > 0f || duck > 0f ? lowest
+                    : !seated && sat <= 0f && flight < 0f && lift <= 0f && swim <= 0f && ease.depth <= 0f ? 0f : float.NegativeInfinity;
                 // A bed that shows only the head: IsoRim's blanket over the body, as over its own figure, and only the head
                 // drawn (fig.tucked, BedTuck.cs), as the chibi's body, arms crossed on the chest, stood up through the lump.
                 Building_Bed blanketBed = lying && !dead && !ctx.ForOtherMod && placed.Situation == FigureSituation.InBed && placed.HeadOnlyInBed
