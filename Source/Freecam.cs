@@ -61,6 +61,8 @@ namespace M3AT
 
         public static KeyBindingDef ToggleKey, UpKey, DownKey, PointerKey, BoostKey;
         private static KeyBindingDef firstPersonKey;   // IsoRim's own (R3D_FirstPerson)
+        private static KeyBindingDef roofsKey;   // IsoRim's own (R3D_ToggleRoofs)
+        private static bool roofsSeen;   // IsoRim's showRoofs at the end of the last frame
 
         private static bool ready;   // everything below was found
         private static bool on;
@@ -138,6 +140,7 @@ namespace M3AT
             {
                 ToggleKey = DefDatabase<KeyBindingDef>.GetNamedSilentFail("M3AT_Freecam");
                 firstPersonKey = DefDatabase<KeyBindingDef>.GetNamedSilentFail("R3D_FirstPerson");
+                roofsKey = DefDatabase<KeyBindingDef>.GetNamedSilentFail("R3D_ToggleRoofs");
                 UpKey = DefDatabase<KeyBindingDef>.GetNamedSilentFail("M3AT_FreecamUp");
                 DownKey = DefDatabase<KeyBindingDef>.GetNamedSilentFail("M3AT_FreecamDown");
                 PointerKey = DefDatabase<KeyBindingDef>.GetNamedSilentFail("M3AT_FreecamPointer");
@@ -505,6 +508,7 @@ namespace M3AT
                 {
                     Resume();
                 }
+                Roofs(typing);
                 if (!on)
                 {
                     return;
@@ -531,6 +535,20 @@ namespace M3AT
                     Unlock();
                 }
             }
+        }
+
+        // IsoRim's roof key. IsoRim reads it after the camera keys a blocking pose holds back, so while the freecam flies it
+        // was never read. Its keys are read before this: if the key was pressed and the roofs are as they were at the end of
+        // the last frame, IsoRim passed it over, and it is done here (so never twice, as on the frame a pose starts or ends).
+        private static void Roofs(bool typing)
+        {
+            bool now = IsoRim.Api.GetOption("showRoofs") is bool shown && shown;
+            if (on && !typing && roofsKey != null && roofsKey.JustPressed && now == roofsSeen && IsoRim.Api.View3DActive)
+            {
+                now = !now;
+                IsoRim.Api.ShowRoofs(now);
+            }
+            roofsSeen = now;
         }
 
         // The pan keys along the ground in the way the camera faces, the up and down keys straight up and down, eased.
