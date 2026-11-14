@@ -2,6 +2,8 @@
 
 *Animated 3D pawns for [IsoRim Waylith](https://steamcommunity.com/sharedfiles/filedetails/?id=3819577715).*
 
+**[Get it on the Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3839520750)**
+
 ![M3AT preview](M3AT%3A%20Maru%27s%203D%20Animated%20Toons/About/Preview.png)
 
 Early WIP, Main features:
@@ -27,6 +29,7 @@ Load M3AT after all of them.
 
 ## Links
 
+Steam Workshop: https://steamcommunity.com/sharedfiles/filedetails/?id=3839520750
 Discord: https://discord.gg/7t5Aav2f2e
 GitHub: https://github.com/MaruMirai/M3AT
 
