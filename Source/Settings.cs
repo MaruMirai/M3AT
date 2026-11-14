@@ -67,6 +67,7 @@ namespace M3AT
         public bool injuryAnims = true;   // pawns limp on a bad leg and hold where they are hurt (WalkFigures.InjuryAnims); a missing leg hops regardless
         public bool prosthetics = true;   // a replaced limb is drawn as its prosthetic (WalkFigures.Prosthetics)
         public float gazeStrength = DefaultGazeStrength;   // how far Facial Animation's eyes move on the chibi (FaceLayers.GazeStrength)
+        public bool talkingMouths = true;   // a talking pawn's mouth opens and shuts on syllables (FaceLayers.TalkingMouths)
         public bool prostheticEyes = true;   // and a bionic or archotech eye's iris; off: the pawn's own eye (WalkFigures.ProstheticEyesShow)
         public bool archotechProsthetics = true;   // and an archotech one too; off: as flesh (WalkFigures.ArchotechShows)
         public bool visibleWounds = true;   // injuries, blood, bandages and scars are drawn on the pawn (WalkFigures.VisibleWounds)
@@ -152,6 +153,7 @@ namespace M3AT
             Scribe_Values.Look(ref archotechProsthetics, "archotechProsthetics", true);
             Scribe_Values.Look(ref prostheticEyes, "prostheticEyes", true);
             Scribe_Values.Look(ref gazeStrength, "gazeStrength", DefaultGazeStrength);
+            Scribe_Values.Look(ref talkingMouths, "talkingMouths", true);
             Scribe_Values.Look(ref outlines, "outlines", true);
             Scribe_Values.Look(ref silhouetteOutlines, "silhouetteOutlines", true);
             Scribe_Values.Look(ref clothesOcclusion, "clothesOcclusion", true);
@@ -446,6 +448,8 @@ namespace M3AT
             }
             Settings.gazeStrength = Mathf.Round(Slider(list, "Eye movement", Settings.gazeStrength.ToStringPercent(), Settings.gazeStrength, 0f, GazeMost,
                 "How far pawns' eyes glance and look about with Facial Animation, against how far they move on its 2D faces (default " + Settings.DefaultGazeStrength.ToStringPercent() + "). Its movements are small, a pixel or so, so higher makes them easier to see on the bigger 3D faces. 0%: the eyes stay still. Brows, eyelids and mouths move as Facial Animation moves them, whatever this is.") / GazeStep) * GazeStep;
+            list.CheckboxLabeled("Talking mouths", ref Settings.talkingMouths,
+                "With Facial Animation, a pawn's mouth opens and shuts as it talks: chatting with someone, at a party, visiting a patient, giving a speech. Uses each face's own open mouth. Off: mouths only move as Facial Animation moves them.");
         }
 
         // What pawns are drawn wearing, and what their clothes hide.

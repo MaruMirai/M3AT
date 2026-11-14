@@ -769,7 +769,7 @@ namespace M3AT
                 // A moving patch poses mouthLow only once it has been asked for, so the first frame keeps the plain mouth.
                 Mesh mouth = lowMouth && patch.lowUsed && patch.mouthLow != null ? patch.mouthLow : patch.mouth;
                 patch.lowUsed |= lowMouth;
-                bool mouthOpen = speaking > SpeakFrom && MouthOpen(pawn.thingIDNumber);
+                bool mouthOpen = speaking > SpeakFrom && TalkingMouths && MouthOpen(pawn.thingIDNumber);
 #if AUTOTEST
                 mouthOpen |= TestMouthOpen;
                 if (speaking > SpeakFrom)
@@ -1645,6 +1645,12 @@ namespace M3AT
         internal static readonly HashSet<string> TalkTextures = new HashSet<string>();   // frames drawn talking with the mouth open / shut (the autotest's talk)
 #endif
         private static int talkClockFrame = -1;
+
+        // The talkingMouths mod option: off, the mouth is left to Facial Animation.
+        internal static bool TalkingMouths
+        {
+            get { return SettingsMod.Settings == null || SettingsMod.Settings.talkingMouths; }
+        }
 
         private static bool MouthOpen(int id)
         {
