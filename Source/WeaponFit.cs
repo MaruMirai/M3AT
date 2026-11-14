@@ -75,6 +75,23 @@ namespace M3AT
             return soup;
         }
 
+        // How far the model reaches out from its middle along the ground (the most of |x| and |z| over its corners, model
+        // space, so for any quarter turn), or 0 for one with no faces. Cached with its faces.
+        public static float ReachOf(ModelHandle m)
+        {
+            Vector3[] soup = m != null ? SoupOf(m) : null;
+            if (soup == null)
+            {
+                return 0f;
+            }
+            float most = 0f;
+            for (int i = 0; i < soup.Length; i++)
+            {
+                most = Mathf.Max(most, Mathf.Max(Mathf.Abs(soup[i].x), Mathf.Abs(soup[i].z)));
+            }
+            return most;
+        }
+
         // The model laid into the slab's unit square, or null when the sprite or the model can't be read. barrelEnd: the
         // model's (ThingModelInfo.BarrelEnd, model space). Worked out once per model and material.
         public static Hold HoldOf(ModelHandle m, Vector3 barrelEnd, Material mat, Vector2 drawSize, float angleOffset)

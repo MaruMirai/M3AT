@@ -144,6 +144,8 @@ namespace M3AT
         private const float BendHurry = 2.5f;   // how much faster the bend plays at a full stride
         private const int DropTicks = 120;   // the longest a person set down is still drawn in the carrier's arms (Dropping)
         private const float LoadReach = 0.2f;   // model units: a hauled thing's middle is at least this far in front
+        private const float ChestFront = 0.15f;   // model units: how far in front of the middle a hauled thing's back edge stays (the chibi's chest reaches about 0.10, a fat one's more)
+        private const float CarriedShare = 0.8f;   // IsoRim's Carried.ItemScale: a carried thing's share of its size on the ground
         private const string CarryBone = "spine.002";   // the bone a carried person rides (walk.CHEST_BONE)
         private const float Lift = 0.04f;   // model units (cells before size): IsoRim's outline hull reaches 0.03 past the
                                             // soles, which sit at y 0, so unlifted the ground hides the rim under the feet
@@ -177,7 +179,8 @@ namespace M3AT
         private const float GlanceLook = 0.8f;   // share of the way it turns its head round toward them (LessonLookOf)
         private const float MealScale = 0.5f;   // of the carried size: a meal being eaten (DrawMeal), by the game's FoodMeals category
         private const float FoodScale = 0.3f;   // .. and any other food being eaten (pemmican, berries, chocolate)
-        private const float MealTurn = 90f;   // degrees about the vertical a meal being eaten is turned
+        private const float MealTurn = 0f;   // degrees about the vertical a meal being eaten in the hand is turned (0: its long side to the body)
+        private const float HandMealFront = 0.11f;   // model units: how far in front of the middle a meal eaten from the hand keeps its back edge (just off the chest; ChestFront for hauling)
         private const float MealTableTurn = 0f;   // .. and one on a table: its long side across the eater, not toward it
         private const float MealFromEdge = 0.15f;   // cells in from the table's edge on the eater's side to a meal's middle there
         private const float EatCloser = 0.2f;   // cells a pawn sat eating at a table is drawn toward it, so its hands reach the meal (eat_sit)
@@ -496,13 +499,14 @@ namespace M3AT
             public float toss;   // 0 .. 1: how far into pitching horseshoes or hoopstone it is (Tossing)
             public string tossClip;   // toss, or snowball for Romance on the Rim's snowball fight (kept while it eases out)
             public Vector3 eatWay;   // the way to the table a pawn sat eats at (EatCloser), flat, unit; kept as it eases out
-            public Vector3 kissWay;
+            public Vector3 kissWay;   // the way and distance to the partner while kissing (KissOf), flat, cells
             public float share;   // 0 .. 1: how far a reader and its watcher have drawn together (SharePartnerOf), eased
             public Vector3 shareWay;   // the way and distance to the other, flat, cells
             public float readShow;   // 0 .. 1: how far the book is held out to a watcher sat beside (ShowSideOf), eased
             public string readShowSide;   // L or R, the watcher's side (kept while it eases back)
             public float listen;   // 0 .. 1: how far a listener at a performance has stepped toward the performer (ListeningTo), eased
-            public Vector3 listenWay;   // the way and distance to the performer, flat, cells   // the way and distance to the partner while kissing (KissOf), flat, cells
+            public Vector3 listenWay;   // the way and distance to the performer, flat, cells
+            public Vector3 drawnAt;   // where the figure was last drawn (true cells: its place after the moves for work, a kiss and the like)
             public float tossAt = -1f;   // how far through the toss clip it is this frame, 0 .. 1; -1: between throws (TossPhase)
             public float? tossFace;   // which way the pin is (degrees clockwise from north); null: none
             public bool cold;   // colder than it is comfortable (ColdOf), looked at with its legs
@@ -6273,6 +6277,12 @@ namespace M3AT
             ease.holding = held != null && Handles(held) && HoldPerson(pawn, held.thingIDNumber, ease, fig, at, yaw, size, false) ? held.thingIDNumber : 0;
             Vector3 hands = (wristR + wristL) * 0.5f;
             hands.z = Mathf.Max(hands.z, LoadReach);
+            if (held == null && size > 0.01f)
+            {
+                // A hauled thing is held out like a tray, its back edge clear of the chest: IsoRim draws its middle at the
+                // point given, and a meal, a third of a cell across, put its back half into the body.
+                hands.z = Mathf.Max(hands.z, ChestFront + CarriedReachOf(load) / size);
+            }
             // A cuddled pet sits along the left forearm (cuddle_pet), its head to the carrier's left, its trunk's middle
             // there (IsoRim's backAt, from its base point, as last drawn).
             Vector3 elbowL = Vector3.zero;
@@ -6286,9 +6296,10 @@ namespace M3AT
             }
             // Eating standing, the meal sits on the left palm (between the wrist and the fingers' joint, lifted from the
             // hand's bone to the palm's face, which eat_stand turns up) rather than where the game would hold it out (its
-            // ingestHoldOffsetStanding), which IsoRim would otherwise put it at; turned with the hand about the vertical.
+            // ingestHoldOffsetStanding), which IsoRim would otherwise put it at. It is kept square to the body, as a tray is
+            // held, not turned with the hand: the left fingers point across the body, which turned it diagonally and put a
+            // corner into the chest; and held out far enough that its back edge clears the chest, the palm under its near half.
             Vector3 fingers;
-            float handTurn = 0f;
             // Feeding a patient with the taming clips, the meal is on the right palm, held out to them palm up.
             bool feeding = held == null && FeedingFromHand(pawn, ease);
             // A pill or powder is held on the left palm the same way (the pill clip pinches from it).
@@ -6299,18 +6310,16 @@ namespace M3AT
                 if (skin.JointOf(fig, feeding ? "hand.R.001" : "hand.L.001", out fingers))
                 {
                     hands = (wrist + fingers) * 0.5f;
-                    // The model space faces +z, so this is the turn that takes straight ahead onto the fingers' way.
-                    Vector3 way = fingers - wrist;
-                    if (way.x * way.x + way.z * way.z > 1e-8f)
-                    {
-                        handTurn = Mathf.Atan2(way.x, way.z) * Mathf.Rad2Deg;
-                    }
                 }
                 else
                 {
                     hands = wrist;
                 }
                 hands.y += PalmLift;
+                if (size > 0.01f)
+                {
+                    hands.z = Mathf.Max(hands.z, HandMealFront + CarriedReachOf(load) / CarriedShare * CarriedItemScale * EatenShareOf(load) / size);
+                }
             }
             try
             {
@@ -6330,7 +6339,7 @@ namespace M3AT
                 }
                 else if (held == null && (feeding || ease.eatClip != null && ease.eat >= 0.5f))
                 {
-                    DrawMeal(pawn, load, hold, yaw, eatenInHand ? handTurn : 0f);
+                    DrawMeal(pawn, load, hold, yaw, 0f);
                 }
                 else if (ease.holding != 0 && holds.TryGetValue(ease.holding, out person))
                 {
@@ -6350,6 +6359,37 @@ namespace M3AT
             {
                 eatenInHand = false;
             }
+        }
+
+        // How far a carried thing reaches out from its middle along the ground as IsoRim draws it carried (cells): its
+        // model's reach (WeaponFit.ReachOf) at its scale, else half its picture's larger side, at CarriedShare.
+        private static float CarriedReachOf(Thing t)
+        {
+            try
+            {
+                ThingModelInfo info;
+                if (Api.ReadThingModel(t, ThingModelUse.Ground, out info) && info.Model != null)
+                {
+                    float reach = WeaponFit.ReachOf(info.Model);
+                    if (reach > 0f)
+                    {
+                        return reach * info.Scale * CarriedShare;
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Log.ErrorOnce(Tag + "Measuring a carried thing failed: " + e, 0x4d3a7e02);
+            }
+            Vector2 drawn = t.def.graphicData != null ? t.def.graphicData.drawSize : Vector2.one;
+            return Mathf.Max(drawn.x, drawn.y) * 0.5f * CarriedShare;
+        }
+
+        // A meal being eaten is drawn at MealScale of its carried size (the game's FoodMeals category), any other food at
+        // FoodScale (DrawMeal).
+        private static float EatenShareOf(Thing t)
+        {
+            return t.def.IsWithinCategory(DefDatabase<ThingCategoryDef>.GetNamedSilentFail("FoodMeals")) ? MealScale : FoodScale;
         }
 
         // Feeding a patient with the taming clips (FeedAsTame): at it, the hand held out to them.
@@ -6389,7 +6429,7 @@ namespace M3AT
                         }
                     }
                 }
-                float share = meal.def.IsWithinCategory(DefDatabase<ThingCategoryDef>.GetNamedSilentFail("FoodMeals")) ? MealScale : FoodScale;
+                float share = EatenShareOf(meal);
                 if (!Api.DrawItem(meal, hold, yaw + (onTable ? MealTableTurn : MealTurn) + turn, CarriedItemScale * share))
                 {
                     Api.DrawCarried(pawn, hold, yaw);
@@ -7925,24 +7965,26 @@ namespace M3AT
                     // Weaving drunk on the move, to either side of its path.
                     at += Quaternion.Euler(0f, yaw, 0f) * Vector3.right * ease.weave;
                 }
-                if (ease.workKind == "bench" || ease.workKind == "hammer_bench")
+                // (Each work branch only while the work is shown: Ease.workKind is kept after the work ends, so it can ease
+                // out, and a stale one here took the chain and skipped the kiss, the shared reading and the listening.)
+                if ((ease.workKind == "bench" || ease.workKind == "hammer_bench") && ease.shownWork > 0f)
                 {
                     // Stood at a bench: the game keeps it in the middle of the cell beside it, out of reach of its top, so
                     // it is drawn stepped up to it, as far as it has taken up the stance.
                     at += Quaternion.Euler(0f, ease.workFace, 0f) * Vector3.forward * (BenchCloser * ease.shownWork);
                 }
-                else if (ease.workKind == "chalk")
+                else if (ease.workKind == "chalk" && ease.shownWork > 0f)
                 {
                     // Drawing on the floor: the game keeps it in the middle of the cell beside the drawing, so it is drawn
                     // shuffled up to it on its knees, the chalk on the drawing's near half.
                     at += Quaternion.Euler(0f, ease.workFace, 0f) * Vector3.forward * (ChalkCloser * ease.shownWork);
                 }
-                else if (ease.workKind == "stir_campfire")
+                else if (ease.workKind == "stir_campfire" && ease.shownWork > 0f)
                 {
                     // Sat at a campfire: drawn shuffled up to it, so the hands reach its stone ring.
                     at += Quaternion.Euler(0f, ease.workFace, 0f) * Vector3.forward * (FireCloser * ease.shownWork);
                 }
-                else if (ease.workKind == "tame" && pawn.CurJobDef == JobDefOf.FeedPatient)
+                else if (ease.workKind == "tame" && ease.shownWork > 0f && pawn.CurJobDef == JobDefOf.FeedPatient)
                 {
                     // Feeding a patient in a bed stood at it: stepped up to the bed, so the meal held out reaches them.
                     at += Quaternion.Euler(0f, ease.workFace, 0f) * Vector3.forward * (FeedCloser * ease.shownWork);
@@ -8010,6 +8052,7 @@ namespace M3AT
                     at.x = Mathf.Lerp(at.x, beside.x, ease.shownWork);
                     at.z = Mathf.Lerp(at.z, beside.z, ease.shownWork);
                 }
+                ease.drawnAt = at;
                 if (!lying && !bedding && !seated && flight < 0f && swim <= 0f && lift <= 0f && duck <= 0f)
                 {
                     ease.upFrame = Time.frameCount;   // on its feet: it can fall from here

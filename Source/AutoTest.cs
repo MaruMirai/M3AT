@@ -3436,6 +3436,18 @@ namespace M3AT
                         {
                             walkShot = true;
                             yield return Shot(name + "_carrying");
+                            // Close up from in front and the side, to see how the meal sits on the hands and against the chest.
+                            IntVec3 step = pawn.pather.nextCell - pawn.Position;
+                            float heading = step.x != 0 || step.z != 0 ? Mathf.Atan2(step.x, step.z) * Mathf.Rad2Deg : pawn.Rotation.AsAngle;
+                            Look(pawn, heading + 180f);
+                            lookPitch = 15f;
+                            lookDistance = 1.6f;
+                            lookHeight = 0.55f;
+                            yield return Shot(name + "_carrying_close");
+                            lookPitch = LookPitch;
+                            lookDistance = LookDistance;
+                            lookHeight = LookHeight;
+                            Look(pawn, 0f);
                         }
                     }
                     if (atTable && pawn.Position == chairAt && !moving)
@@ -4759,6 +4771,10 @@ namespace M3AT
                 case "kiss":
                     b.Position = middle + new IntVec3(2, 0, 0);
                     b.Notify_Teleported();
+                    // As though both had last worked stood at a bench: Ease.workKind is kept after the work ends, and a
+                    // stale one once took the drawing's place chain ahead of the kiss, which then left them a cell apart.
+                    WalkFigures.AutoSetField(a, "workKind", "bench");
+                    WalkFigures.AutoSetField(b, "workKind", "bench");
                     lordJob = MakeLordJob("LordJob_Kiss", a, b, Enum.ToObject(GenTypes.GetTypeInAnyAssembly("RomanceOnTheRim.KissUtility").GetNestedType("KissType"), 1), 3f);
                     break;
                 case "skygaze":
@@ -4889,6 +4905,7 @@ namespace M3AT
             var seenA = new HashSet<string>();
             var seenB = new HashSet<string>();
             bool interacted = false;
+            float kissGap = float.MaxValue;
             float kissed = 0f, kissedB = 0f, pillowA = 0f, pillowB = 0f, looked = 0f;
             int throwsA = 0, throwsB = 0;
             float listened = 0f, listenLook = 0f, shown = 0f;
@@ -4910,6 +4927,11 @@ namespace M3AT
                 if (Field<string>(b, "eatClip") == "kiss")
                 {
                     kissedB = Mathf.Max(kissedB, Field<float>(b, "eat"));
+                }
+                if (date == "kiss" && Field<float>(a, "eat") > 0.95f && Field<float>(b, "eat") > 0.95f)
+                {
+                    Vector3 apart = Field<Vector3>(a, "drawnAt") - Field<Vector3>(b, "drawnAt");
+                    kissGap = Mathf.Min(kissGap, new Vector2(apart.x, apart.z).magnitude);
                 }
                 pillowA = Mathf.Max(pillowA, Field<float>(a, "lovinShift"));
                 pillowB = Mathf.Max(pillowB, Field<float>(b, "lovinShift"));
@@ -4948,6 +4970,8 @@ namespace M3AT
             {
                 case "kiss":
                     Check("kiss: both kiss", kissed > 0.9f && kissedB > 0.9f, "kiss weight " + kissed.ToString("F2") + " / " + kissedB.ToString("F2"));
+                    // Drawn KissGap (0.42 for grown pawns) apart, not the cell the mod stands them apart.
+                    Check("kiss: drawn together", kissGap < 0.6f, "nearest drawn apart " + (kissGap < float.MaxValue ? kissGap.ToString("F2") + " cells" : "never both kissing"));
                     break;
                 case "music":
                     Check("music: the player at the keys", played == "piano", "work kind " + (played ?? "none"));
@@ -6009,6 +6033,22 @@ namespace M3AT
             }
             FieldInfo field = typeof(Ease).GetField(name);
             return field != null ? field.GetValue(e) : null;
+        }
+
+        // Sets one of the pawn's Ease fields (making its Ease if it has none yet), to stage what it was doing before.
+        internal static void AutoSetField(Pawn pawn, string name, object value)
+        {
+            Ease e;
+            if (!eases.TryGetValue(pawn.thingIDNumber, out e))
+            {
+                e = new Ease();
+                eases[pawn.thingIDNumber] = e;
+            }
+            FieldInfo field = typeof(Ease).GetField(name);
+            if (field != null)
+            {
+                field.SetValue(e, value);
+            }
         }
     }
 }
