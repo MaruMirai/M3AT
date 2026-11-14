@@ -4623,7 +4623,8 @@ namespace M3AT
             // the patient's own cell, where the cell gives no way at all. On the ground it is drawn kneeling beside them
             // (KneelBeside); at a bed it stays where it stands.
             Ease lying;
-            if (!coming && LyingOf(a.Thing, out lying))
+            float inset = -1f;
+            if (!coming && (LyingOf(a.Thing, out lying) || AnimalLyingOf(a.Thing, out lying, out inset)))
             {
                 if (kind == "bench" || kind == "bench_sit" || kind == "tame")
                 {
@@ -4649,7 +4650,7 @@ namespace M3AT
                     {
                         lying.onBack = true;
                     }
-                    beside = KneelBeside(pawn, "work_" + kind, lying, mine, on.thingIDNumber, came, out face, kind == "visit" ? VisitBack : 0f);
+                    beside = KneelBeside(pawn, "work_" + kind, lying, mine, on.thingIDNumber, came, out face, kind == "visit" ? VisitBack : 0f, inset);
                 }
             }
             return kind;
@@ -4667,6 +4668,87 @@ namespace M3AT
             return true;
         }
 
+        // An animal lying (downed, asleep or dead), which IsoRim draws, not this mod, so it has no lyingJoints of its own: a
+        // stand-in lying body made from where IsoRim draws it (Api.ReadHost: its place and yaw; Api.FigureBounds: the box it
+        // fills as posed, in its own space, so on its side the legs reach out to one side and the back to the other), for
+        // KneelBeside to keep the doctor's knees off and its hands at the near side of the trunk. Without it the doctor
+        // faced the animal's cell from where the game stood it, often on that very cell, so any way at all. chest is the
+        // trunk's middle (its line, x = 0, as IsoRim rolls a downed animal about it), inset how far out from there its
+        // hands go: the box's back side (-x, the back as it lies on its side), plus AnimalInset. Cached for AnimalBodyFrames
+        // per animal, as measuring draws its whole model.
+        private const float AnimalInset = 0.03f;   // cells: the doctor's hands this far out from an animal's drawn back
+        private const int AnimalBodyFrames = 30;
+        private const float AnimalGridStep = 0.1f;   // cells: the stand-in joints' spacing over its footprint
+        private class AnimalBody
+        {
+            public Ease body;
+            public float inset;
+            public int frame;
+        }
+        private static readonly Dictionary<int, AnimalBody> animalBodies = new Dictionary<int, AnimalBody>();
+
+        private static bool AnimalLyingOf(Thing thing, out Ease e, out float inset)
+        {
+            e = null;
+            inset = -1f;
+            Pawn animal = thing as Pawn ?? (thing as Corpse)?.InnerPawn;
+            Thing drawn = thing as Pawn ?? (Thing)(thing as Corpse);
+            if (animal == null || drawn == null || !drawn.Spawned || animal.RaceProps == null || animal.RaceProps.Humanlike
+                || (!animal.Dead && animal.GetPosture() == PawnPosture.Standing) || Api.Version < 13)
+            {
+                return false;
+            }
+            AnimalBody known;
+            if (animalBodies.TryGetValue(animal.thingIDNumber, out known) && Time.frameCount - known.frame < AnimalBodyFrames)
+            {
+                e = known.body;
+                inset = known.inset;
+                return true;
+            }
+            HostTransform h;
+            if (!Api.ReadHost(drawn, out h))
+            {
+                return false;
+            }
+            Vector3 lo, hi;
+            if (!Api.FigureBounds(animal, out lo, out hi) || hi.x <= lo.x || hi.z <= lo.z)
+            {
+                // (drawn no model: a rough box by body size, the back on -x as it lies on its side)
+                float r = 0.25f * Mathf.Sqrt(Mathf.Max(0.1f, animal.BodySize));
+                lo = new Vector3(-r, 0f, -1.6f * r);
+                hi = new Vector3(2f * r, 0f, 1.6f * r);
+            }
+            Vector3 origin = new Vector3(drawn.DrawPos.x, 0f, drawn.DrawPos.z);
+            Quaternion turn = Quaternion.AngleAxis(h.yaw, Vector3.up);
+            int nx = Mathf.Clamp(Mathf.CeilToInt((hi.x - lo.x) / AnimalGridStep), 1, 12);
+            int nz = Mathf.Clamp(Mathf.CeilToInt((hi.z - lo.z) / AnimalGridStep), 1, 16);
+            Vector3[] joints = new Vector3[(nx + 1) * (nz + 1)];
+            int k = 0;
+            for (int i = 0; i <= nx; i++)
+            {
+                for (int j = 0; j <= nz; j++)
+                {
+                    Vector3 local = new Vector3(Mathf.Lerp(lo.x, hi.x, (float)i / nx), 0f, Mathf.Lerp(lo.z, hi.z, (float)j / nz));
+                    joints[k++] = origin + turn * local;
+                }
+            }
+            float middle = h.model ? h.backAt.z : 0.5f * (lo.z + hi.z);
+            Ease body = new Ease();
+            body.lyingChest = origin + turn * new Vector3(0f, 0f, Mathf.Clamp(middle, lo.z, hi.z));
+            body.lyingAlong = turn * Vector3.forward;
+            body.lyingJoints = joints;
+            body.lyingSize = 1f;
+            body.lyingFrame = Time.frameCount;
+            inset = Mathf.Max(0.05f, -lo.x) + AnimalInset;
+            if (animalBodies.Count > 64)
+            {
+                animalBodies.Clear();
+            }
+            animalBodies[animal.thingIDNumber] = new AnimalBody { body = body, inset = inset, frame = Time.frameCount };
+            e = body;
+            return true;
+        }
+
         // Where a pawn working on someone lying on the ground is drawn (true cells, flat) and the way it faces: kneeling
         // with its hands (the clip's, first frame) on the near side of their chest, out from it on whichever way round
         // (KneelWays of them) leaves its knees and feet (the clip's joints below KneelLow) clearest of the body as drawn,
@@ -4675,7 +4757,7 @@ namespace M3AT
         // best; then square to the body, then the way it kneels already (so it doesn't hop about as the body breathes),
         // and without came, the side of the body it is on. back (cells at size 1) puts the hands that much further out, for
         // a clip whose hands don't reach for the body (a visitor sat with them on its knees, VisitBack).
-        private static Vector3 KneelBeside(Pawn pawn, string clip, Ease lying, Ease mine, int whom, Vector3? came, out float face, float back = 0f)
+        private static Vector3 KneelBeside(Pawn pawn, string clip, Ease lying, Ease mine, int whom, Vector3? came, out float face, float back = 0f, float bodyInset = -1f)
         {
             float size = SizeOf(pawn);
             Vector3 hands = 0.5f * (skin.HeadOf(clip, "hand.L") + skin.HeadOf(clip, "hand.R")) * size;
@@ -4686,7 +4768,7 @@ namespace M3AT
             from.y = 0f;
             Vector3? kept = mine != null && mine.besideOf == whom ? mine.besideWay : null;
             float clear = KneelClear * Mathf.Max(size, lying.lyingSize);
-            float inset = (ChestInset + back) * lying.lyingSize;
+            float inset = bodyInset >= 0f ? bodyInset + back * lying.lyingSize : (ChestInset + back) * lying.lyingSize;
             float best = float.MaxValue;
             Vector3 bestWay = Vector3.forward, bestAt = chest;
             for (int i = 0; i < KneelWays; i++)

@@ -3978,11 +3978,13 @@ namespace M3AT
 
         // Tending a patient (TendPatient): in a bed (stood at it, bench), on a sleeping spot and lying on the bare floor
         // (knelt beside them, crouch), each with medicine fetched first and without. The floor is tended drafted, as the
-        // game only lets a doctor tend someone on the ground by order. tend_<where> (bed, spot, floor) for one place.
+        // game only lets a doctor tend someone on the ground by order; and a warg downed on the floor (animal: drawn by
+        // IsoRim, so knelt beside its drawn body by AnimalLyingOf, not on its cell facing anywhere). tend_<where> (bed,
+        // spot, floor, animal) for one place.
         private static IEnumerator TendTest(string only)
         {
-            string[] places = { "bed", "spot", "floor" };
-            string[] wantKind = { "bench", "crouch", "crouch" };
+            string[] places = { "bed", "spot", "floor", "animal" };
+            string[] wantKind = { "bench", "crouch", "crouch", "crouch" };
             for (int c = 0; c < places.Length; c++)
             {
                 string where = places[c];
@@ -3992,10 +3994,16 @@ namespace M3AT
                 }
                 foreach (bool meds in new[] { true, false })
                 {
+                    if (meds && where == "animal")
+                    {
+                        continue;   // (a drafted doctor ordered to tend an animal with medicine never starts: Wait_Combat)
+                    }
                     ClearPatch();
                     string name = where + (meds ? "_meds" : "_nomeds");
                     Building_Bed bed = null;
-                    if (where != "floor")
+                    bool animal = where == "animal";
+                    bool ground = where == "floor" || animal;
+                    if (!ground)
                     {
                         ThingDef bedDef = DefDatabase<ThingDef>.GetNamed(where == "spot" ? "SleepingSpot" : "Bed");
                         Thing made = ThingMaker.MakeThing(bedDef, bedDef.MadeFromStuff ? ThingDefOf.WoodLog : null);
@@ -4003,9 +4011,19 @@ namespace M3AT
                         bed = (Building_Bed)Spawn(made, middle + new IntVec3(1, 0, 0), Rot4.North);
                         bed.Medical = true;
                     }
-                    Pawn patient = NewPawn(middle + new IntVec3(1, 0, where == "floor" ? 0 : -1), null);
+                    Pawn patient;
+                    if (animal)
+                    {
+                        PawnKindDef kindDef = DefDatabase<PawnKindDef>.GetNamedSilentFail("Warg") ?? PawnKindDefOf.Thrumbo;
+                        patient = PawnGenerator.GeneratePawn(new PawnGenerationRequest(kindDef, Faction.OfPlayer, fixedBiologicalAge: 5f));
+                        Spawn(patient, middle + new IntVec3(1, 0, 0));
+                    }
+                    else
+                    {
+                        patient = NewPawn(middle + new IntVec3(1, 0, ground ? 0 : -1), null);
+                    }
                     Pawn doctor = NewDoctor(middle + new IntVec3(-2, 0, -1));
-                    Wound(patient, 8);
+                    Wound(patient, animal ? 3 : 8);   // (a warg dies of eight)
                     if (bed != null)
                     {
                         HealthUtility.AdjustSeverity(patient, HediffDefOf.Anesthetic, 1f);   // (down and kept there)
@@ -4015,7 +4033,10 @@ namespace M3AT
                     {
                         // On the floor it goes down where it stands, as in play, so it falls and lies as a ragdoll (which
                         // steps by frame time, none while the test steps the game paused: so that runs at normal speed).
-                        Hold(patient);
+                        if (patient.jobs != null)
+                        {
+                            Hold(patient);
+                        }
                         Look(patient, 0f);
                         yield return WaitReal(2f);
                         HealthUtility.AdjustSeverity(patient, HediffDefOf.Anesthetic, 1f);
@@ -4030,7 +4051,7 @@ namespace M3AT
                         m.stackCount = 10;
                         medicine = Spawn(m, middle + new IntVec3(-3, 0, 2));
                     }
-                    if (where == "floor" && doctor.drafter != null)
+                    if (ground && doctor.drafter != null)
                     {
                         doctor.drafter.Drafted = true;
                     }
@@ -4042,6 +4063,7 @@ namespace M3AT
                     int tendTicks = 0;
                     bool tending = false, placed = false, topShot = false;
                     float nearest = float.MaxValue;
+                    float facingOff = 0f;
                     for (int i = 0; i < 200; i++)
                     {
                         if (bed != null && !patient.InBed())
@@ -4054,7 +4076,7 @@ namespace M3AT
                             Job job = JobMaker.MakeJob(JobDefOf.TendPatient, patient, medicine != null && medicine.Spawned ? medicine : null);
                             job.count = 1;
                             job.playerForced = true;
-                            job.draftedTend = where == "floor";
+                            job.draftedTend = ground;
                             doctor.jobs.StartJob(job, JobCondition.InterruptForced);
                         }
                         yield return Ticks(15, "tend_" + name, doctor);
@@ -4073,7 +4095,14 @@ namespace M3AT
                             kind = k;
                         }
                         work = Mathf.Max(work, w);
-                        Vector3[] joints = Field<Vector3[]>(patient, "lyingJoints");
+                        Vector3[] joints = animal ? new[] { patient.DrawPos } : Field<Vector3[]>(patient, "lyingJoints");
+                        if (animal && k == "crouch" && w > 0.9f && beside.HasValue)
+                        {
+                            // (facing the animal's body: its workFace against the way from where it kneels to the animal)
+                            Vector3 to = patient.DrawPos - beside.Value;
+                            to.y = 0f;
+                            facingOff = Mathf.Max(facingOff, Mathf.Abs(Mathf.DeltaAngle(Field<float>(doctor, "workFace"), to.AngleFlat())));
+                        }
                         if (k == "crouch" && w > 0.9f && beside.HasValue && joints != null)
                         {
                             placed = true;
@@ -4132,7 +4161,13 @@ namespace M3AT
                         untendedBefore + " wounds untended before, " + untendedAfter + " after; job " + (doctor.CurJobDef != null ? doctor.CurJobDef.defName : "none")
                         + ", " + tendTicks + " ticks at it, patient " + patient.GetPosture() + (bed != null ? ", in bed " + patient.InBed() : ""));
                     Check(name + ": work_" + wantKind[c], kind == wantKind[c] && work > 0.9f, "work kind " + (kind ?? "none") + ", weight " + work.ToString("F2"));
-                    if (wantKind[c] == "crouch")
+                    if (animal)
+                    {
+                        Check(name + ": faces the animal", placed && facingOff < 60f, "most off the way to its middle " + facingOff.ToString("F0") + " degrees");
+                        Check(name + ": knelt off the animal's middle", placed && nearest > 0.3f && nearest < 1.6f,
+                            placed ? "hips " + nearest.ToString("F2") + " cells from its middle" : "not placed beside (KneelBeside)");
+                    }
+                    else if (wantKind[c] == "crouch")
                     {
                         Check(name + ": knelt beside, off the patient", placed && nearest > 0.3f && nearest < 1f,
                             placed ? "hips " + nearest.ToString("F2") + " cells from the patient's nearest joint" : "not placed beside (KneelBeside)");
