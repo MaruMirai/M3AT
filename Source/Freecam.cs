@@ -1208,7 +1208,8 @@ namespace M3AT
             distance = Mathf.Clamp(distance, JumpNearest, JumpFarthest);
             pitch = Mathf.Clamp(Mathf.Max(pitch, JumpLeastPitch), LeastPitch, MostPitch);
             Vector3 fwd = Quaternion.Euler(pitch, yaw, 0f) * Vector3.forward;
-            Vector3 to = new Vector3(jumpAt.x, JumpAbove, jumpAt.z) - fwd * distance;
+            Vector3 at = OnItsFloor(map, jumpAt);
+            Vector3 to = new Vector3(at.x, at.y + JumpAbove, at.z) - fwd * distance;
             IntVec3 size = map.Size;
             to.x = Mathf.Clamp(to.x, -MapMargin, size.x + MapMargin);
             to.z = Mathf.Clamp(to.z, -MapMargin, size.z + MapMargin);
@@ -1227,6 +1228,44 @@ namespace M3AT
             glideTo = to;
             glideTime = 0f;
             gliding = true;
+        }
+
+        // A cell's middle moved to where IsoRim draws it: with stacked floors (IsoRimZ), an upper floor's cells are rows
+        // of the same map north of the ground's, drawn over the ground at that floor's height, so a jump to a colonist
+        // upstairs went to the raw row, off the map. Asked of the layout itself rather than Api.DrawnPosition, which
+        // leaves a point on a hidden floor where it is, as the floor the jump's target is on may not be shown yet
+        // (IsoRimZ shows it from its own patch on the jump). True space, as the eye is: y the floor's height over the
+        // ground in cells (IsoRim's drawn space divides heights by Api.HeightSquash, about 0.003).
+        private static Vector3 OnItsFloor(Map m, Vector3 at)
+        {
+            try
+            {
+                IFloorLayout layout = IsoRim.Api.Floors;
+                if (layout == null)
+                {
+                    return at;
+                }
+                int rows = layout.GroundRows(m);
+                int z = Mathf.FloorToInt(at.z);
+                if (rows <= 0 || z < rows)
+                {
+                    return at;
+                }
+                int count = layout.FloorCount(m);
+                for (int k = 1; k <= count; k++)
+                {
+                    layout.Floor(m, k, out float height, out int shift);
+                    if (z >= shift && z < shift + rows)
+                    {
+                        return new Vector3(at.x, height, at.z - shift);
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Log.WarningOnce(Tag + "couldn't place a jump on its floor: " + e.Message, 0x4d33a7f1);
+            }
+            return at;
         }
 
         // The game's camera kept a little ahead of the eye on the ground: the game hears the map from there, and puts
