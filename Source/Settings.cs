@@ -507,7 +507,7 @@ namespace M3AT
                 list.CheckboxLabeled("  Visible prosthetic eyes", ref Settings.prostheticEyes,
                     "Bionic and archotech eyes are drawn with a mechanical iris. Off: they look like the pawn's own eyes.");
                 list.CheckboxLabeled("  Visible archotech prosthetics", ref Settings.archotechProsthetics,
-                    "Archotech limbs are drawn in the olive and yellow-circuit look of archotech machinery. Off: they look like natural flesh, as the game describes them.");
+                    "Archotech limbs are drawn in the olive and yellow-circuit look of archotech machinery. Off: they look like natural flesh, as the game used to describe them.");
             }
         }
 

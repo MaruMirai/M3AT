@@ -60,11 +60,11 @@ blender -b Models/pawnHumanRig.blend --python anim_scripts/export_frames.py -- "
 
 ## Credits
 
-- **Peren717**: [IsoRim Waylith](https://steamcommunity.com/sharedfiles/filedetails/?id=3819577715), and for expanding its API to better support M3AT
+- **Peren717**: [IsoRim Waylith](https://steamcommunity.com/sharedfiles/filedetails/?id=3819577715), thanks for expanding its API to support M3AT
 - **Kndzio**: the original [IsoRim](https://steamcommunity.com/sharedfiles/filedetails/?id=3819266222), whose shaders the `MarusSmooth` shaders are adapted from
 - **Nals**: [Facial Animation](https://steamcommunity.com/sharedfiles/filedetails/?id=1635901197)
-- **Monymensss** (Sketchfab): the chibi base model, ["Chibi Base Body"](https://sketchfab.com/3d-models/chibi-base-body-96d80b8fd2f542999b11e94ef4ddd9fb) (CC BY 4.0), rigged and reshaped here
-- **Claude**: nearly everything else
+- **Monymensss** (Sketchfab): the chibi base model, ["Chibi Base Body"](https://sketchfab.com/3d-models/chibi-base-body-96d80b8fd2f542999b11e94ef4ddd9fb) (CC BY 4.0), rigged and reshaped for M3AT
+- **Claude**: most of the hard work
 
 ## Licence
 

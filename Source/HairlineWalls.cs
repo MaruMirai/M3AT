@@ -22,7 +22,7 @@ namespace M3AT
         public static bool HairlineWallsOn = true;   // false: the builder's walls under the hair's open edges, as before
         // cells between the walls' columns along the hairline, measured along it, not per segment of it, as the
         // Hairline curve's points are only about 0.013 apart (at 0.008 a quarter of a cut style's triangles)
-        public static float WallStep = 0.02f;
+        public static float WallStep = 0.03f;
         public static bool WallStepAlong = true;     // false: per segment of the line, as before (the harness's M3AT_WALL_SEGMENTS)
         private const float WallReach = 0.1f;        // cells out from the skin a wall looks for the hair
         private const float WallSink = 0.006f;       // cells a wall's foot is sunk into the head
