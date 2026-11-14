@@ -180,6 +180,7 @@ namespace M3AT
         private const float MealTurn = 90f;   // degrees about the vertical a meal being eaten is turned
         private const float MealTableTurn = 0f;   // .. and one on a table: its long side across the eater, not toward it
         private const float MealFromEdge = 0.15f;   // cells in from the table's edge on the eater's side to a meal's middle there
+        private const float EatCloser = 0.2f;   // cells a pawn sat eating at a table is drawn toward it, so its hands reach the meal (eat_sit)
         private const float PalmLift = 0.022f;   // model units from the hand's bone up to its palm's face (walk.HAND_HALF), where a meal eaten standing sits
         private const float CarriedItemScale = 0.8f;   // as IsoRim draws a carried item: its share of the game's size
         private const float EatEase = 3f;   // how fast a pawn takes up eating (or leaves it), per real second
@@ -494,6 +495,7 @@ namespace M3AT
             public int speakingFrame = -1;   // the frame speaking was set on (Time.frameCount); other frames count as none
             public float toss;   // 0 .. 1: how far into pitching horseshoes or hoopstone it is (Tossing)
             public string tossClip;   // toss, or snowball for Romance on the Rim's snowball fight (kept while it eases out)
+            public Vector3 eatWay;   // the way to the table a pawn sat eats at (EatCloser), flat, unit; kept as it eases out
             public Vector3 kissWay;
             public float share;   // 0 .. 1: how far a reader and its watcher have drawn together (SharePartnerOf), eased
             public Vector3 shareWay;   // the way and distance to the other, flat, cells
@@ -7944,6 +7946,19 @@ namespace M3AT
                 {
                     // Feeding a patient in a bed stood at it: stepped up to the bed, so the meal held out reaches them.
                     at += Quaternion.Euler(0f, ease.workFace, 0f) * Vector3.forward * (FeedCloser * ease.shownWork);
+                }
+                else if (seated && ease.eatClip != null && ease.eatClip.StartsWith("eat_sit") && ease.eat > 0f)
+                {
+                    // Sat eating at a table: the game keeps it in the middle of the chair's cell, where the hands fall short of
+                    // the meal at the table's near edge, so it is drawn scooted forward on the seat toward the table.
+                    Job job = pawn.CurJob;
+                    IntVec3 table = job != null && job.def == JobDefOf.Ingest ? job.GetTarget(TargetIndex.B).Cell : IntVec3.Invalid;
+                    if (table.IsValid && table.AdjacentToCardinal(pawn.Position))
+                    {
+                        IntVec3 to = table - pawn.Position;
+                        ease.eatWay = new Vector3(to.x, 0f, to.z);
+                    }
+                    at += ease.eatWay * (EatCloser * Mathf.SmoothStep(0f, 1f, ease.eat));
                 }
                 else if (ease.eatClip == "kiss" && ease.eat > 0f)
                 {
