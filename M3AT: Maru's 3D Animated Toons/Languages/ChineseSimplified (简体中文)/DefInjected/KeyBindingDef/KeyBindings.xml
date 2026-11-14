@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+  <M3AT_Freecam.label>开关自由视角</M3AT_Freecam.label>
+  <M3AT_FreecamUp.label>自由视角：上升</M3AT_FreecamUp.label>
+  <M3AT_FreecamDown.label>自由视角：下降</M3AT_FreecamDown.label>
+  <M3AT_FreecamBoost.label>自由视角：双倍速度</M3AT_FreecamBoost.label>
+  <M3AT_FreecamPointer.label>自由视角：切换指针</M3AT_FreecamPointer.label>
+</LanguageData>

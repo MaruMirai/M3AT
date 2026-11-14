@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+  <M3AT_WeaponType_handgun>Handguns</M3AT_WeaponType_handgun>
+  <M3AT_WeaponType_rifle>Rifles and launchers</M3AT_WeaponType_rifle>
+  <M3AT_WeaponType_bow>Bows</M3AT_WeaponType_bow>
+  <M3AT_WeaponType_grenade>Grenades</M3AT_WeaponType_grenade>
+  <M3AT_WeaponType_melee_1h>One-handed melee</M3AT_WeaponType_melee_1h>
+  <M3AT_WeaponType_melee_2h>Two-handed melee</M3AT_WeaponType_melee_2h>
+  <M3AT_Unbound>unbound</M3AT_Unbound>
+  <M3AT_MiddleButton>Middle button</M3AT_MiddleButton>
+  <M3AT_MouseButton4>Mouse button 4</M3AT_MouseButton4>
+  <M3AT_MouseButton5>Mouse button 5</M3AT_MouseButton5>
+  <M3AT_NoButton>None</M3AT_NoButton>
+  <M3AT_EarsAnyHeadgear>Any headgear</M3AT_EarsAnyHeadgear>
+  <M3AT_EarsHelmets>Helmets only</M3AT_EarsHelmets>
+  <M3AT_EarsNever>Never</M3AT_EarsNever>
+  <M3AT_SleepDressed>Normal clothes</M3AT_SleepDressed>
+  <M3AT_SleepNoEquipment>No equipment</M3AT_SleepNoEquipment>
+  <M3AT_SleepPajamas>Pajamas</M3AT_SleepPajamas>
+  <M3AT_SleepNothing>No clothes</M3AT_SleepNothing>
+  <M3AT_BeardsOff>Off</M3AT_BeardsOff>
+  <M3AT_DefaultsRestored>M3AT's options are back to their defaults.</M3AT_DefaultsRestored>
+  <M3AT_Pawns>Pawns</M3AT_Pawns>
+  <M3AT_PawnSize>Pawn size</M3AT_PawnSize>
+  <M3AT_PawnSizeTip>How big every pawn is drawn. 100% (default) is the usual size; children, gender and height variety are on top of it. It changes only how pawns look, not the space they take up.</M3AT_PawnSizeTip>
+  <M3AT_HeadShrink>Head shrink</M3AT_HeadShrink>
+  <M3AT_HeadShrinkTip>How much smaller the head is drawn than the default chibi. Left: default; right: smaller. No effect on vanilla or CE hit calculations.</M3AT_HeadShrinkTip>
+  <M3AT_HeightVariety>Height variety</M3AT_HeightVariety>
+  <M3AT_HeightVarietyTip>How much pawns' heights vary (default {0}). A normal distribution is used, with most near the usual size and a few further off. 0% makes everyone of a gender the same size. Each pawn's height is derived from the pawn's id, so no save data is needed.</M3AT_HeightVarietyTip>
+  <M3AT_GenderSizes>Gender size difference</M3AT_GenderSizes>
+  <M3AT_GenderSizesTip>Renders men and women with a 10% size difference eased in over teenage years. Off: they are the same size.</M3AT_GenderSizesTip>
+  <M3AT_VariedBodies>Varied bodies</M3AT_VariedBodies>
+  <M3AT_VariedBodiesTip>Each pawn gets a build of its own, somewhere around its body type: some thinner or heavier, some more muscular, so not every average body looks the same. Thin, fat and hulk pawns are still based on those bodies. Off: every pawn of a body type has the same body.</M3AT_VariedBodiesTip>
+  <M3AT_BodyVariety>Body variety</M3AT_BodyVariety>
+  <M3AT_BodyVarietyTip>How far pawns' builds wander from their body type (default {0}). Most stay near it, a few go most of the way to the next type. Each pawn's build is derived from the pawn's id, so no save data is needed.</M3AT_BodyVarietyTip>
+  <M3AT_HairDetail>Hair detail</M3AT_HairDetail>
+  <M3AT_HairDetailTip>How much of the shape of each hairstyle made from its sprites is kept (default {0}). Higher looks smoother and follows the art more closely, but costs more with many pawns on screen. Hair a mod supplies as a 3D model is always drawn in full. Takes effect when this window closes.</M3AT_HairDetailTip>
+  <M3AT_Beards>Beards</M3AT_Beards>
+  <M3AT_BeardsTip>2D (default): the beard's sprite is laid flat on the face. Cheap, but only seen from the front, and cut off at the chin.\n\n3D: each beard is built as a 3D mesh from its sprites the first time it is worn, so it is seen from every side.\n\nOff: no beards are drawn or built.</M3AT_BeardsTip>
+  <M3AT_EyeMovement>Eye movement</M3AT_EyeMovement>
+  <M3AT_EyeMovementTip>How far pawns' eyes glance and look about with Facial Animation, against how far they move on its 2D faces (default {0}). Its movements are small, a pixel or so, so higher makes them easier to see on the bigger 3D faces. 0%: the eyes stay still. Brows, eyelids and mouths move as Facial Animation moves them, whatever this is.</M3AT_EyeMovementTip>
+  <M3AT_TalkingMouths>Talking mouths</M3AT_TalkingMouths>
+  <M3AT_TalkingMouthsTip>With Facial Animation, a pawn's mouth opens and shuts as it talks: chatting with someone, at a party, visiting a patient, giving a speech. Uses each face's own open mouth. Off: mouths only move as Facial Animation moves them.</M3AT_TalkingMouthsTip>
+  <M3AT_Clothes>Clothes and gear</M3AT_Clothes>
+  <M3AT_Shoes>Shoes when dressed</M3AT_Shoes>
+  <M3AT_ShoesTip>A pawn whose clothes cover both the body and the legs (a shirt and trousers, or a duster, robe or suit) has plain shoes on. Off: bare feet unless a mod's shoes are worn.</M3AT_ShoesTip>
+  <M3AT_ArmourHidesTail>Armour hides tails</M3AT_ArmourHidesTail>
+  <M3AT_ArmourHidesTailTip>A pawn with a tail gene wearing full body armour (power, recon, cataphract or plate armour) has its tail hidden, as it would otherwise go through the armour. Vacsuits leave it out. Off: the tail is always shown.</M3AT_ArmourHidesTailTip>
+  <M3AT_EarHiding>Headgear hides animal ears</M3AT_EarHiding>
+  <M3AT_EarHidingTip>Whether cat, pig or floppy ears are hidden under what a pawn wears on its head, as they would otherwise go through it.\n\nAny headgear (default): helmets, and hats that cover the top of the head.\n\nHelmets only: armour helmets (simple, advanced, power armour, recon, cataphract and the like); the ears poke through other hats.\n\nNever: the ears are always shown.</M3AT_EarHidingTip>
+  <M3AT_WornGear>Worn packs, belts and headwear</M3AT_WornGear>
+  <M3AT_WornGearTip>Jump packs, shield belts and the other packs, belts and lances a pawn wears are shown on its back or waist, and headsets, masks, crowns, blindfolds and slave collars on its head and neck, with IsoRim's models of them. Off: they are not shown.</M3AT_WornGearTip>
+  <M3AT_GroundGarments>M3AT apparel on the ground</M3AT_GroundGarments>
+  <M3AT_GroundGarmentsTip>Clothes on the map will be drawn as the same 3D garment a pawn wears, squashed flat. Off (default): IsoRim's 3D models are used. Takes effect when this window closes.</M3AT_GroundGarmentsTip>
+  <M3AT_BedBlankets>Blankets in bed</M3AT_BedBlankets>
+  <M3AT_BedBlanketsTip>In beds that show only the sleeper's head, IsoRim's blanket is drawn over the body, raised by it. Other beds, such as sleeping spots and bedrolls, have no blanket. Off: pawns lie on top of every bed.</M3AT_BedBlanketsTip>
+  <M3AT_SleepWear>Clothes in bed</M3AT_SleepWear>
+  <M3AT_SleepWearTip>What pawns lying in a bed are drawn wearing, wherever their body shows (a bed with no blanket, or with blankets off). Only how they look: nothing is taken off or put on in the game.\n\nNormal clothes: what they wear.\n\nNo equipment (default): without armour, helmets and hats, coats, belts, packs or shields; shirts, trousers and the like stay on.\n\nPajamas: pastel pajamas; babies in their romper.\n\nNo clothes: no clothes; babies keep their romper.</M3AT_SleepWearTip>
+  <M3AT_VatClothes>Clothes in vats</M3AT_VatClothes>
+  <M3AT_VatClothesTip>Pawns in growth vats and biosculpter pods are drawn in their clothes. Off (default): they are drawn without them. Babies never get their romper in a vat.</M3AT_VatClothesTip>
+  <M3AT_Injuries>Injuries</M3AT_Injuries>
+  <M3AT_InjuryAnims>Injury-reactive animations</M3AT_InjuryAnims>
+  <M3AT_InjuryAnimsTip>Pawns limp on a bad leg, hold injured areas, etc. Off: they move as if unhurt. Off doesn't disable hit flinch animations, hopping for missing legs, or slowed movement.</M3AT_InjuryAnimsTip>
+  <M3AT_VisibleWounds>Visible injuries</M3AT_VisibleWounds>
+  <M3AT_VisibleWoundsTip>Wounds, blood, bandages and scars are drawn on the pawn, where the injury is. Wounds and blood are visible through some clothing; bruises, bandages and scars go only on the skin. Off: none are drawn.</M3AT_VisibleWoundsTip>
+  <M3AT_Prosthetics>Visible prosthetics</M3AT_Prosthetics>
+  <M3AT_ProstheticsTip>Peg legs, wooden hands and feet, and simple, bionic and archotech arms and legs are drawn as what they are made of, where clothes leave them bare. Off: a replaced limb looks like skin.</M3AT_ProstheticsTip>
+  <M3AT_ProstheticEyes>  Visible prosthetic eyes</M3AT_ProstheticEyes>
+  <M3AT_ProstheticEyesTip>Bionic and archotech eyes are drawn with a mechanical iris. Off: they look like the pawn's own eyes.</M3AT_ProstheticEyesTip>
+  <M3AT_ArchotechProsthetics>  Visible archotech prosthetics</M3AT_ArchotechProsthetics>
+  <M3AT_ArchotechProstheticsTip>Archotech limbs are drawn in the olive and yellow-circuit look of archotech machinery. Off: they look like natural flesh, as the game used to describe them.</M3AT_ArchotechProstheticsTip>
+  <M3AT_Drawing>Drawing</M3AT_Drawing>
+  <M3AT_Outlines>Outlines</M3AT_Outlines>
+  <M3AT_OutlinesTip>Pawns are drawn with a dark outline round the body, clothes and hair, as IsoRim draws its models. Off: no outline. Weapons and tools keep IsoRim's own.</M3AT_OutlinesTip>
+  <M3AT_SilhouetteOutlines>Disable self-outlines</M3AT_SilhouetteOutlines>
+  <M3AT_SilhouetteOutlinesTip>The outline goes only round the outside of the pawn, never over its own body. Off: as IsoRim draws its outlines, with lines over the body too where a part such as an arm is well in front of the rest.</M3AT_SilhouetteOutlinesTip>
+  <M3AT_FirstPersonEye>First person from the pawn's eyes</M3AT_FirstPersonEye>
+  <M3AT_FirstPersonEyeTip>IsoRim's first person looks out from where the pawn's eyes are drawn, so lower for a child and higher for a tall adult, and lower when sitting, lying or swimming. Off: IsoRim's own eye height setting is used for everyone. Needs a recent IsoRim.</M3AT_FirstPersonEyeTip>
+  <M3AT_ClothesOcclusion>Occlusion and shadows on clothes</M3AT_ClothesOcclusion>
+  <M3AT_ClothesOcclusionTip>With IsoRim's ambient occlusion or screen-space shadows on, clothes and hair are darkened in their creases and by shadows as the rest of the world is. It picks out their flat faces, so they look less smooth. Off: pawns are left out of both, though they still cast shadows. Skin and faces are always left out, as it spoils the eyes.</M3AT_ClothesOcclusionTip>
+  <M3AT_Combat>Combat</M3AT_Combat>
+  <M3AT_Ragdolls>Ragdolls</M3AT_Ragdolls>
+  <M3AT_RagdollsTip>Pawns knocked down or killed where they stand fall limp under their own weight and lie as they land. Off: they play a set fall instead.</M3AT_RagdollsTip>
+  <M3AT_FlingPower>Fling power</M3AT_FlingPower>
+  <M3AT_FlingPowerTip>How far blows throw bodies and weapons (default 100%). 200% throws them about twice as far. With "Throw bodies" on, the biggest blasts throw a grown pawn about 6 cells at 100% and about 30 at 500%, and a grenade about a quarter of that; with it off, this only changes how hard a body is knocked about where it falls.</M3AT_FlingPowerTip>
+  <M3AT_FlingBodies>Throw bodies between cells</M3AT_FlingBodies>
+  <M3AT_FlingBodiesTip>Enough damage can throw the pawn they knock down or kill. Explosions and heavy melee move most. This lets M3AT move things around in the game itself, so could cause issues in multiplayer or other mods that expect the game alone to decide where things are. Off: bodies stay in the cell they fell in.</M3AT_FlingBodiesTip>
+  <M3AT_FlingWeapons>Throw weapons between cells</M3AT_FlingWeapons>
+  <M3AT_FlingWeaponsTip>The weapon a pawn drops as it goes down can be flung. This lets M3AT move things around in the game itself, not only on screen, so could cause issues in multiplayer or other mods that expect the game alone to decide where things are. Off: it is dropped at the pawn's feet.</M3AT_FlingWeaponsTip>
+  <M3AT_Holsters>Weapons worn on the body</M3AT_Holsters>
+  <M3AT_HolstersTip>A weapon a pawn carries but isn't holding, and any in its inventory, is shown on its back or hip. Off: only weapons in hand are shown.</M3AT_HolstersTip>
+  <M3AT_MuzzleFlash>Muzzle flash</M3AT_MuzzleFlash>
+  <M3AT_MuzzleFlashTip>A gun fired by a pawn flashes at the end of its barrel, a burst of fire along the shot as well as the game's own glow. Off: only the game's glow.</M3AT_MuzzleFlashTip>
+  <M3AT_HitFlash>Flash red when hit</M3AT_HitFlash>
+  <M3AT_HitFlashTip>A pawn that takes damage flashes red for a moment, as the game's own pawns and IsoRim's 3D figures do. Off: no flash.</M3AT_HitFlashTip>
+  <M3AT_AutoGrips>Find grips on other mods' weapons</M3AT_AutoGrips>
+  <M3AT_AutoGripsTip>Guns and melee weapons from other mods are held by the grip or handle found in their art, rather than where the game's own weapon of that kind is held. Where the art doesn't show a clear grip, the usual hold is kept. Off: always the usual hold.</M3AT_AutoGripsTip>
+  <M3AT_RetexturedWeaponModels>Retextured weapons as 3D models</M3AT_RetexturedWeaponModels>
+  <M3AT_RetexturedWeaponModelsTip>The game's own weapons are shown as IsoRim's 3D models even when another mod (such as Combat Extended or a texture pack) gives them new art, or removes their models. The model is lined up with the new art but keeps its own shape, so a weapon redrawn very differently may not match it. Weapons from other mods are left to IsoRim. Off: IsoRim's choice, which shows a retextured weapon as its art. Needs IsoRim's "Weapons as 3D models" setting. Takes effect when this window closes for weapons on the ground.</M3AT_RetexturedWeaponModelsTip>
+  <M3AT_WeaponSizes>Weapon sizes</M3AT_WeaponSizes>
+  <M3AT_WeaponSizeTip>This weapon type's size in a pawn's hands or on its body against the same weapon lying on the ground (default {0}). 100% is the size IsoRim draws it on the ground.</M3AT_WeaponSizeTip>
+  <M3AT_ResetWeaponSizes>Reset weapon sizes</M3AT_ResetWeaponSizes>
+  <M3AT_Performance>Performance</M3AT_Performance>
+  <M3AT_GpuSkinning>Animate on the graphics card</M3AT_GpuSkinning>
+  <M3AT_GpuSkinningTip>Moves each pawn's body, clothes and hair into its pose on the graphics card, which is much faster with many pawns in view. Turn it off if pawns look broken or stretched, to animate them the old way.</M3AT_GpuSkinningTip>
+  <M3AT_FewerPoses>Fewer updates with many pawns</M3AT_FewerPoses>
+  <M3AT_FewerPosesTip>When many pawns are in view they are animated less often, giving a stop-motion like effect. Reduces M3AT's performance overhead around 6–9%. Off: Pawn animated as normal. (Default)</M3AT_FewerPosesTip>
+  <M3AT_Problems>Problems</M3AT_Problems>
+  <M3AT_CopyBugReport>Copy bug report</M3AT_CopyBugReport>
+  <M3AT_BugReportCopied>Bug report copied to the clipboard.</M3AT_BugReportCopied>
+  <M3AT_BugReportCopiedSaved>Bug report copied to the clipboard and saved to {0}.</M3AT_BugReportCopiedSaved>
+  <M3AT_BugReportPaste>Paste it into the mod's bug report thread with a few words on what went wrong.</M3AT_BugReportPaste>
+  <M3AT_BugReportNote>Copies this mod's settings, errors and your mod list for a bug report, and the state of any pawns selected in the game: select the one that looks wrong first. Nothing is sent anywhere.</M3AT_BugReportNote>
+  <M3AT_RestoreDefaults>Restore all defaults</M3AT_RestoreDefaults>
+  <M3AT_RestoreDefaultsConfirm>Put every M3AT option back to its default, the weapon sizes too?</M3AT_RestoreDefaultsConfirm>
+  <M3AT_Freecam>Freecam</M3AT_Freecam>
+  <M3AT_FreecamIntro>Fly around with pan keys + mouselook, scrollwheel for altitude. Selections and orders still work with the crosshair. Use your set toggle button, or open any menu, to switch to pointer. Press again or close the open menu to return to freelook.</M3AT_FreecamIntro>
+  <M3AT_FreecamKeys>Set keyboard keys in RimWorld's keybindings. Current settings:</M3AT_FreecamKeys>
+  <M3AT_FreecamKeyToggle>freecam on/off</M3AT_FreecamKeyToggle>
+  <M3AT_FreecamKeyUp>up</M3AT_FreecamKeyUp>
+  <M3AT_FreecamKeyDown>down</M3AT_FreecamKeyDown>
+  <M3AT_FreecamKeyBoost>double speed</M3AT_FreecamKeyBoost>
+  <M3AT_FreecamKeyPointer>toggle pointer / freelook</M3AT_FreecamKeyPointer>
+  <M3AT_FreecamButton>Toggle pointer (mouse)</M3AT_FreecamButton>
+  <M3AT_FreecamButtonTip>A mouse-button version of the "toggle pointer" key above: it frees the pointer or goes back to looking. Default: middle button</M3AT_FreecamButtonTip>
+  <M3AT_FreecamClickOffLooks>Empty left click closes pointermode</M3AT_FreecamClickOffLooks>
+  <M3AT_FreecamClickOffLooksTip>In pointer mode, a left click that selects nothing goes back to looking, as a right click does. Off (default): it only clears the selection, as in the game.</M3AT_FreecamClickOffLooksTip>
+  <M3AT_FreecamPointerBack>Pointer mode returns the pointer</M3AT_FreecamPointerBack>
+  <M3AT_FreecamPointerBackTip>Going into pointer mode puts the pointer back where it was when looking began (default). Off: it starts in the middle of the screen, under the cross.</M3AT_FreecamPointerBackTip>
+  <M3AT_FreecamMenuFreesPointer>Orders menu frees the pointer</M3AT_FreecamMenuFreesPointer>
+  <M3AT_FreecamMenuFreesPointerTip>A menu of orders opened while looking frees the pointer to pick from it, going back to looking once it closes. Off (default): the menu is pinned where it opened and you pick by turning the view onto an option.</M3AT_FreecamMenuFreesPointerTip>
+  <M3AT_LookSpeed>Look speed</M3AT_LookSpeed>
+  <M3AT_LookSpeedTip>How far the view turns for the mouse's movement, in degrees per pixel (default {0}).</M3AT_LookSpeedTip>
+  <M3AT_InvertMouse>Invert mouse look</M3AT_InvertMouse>
+  <M3AT_InvertMouseTip>Moving the mouse up looks down.</M3AT_InvertMouseTip>
+  <M3AT_FreecamCutaway>Use IsoRim's wall hiding</M3AT_FreecamCutaway>
+  <M3AT_FreecamCutawayTip>While flying, walls are cut down as IsoRim's own settings say: around the pointer (the middle of the screen while looking), near colonists and in front of rooms. Off (default): every wall stands at full height, as in IsoRim's first-person view.</M3AT_FreecamCutawayTip>
+  <M3AT_ScrollFlies>Scroll wheel flies up and down</M3AT_ScrollFlies>
+  <M3AT_ScrollFliesTip>Scrolling up raises the camera and scrolling down lowers it, further at a higher flying speed. Off: the scroll wheel does nothing while flying.</M3AT_ScrollFliesTip>
+  <M3AT_FlyingSpeed>Flying speed</M3AT_FlyingSpeed>
+  <M3AT_CellsPerSecond>{0} cells/s</M3AT_CellsPerSecond>
+  <M3AT_FlyingSpeedTip>How fast the camera flies, in cells a second (default {0}). Not affected by the game's speed.</M3AT_FlyingSpeedTip>
+  <M3AT_ScrollSpeed>Scroll height speed</M3AT_ScrollSpeed>
+  <M3AT_ScrollSpeedTip>How far one notch of the scroll wheel raises or lowers the camera, on top of the flying speed (default {0}).</M3AT_ScrollSpeedTip>
+  <M3AT_FieldOfView>Field of view</M3AT_FieldOfView>
+  <M3AT_FieldOfViewTip>How wide the camera sees, in degrees from the top of the screen to the bottom (default {0}).</M3AT_FieldOfViewTip>
+  <M3AT_FreecamOn>Freecam on: {0} to leave.</M3AT_FreecamOn>
+  <M3AT_FreecamOff>Freecam off.</M3AT_FreecamOff>
+</LanguageData>

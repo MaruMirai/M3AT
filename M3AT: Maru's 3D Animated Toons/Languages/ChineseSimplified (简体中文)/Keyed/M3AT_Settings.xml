@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+  <M3AT_WeaponType_handgun>手枪</M3AT_WeaponType_handgun>
+  <M3AT_WeaponType_rifle>步枪与发射器</M3AT_WeaponType_rifle>
+  <M3AT_WeaponType_bow>弓</M3AT_WeaponType_bow>
+  <M3AT_WeaponType_grenade>手雷</M3AT_WeaponType_grenade>
+  <M3AT_WeaponType_melee_1h>单手近战</M3AT_WeaponType_melee_1h>
+  <M3AT_WeaponType_melee_2h>双手近战</M3AT_WeaponType_melee_2h>
+  <M3AT_Unbound>未绑定</M3AT_Unbound>
+  <M3AT_MiddleButton>鼠标中键</M3AT_MiddleButton>
+  <M3AT_MouseButton4>鼠标侧键 4</M3AT_MouseButton4>
+  <M3AT_MouseButton5>鼠标侧键 5</M3AT_MouseButton5>
+  <M3AT_NoButton>无</M3AT_NoButton>
+  <M3AT_EarsAnyHeadgear>任意头饰</M3AT_EarsAnyHeadgear>
+  <M3AT_EarsHelmets>仅头盔</M3AT_EarsHelmets>
+  <M3AT_EarsNever>从不</M3AT_EarsNever>
+  <M3AT_SleepDressed>日常服装</M3AT_SleepDressed>
+  <M3AT_SleepNoEquipment>不带装备</M3AT_SleepNoEquipment>
+  <M3AT_SleepPajamas>睡衣</M3AT_SleepPajamas>
+  <M3AT_SleepNothing>不穿衣服</M3AT_SleepNothing>
+  <M3AT_BeardsOff>关闭</M3AT_BeardsOff>
+  <M3AT_DefaultsRestored>M3AT 的设置已恢复为默认值。</M3AT_DefaultsRestored>
+  <M3AT_Pawns>小人</M3AT_Pawns>
+  <M3AT_PawnSize>小人尺寸</M3AT_PawnSize>
+  <M3AT_PawnSizeTip>所有小人绘制的大小。100%（默认）为正常尺寸；儿童、性别和身高差异在此基础上叠加。只改变外观，不改变小人占据的空间。</M3AT_PawnSizeTip>
+  <M3AT_HeadShrink>头部缩小</M3AT_HeadShrink>
+  <M3AT_HeadShrinkTip>头部比默认的 Q 版头小多少。最左：默认；向右：更小。不影响原版或 CE 的命中计算。</M3AT_HeadShrinkTip>
+  <M3AT_HeightVariety>身高差异</M3AT_HeightVariety>
+  <M3AT_HeightVarietyTip>小人身高的差异程度（默认 {0}）。采用正态分布：大多数接近正常尺寸，少数偏离较远。0% 时同性别的人一样高。每个小人的身高由其 ID 推算，因此不需要存档数据。</M3AT_HeightVarietyTip>
+  <M3AT_GenderSizes>性别体型差异</M3AT_GenderSizes>
+  <M3AT_GenderSizesTip>男性与女性有 10% 的体型差异，在青春期逐渐显现。关闭：两者一样大。</M3AT_GenderSizesTip>
+  <M3AT_VariedBodies>体格差异</M3AT_VariedBodies>
+  <M3AT_VariedBodiesTip>每个小人在其体型附近有自己的体格：有的更瘦或更胖，有的更壮，因此标准体型的人不再千篇一律。瘦弱、肥胖和魁梧的小人仍以各自的体型为基础。关闭：同一体型的小人身材完全相同。</M3AT_VariedBodiesTip>
+  <M3AT_BodyVariety>体格差异程度</M3AT_BodyVariety>
+  <M3AT_BodyVarietyTip>小人体格偏离其体型的程度（默认 {0}）。大多数接近原体型，少数会接近相邻的体型。每个小人的体格由其 ID 推算，因此不需要存档数据。</M3AT_BodyVarietyTip>
+  <M3AT_HairDetail>头发细节</M3AT_HairDetail>
+  <M3AT_HairDetailTip>由贴图生成的发型保留多少形状细节（默认 {0}）。越高越平滑、越贴近原画，但屏幕上小人多时开销更大。模组自带的 3D 发型模型总是完整绘制。关闭此窗口后生效。</M3AT_HairDetailTip>
+  <M3AT_Beards>胡子</M3AT_Beards>
+  <M3AT_BeardsTip>2D（默认）：胡子的贴图平铺在脸上。开销小，但只能从正面看到，且在下巴处截断。\n\n3D：每种胡子在首次出现时由其贴图生成 3D 网格，从各个角度都能看到。\n\n关闭：不绘制也不生成胡子。</M3AT_BeardsTip>
+  <M3AT_EyeMovement>眼球转动</M3AT_EyeMovement>
+  <M3AT_EyeMovementTip>使用 Facial Animation 时，小人眼睛四处张望的幅度，相对于其 2D 面部上的幅度（默认 {0}）。原本的动作很小，大约一个像素，调高后在更大的 3D 面部上更容易看出。0%：眼睛不动。眉毛、眼睑和嘴巴始终按 Facial Animation 的方式活动，不受此项影响。</M3AT_EyeMovementTip>
+  <M3AT_TalkingMouths>说话口型</M3AT_TalkingMouths>
+  <M3AT_TalkingMouthsTip>使用 Facial Animation 时，小人说话时嘴巴会一张一合：聊天、参加派对、探望病人、发表演讲时。使用每张脸自带的张嘴贴图。关闭：嘴巴只按 Facial Animation 的方式活动。</M3AT_TalkingMouthsTip>
+  <M3AT_Clothes>服装与装备</M3AT_Clothes>
+  <M3AT_Shoes>穿衣时穿鞋</M3AT_Shoes>
+  <M3AT_ShoesTip>衣服同时覆盖身体和双腿的小人（衬衫加裤子，或风衣、长袍、套装）会穿上普通的鞋。关闭：赤脚，除非穿着模组添加的鞋子。</M3AT_ShoesTip>
+  <M3AT_ArmourHidesTail>护甲遮住尾巴</M3AT_ArmourHidesTail>
+  <M3AT_ArmourHidesTailTip>有尾巴基因的小人穿着全身护甲（动力装甲、侦察装甲、重装甲或板甲）时隐藏尾巴，否则尾巴会穿模。真空服不隐藏。关闭：始终显示尾巴。</M3AT_ArmourHidesTailTip>
+  <M3AT_EarHiding>头饰遮住动物耳朵</M3AT_EarHiding>
+  <M3AT_EarHidingTip>是否在小人头戴物品时隐藏猫耳、猪耳或垂耳，否则耳朵会穿模。\n\n任意头饰（默认）：头盔，以及盖住头顶的帽子。\n\n仅头盔：护甲头盔（简易、高级、动力装甲、侦察、重装甲等）；耳朵会从其他帽子中穿出。\n\n从不：始终显示耳朵。</M3AT_EarHidingTip>
+  <M3AT_WornGear>穿戴的背包、腰带和头戴装备</M3AT_WornGear>
+  <M3AT_WornGearTip>小人穿戴的跳跃背包、护盾腰带以及其他背包、腰带和长矛显示在背上或腰间，耳机、面具、王冠、眼罩和奴隶项圈显示在头部和颈部，使用 IsoRim 的模型。关闭：不显示。</M3AT_WornGearTip>
+  <M3AT_GroundGarments>地上的服装使用 M3AT 模型</M3AT_GroundGarments>
+  <M3AT_GroundGarmentsTip>地图上的服装绘制为小人身上所穿的同款 3D 服装，并压平摆放。关闭（默认）：使用 IsoRim 的 3D 模型。关闭此窗口后生效。</M3AT_GroundGarmentsTip>
+  <M3AT_BedBlankets>床上盖被子</M3AT_BedBlankets>
+  <M3AT_BedBlanketsTip>在只露出睡觉者头部的床上，IsoRim 的被子盖在身体上，随身体隆起。其他床（如睡眠点和睡袋）没有被子。关闭：小人躺在所有床的上面。</M3AT_BedBlanketsTip>
+  <M3AT_SleepWear>床上的穿着</M3AT_SleepWear>
+  <M3AT_SleepWearTip>躺在床上的小人在身体露出时（没有被子的床，或关闭了被子）穿什么。只影响外观：游戏中并不会脱下或穿上任何东西。\n\n日常服装：平时穿的衣服。\n\n不带装备（默认）：不穿护甲、头盔和帽子、外套、腰带、背包或盾牌；衬衫、裤子等保留。\n\n睡衣：淡色睡衣；婴儿穿连体衣。\n\n不穿衣服：不穿衣服；婴儿仍穿连体衣。</M3AT_SleepWearTip>
+  <M3AT_VatClothes>舱内穿衣</M3AT_VatClothes>
+  <M3AT_VatClothesTip>生长舱和生物塑形舱中的小人穿着衣服。关闭（默认）：不穿衣服。婴儿在舱内从不穿连体衣。</M3AT_VatClothesTip>
+  <M3AT_Injuries>伤势</M3AT_Injuries>
+  <M3AT_InjuryAnims>受伤反应动画</M3AT_InjuryAnims>
+  <M3AT_InjuryAnimsTip>小人会因腿伤而跛行、捂住受伤部位等。关闭：行动如同未受伤。关闭不会禁用受击退缩动画、缺腿时的单脚跳，以及移动减速。</M3AT_InjuryAnimsTip>
+  <M3AT_VisibleWounds>可见伤势</M3AT_VisibleWounds>
+  <M3AT_VisibleWoundsTip>伤口、血迹、绷带和伤疤绘制在小人身上受伤的位置。伤口和血迹会透过部分衣物显示；淤青、绷带和伤疤只显示在皮肤上。关闭：都不绘制。</M3AT_VisibleWoundsTip>
+  <M3AT_Prosthetics>可见义肢</M3AT_Prosthetics>
+  <M3AT_ProstheticsTip>木腿、木手木脚，以及简易、仿生和超凡的手臂与腿，在衣服未遮住时按其材质绘制。关闭：替换的肢体看起来和皮肤一样。</M3AT_ProstheticsTip>
+  <M3AT_ProstheticEyes>  可见义眼</M3AT_ProstheticEyes>
+  <M3AT_ProstheticEyesTip>仿生眼和超凡眼绘制为机械虹膜。关闭：看起来与小人自己的眼睛一样。</M3AT_ProstheticEyesTip>
+  <M3AT_ArchotechProsthetics>  可见超凡义肢</M3AT_ArchotechProsthetics>
+  <M3AT_ArchotechProstheticsTip>超凡肢体绘制为超凡机械的橄榄色与黄色电路外观。关闭：看起来像天然血肉，如游戏过去的描述。</M3AT_ArchotechProstheticsTip>
+  <M3AT_Drawing>绘制</M3AT_Drawing>
+  <M3AT_Outlines>描边</M3AT_Outlines>
+  <M3AT_OutlinesTip>小人的身体、衣服和头发周围绘制深色描边，与 IsoRim 绘制模型的方式一样。关闭：无描边。武器和工具保留 IsoRim 自己的描边。</M3AT_OutlinesTip>
+  <M3AT_SilhouetteOutlines>禁用自身内描边</M3AT_SilhouetteOutlines>
+  <M3AT_SilhouetteOutlinesTip>描边只围绕小人的外轮廓，不会画在身体上。关闭：与 IsoRim 的描边方式一样，当手臂等部位明显位于身体前方时，身体上也会出现线条。</M3AT_SilhouetteOutlinesTip>
+  <M3AT_FirstPersonEye>从小人眼睛处第一人称</M3AT_FirstPersonEye>
+  <M3AT_FirstPersonEyeTip>IsoRim 的第一人称从小人眼睛绘制的位置看出去：儿童更低，高个子成人更高，坐下、躺下或游泳时也会更低。关闭：所有人都使用 IsoRim 自己的视线高度设置。需要较新版本的 IsoRim。</M3AT_FirstPersonEyeTip>
+  <M3AT_ClothesOcclusion>衣服上的环境光遮蔽与阴影</M3AT_ClothesOcclusion>
+  <M3AT_ClothesOcclusionTip>开启 IsoRim 的环境光遮蔽或屏幕空间阴影时，衣服和头发会像世界其他部分一样在褶皱处和阴影中变暗。这会凸显平面，使其看起来不那么平滑。关闭：小人不受这两者影响，但仍会投下阴影。皮肤和面部始终不受影响，因为会破坏眼睛的效果。</M3AT_ClothesOcclusionTip>
+  <M3AT_Combat>战斗</M3AT_Combat>
+  <M3AT_Ragdolls>布娃娃物理</M3AT_Ragdolls>
+  <M3AT_RagdollsTip>在原地被击倒或击杀的小人会在自身重量下瘫软倒地，落地是什么样就保持什么样。关闭：改为播放固定的倒地动画。</M3AT_RagdollsTip>
+  <M3AT_FlingPower>击飞力度</M3AT_FlingPower>
+  <M3AT_FlingPowerTip>攻击将尸体和武器击飞多远（默认 100%）。200% 约为两倍远。开启"击飞尸体"时，最大的爆炸在 100% 下将成年小人击飞约 6 格，500% 下约 30 格，手雷约为其四分之一；关闭时，此项只改变尸体在倒下处被撞动的力度。</M3AT_FlingPowerTip>
+  <M3AT_FlingBodies>击飞尸体到其他格子</M3AT_FlingBodies>
+  <M3AT_FlingBodiesTip>足够的伤害可以把被击倒或击杀的小人击飞。爆炸和重型近战击飞最远。这会让 M3AT 在游戏本身中移动物体，因此可能与多人联机或其他认为只有游戏本身决定物体位置的模组产生问题。关闭：尸体留在倒下的格子里。</M3AT_FlingBodiesTip>
+  <M3AT_FlingWeapons>击飞武器到其他格子</M3AT_FlingWeapons>
+  <M3AT_FlingWeaponsTip>小人倒下时掉落的武器可以被击飞。这会让 M3AT 在游戏本身中（而不仅是画面上）移动物体，因此可能与多人联机或其他认为只有游戏本身决定物体位置的模组产生问题。关闭：武器掉在小人脚边。</M3AT_FlingWeaponsTip>
+  <M3AT_Holsters>身上佩挂的武器</M3AT_Holsters>
+  <M3AT_HolstersTip>小人携带但未手持的武器，以及物品栏中的武器，显示在背上或腰间。关闭：只显示手中的武器。</M3AT_HolstersTip>
+  <M3AT_MuzzleFlash>枪口火焰</M3AT_MuzzleFlash>
+  <M3AT_MuzzleFlashTip>小人开枪时，枪管末端会喷出一团沿射击方向的火焰，并保留游戏自带的光晕。关闭：只有游戏自带的光晕。</M3AT_MuzzleFlashTip>
+  <M3AT_HitFlash>受击时闪红</M3AT_HitFlash>
+  <M3AT_HitFlashTip>受到伤害的小人会短暂闪红，与游戏原版小人和 IsoRim 的 3D 人物一样。关闭：不闪烁。</M3AT_HitFlashTip>
+  <M3AT_AutoGrips>识别其他模组武器的握把</M3AT_AutoGrips>
+  <M3AT_AutoGripsTip>其他模组的枪械和近战武器按其贴图中识别出的握把或手柄持握，而不是按游戏中同类武器的握法。贴图中看不出明确握把时，保持通常握法。关闭：始终使用通常握法。</M3AT_AutoGripsTip>
+  <M3AT_RetexturedWeaponModels>重绘贴图的武器使用 3D 模型</M3AT_RetexturedWeaponModels>
+  <M3AT_RetexturedWeaponModelsTip>即使其他模组（如 Combat Extended 或材质包）给游戏原版武器换了新贴图或移除了其模型，仍显示 IsoRim 的 3D 模型。模型会与新贴图对齐，但保持自己的形状，因此重绘差异很大的武器可能对不上。其他模组的武器交给 IsoRim 处理。关闭：由 IsoRim 决定，重绘贴图的武器显示为贴图。需要开启 IsoRim 的"武器使用 3D 模型"设置。对地上的武器，关闭此窗口后生效。</M3AT_RetexturedWeaponModelsTip>
+  <M3AT_WeaponSizes>武器尺寸</M3AT_WeaponSizes>
+  <M3AT_WeaponSizeTip>此类武器在小人手中或身上的大小，相对于同一武器放在地上时（默认 {0}）。100% 即 IsoRim 在地上绘制它的大小。</M3AT_WeaponSizeTip>
+  <M3AT_ResetWeaponSizes>重置武器尺寸</M3AT_ResetWeaponSizes>
+  <M3AT_Performance>性能</M3AT_Performance>
+  <M3AT_GpuSkinning>在显卡上计算动画</M3AT_GpuSkinning>
+  <M3AT_GpuSkinningTip>在显卡上把每个小人的身体、衣服和头发摆成当前姿势，画面中小人多时快得多。如果小人看起来破碎或被拉伸，请关闭此项，改用旧方式计算动画。</M3AT_GpuSkinningTip>
+  <M3AT_FewerPoses>小人多时减少更新</M3AT_FewerPoses>
+  <M3AT_FewerPosesTip>画面中小人很多时降低其动画更新频率，产生类似定格动画的效果。可将 M3AT 的性能开销降低约 6–9%。关闭：小人正常播放动画。（默认）</M3AT_FewerPosesTip>
+  <M3AT_Problems>问题</M3AT_Problems>
+  <M3AT_CopyBugReport>复制错误报告</M3AT_CopyBugReport>
+  <M3AT_BugReportCopied>错误报告已复制到剪贴板。</M3AT_BugReportCopied>
+  <M3AT_BugReportCopiedSaved>错误报告已复制到剪贴板，并保存到 {0}。</M3AT_BugReportCopiedSaved>
+  <M3AT_BugReportPaste>请将其粘贴到本模组的错误报告帖中，并简单说明出了什么问题。</M3AT_BugReportPaste>
+  <M3AT_BugReportNote>复制本模组的设置、错误信息和你的模组列表用于错误报告，以及游戏中所选小人的状态：请先选中看起来有问题的小人。不会向任何地方发送数据。</M3AT_BugReportNote>
+  <M3AT_RestoreDefaults>全部恢复默认</M3AT_RestoreDefaults>
+  <M3AT_RestoreDefaultsConfirm>将 M3AT 的所有设置（包括武器尺寸）恢复为默认值？</M3AT_RestoreDefaultsConfirm>
+  <M3AT_Freecam>自由视角</M3AT_Freecam>
+  <M3AT_FreecamIntro>用平移键加鼠标转向飞行，滚轮调整高度。选择和命令仍可通过准星进行。按下设定的切换键或打开任意菜单即可切换为鼠标指针。再按一次或关闭菜单即可回到自由视角。</M3AT_FreecamIntro>
+  <M3AT_FreecamKeys>在边缘世界的按键设置中设定按键。当前设置：</M3AT_FreecamKeys>
+  <M3AT_FreecamKeyToggle>开关自由视角</M3AT_FreecamKeyToggle>
+  <M3AT_FreecamKeyUp>上升</M3AT_FreecamKeyUp>
+  <M3AT_FreecamKeyDown>下降</M3AT_FreecamKeyDown>
+  <M3AT_FreecamKeyBoost>双倍速度</M3AT_FreecamKeyBoost>
+  <M3AT_FreecamKeyPointer>切换指针 / 自由视角</M3AT_FreecamKeyPointer>
+  <M3AT_FreecamButton>切换指针（鼠标）</M3AT_FreecamButton>
+  <M3AT_FreecamButtonTip>上面"切换指针"按键的鼠标按键版本：释放鼠标指针或回到自由视角。默认：鼠标中键</M3AT_FreecamButtonTip>
+  <M3AT_FreecamClickOffLooks>空白处左键退出指针模式</M3AT_FreecamClickOffLooks>
+  <M3AT_FreecamClickOffLooksTip>指针模式下，没有选中任何东西的左键点击会回到自由视角，与右键一样。关闭（默认）：只清除选择，与游戏中一样。</M3AT_FreecamClickOffLooksTip>
+  <M3AT_FreecamPointerBack>指针模式恢复指针位置</M3AT_FreecamPointerBack>
+  <M3AT_FreecamPointerBackTip>进入指针模式时，指针回到开始自由视角前的位置（默认）。关闭：从屏幕中央、准星下方开始。</M3AT_FreecamPointerBackTip>
+  <M3AT_FreecamMenuFreesPointer>命令菜单释放指针</M3AT_FreecamMenuFreesPointer>
+  <M3AT_FreecamMenuFreesPointerTip>自由视角下打开的命令菜单会释放指针供你选择，菜单关闭后回到自由视角。关闭（默认）：菜单固定在打开的位置，通过转动视角对准选项来选择。</M3AT_FreecamMenuFreesPointerTip>
+  <M3AT_LookSpeed>转向速度</M3AT_LookSpeed>
+  <M3AT_LookSpeedTip>鼠标移动时视角转动的幅度，单位为度/像素（默认 {0}）。</M3AT_LookSpeedTip>
+  <M3AT_InvertMouse>反转鼠标视角</M3AT_InvertMouse>
+  <M3AT_InvertMouseTip>向上移动鼠标时向下看。</M3AT_InvertMouseTip>
+  <M3AT_FreecamCutaway>使用 IsoRim 的墙壁隐藏</M3AT_FreecamCutaway>
+  <M3AT_FreecamCutawayTip>飞行时按 IsoRim 自己的设置降低墙壁：指针周围（自由视角下为屏幕中央）、殖民者附近和房间前方。关闭（默认）：所有墙壁保持完整高度，与 IsoRim 的第一人称视角一样。</M3AT_FreecamCutawayTip>
+  <M3AT_ScrollFlies>滚轮控制升降</M3AT_ScrollFlies>
+  <M3AT_ScrollFliesTip>向上滚动升高镜头，向下滚动降低镜头，飞行速度越高幅度越大。关闭：飞行时滚轮无作用。</M3AT_ScrollFliesTip>
+  <M3AT_FlyingSpeed>飞行速度</M3AT_FlyingSpeed>
+  <M3AT_CellsPerSecond>{0} 格/秒</M3AT_CellsPerSecond>
+  <M3AT_FlyingSpeedTip>镜头飞行的速度，单位为格/秒（默认 {0}）。不受游戏速度影响。</M3AT_FlyingSpeedTip>
+  <M3AT_ScrollSpeed>滚轮升降速度</M3AT_ScrollSpeed>
+  <M3AT_ScrollSpeedTip>滚轮每滚一格镜头升降多少，在飞行速度基础上叠加（默认 {0}）。</M3AT_ScrollSpeedTip>
+  <M3AT_FieldOfView>视野</M3AT_FieldOfView>
+  <M3AT_FieldOfViewTip>镜头的视野宽度，以屏幕上沿到下沿的角度计（默认 {0}）。</M3AT_FieldOfViewTip>
+  <M3AT_FreecamOn>自由视角已开启：按 {0} 退出。</M3AT_FreecamOn>
+  <M3AT_FreecamOff>自由视角已关闭。</M3AT_FreecamOff>
+</LanguageData>
