@@ -176,6 +176,10 @@ namespace M3AT
         private const float StirRestTo = 14f;   // .. and at most
         private const float BurnEase = 4f;   // how fast a pawn on fire takes to patting at the flames (Burning), or leaves off, per real second
         private const int GlanceTicks = 150;   // game ticks a pawn looks at whom it had a social interaction with (InteractedPostfix)
+        private const int SayTicks = 120;   // game ticks the one who began a social interaction talks (the mouth only, SayOf) ..
+        private const float SayLong = 1.6f;   // .. times this for a deep talk, a romance attempt or a proposal
+        private const int ReplyGap = 25;   // game ticks after it stops before the other answers ..
+        private const int ReplyTicks = 90;   // .. and how long the answer is (times SayLong as above)
         private const float GlanceLook = 0.8f;   // share of the way it turns its head round toward them (LessonLookOf)
         private const float MealScale = 0.5f;   // of the carried size: a meal being eaten (DrawMeal), by the game's FoodMeals category
         private const float FoodScale = 0.3f;   // .. and any other food being eaten (pemmican, berries, chocolate)
@@ -3566,6 +3570,7 @@ namespace M3AT
             public int tick;
             public Pawn with;
             public bool wave;
+            public int sayFrom, sayTo;   // game ticks this pawn talks between, for the mouth (SayOf); sayTo <= sayFrom for none
         }
         private static readonly Dictionary<int, Interaction> interactions = new Dictionary<int, Interaction>();
 
@@ -3583,8 +3588,32 @@ namespace M3AT
             int now = Find.TickManager.TicksGame;
             string name = intDef.defName;
             bool friendly = name == "Chitchat" || name == "DeepTalk" || name == "KindWords";
-            interactions[___pawn.thingIDNumber] = new Interaction { tick = now, with = recipient, wave = friendly };
-            interactions[recipient.thingIDNumber] = new Interaction { tick = now, with = ___pawn, wave = false };
+            // Both talk, the mouth only: the one who began it, then the other answering if it is awake and can talk.
+            float length = name == "DeepTalk" || name == "RomanceAttempt" || name == "MarriageProposal" ? SayLong : 1f;
+            int said = now + Mathf.RoundToInt(SayTicks * length);
+            bool replies = recipient.Awake() && CanTalk(recipient);
+            int replyFrom = said + ReplyGap;
+            interactions[___pawn.thingIDNumber] = new Interaction { tick = now, with = recipient, wave = friendly, sayFrom = now, sayTo = said };
+            interactions[recipient.thingIDNumber] = new Interaction { tick = now, with = ___pawn, wave = false,
+                sayFrom = replyFrom, sayTo = replies ? replyFrom + Mathf.RoundToInt(ReplyTicks * length) : replyFrom };
+        }
+
+        private static bool CanTalk(Pawn pawn)
+        {
+            return pawn.health?.capacities == null || pawn.health.capacities.CapableOf(PawnCapacityDefOf.Talking);
+        }
+
+        // 1 while the pawn is talking in a social interaction (its part of it, InteractedPostfix), else 0: for the mouth,
+        // FaceLayers.Draw's speaking, laid on whatever else it is doing, standing, sat or lying.
+        private static float SayOf(Pawn pawn)
+        {
+            Interaction i;
+            if (!interactions.TryGetValue(pawn.thingIDNumber, out i) || i.sayTo <= i.sayFrom || !pawn.Awake())
+            {
+                return 0f;
+            }
+            int now = Find.TickManager.TicksGame;
+            return now >= i.sayFrom && now < i.sayTo ? 1f : 0f;
         }
 
         // Whom the pawn had a social interaction with within GlanceTicks, if they are still about; else null.
@@ -6210,6 +6239,7 @@ namespace M3AT
             {
                 Ease said;
                 float speaking = eases.TryGetValue(pawn.thingIDNumber, out said) && said.speakingFrame == Time.frameCount ? said.speaking : 0f;
+                speaking = Mathf.Max(speaking, SayOf(pawn));   // its part in a social interaction
                 FaceLayers.Draw(pawn, fig.face, at, yaw, size, Wounds.EyeWoundsOn(fig), HasGeneKey(pawn, NosePig), speaking);
             }
             FaceLayers.Flash = 0f;

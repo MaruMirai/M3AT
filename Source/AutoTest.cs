@@ -575,6 +575,7 @@ namespace M3AT
                 case "drugs": return DrugsTest();
                 case "visit": return VisitTest();
                 case "talk": return TalkTest();
+                case "chat": return ChatTest();
                 case "music": return MusicTest();
                 case "rolljoint": return RollJointTest();
                 case "drunk": return DrunkTest();
@@ -3769,6 +3770,70 @@ namespace M3AT
                 Check(where + ": quiet once it stops", FaceLayers.TalkOpenDraws + FaceLayers.TalkShutDraws == before, "talking frames counted after the visit ended: " + (FaceLayers.TalkOpenDraws + FaceLayers.TalkShutDraws - before));
             }
             Note("Look: the _face pictures, the visitor's mouth open in some and closed in others, never stuck either way.");
+        }
+
+        // Talking in a social interaction (WalkFigures.SayOf): two pawns stood side by side, a chitchat and then a deep
+        // talk between a new pair, the face draws counted per pawn (FaceLayers.TalkDrawsOf) in 5 tick steps, so it shows
+        // who talks when: the one who began it for SayTicks (times SayLong for a deep talk), then after ReplyGap the other
+        // for ReplyTicks, then neither.
+        private static IEnumerator ChatTest()
+        {
+            foreach (string kind in new[] { "Chitchat", "DeepTalk" })
+            {
+                float length = kind == "DeepTalk" ? 1.6f : 1f;   // WalkFigures.SayLong
+                int said = Mathf.RoundToInt(120 * length), replyFrom = said + 25, replyTo = replyFrom + Mathf.RoundToInt(90 * length);
+                ClearPatch();
+                Pawn a = NewPawn(middle + new IntVec3(-1, 0, 0), null);
+                Pawn b = NewPawn(middle + new IntVec3(1, 0, 0), null);
+                Hold(a);
+                Hold(b);
+                a.Rotation = b.Rotation = Rot4.South;
+                lookAt = (a.DrawPos + b.DrawPos) * 0.5f;
+                lookYaw = 0f;
+                lookPitch = 15f;
+                lookDistance = 3f;
+                lookHeight = 0.9f;
+                yield return WaitReal(3f);
+                FaceLayers.TalkDrawsOf.Clear();
+                int start = Find.TickManager.TicksGame;
+                bool done = a.interactions.TryInteractWith(b, DefDatabase<InteractionDef>.GetNamed(kind));
+                Check(kind + ": interaction made", done, done ? kind : "the game refused it");
+                if (!done)
+                {
+                    continue;
+                }
+                // Draws by each pawn in windows wholly inside each stretch (a step's slack either side of the edges).
+                int aSaying = 0, aAfter = 0, bBefore = 0, bReplying = 0, bAfter = 0;
+                int lastA = 0, lastB = 0;
+                while (Find.TickManager.TicksGame - start < replyTo + 40)
+                {
+                    int from = Find.TickManager.TicksGame - start;
+                    yield return Ticks(5, "chat_" + kind, a);
+                    int to = Find.TickManager.TicksGame - start;
+                    int nowA, nowB;
+                    FaceLayers.TalkDrawsOf.TryGetValue(a.thingIDNumber, out nowA);
+                    FaceLayers.TalkDrawsOf.TryGetValue(b.thingIDNumber, out nowB);
+                    int da = nowA - lastA, db = nowB - lastB;
+                    lastA = nowA;
+                    lastB = nowB;
+                    if (to <= said - 5) { aSaying += da; }
+                    if (from >= said + 5) { aAfter += da; }
+                    if (to <= replyFrom - 5) { bBefore += db; }
+                    if (from >= replyFrom + 5 && to <= replyTo - 5) { bReplying += db; }
+                    if (from >= replyTo + 5) { bAfter += db; }
+                    if (from < 30 && to >= 30) { yield return Shot(kind + "_says"); }
+                    if (from < replyFrom + 30 && to >= replyFrom + 30) { yield return Shot(kind + "_replies"); }
+                }
+                Check(kind + ": the one who began it talks", aSaying > 0, aSaying + " talking draws in its first " + said + " ticks");
+                Check(kind + ": then stops", aAfter == 0, aAfter + " talking draws after tick " + said);
+                Check(kind + ": the other waits", bBefore == 0, bBefore + " talking draws before tick " + replyFrom);
+                Check(kind + ": then answers", bReplying > 0, bReplying + " talking draws between ticks " + replyFrom + " and " + replyTo);
+                Check(kind + ": then stops", bAfter == 0, bAfter + " talking draws after tick " + replyTo);
+            }
+            lookPitch = LookPitch;
+            lookDistance = LookDistance;
+            lookHeight = LookHeight;
+            Note("Look: in _says the left pawn's mouth moves (open or shut, it swaps on syllables), in _replies the right one's.");
         }
 
         // Tending a patient (TendPatient): in a bed (stood at it, bench), on a sleeping spot and lying on the bare floor

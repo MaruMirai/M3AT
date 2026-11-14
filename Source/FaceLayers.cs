@@ -775,6 +775,9 @@ namespace M3AT
                 if (speaking > SpeakFrom)
                 {
                     if (mouthOpen) { TalkOpenDraws++; } else { TalkShutDraws++; }
+                    int drawn;
+                    TalkDrawsOf.TryGetValue(pawn.thingIDNumber, out drawn);
+                    TalkDrawsOf[pawn.thingIDNumber] = drawn + 1;
                 }
 #endif
                 int place = 0;
@@ -1642,6 +1645,7 @@ namespace M3AT
 #if AUTOTEST
         internal static bool TestMouthOpen;   // the autotest's beard: the open mouth shape forced, to see it under a beard
         internal static int TalkOpenDraws, TalkShutDraws, TalkNoOpen;   // (NoOpen: open draws where the open shape is missing or the same picture)
+        internal static readonly Dictionary<int, int> TalkDrawsOf = new Dictionary<int, int>();   // talking face draws per pawn id (the autotest's chat)
         internal static readonly HashSet<string> TalkTextures = new HashSet<string>();   // frames drawn talking with the mouth open / shut (the autotest's talk)
 #endif
         private static int talkClockFrame = -1;
