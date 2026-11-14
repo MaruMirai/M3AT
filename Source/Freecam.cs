@@ -187,6 +187,15 @@ namespace M3AT
                     harmony.Patch(windowEvents, prefix: new HarmonyMethod(typeof(Freecam), nameof(WindowEventsPrefix)),
                         postfix: new HarmonyMethod(typeof(Freecam), nameof(WindowEventsPostfix)));
                 }
+                // A box selection begun on the sky goes from where the button went down on screen (SkyBoxPostfix,
+                // SkyRectPostfix), not from the place IsoRim gives for it out on the horizon.
+                MethodInfo boxValid = AccessTools.PropertyGetter(typeof(DragBox), nameof(DragBox.IsValid));
+                MethodInfo boxRect = AccessTools.PropertyGetter(typeof(DragBox), nameof(DragBox.ScreenRect));
+                if (boxValid != null && boxRect != null)
+                {
+                    harmony.Patch(boxValid, postfix: new HarmonyMethod(typeof(Freecam), nameof(SkyBoxPostfix)));
+                    harmony.Patch(boxRect, postfix: new HarmonyMethod(typeof(Freecam), nameof(SkyRectPostfix)));
+                }
                 if (rootUpdate != null)
                 {
                     harmony.Patch(rootUpdate, postfix: new HarmonyMethod(typeof(Freecam), nameof(RootUpdatePostfix)));
@@ -831,6 +840,15 @@ namespace M3AT
                 {
                     return true;
                 }
+                // A left click on the sky is noted with where it went down: the game's box selection it begins is measured
+                // and drawn from there on screen (SkyBoxPostfix, SkyRectPostfix). IsoRim stops a ray that never meets the
+                // ground at its view distance and gives that point on the ground, which shows on the horizon below the
+                // pointer, so the box started there, reached up to the pointer and counted as a drag at once: the release
+                // then selected along that strip, and a click on a colonist's portrait missed it, as the game picks a
+                // portrait only for a release that is no box (Selector.SelectUnderMouse). The click itself goes on.
+                skyPress = e.button == 0 && InSky(looking ? new Vector2(Screen.width * 0.5f, Screen.height * 0.5f)
+                    : new Vector2(Input.mousePosition.x, Input.mousePosition.y));
+                skyFrom = UI.MousePositionOnUIInverted;
                 bool nothingSelected = Find.Selector == null || Find.Selector.NumSelected == 0;
                 if (!pointerMode)
                 {
@@ -870,6 +888,48 @@ namespace M3AT
                 Log.ErrorOnce(Tag + "The freecam's click handling failed: " + ex, 0x4d334643);
             }
             return true;
+        }
+
+        // Whether the line of sight through a screen point (pixels from the bottom left) misses the ground: the place IsoRim
+        // gives for it doesn't show back under that point (it was cut short at the view distance, above the horizon or out
+        // past the fog).
+        private const float SkySlack = 4f;   // screen pixels
+        private static bool InSky(Vector2 px)
+        {
+            Vector3 ground = IsoRim.Api.ScreenToGround(px);
+            return (IsoRim.Api.WorldToScreen(ground) - px).sqrMagnitude > SkySlack * SkySlack;
+        }
+
+        private static bool skyPress;   // the last left click on the map went down on the sky
+        private static Vector2 skyFrom;   // where, as the game's box has its corners (UI pixels, y down)
+        private const float SkyDrag = 8f;   // UI pixels the pointer has to move for a press on the sky to be a box
+
+        private static bool SkyBox(DragBox box)
+        {
+            return on && skyPress && Find.Selector != null && box == Find.Selector.dragBox;
+        }
+
+        // The game's box selection, begun by a press on the sky, is a box once the pointer has moved SkyDrag from where
+        // it went down; until then it is not (so not drawn, and its release selects under the pointer, a colonist's
+        // portrait or nothing). IsoRim's prefix on it, which measures from the horizon, runs first.
+        public static void SkyBoxPostfix(DragBox __instance, ref bool __result)
+        {
+            if (SkyBox(__instance))
+            {
+                __result = (UI.MousePositionOnUIInverted - skyFrom).sqrMagnitude > SkyDrag * SkyDrag;
+            }
+        }
+
+        // And that box is from where the button went down to the pointer, on screen: what is drawn, and what the game,
+        // IsoRim and the colonist bar select inside.
+        public static void SkyRectPostfix(DragBox __instance, ref Rect __result)
+        {
+            if (SkyBox(__instance))
+            {
+                Vector2 to = UI.MousePositionOnUIInverted;
+                __result = Rect.MinMaxRect(Mathf.Min(skyFrom.x, to.x), Mathf.Min(skyFrom.y, to.y),
+                    Mathf.Max(skyFrom.x, to.x), Mathf.Max(skyFrom.y, to.y));
+            }
         }
 
         private static void KeepTabsOpen()
