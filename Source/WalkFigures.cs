@@ -1974,7 +1974,8 @@ namespace M3AT
             // Aiming, the weapon brought up to the aim, if the export has aim clips for it.
             float aimGame, aimDrawn;
             // (Not while it uses its hip gear: IsoRim aims the weapon for any verb the stance is busy with.)
-            bool aiming = carryClip == null && !HipVerb(pawn) && AimOf(pawn, out aimGame, out aimDrawn);
+            // (Nor in a social fight, which IsoRim takes for aiming as the stance is busy with a punch: SocialFighting.)
+            bool aiming = carryClip == null && !HipVerb(pawn) && !SocialFighting(pawn) && AimOf(pawn, out aimGame, out aimDrawn);
             string aimName = skin != null && aiming ? AimName(pawn) : null;
             float aim = aimName != null ? 1f : 0f;
             int now = Find.TickManager.TicksGame;
@@ -3456,9 +3457,22 @@ namespace M3AT
 
         // The weapon in the pawn's hands when it shows one: the one it reloads (out of the inventory too, the equipped one
         // holstered meanwhile), else the equipped one; null: none.
+        // Not in a social fight: the game fights those with the body's own verbs alone (SocialInteractionUtility's
+        // TryGetRandomVerbForSocialFight), so the weapon stays where it is carried and the fists come up.
         private static ThingWithComps HeldWeapon(Pawn pawn)
         {
+            if (SocialFighting(pawn))
+            {
+                return null;
+            }
             return Reloaded(pawn) ?? (pawn.equipment != null ? pawn.equipment.Primary : null);
+        }
+
+        // In a social fight: its mental state, or the SocialFight job it is given for each blow.
+        private static bool SocialFighting(Pawn pawn)
+        {
+            return pawn.MentalStateDef == MentalStateDefOf.SocialFighting
+                || (pawn.CurJob != null && pawn.CurJob.def == JobDefOf.SocialFight);
         }
 
         // 1 while the pawn waits out a reload (Reloading), with e.reloadAt how far through it is; else 0. CE's reload is one

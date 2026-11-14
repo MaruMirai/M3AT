@@ -579,6 +579,7 @@ namespace M3AT
                 case "music": return MusicTest();
                 case "rolljoint": return RollJointTest();
                 case "drunk": return DrunkTest();
+                case "socialfight": return SocialFightTest();
                 case "dress": return DressTest();
                 case "shields": return ShieldTest();
                 case "cook": return CookTest();
@@ -1800,6 +1801,89 @@ namespace M3AT
             }
             Check("drunk: weaving on the move", weave > 0.01f, "weave up to " + weave.ToString("F3") + " cells");
             Note("Look: drunk_stand_* leant to a side with the head lolling, the arms hanging; drunk_walk_* off its straight path.");
+        }
+
+        // A social fight between two armed colonists, one with a knife and one with a rifle (WalkFigures.SocialFighting):
+        // the game fights it with the body's own verbs, so each should punch bare-handed, its weapon left where it is
+        // carried, never shown in the hands or aimed (IsoRim takes the busy stance of a punch for aiming). Stepped a tick at
+        // a time, with a picture at each pawn's first two blows.
+        private static IEnumerator SocialFightTest()
+        {
+            ClearPatch();
+            Pawn a = NewPawn(middle + new IntVec3(-1, 0, 0), "MeleeWeapon_Knife");
+            Pawn b = NewPawn(middle + new IntVec3(0, 0, 0), "Gun_AssaultRifle");
+            Hold(a);
+            Hold(b);
+            lookAt = (a.DrawPos + b.DrawPos) * 0.5f;
+            lookYaw = 0f;
+            yield return Ticks(30, "socialfight_before", a);
+            yield return WaitReal(2f);
+            yield return Shot("socialfight_before");
+            a.interactions.StartSocialFight(b);
+            Check("socialfight: started", a.MentalStateDef == MentalStateDefOf.SocialFighting && b.MentalStateDef == MentalStateDefOf.SocialFighting,
+                "states " + (a.MentalStateDef != null ? a.MentalStateDef.defName : "none") + ", " + (b.MentalStateDef != null ? b.MentalStateDef.defName : "none"));
+            Pawn[] both = { a, b };
+            int[] blows = new int[2], shown = new int[2], aimed = new int[2], armedStance = new int[2], shots = new int[2];
+            string[] clips = { "", "" };
+            string[] lastClip = new string[2];
+            for (int t = 0; t < 900 && (a.MentalStateDef == MentalStateDefOf.SocialFighting || b.MentalStateDef == MentalStateDefOf.SocialFighting); t++)
+            {
+                yield return Ticks(1, "socialfight", a);
+                lookAt = (a.DrawPos + b.DrawPos) * 0.5f;
+                bool picture = false;
+                for (int i = 0; i < 2; i++)
+                {
+                    Pawn p = both[i];
+                    if (!p.Spawned || p.Downed)
+                    {
+                        continue;
+                    }
+                    string clip = Field<string>(p, "strikeClip");
+                    if (clip != null && clip != lastClip[i])
+                    {
+                        blows[i]++;
+                        if (!clips[i].Contains(clip))
+                        {
+                            clips[i] += (clips[i].Length > 0 ? " " : "") + clip;
+                        }
+                    }
+                    lastClip[i] = clip;
+                    if (WalkFigures.AutoWeaponShows(p) || Field<bool>(p, "handHeld"))
+                    {
+                        shown[i]++;
+                    }
+                    if (Field<float>(p, "aim") > 0.01f)
+                    {
+                        aimed[i]++;
+                    }
+                    string stance = Field<string>(p, "stance");
+                    if (clip != null && stance != null && !stance.Contains("unarmed"))
+                    {
+                        armedStance[i]++;
+                    }
+                    if (clip != null && Field<float>(p, "strikePhase") > 0.3f && shots[i] < 2 && blows[i] > shots[i])
+                    {
+                        picture = true;
+                        shots[i]++;
+                    }
+                }
+                if (picture)
+                {
+                    yield return Shot("socialfight_blow_" + (shots[0] + shots[1]));
+                }
+            }
+            for (int i = 0; i < 2; i++)
+            {
+                string who = i == 0 ? "knife" : "rifle";
+                Check("socialfight (" + who + "): threw blows", blows[i] > 0, blows[i] + " blows: " + (clips[i].Length > 0 ? clips[i] : "none"));
+                Check("socialfight (" + who + "): bare-handed blows", clips[i].Length > 0 && !clips[i].Replace("melee_fist", "").Contains("melee_"), clips[i]);
+                Check("socialfight (" + who + "): weapon never in the hands", shown[i] == 0, shown[i] + " ticks shown");
+                Check("socialfight (" + who + "): never aimed", aimed[i] == 0, aimed[i] + " ticks aimed");
+                Check("socialfight (" + who + "): unarmed stance in blows", armedStance[i] == 0, armedStance[i] + " ticks in an armed stance");
+            }
+            yield return Ticks(60, "socialfight_after", a);
+            yield return Shot("socialfight_after");
+            Note("Look: socialfight_blow_* fists up, no knife or rifle in the hands (each on its holster); _before and _after the same.");
         }
 
         // Combat Extended's shields (Shields.cs): each worn by a colonist with an autopistol, carried on the back undrafted,
@@ -6089,6 +6173,11 @@ namespace M3AT
         }
 
         // One Ease field by name, null when the pawn hasn't been drawn.
+        internal static bool AutoWeaponShows(Pawn pawn)
+        {
+            return WeaponShows(pawn);
+        }
+
         internal static object AutoField(Pawn pawn, string name)
         {
             Ease e;
