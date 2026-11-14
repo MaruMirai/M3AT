@@ -113,28 +113,28 @@
   <M3AT_BugReportNote>复制本模组的设置、错误信息和你的模组列表用于错误报告，以及游戏中所选小人的状态：请先选中看起来有问题的小人。不会向任何地方发送数据。</M3AT_BugReportNote>
   <M3AT_RestoreDefaults>全部恢复默认</M3AT_RestoreDefaults>
   <M3AT_RestoreDefaultsConfirm>将 M3AT 的所有设置（包括武器尺寸）恢复为默认值？</M3AT_RestoreDefaultsConfirm>
-  <M3AT_Freecam>自由视角</M3AT_Freecam>
-  <M3AT_FreecamIntro>用平移键加鼠标转向飞行，滚轮调整高度。选择和命令仍可通过准星进行。按下设定的切换键或打开任意菜单即可切换为鼠标指针。再按一次或关闭菜单即可回到自由视角。</M3AT_FreecamIntro>
+  <M3AT_Freecam>自由镜头</M3AT_Freecam>
+  <M3AT_FreecamIntro>用平移键加鼠标转向飞行，滚轮调整高度。选择和命令仍可通过准星进行。按下设定的切换键或打开任意菜单即可切换为鼠标指针。再按一次或关闭菜单即可回到环视。</M3AT_FreecamIntro>
   <M3AT_FreecamKeys>在边缘世界的按键设置中设定按键。当前设置：</M3AT_FreecamKeys>
-  <M3AT_FreecamKeyToggle>开关自由视角</M3AT_FreecamKeyToggle>
+  <M3AT_FreecamKeyToggle>开关自由镜头</M3AT_FreecamKeyToggle>
   <M3AT_FreecamKeyUp>上升</M3AT_FreecamKeyUp>
   <M3AT_FreecamKeyDown>下降</M3AT_FreecamKeyDown>
   <M3AT_FreecamKeyBoost>双倍速度</M3AT_FreecamKeyBoost>
-  <M3AT_FreecamKeyPointer>切换指针 / 自由视角</M3AT_FreecamKeyPointer>
+  <M3AT_FreecamKeyPointer>切换指针 / 环视</M3AT_FreecamKeyPointer>
   <M3AT_FreecamButton>切换指针（鼠标）</M3AT_FreecamButton>
-  <M3AT_FreecamButtonTip>上面"切换指针"按键的鼠标按键版本：释放鼠标指针或回到自由视角。默认：鼠标中键</M3AT_FreecamButtonTip>
+  <M3AT_FreecamButtonTip>上面"切换指针"按键的鼠标按键版本：释放鼠标指针或回到环视。默认：鼠标中键</M3AT_FreecamButtonTip>
   <M3AT_FreecamClickOffLooks>空白处左键退出指针模式</M3AT_FreecamClickOffLooks>
-  <M3AT_FreecamClickOffLooksTip>指针模式下，没有选中任何东西的左键点击会回到自由视角，与右键一样。关闭（默认）：只清除选择，与游戏中一样。</M3AT_FreecamClickOffLooksTip>
+  <M3AT_FreecamClickOffLooksTip>指针模式下，没有选中任何东西的左键点击会回到环视，与右键一样。关闭（默认）：只清除选择，与游戏中一样。</M3AT_FreecamClickOffLooksTip>
   <M3AT_FreecamPointerBack>指针模式恢复指针位置</M3AT_FreecamPointerBack>
-  <M3AT_FreecamPointerBackTip>进入指针模式时，指针回到开始自由视角前的位置（默认）。关闭：从屏幕中央、准星下方开始。</M3AT_FreecamPointerBackTip>
+  <M3AT_FreecamPointerBackTip>进入指针模式时，指针回到开始自由镜头前的位置（默认）。关闭：从屏幕中央、准星下方开始。</M3AT_FreecamPointerBackTip>
   <M3AT_FreecamMenuFreesPointer>命令菜单释放指针</M3AT_FreecamMenuFreesPointer>
-  <M3AT_FreecamMenuFreesPointerTip>自由视角下打开的命令菜单会释放指针供你选择，菜单关闭后回到自由视角。关闭（默认）：菜单固定在打开的位置，通过转动视角对准选项来选择。</M3AT_FreecamMenuFreesPointerTip>
+  <M3AT_FreecamMenuFreesPointerTip>环视时打开的命令菜单会释放指针供你选择，菜单关闭后回到环视。关闭（默认）：菜单固定在打开的位置，通过转动视角对准选项来选择。</M3AT_FreecamMenuFreesPointerTip>
   <M3AT_LookSpeed>转向速度</M3AT_LookSpeed>
   <M3AT_LookSpeedTip>鼠标移动时视角转动的幅度，单位为度/像素（默认 {0}）。</M3AT_LookSpeedTip>
   <M3AT_InvertMouse>反转鼠标视角</M3AT_InvertMouse>
   <M3AT_InvertMouseTip>向上移动鼠标时向下看。</M3AT_InvertMouseTip>
   <M3AT_FreecamCutaway>使用 IsoRim 的墙壁隐藏</M3AT_FreecamCutaway>
-  <M3AT_FreecamCutawayTip>飞行时按 IsoRim 自己的设置降低墙壁：指针周围（自由视角下为屏幕中央）、殖民者附近和房间前方。关闭（默认）：所有墙壁保持完整高度，与 IsoRim 的第一人称视角一样。</M3AT_FreecamCutawayTip>
+  <M3AT_FreecamCutawayTip>飞行时按 IsoRim 自己的设置降低墙壁：指针周围（环视时为屏幕中央）、殖民者附近和房间前方。关闭（默认）：所有墙壁保持完整高度，与 IsoRim 的第一人称视角一样。</M3AT_FreecamCutawayTip>
   <M3AT_ScrollFlies>滚轮控制升降</M3AT_ScrollFlies>
   <M3AT_ScrollFliesTip>向上滚动升高镜头，向下滚动降低镜头，飞行速度越高幅度越大。关闭：飞行时滚轮无作用。</M3AT_ScrollFliesTip>
   <M3AT_FlyingSpeed>飞行速度</M3AT_FlyingSpeed>
@@ -144,6 +144,6 @@
   <M3AT_ScrollSpeedTip>滚轮每滚一格镜头升降多少，在飞行速度基础上叠加（默认 {0}）。</M3AT_ScrollSpeedTip>
   <M3AT_FieldOfView>视野</M3AT_FieldOfView>
   <M3AT_FieldOfViewTip>镜头的视野宽度，以屏幕上沿到下沿的角度计（默认 {0}）。</M3AT_FieldOfViewTip>
-  <M3AT_FreecamOn>自由视角已开启：按 {0} 退出。</M3AT_FreecamOn>
-  <M3AT_FreecamOff>自由视角已关闭。</M3AT_FreecamOff>
+  <M3AT_FreecamOn>自由镜头已开启：按 {0} 退出。</M3AT_FreecamOn>
+  <M3AT_FreecamOff>自由镜头已关闭。</M3AT_FreecamOff>
 </LanguageData>
