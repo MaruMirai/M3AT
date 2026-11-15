@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using IsoRim;
 using UnityEngine;
 using Verse;
@@ -7,7 +8,7 @@ using Verse;
 namespace M3AT
 {
     // The hair's strand streaks (HairBuilder.Streaked) on what else is drawn in the hair's colour with no image of its own:
-    // the gene ears, the cat tail and the Furskin gene's tufts. Each is given texture places running along its strands
+    // the gene ears, the cat tail and the Furskin gene's tufts, and with that gene the whole body and head (GrainBody). Each is given texture places running along its strands
     // (StrandUvs*) on one shared grey texture of the same streaks (StrandTexture), drawn with the hair's textured material
     // (TexturedMaterial), so they come out with the same grain rather than as flat colour beside the hair.
     public sealed partial class SkinnedFigure
@@ -84,25 +85,233 @@ namespace M3AT
             piece.mean = Color.white;   // its outline stays in its own colour
         }
 
-        // The Furskin gene's tufts (FurPiece) grained, unless the export gives them an image of their own. Without the grain if
-        // that fails: it is only a look.
+        // The Furskin gene's tufts (FurPiece) grained, unless the export gives them an image of their own; and the body given
+        // strand places (GrainBody). Without the grain if that fails: it is only a look.
         private void GrainFur()
         {
             int at = FurPiece;
-            if (at < 0 || pieces[at].texture != null)
+            if (at < 0)
             {
                 return;
             }
+            Piece fur = pieces[at];
+            if (fur.texture == null)
+            {
+                try
+                {
+                    fur.uvs = StrandUvsTufts(fur.rest, fur.tris);
+                    Grain(fur);
+                }
+                catch (Exception e)
+                {
+                    Log.Warning(Tag + "could not lay the strand grain on the fur, so it is drawn plain: " + e.Message);
+                }
+            }
             try
             {
-                Piece fur = pieces[at];
-                fur.uvs = StrandUvsTufts(fur.rest, fur.tris);
-                Grain(fur);
+                GrainBody();
             }
             catch (Exception e)
             {
-                Log.Warning(Tag + "could not lay the strand grain on the fur, so it is drawn plain: " + e.Message);
+                pieces[0].uvs = null;
+                Log.Warning(Tag + "could not lay the strand grain on the body, so a furred one is drawn plain: " + e.Message);
             }
+        }
+
+        // The body's strand places, for a pawn with the Furskin gene (DrawBody's grained): each vertex goes with the chain of
+        // bones that carries most of its weight (the trunk and head, each arm with its shoulder, each leg), and is placed
+        // on it as the tail's tube is (StrandUvsTube: along the chain, round it mirrored, so no seam), so the streaks run
+        // down the trunk and head and along the limbs. Where a triangle's corners go with different chains its places jump,
+        // which the texture's mip levels draw as flat colour, a thin line at the shoulders and hips.
+        private void GrainBody()
+        {
+            Piece body = pieces[0];
+            string[] names = new string[boneHead.Length];
+            foreach (KeyValuePair<string, int> pair in boneIndex)
+            {
+                names[pair.Value] = pair.Key;
+            }
+            float top = float.MinValue;
+            foreach (Vector3 v in body.rest)
+            {
+                top = Mathf.Max(top, v.y);
+            }
+            List<Vector3[]> chains = new List<Vector3[]>();
+            int[] chainOf = new int[boneHead.Length];
+            Vector3[] trunk = ChainOf("spine", "spine.001", "spine.002", "spine.003", "spine.004", "spine.005", "spine.006");
+            if (trunk == null)
+            {
+                throw new InvalidDataException("no spine bones");
+            }
+            Vector3 crown = trunk[trunk.Length - 1];
+            crown.y = Mathf.Max(top, crown.y + 0.05f);
+            chains.Add(Extended(trunk, crown));
+            foreach (string side in new[] { "L", "R" })
+            {
+                Vector3[] arm = ChainOf("upper_arm." + side, "forearm." + side, "hand." + side, "hand." + side + ".001", "hand." + side + ".002");
+                Vector3[] leg = ChainOf("thigh." + side, "shin." + side, "foot." + side, "toe." + side);
+                int armAt = -1, legAt = -1;
+                if (arm != null)
+                {
+                    armAt = chains.Count;
+                    chains.Add(Extended(arm, Past(arm, 0.04f)));
+                }
+                if (leg != null)
+                {
+                    legAt = chains.Count;
+                    chains.Add(Extended(leg, Past(leg, 0.04f)));
+                }
+                for (int b = 0; b < names.Length; b++)
+                {
+                    string n = names[b];
+                    if (n == null || !n.Contains("." + side))
+                    {
+                        continue;
+                    }
+                    if (armAt >= 0 && (n.StartsWith("upper_arm") || n.StartsWith("forearm") || n.StartsWith("hand") || n.StartsWith("thumb") || n.StartsWith("shoulder")))
+                    {
+                        chainOf[b] = armAt;
+                    }
+                    else if (legAt >= 0 && (n.StartsWith("thigh") || n.StartsWith("shin") || n.StartsWith("foot") || n.StartsWith("toe")))
+                    {
+                        chainOf[b] = legAt;
+                    }
+                }
+            }
+            float scale = StrandScale();
+            Vector3[][] sides = new Vector3[chains.Count][];
+            for (int c = 0; c < chains.Count; c++)
+            {
+                sides[c] = ChainSides(chains[c]);
+            }
+            float[] share = new float[chains.Count];
+            Vector2[] uvs = new Vector2[body.rest.Length];
+            for (int i = 0; i < body.rest.Length; i++)
+            {
+                Array.Clear(share, 0, share.Length);
+                for (int k = body.firstWeight[i]; k < body.firstWeight[i + 1]; k++)
+                {
+                    int b = body.weightBone[k];
+                    share[b >= 0 && b < chainOf.Length ? chainOf[b] : 0] += body.weight[k];
+                }
+                int best = 0;
+                for (int c = 1; c < share.Length; c++)
+                {
+                    if (share[c] > share[best])
+                    {
+                        best = c;
+                    }
+                }
+                Vector3[] joints = chains[best];
+                float along;
+                Vector3 off;
+                int seg;
+                OnChain(body.rest[i], joints, out along, out off, out seg);
+                Vector3 d = (joints[seg + 1] - joints[seg]).normalized, side = sides[best][seg], up = Vector3.Cross(side, d);
+                float round = off.magnitude * Mathf.Atan2(Vector3.Dot(off, side), Mathf.Abs(Vector3.Dot(off, up)));
+                uvs[i] = new Vector2(round * scale + 0.37f * best, along * scale);
+            }
+            body.uvs = uvs;
+        }
+
+        // The rest heads of these bones in order, or null if the export lacks any.
+        private Vector3[] ChainOf(params string[] bones)
+        {
+            Vector3[] joints = new Vector3[bones.Length];
+            for (int k = 0; k < bones.Length; k++)
+            {
+                int b;
+                if (!boneIndex.TryGetValue(bones[k], out b) || b >= boneHead.Length)
+                {
+                    return null;
+                }
+                joints[k] = boneHead[b];
+            }
+            return joints;
+        }
+
+        // A chain with one more joint at its end (the last bone's own end, which the bone heads don't give).
+        private static Vector3[] Extended(Vector3[] joints, Vector3 end)
+        {
+            Vector3[] more = new Vector3[joints.Length + 1];
+            Array.Copy(joints, more, joints.Length);
+            more[joints.Length] = end;
+            return more;
+        }
+
+        // A point past a chain's last joint, by cells, on along its last segment.
+        private static Vector3 Past(Vector3[] joints, float by)
+        {
+            Vector3 a = joints[joints.Length - 2], b = joints[joints.Length - 1];
+            return b + (b - a).normalized * by;
+        }
+
+        // The pieces of one mesh joined to nothing else (the tufts), each a list of its vertices, by one of them.
+        private static Dictionary<int, List<int>> Tufts(Vector3[] rest, int[] tris)
+        {
+            int n = rest.Length;
+            int[] root = new int[n];
+            for (int i = 0; i < n; i++)
+            {
+                root[i] = i;
+            }
+            Func<int, int> find = null;
+            find = i =>
+            {
+                while (root[i] != i)
+                {
+                    root[i] = root[root[i]];
+                    i = root[i];
+                }
+                return i;
+            };
+            for (int t = 0; t + 2 < tris.Length; t += 3)
+            {
+                int a = find(tris[t]), b = find(tris[t + 1]), c = find(tris[t + 2]);
+                root[b] = a;
+                root[find(c)] = a;
+            }
+            Dictionary<int, List<int>> groups = new Dictionary<int, List<int>>();
+            for (int i = 0; i < n; i++)
+            {
+                int r = find(i);
+                List<int> g;
+                if (!groups.TryGetValue(r, out g))
+                {
+                    g = new List<int>();
+                    groups[r] = g;
+                }
+                g.Add(i);
+            }
+            return groups;
+        }
+
+        private Piece bodyGrain;   // holds the streak texture and its materials for the body (BodyMaterial); not drawn itself
+
+        // The body's material: the hair's textured one on the streak texture for a furred pawn (grained, the body's places
+        // laid by GrainBody), its light pass a part of m's own, else the plain solid one. The light pass part is kept once
+        // added, with no material while the body is drawn plain (DrawParts skips it), so the parts' places stay put.
+        private Material BodyMaterial(PieceMeshes m, bool grained)
+        {
+            Material t = null;
+            if (grained && pieces[0].uvs != null)
+            {
+                if (bodyGrain == null)
+                {
+                    bodyGrain = new Piece { name = "Body_Grain", texture = StrandTexture() };
+                }
+                t = TexturedMaterial(bodyGrain);
+            }
+            if (t != null && m.grainMarkAt < 0 && bodyGrain.mark != null)
+            {
+                m.grainMarkAt = m.parts.Count;
+                m.parts.Add(new MeshPart { mesh = m.solid, material = bodyGrain.mark, outline = false });
+            }
+            if (m.grainMarkAt >= 0)
+            {
+                m.parts[m.grainMarkAt].material = t != null ? bodyGrain.mark : null;
+            }
+            return t ?? SolidMaterial();
         }
 
         // The textured material for a grained piece, its light pass added to m's parts once; else the plain solid material
@@ -245,39 +454,7 @@ namespace M3AT
         {
             float scale = StrandScale();
             int n = rest.Length;
-            int[] root = new int[n];
-            for (int i = 0; i < n; i++)
-            {
-                root[i] = i;
-            }
-            Func<int, int> find = null;
-            find = i =>
-            {
-                while (root[i] != i)
-                {
-                    root[i] = root[root[i]];
-                    i = root[i];
-                }
-                return i;
-            };
-            for (int t = 0; t + 2 < tris.Length; t += 3)
-            {
-                int a = find(tris[t]), b = find(tris[t + 1]), c = find(tris[t + 2]);
-                root[b] = a;
-                root[find(c)] = a;
-            }
-            Dictionary<int, List<int>> groups = new Dictionary<int, List<int>>();
-            for (int i = 0; i < n; i++)
-            {
-                int r = find(i);
-                List<int> g;
-                if (!groups.TryGetValue(r, out g))
-                {
-                    g = new List<int>();
-                    groups[r] = g;
-                }
-                g.Add(i);
-            }
+            Dictionary<int, List<int>> groups = Tufts(rest, tris);
             Vector2[] uvs = new Vector2[n];
             foreach (KeyValuePair<int, List<int>> kv in groups)
             {

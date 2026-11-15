@@ -243,6 +243,18 @@ namespace M3AT
         private readonly HashSet<string> busy = new HashSet<string>();
         private Thread worker;
 
+        // Styles queued or being built and not yet written (Finish), for the benchmark to wait on.
+        public int BusyCount
+        {
+            get
+            {
+                lock (waiting)
+                {
+                    return busy.Count;
+                }
+            }
+        }
+
         public HairBuilder(Vector3[] body, int[] bodyTris, bool[] onHead, Dictionary<string, Vector3[]> keys, bool reversed,
             Vector3 headBone, string cache, bool beard = false, bool[] scalp = null, bool[] onArm = null)
         {

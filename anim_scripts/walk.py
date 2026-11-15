@@ -1119,6 +1119,65 @@ SLEEP_BREATH_NECK = 1.5
 # clip faces the other way, mirror_pose), breathing a little faster.
 LOVIN_SECONDS = 6.0
 LOVIN_BREATHS = 3
+LOVIN_CHIN = 78.3    # the head tipped back (degrees, the neck taking half and the head half), the chin up off the chest so
+                     # the two look at each other rather than down toward the foot of the bed
+LOVIN_CLOSER = 0.3   # cells each is drawn across the bed toward the other (their slots are a cell apart; anim.txt's
+                     # lovin_pair line, WalkFigures' lovinShift)
+LOVIN_SPLAY = 17.8   # degrees each is turned about its head, its hips away from the other's, so the two lie in a V with
+                     # the heads together and the knees clear of each other
+# So the two don't lie as mirror images, the one with the partner on its right (lovin_R) differs a little: it lies
+# LOVIN_R_ALONG cells further toward the foot of the bed (its head a little under the other's), is turned LOVIN_R_SPLAY
+# degrees more (less than 0 is less) and has its chin tipped LOVIN_R_CHIN degrees more (less than 0 is less). Each
+# breathes on its own time, offset by the pawn's id (WalkFigures.LoopPhase).
+LOVIN_R_ALONG = 0.06
+LOVIN_R_SPLAY = 0.0
+LOVIN_R_CHIN = 12.3
+# A second way of lying at lovin (lovin_L~2, lovin_R~2, a VARIANTS entry with LOVIN_CARESS on): the upper hand (the arm
+# on top as it lies on its side) reached across and laid on the partner's upper cheek, palm to it and the fingers up
+# toward the temple, stroking it slowly (LOVIN_STROKES a loop, LOVIN_STROKE leg lengths up and down the cheek along
+# the partner's head, and LOVIN_PRESS of that in toward it at the bottom of each stroke). The partner is placed as the game
+# lays the pair (lovin_placed: the slots a cell apart, LOVIN_CLOSER, LOVIN_SPLAY, LOVIN_R_ALONG), each at a grown
+# pawn's size; LOVIN_CHEEK is the cheek's place from the partner's head joint in its head's frame (leg lengths, x out
+# toward its upper side, y back, z up). The elbow rests down on its own side (LOVIN_ELBOW, armature space, the
+# figure's way up taken as LOVIN_ELBOW's x toward the partner, y the figure's own up as it lies, z toward the head).
+# WalkFigures picks it per pair and night: neither, one or both.
+LOVIN_CARESS = False
+LOVIN_CHEEK = (0.33, -0.18, 0.16)
+LOVIN_HEAD_MIDDLE = (0.0, 0.04, 0.33)   # the middle of the head's ball, the same way: the palm faces it
+LOVIN_STROKES = 2
+LOVIN_STROKE = 0.05
+LOVIN_PRESS = 0.15
+LOVIN_FINGERS_TIP = 25.0   # degrees the fingers lean back from the partner's head's up toward the back of its head
+LOVIN_CURL = 0.25          # the fingers' curl round the cheek (shares of FIST)
+LOVIN_ELBOW = (0.2, 0.6, -1.0)
+# Spooning at lovin (spoon_big_<side>, spoon_little_<side>, the partner on the figure's left or right as for lovin_L
+# and lovin_R): both on their sides in the same still lying, facing the same way, the little spoon facing away from the
+# big one, their knees nested as they bend alike. The chibi's head is far deeper than its trunk, so the big spoon lies
+# SPOON_ALONG cells further toward the foot of the bed (its face in the little one's upper back, its head under the
+# other's) and each is drawn toward the other across the bed (SPOON_BIG_CLOSER, SPOON_LITTLE_CLOSER cells from its slot;
+# the slots are a cell apart), not turned. The big spoon's upper arm goes over the little one's waist, the palm on its
+# belly (SPOON_HUG from the little one's waist joint, spine.001, in its frame: leg lengths, x out toward its upper
+# side, y back, z up; facing SPOON_HUG_FACING, the fingers along SPOON_HUG_FINGERS), and the little one's
+# upper hand lies on the back of it (SPOON_HOLD leg lengths off it, the fingers along it). The chins: SPOON_BIG_CHIN
+# and SPOON_LITTLE_CHIN degrees tipped back, as LOVIN_CHIN (less than 0 tucked). anim.txt's spoon_pair line.
+SPOON_ALONG = 0.16
+SPOON_BIG_CLOSER = 0.39
+SPOON_LITTLE_CLOSER = 0.39
+SPOON_HUG = (0.2, -0.08, 0.0)
+SPOON_HUG_FACING = (-1.0, 0.5, 0.0)    # the palm's facing, the same frame: in onto the waist from its upper side
+SPOON_HUG_FINGERS = (-0.3, -1.0, -0.3)   # the fingers' way: round toward the front of the belly, a little down
+SPOON_HOLD = 0.06
+SPOON_BIG_CHIN = 60.0
+SPOON_LITTLE_CHIN = 20.0
+SPOON_ELBOW = (0.0, 1.0, -0.6)   # the big spoon's elbow, as LOVIN_ELBOW: over its own side and toward its hips
+SPOON_CURL = 0.2
+# The sizes the two are posed for, against a grown pawn's: a man behind a woman with the gender sizes option on
+# (WalkFigures.GenderGap 0.1, split between them), as BigSpoon puts a man and a woman; a couple of one gender is
+# within a few hundredths of each other, so the hug sits a little off there.
+SPOON_BIG_SIZE = 1.05
+SPOON_LITTLE_SIZE = 0.95
+SPOON_BIG_LEGS = 0.0   # the share of the big spoon's leg bend taken out, at the hips and the knees alike (0 as it
+                       # lies, 1 both legs straight down the line of its trunk)
 # A baby awake on its back (baby_at): the lie loop's trunk and breathing, with the arms waving and the legs kicking laid
 # on it. The arms are posed by hand: they flail all the while (BABY_FLAIL: each arm's raise forward, swing out and
 # elbow bend, and how far the fingers curl, wandering about a middle by a few sines a loop, each a whole number of times
@@ -2620,6 +2679,8 @@ VARIANTS = {
             through=dict(hand=(0.15, -0.4, 0.55), fingers=(1.0, -0.3, 0.0), palm=(0.0, 0.0, -1.0), other=(0.18, -0.22, 0.48),
                          lean=8.0, twist=32.0, lunge=0.09, drop=0.04)))),
     ],
+    # At lovin, the upper hand on the partner's cheek, stroking it.
+    'lovin': [dict(LOVIN_CARESS=True)],
     # Harvesting by hand, crouched and picking (the mocap gather), with no scythe.
     'work_scythe': [dict(WORK_MOCAP=GATHER_CLIP, WORK_MOCAP_TOOL=False)] if GATHER_CLIP is not None else [],
     # Eating at a table with a knife and fork, bowed to the plate (the second mocap clip).
@@ -3466,10 +3527,161 @@ def lovin_at(t, side):
     round the loop; see LOVIN_SECONDS). Returns the pose and the worst overreach."""
     with varied(dict(SLEEP_CLIP=DOWNED_SIDE_CLIP, SLEEP_HOLD=True, SLEEP_HOLD_SECONDS=LOVIN_SECONDS, SLEEP_BREATHS=LOVIN_BREATHS)):
         X, _ = sleep_at(t)
+    for bone in (NECK, HEAD):
+        pivot = X[bone] @ head[bone]
+        chin = LOVIN_CHIN + (LOVIN_R_CHIN if side == 'R' else 0.0)
+        turn_branch(X, bone, about(pivot, (X[bone].to_3x3() @ Vector((1, 0, 0))).normalized(), -chin * 0.5))
     face = X[HEAD].to_3x3() @ FWD
     if (face.x > 0.0) != (side == 'L'):
         X = mirror_pose(X)
-    return X, 0.0
+    clamp = lovin_caress(X, t, side) if LOVIN_CARESS else 0.0
+    return X, clamp
+
+LOVIN_LAY = Matrix.Rotation(math.radians(-90.0), 4, 'X')   # upright to lying, the head to +y, as WalkFigures lays it
+
+def lovin_laid(size):
+    """The figure laid down (LOVIN_LAY) and scaled by size about its head's middle, as WalkFigures lays a figure in a
+    bed with its head's middle (the face patch's centre, HeadHeight) at the pawn's place and draws it at its size about
+    that place. The head's middle is taken at rest, LOVIN_HEAD_MIDDLE."""
+    c = LOVIN_LAY @ Vector((0.0, 0.0, head[HEAD].z + LOVIN_HEAD_MIDDLE[2] * LEG))
+    return T(c) @ Matrix.Scale(size, 4) @ T(-c) @ LOVIN_LAY
+
+def lovin_placed(side, X, size=1.0):
+    """Where the figure at lovin playing lovin_<side> in the pose X lies: the matrix from its upright armature space to
+    the bed's (x across, the lovin_L one's slot at 0 and the lovin_R one's a cell to +x, y toward the head end, z up),
+    as WalkFigures lays the pair (and the preview's draw_lovers), before each is rested on its lowest point (alike for
+    the two, as their poses are alike). size: the figure's own size against a grown pawn's (the game's GenderSize and
+    height), about its head's middle (lovin_laid); the cells it is moved are not scaled, as in the game."""
+    cell = LEG / MODEL_LEG / GAME_SCALE   # armature units per cell, for a grown pawn
+    laid = lovin_laid(size)
+    head_at, hips = laid @ (X[HEAD] @ head[HEAD]), laid @ (X[HIPS] @ head[HIPS])
+    toward = 1.0 if side == 'L' else -1.0
+    slot = 0.0 if side == 'L' else cell
+    v = hips - head_at
+    second = side == 'R'
+    splay = math.copysign(LOVIN_SPLAY + (LOVIN_R_SPLAY if second else 0.0), v.y * toward)
+    down = Vector((v.x, v.y, 0.0)).normalized() * (LOVIN_R_ALONG * cell if second else 0.0)
+    turn = (T(Vector((head_at.x, head_at.y, 0.0))) @ Matrix.Rotation(math.radians(splay), 4, 'Z')
+            @ T(Vector((-head_at.x, -head_at.y, 0.0))))
+    return T(Vector((slot + toward * LOVIN_CLOSER * cell, 0.0, 0.0)) + down) @ turn @ laid
+
+def spoon_pose(t, facing, chin):
+    """The still side lying spooning is posed from at t (0 .. 1 round the loop), facing its +x (facing 'L') or -x
+    ('R'), the head tipped back chin degrees."""
+    with varied(dict(SLEEP_CLIP=DOWNED_SIDE_CLIP, SLEEP_HOLD=True, SLEEP_HOLD_SECONDS=LOVIN_SECONDS, SLEEP_BREATHS=LOVIN_BREATHS)):
+        X, _ = sleep_at(t)
+    for bone in (NECK, HEAD):
+        turn_branch(X, bone, about(X[bone] @ head[bone], (X[bone].to_3x3() @ Vector((1, 0, 0))).normalized(), -chin * 0.5))
+    face = X[HEAD].to_3x3() @ FWD
+    if (face.x > 0.0) != (facing == 'L'):
+        X = mirror_pose(X)
+    return X
+
+def spoon_placed(side, role, X, size=1.0):
+    """Where the figure spooning (role 'big' or 'little', playing spoon_<role>_<side>, posed in X) lies: the matrix from
+    its upright armature space to the bed's, as lovin_placed's (the lovin_L slot, the partner on its left, at 0 and the
+    other a cell to +x), before each is rested on its lowest point; size as lovin_placed's."""
+    cell = LEG / MODEL_LEG / GAME_SCALE
+    laid = lovin_laid(size)
+    head_at, hips = laid @ (X[HEAD] @ head[HEAD]), laid @ (X[HIPS] @ head[HIPS])
+    toward = 1.0 if side == 'L' else -1.0
+    slot = 0.0 if side == 'L' else cell
+    v = hips - head_at
+    down = Vector((v.x, v.y, 0.0)).normalized() * (SPOON_ALONG * cell if role == 'big' else 0.0)
+    closer = SPOON_BIG_CLOSER if role == 'big' else SPOON_LITTLE_CLOSER
+    return T(Vector((slot + toward * closer * cell, 0.0, 0.0)) + down) @ laid
+
+def spoon_hug(Y):
+    """The big spoon's palm on the little one (posed in Y, its upper side its +x when it faces -x): the palm's place,
+    the way it faces and the fingers' way, in the little one's upright armature space."""
+    up = 1.0 if (Y[HEAD].to_3x3() @ FWD).x < 0.0 else -1.0   # the little one's upper side (it faces away from it)
+    W = Y['spine.001']
+    Wr = W.to_3x3().normalized()
+    hug = Vector(SPOON_HUG)
+    hug.x *= up
+    palm = W @ (head['spine.001'] + hug * LEG)
+    way = lambda v: (Wr @ Vector((up * v[0], v[1], v[2]))).normalized()
+    return palm, way(SPOON_HUG_FACING), way(SPOON_HUG_FINGERS)
+
+def straighten_legs(X, share):
+    """Both legs of X unbent by share of their bend (0 none, 1 straight): each thigh with all below it turned about its
+    hip toward the line of the trunk down from the hips, then each shin with all below it about its knee toward the
+    thigh's line, in place."""
+    if share == 0.0:
+        return
+    down = -(X[HIPS] @ tail[HIPS] - X[HIPS] @ head[HIPS]).normalized()
+    for side in ('L', 'R'):
+        for bone, toward in (('thigh.' + side, lambda: down),
+                             ('shin.' + side, lambda: (X['thigh.' + side] @ tail['thigh.' + side] - X['thigh.' + side] @ head['thigh.' + side]).normalized())):
+            joint = X[bone] @ head[bone]
+            u = toward()
+            v = (X[bone] @ tail[bone] - joint).normalized()
+            axis = v.cross(u)
+            if axis.length < 1e-6:
+                continue
+            turn_branch(X, bone, about(joint, axis.normalized(), math.degrees(v.angle(u)) * share))
+
+def spoon_at(t, side, role):
+    """Spooning at lovin at t (0 .. 1 round the loop; see SPOON_ALONG), the partner on the figure's side ('L' its
+    left, +x; 'R' its right), as the big spoon (facing the partner's back, its upper arm over the partner's waist) or
+    the little one (facing away, its upper hand on the big one's). Returns the pose and the worst overreach."""
+    other = 'R' if side == 'L' else 'L'
+    big_facing, big_side = (side, side) if role == 'big' else (other, other)   # the big spoon faces the little one
+    Big = spoon_pose(t, big_facing, SPOON_BIG_CHIN)
+    straighten_legs(Big, SPOON_BIG_LEGS)
+    Little = spoon_pose(t, big_facing, SPOON_LITTLE_CHIN)   # facing the same way, away from the big one
+    little_side = other if role == 'big' else side
+    to_big = (spoon_placed(big_side, 'big', Big, SPOON_BIG_SIZE).inverted()
+              @ spoon_placed(little_side, 'little', Little, SPOON_LITTLE_SIZE))   # (scaled: little over big)
+    palm, facing, fingers = spoon_hug(Little)
+    hand_side, sign = ('R', -1) if big_facing == 'L' else ('L', 1)   # the upper arm: the one away from the bed
+    toward = 1.0 if big_facing == 'L' else -1.0
+    pole = Big[CHEST_BONE].to_3x3().inverted() @ Vector((SPOON_ELBOW[0] * toward, -SPOON_ELBOW[1], SPOON_ELBOW[2]))
+    clamp = hand_on(hand_side, sign, to_big @ palm, (to_big.to_3x3() @ fingers).normalized(),
+                    (to_big.to_3x3() @ facing).normalized(), Big, pole=pole)
+    close_hand(Big, hand_side, sign, SPOON_CURL)
+    if role == 'big':
+        return Big, clamp
+    # The little one's upper hand (the same side as the big one's, as they face alike) laid on the back of the big
+    # one's hand, the fingers along its fingers.
+    to_little = to_big.inverted()
+    hn = 'hand.' + hand_side
+    back = to_little @ (Big[hn] @ ((head[hn] + tail[hn]) * 0.5))
+    d0, n0 = hand_rest_axes(hand_side, sign)
+    big_palm = (to_little.to_3x3() @ Big[hn].to_3x3() @ n0).normalized()   # the big one's palm's facing (into the belly)
+    big_fingers = (to_little.to_3x3() @ Big[hn].to_3x3() @ d0).normalized()
+    clamp = hand_on(hand_side, sign, back - big_palm * SPOON_HOLD * LEG, big_fingers, big_palm, Little,
+                    pole=Little[CHEST_BONE].to_3x3().inverted() @ Vector((0.0, -1.0, -0.6)))
+    close_hand(Little, hand_side, sign, SPOON_CURL)
+    return Little, clamp
+
+def lovin_caress(X, t, side):
+    """The upper hand of the figure at lovin (playing lovin_<side>, posed in X) laid on the partner's upper cheek and
+    stroking it at t (0 .. 1 round the loop; see LOVIN_CARESS), in place. Returns how far the wrist was out of reach."""
+    other = 'R' if side == 'L' else 'L'
+    with varied(dict(LOVIN_CARESS=False)):
+        Y, _ = lovin_at(t, other)
+    to_self = lovin_placed(side, X).inverted() @ lovin_placed(other, Y)   # the partner's upright space to this one's
+    up_sign = 1.0 if other == 'R' else -1.0   # the partner's upper side: its +x lying as lovin_R, -x as lovin_L
+    hand_side, sign = ('R', -1) if side == 'L' else ('L', 1)   # this one's upper arm
+    H = to_self @ Y[HEAD]
+    Hr = H.to_3x3().normalized()
+    stroke = math.sin(2 * math.pi * LOVIN_STROKES * t)
+    press = 0.5 - 0.5 * stroke   # in most at the bottom of the stroke
+    cheek = Vector(LOVIN_CHEEK)
+    cheek.x *= up_sign
+    middle = Vector(LOVIN_HEAD_MIDDLE)
+    out = (Hr @ (cheek - middle)).normalized()   # out of the partner's upper cheek
+    palm = H @ (head[HEAD] + cheek * LEG) + Hr @ Vector((0.0, 0.0, LOVIN_STROKE * stroke * LEG)) - out * (LOVIN_PRESS * LOVIN_STROKE * press * LEG)
+    tip = math.radians(LOVIN_FINGERS_TIP)
+    fingers = Hr @ Vector((0.0, math.sin(tip), math.cos(tip)))   # (made square to the facing by hand_on)
+    # The elbow down on its own side: the pole in the chest's frame.
+    toward = 1.0 if side == 'L' else -1.0
+    pole = Vector((LOVIN_ELBOW[0] * toward, -LOVIN_ELBOW[1], LOVIN_ELBOW[2]))   # this one's up as it lies is -y upright
+    pole = X[CHEST_BONE].to_3x3().inverted() @ pole
+    clamp = hand_on(hand_side, sign, palm, fingers, -out, X, pole=pole)
+    close_hand(X, hand_side, sign, LOVIN_CURL)
+    return clamp
 
 def downed_at(t):
     """Downed in bed at t (0 .. 1 round the loop; see DOWNED_CLIP). Returns the pose and the worst overreach."""

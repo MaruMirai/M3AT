@@ -113,7 +113,7 @@ namespace M3AT
         // A menu of orders opened while looking (a right click under the cross with something selected) is kept in
         // looking: pinned to the place it was opened over, it moves on screen as the view turns or flies, so its options
         // are picked by turning the cross onto them, and looking away from it closes it as the game closes one the
-        // pointer leaves (FloatMenu.UpdateBaseColor, 95 px off it). The freecamMenuFreesPointer option (off by default)
+        // pointer leaves (FloatMenu.UpdateBaseColor, 95 px off it). The freecamMenuFreesPointer option (on by default)
         // puts back the old way instead: the menu frees the pointer, in the middle of the screen, while it is up.
         private static FloatMenu pinned;
         private static Vector3 pinnedAt;   // the place under the cross when it opened, in the eye's (unsquashed) space

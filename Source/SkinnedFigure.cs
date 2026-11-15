@@ -305,6 +305,7 @@ namespace M3AT
             public int outlineMarkAt = -1;   // where the outline's light pass is in parts; -1: not added yet
             public bool textureMarked;   // a textured garment's light pass is in parts
             public int clearAt = -1;   // where its two stencil-clearing parts are in parts (SetSlot); -1: not added yet
+            public int grainMarkAt = -1;   // the body's: where the light pass of its strand grain is in parts (BodyMaterial); -1: not added yet
             public int afterAt = -1;   // where its redraw after IsoRim's ambient occlusion is in parts (SetSlot); -1: not added yet
             public bool isSkin;   // the body or the fur on it, which never take the occlusion (ClothesOcclusion)
             public bool dressed;  // a garment (or the fur): skinned by the pawn's dress bones while it has a pylon (Prosthetics.cs)
@@ -1172,6 +1173,22 @@ namespace M3AT
                 {
                     HipGrab = Num(p[1]);
                     HipSlide = Num(p[2]);
+                }
+                else if (p[0] == "lovin_pair" && p.Length > 2)
+                {
+                    LovinCloser = Num(p[1]);
+                    LovinSplay = Num(p[2]);
+                    if (p.Length > 4)
+                    {
+                        LovinRAlong = Num(p[3]);
+                        LovinRSplay = Num(p[4]);
+                    }
+                }
+                else if (p[0] == "spoon_pair" && p.Length > 3)
+                {
+                    SpoonAlong = Num(p[1]);
+                    SpoonBigCloser = Num(p[2]);
+                    SpoonLittleCloser = Num(p[3]);
                 }
                 else if (p[0] == "cuddle_pet" && p.Length > 3)
                 {
@@ -2063,6 +2080,22 @@ namespace M3AT
                 Reach(p, whole, side, whole.MultiplyPoint3x4(p.pos[hand] + by), w);
             }
         }
+
+        // At lovin with no blanket (lovin_L, lovin_R; anim.txt's lovin_pair line, walk.LOVIN_CLOSER and LOVIN_SPLAY): cells
+        // each is drawn across the bed toward the other, and degrees each is turned about its head, its hips away from the
+        // other's, so the two lie in a V with the heads together and the knees clear.
+        public float LovinCloser = 0.1f;
+        public float LovinSplay = 25f;
+        // So the two aren't mirror images, the one playing lovin_R lies LovinRAlong cells further toward the foot of the
+        // bed and is turned LovinRSplay degrees more.
+        public float LovinRAlong = 0f;
+        public float LovinRSplay = 0f;
+        // Spooning at lovin (spoon_big_<side>, spoon_little_<side>; anim.txt's spoon_pair line, walk.SPOON_ALONG,
+        // SPOON_BIG_CLOSER, SPOON_LITTLE_CLOSER): the big spoon lies SpoonAlong cells further toward the foot of the bed,
+        // and each is drawn its closer cells across the bed toward the other, not turned.
+        public float SpoonAlong = 0.35f;
+        public float SpoonBigCloser = 0.36f;
+        public float SpoonLittleCloser = 0.36f;
 
         // A cuddled pet (carry_cuddle, anim.txt's cuddle_pet line; walk.PET_ALONG, PET_LIFT, PET_BACK): its trunk's middle
         // PetAlong of the way from the left elbow to the wrist and its feet PetLift (model units) over that line; the clips
@@ -3701,7 +3734,7 @@ namespace M3AT
         // Draws the body as Draw does, with the scalp (Scalp) in the hair colour shaded ScalpShade if it has hair
         // (hairStyle, null: none): where the head shows through the hair, or pokes out of it as it bends, it reads as hair
         // in shadow.
-        public void DrawBody(Posed p, HairDef hairStyle, Vector3 position, float yaw, float size, Color tint, Color hairTint)
+        public void DrawBody(Posed p, HairDef hairStyle, Vector3 position, float yaw, float size, Color tint, Color hairTint, bool grained = false)
         {
             Piece hair = Hair(hairStyle);
             bool[] scalp = hair != null ? Scalp() : null;
@@ -3717,7 +3750,7 @@ namespace M3AT
             }
             PieceMeshes body = Pose(p, 0);
             body.isSkin = true;
-            DrawMeshes(p, body, pieces[0].rest.Length, SolidMaterial(), position, yaw, size, tint, null, default(Color),
+            DrawMeshes(p, body, pieces[0].rest.Length, BodyMaterial(body, grained), position, yaw, size, tint, null, default(Color),
                 scalp, hairTint, null, PaintOf(p.limbs));
         }
 

@@ -1126,6 +1126,18 @@ def write_anim(path, clips):
                 f.write('# from the left elbow to the wrist, walk.PET_LIFT (model units) over that line; the clips lay the right hand on\n')
                 f.write('# a back walk.PET_BACK (model units) over that again.\n')
                 f.write('cuddle_pet %.4f %.4f %.4f\n' % (walk.PET_ALONG, walk.PET_LIFT * walk.MODEL_LEG, walk.PET_BACK * walk.MODEL_LEG))
+            if hasattr(walk, 'LOVIN_CLOSER'):
+                f.write('# lovin_pair closer splay: at lovin with no blanket (lovin_L, lovin_R) each is drawn walk.LOVIN_CLOSER cells across\n')
+                f.write('# the bed toward the other and turned walk.LOVIN_SPLAY degrees about its head, its hips away from the other\'s.\n')
+                f.write('# Then r_along r_splay: the one playing lovin_R lies walk.LOVIN_R_ALONG cells further toward the foot and is\n')
+                f.write('# turned walk.LOVIN_R_SPLAY degrees more.\n')
+                f.write('lovin_pair %.4f %.4f %.4f %.4f\n' % (walk.LOVIN_CLOSER, walk.LOVIN_SPLAY, getattr(walk, 'LOVIN_R_ALONG', 0.0),
+                                                           getattr(walk, 'LOVIN_R_SPLAY', 0.0)))
+            if hasattr(walk, 'SPOON_ALONG'):
+                f.write('# spoon_pair along big_closer little_closer: spooning at lovin (spoon_big_<side>, spoon_little_<side>) the big\n')
+                f.write('# spoon lies walk.SPOON_ALONG cells further toward the foot of the bed, and each is drawn its closer cells across\n')
+                f.write('# the bed toward the other (walk.SPOON_BIG_CLOSER, SPOON_LITTLE_CLOSER), not turned.\n')
+                f.write('spoon_pair %.4f %.4f %.4f\n' % (walk.SPOON_ALONG, walk.SPOON_BIG_CLOSER, walk.SPOON_LITTLE_CLOSER))
             f.write('# draw_timing at: walk.DRAW_AT, where a draw clip\'s hand closes on the handle. draw_slide clip share: the share\n')
             f.write('# of the clip the game swings the weapon to the hand over, ending there (walk.DRAW_SIZES).\n')
             f.write('draw_timing %.4f\n' % walk.DRAW_AT)
@@ -1683,6 +1695,12 @@ if hasattr(walk, 'lovin_at') and walk.DOWNED_SIDE_CLIP is not None:
     for side in ('L', 'R'):
         pose_worst = max(pose_worst, export_loop('lovin_' + side, lambda t, s=side: walk.lovin_at(t, s),
                                                  walk.loop_frames(walk.LOVIN_SECONDS), walk.LOVIN_SECONDS))
+# Spooning at lovin: the big spoon behind, the little one facing away, the partner on the figure's left or right.
+if hasattr(walk, 'spoon_at') and walk.DOWNED_SIDE_CLIP is not None:
+    for role in ('big', 'little'):
+        for side in ('L', 'R'):
+            pose_worst = max(pose_worst, export_loop('spoon_%s_%s' % (role, side), lambda t, s=side, r=role: walk.spoon_at(t, s, r),
+                                                     walk.loop_frames(walk.LOVIN_SECONDS), walk.LOVIN_SECONDS))
 # A baby awake on its back, waving and kicking (arms posed by hand and the crawl's legs on the lie).
 if hasattr(walk, 'baby_at') and walk.CRAWL_CLIP is not None:
     pose_worst = max(pose_worst, export_loop('baby', walk.baby_at, walk.loop_frames(walk.BABY_SECONDS), walk.BABY_SECONDS))

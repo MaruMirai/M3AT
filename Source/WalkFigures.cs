@@ -577,6 +577,7 @@ namespace M3AT
             public float tuckShift;   // and how far TuckedDown moved the figure toward the feet, cells
             public int blanketFrame = -1;   // the frame IsoRim last drew (or queued) the blanket over this sleeper (DrawTuckedIn; for AutoTest)
             public float lovinWay;     // and with no blanket, which way it goes (+1 the figure's +x), kept as it eases back out
+            public int lovinRole;      // with no blanket, how it lies at lovin: 0 face to face, 1 the big spoon, 2 the little one (LovinClip)
             public float lovinShift;   // under the blanket at lovin: cells the head and lump are drawn across the bed toward the partner, eased (LovinOf)
             public float lieFloor;
             public float risen = 1f;   // how far through getting up, 0 .. 1; 1: done (RiseOf)
@@ -6284,8 +6285,8 @@ namespace M3AT
             skin.HideUnder(fig, mask, hair);
             string earFile = headless ? null : EarFileOf(pawn);
             skin.HideGarments(fig, mask, wornBuffer, wornVersion);
-            skin.DrawBody(fig, hair, at, yaw, size, skinColour, pawn.story.HairColor);
             int fur = FurOf(pawn);
+            skin.DrawBody(fig, hair, at, yaw, size, skinColour, pawn.story.HairColor, fur > 0);   // furred: the hair's strand grain all over (StrandGrain.cs)
             if (fur > 0)
             {
                 // In the skin's colour, which is the hair's on this gene (skinIsHairColor), so its roots melt into the skin.
@@ -7043,8 +7044,9 @@ namespace M3AT
             {
                 return false;
             }
-#if AUTOTEST
-            // The perf test (AutoTest's Perf): 1 leaves the figure to IsoRim, as without this mod; 2 draws no figure at all.
+            // The benchmark (BenchmarkWindow, AutoTest's Perf): 1 leaves the figure to IsoRim, as without this mod; 2 draws no
+            // figure at all.
+            PerfAsked++;
             if (PerfMode == 1 || PerfMode == 0 && PerfAllowed != null && !PerfAllowed.Contains(pawn.thingIDNumber))
             {
                 return false;
@@ -7055,7 +7057,6 @@ namespace M3AT
             }
             long perfFrom = System.Diagnostics.Stopwatch.GetTimestamp();
             PerfDraws++;
-#endif
             FigureDrawContext was = drawing;
             drawing = ctx;
             try
@@ -7065,12 +7066,10 @@ namespace M3AT
             finally
             {
                 drawing = was;
-#if AUTOTEST
                 if (was == null)
                 {
                     PerfTicks += System.Diagnostics.Stopwatch.GetTimestamp() - perfFrom;   // (a carried figure drawn inside its carrier's is in the carrier's)
                 }
-#endif
             }
         }
 
@@ -7232,7 +7231,7 @@ namespace M3AT
         // which a look of + degrees turns the face toward, as the lying clips are laid down about x), scaled by how far
         // they have settled in (both lying in the same bed); 0 for anyone else.
         private const float LovinCloser = 0.17f;   // cells each head moves toward the other's (the slots are a cell apart)
-        private const float LovinLook = 65f;   // degrees the head turns toward the partner, within LookMost
+        private const float LovinLook = 85f;   // degrees the head turns toward the partner (past LookMost: lying, the face is turned nearly onto its side)
         private const float LovinEase = 0.4f;   // cells a second the shift comes in or goes out
         private const float LovinSnap = 0.02f;   // cells: the shift taken up in these steps, so IsoRim rebuilds the lump only a few times
 
@@ -7247,9 +7246,10 @@ namespace M3AT
 
         // Lovin with no blanket over the bed (the bedBlankets option off, a bed that shows the body, or an IsoRim
         // without the blanket): the two lie on their sides facing each other (lovin_L, lovin_R: still, breathing, from the
-        // downed side lying), each drawn LovinSideCloser across the bed toward the other. The partner's side as LovinOf
+        // downed side lying), each drawn skin.LovinCloser across the bed toward the other. The partner's side as LovinOf
         // gives it; 0 for anyone else, or where the blanket is drawn.
-        private const float LovinSideCloser = 0.04f;   // cells each moves toward the other (the slots are a cell apart)
+        // How far (skin.LovinCloser, cells) and how far turned (skin.LovinSplay, degrees about its head, the legs away from
+        // the other's): walk.LOVIN_CLOSER and LOVIN_SPLAY, from anim.txt's lovin_pair line.
 
         private static float LovinBareOf(Pawn pawn, FigurePlacement placed, float yaw)
         {
@@ -7274,6 +7274,54 @@ namespace M3AT
             }
             Vector3 local = Quaternion.Inverse(Quaternion.AngleAxis(yaw, Vector3.up)) * (partner.DrawPos - pawn.DrawPos);
             return Mathf.Abs(local.x) < 0.05f ? 0f : Mathf.Sign(local.x);
+        }
+
+        // The lying clip at lovin with no blanket, picked per couple and night (from noon to noon), so the two agree and
+        // keep it through the night: a third of nights spooning (spoon_big_<side>, spoon_little_<side>: the man, else the
+        // bigger drawn of the two, the big spoon, BigSpoon), else face to face, lovin_R (the partner on its right) or lovin_L, or its
+        // caress (~2: the upper hand on the partner's cheek, walk.LOVIN_CARESS): neither caresses, one or the other, or
+        // both, a quarter of those nights each.
+        internal static int LovinCaressTest = -1;   // the autotest's pick in place of the night's (1 lovin_L's caress, 2 lovin_R's, 3 both)
+        internal static int LovinSpoonTest = -1;    // the autotest's: 1 spooning, 0 not
+
+        private static string LovinClip(Pawn pawn, bool partnerRight)
+        {
+            string side = partnerRight ? "R" : "L";
+            string clip = "lovin_" + side;
+            Job job = pawn.CurJob;
+            Pawn partner = job == null ? null : job.def == JobDefOf.Lovin ? job.targetA.Pawn : job.def.defName == "RomanceOnTheRim_PillowTalk" ? job.targetB.Pawn : null;
+            if (partner == null)
+            {
+                return clip;
+            }
+            uint low = (uint)Mathf.Min(pawn.thingIDNumber, partner.thingIDNumber);
+            uint high = (uint)Mathf.Max(pawn.thingIDNumber, partner.thingIDNumber);
+            uint night = (uint)((Find.TickManager.TicksAbs + GenDate.TicksPerDay / 2) / GenDate.TicksPerDay);   // (from noon to noon)
+            uint roll = Mix(Mix(Mix(low) ^ high) ^ night);
+            bool spoons = LovinSpoonTest >= 0 ? LovinSpoonTest > 0 : (roll >> 2) % 3u == 0u;
+            if (spoons && skin.Has("spoon_big_" + side) && skin.Has("spoon_little_" + side))
+            {
+                return (BigSpoon(pawn, partner) ? "spoon_big_" : "spoon_little_") + side;
+            }
+            if (!skin.Has(clip + "~2"))
+            {
+                return clip;
+            }
+            uint caress = LovinCaressTest >= 0 ? (uint)LovinCaressTest : roll;
+            return (caress & (partnerRight ? 2u : 1u)) != 0u ? clip + "~2" : clip;
+        }
+
+        // Whether the pawn is the big spoon of the two: of a man and a woman the man, else the one drawn bigger, else the
+        // one with the lower id.
+        private static bool BigSpoon(Pawn pawn, Pawn partner)
+        {
+            bool gendered = pawn.gender != Gender.None && partner.gender != Gender.None;
+            if (gendered && pawn.gender != partner.gender)
+            {
+                return pawn.gender == Gender.Male;
+            }
+            float mine = SizeOf(pawn), theirs = SizeOf(partner);
+            return Mathf.Abs(mine - theirs) > 1e-4f ? mine > theirs : pawn.thingIDNumber < partner.thingIDNumber;
         }
 
         // Whether this IsoRim has the blanket to draw.
@@ -7588,7 +7636,11 @@ namespace M3AT
                     {
                         yaw = ease.fellYaw.Value;   // lying where it fell, the way it fell
                     }
-                    string lieClip = lovinBare != 0f ? (lovinBare > 0f ? "lovin_R" : "lovin_L") : LieClip(pawn, dead, inBed, inBed || onCouch);
+                    string lieClip = lovinBare != 0f ? LovinClip(pawn, lovinBare > 0f) : LieClip(pawn, dead, inBed, inBed || onCouch);
+                    if (lovinBare != 0f)
+                    {
+                        ease.lovinRole = lieClip.StartsWith("spoon_big_") ? 1 : lieClip.StartsWith("spoon_little_") ? 2 : 0;
+                    }
                     if (inBed && lieClip != BedMiddleClip && skin.Has(BedMiddleClip))
                     {
                         // Every lying clip with its body's middle where the sleep's is: their hips are in one place, but
@@ -8221,12 +8273,38 @@ namespace M3AT
                 else if (lying && (lovinBare != 0f || ease.lovinShift > 0f))
                 {
                     // At lovin with no blanket, drawn across the bed toward the partner, eased in and out.
-                    ease.lovinShift = Mathf.MoveTowards(ease.lovinShift, lovinBare != 0f ? LovinSideCloser : 0f, LovinEase * Time.deltaTime);
+                    // (spooning, each by its own role's closer: the big spoon's or the little one's)
+                    float pairCloser = ease.lovinRole == 1 ? skin.SpoonBigCloser : ease.lovinRole == 2 ? skin.SpoonLittleCloser : skin.LovinCloser;
+                    ease.lovinShift = Mathf.MoveTowards(ease.lovinShift, lovinBare != 0f ? pairCloser : 0f, LovinEase * Time.deltaTime);
                     if (lovinBare != 0f)
                     {
                         ease.lovinWay = Mathf.Sign(lovinBare);
                     }
                     at += Quaternion.AngleAxis(yaw, Vector3.up) * Vector3.right * (ease.lovinWay * ease.lovinShift);
+                    // Turned about its head so the legs swing away from the partner's (LovinSplay): the two lie in a V,
+                    // heads together, their knees clear of each other.
+                    Vector3 headJoint, hipsJoint;
+                    if (skin.JointOf(fig, "spine.006", out headJoint) && skin.JointOf(fig, "spine", out hipsJoint))
+                    {
+                        // The one playing lovin_R (partner on its right) lies a little further toward the foot of the bed
+                        // and is turned a little more or less (LovinRAlong, LovinRSplay), so the two aren't mirror images.
+                        // Spooning, the big spoon lies SpoonAlong further down instead, and neither is turned: their
+                        // knees nest, as they lie alike.
+                        bool second = ease.lovinWay > 0f;
+                        float settled = pairCloser > 0f ? Mathf.Min(ease.lovinShift / pairCloser, 1f) : 0f;
+                        Vector3 down = hipsJoint - headJoint;
+                        down.y = 0f;
+                        float lower = ease.lovinRole == 1 ? skin.SpoonAlong : ease.lovinRole == 0 && second ? skin.LovinRAlong : 0f;
+                        if (lower != 0f && down.sqrMagnitude > 1e-6f)
+                        {
+                            at += Quaternion.AngleAxis(yaw, Vector3.up) * down.normalized * (lower * settled);
+                        }
+                        float splay = ease.lovinRole != 0 ? 0f : -ease.lovinWay * Mathf.Sign(hipsJoint.z - headJoint.z) * (skin.LovinSplay + (second ? skin.LovinRSplay : 0f)) * settled;
+                        Vector3 h = headJoint * size;
+                        h.y = 0f;
+                        at += Quaternion.AngleAxis(yaw, Vector3.up) * (h - Quaternion.AngleAxis(splay, Vector3.up) * h);
+                        yaw += splay;
+                    }
                 }
                 else
                 {

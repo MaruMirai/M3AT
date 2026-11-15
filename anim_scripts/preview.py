@@ -56,7 +56,7 @@ FLINCH_SECONDS = 0.4   # how long Play takes over a flinch (WalkFigures' FlinchT
 STRIKE_SECONDS = 0.8   # how long Play takes over a blow or a throw (the game's melee blow: WalkFigures' WindTicks + RecoverTicks)
 # walk.py's paragraphs, by the first name in each, and the clips each one shapes.
 SECTIONS = [('FRAMES', 'Walk and run'), ('IDLE_SECONDS', 'Idle'), ('DRAFT_SECONDS', 'Drafted'), ('SIT_SECONDS', 'Sitting'),
-            ('LIE_SECONDS', 'Lying'), ('RAGDOLL_CURL', 'Ragdoll'), ('CRAWL_FRAMES', 'Crawling'), ('PLUCK_LEAN', 'Kneeling at work'), ('LIMP_GOOD', 'Limping'), ('HOP_GROUND', 'Hopping'), ('WADE_STRIDE', 'Wading'),
+            ('LIE_SECONDS', 'Lying'), ('RAGDOLL_CURL', 'Ragdoll'), ('CRAWL_FRAMES', 'Crawling'), ('PLUCK_LEAN', 'Kneeling at work'), ('SLEEP_CLIP', 'Lying'), ('LIMP_GOOD', 'Limping'), ('HOP_GROUND', 'Hopping'), ('WADE_STRIDE', 'Wading'),
             ('SWIM_FRAMES', 'Swimming'), ('TREAD_SECONDS', 'Treading water'), ('CARRY_SECONDS', 'Carrying'),
             ('HURT_SECONDS', 'Hurt'), ('CRY_SECONDS', 'Cowering'), ('COVER_SECONDS', 'Taking cover'), ('LEAD_SECONDS', 'Leading'), ('WAVE_SECONDS', 'Waving'), ('SAD_SECONDS', 'Sad'), ('DRUNK_SECONDS', 'Drunk'), ('STIR_SECONDS', 'Stirring'), ('FIRE_LEAN', 'Roasting'), ('BURN_SECONDS', 'On fire'), ('REACH_SECONDS', 'Reaching'), ('RUB_UPPER', 'Rubbing the hands'), ('TALK_UPPER', 'Talking'), ('RELOAD_UPPER', 'Reloading'), ('EAT_UPPER', 'Eating'), ('READ_SECONDS', 'Reading'), ('RESEARCH_CLIP', 'Researching'), ('CROUCH_CLIP', 'Working by place'),
             ('CAST_SECONDS', 'Casting'), ('HIP_SECONDS', 'Hip gear'), ('SHIELD_SECONDS', 'Shield'), ('FLINCH_FRAMES', 'Flinching'), ('REEL_SECONDS', 'Staggered'), ('TOSS_SECONDS', 'Tossing'), ('KISS_SECONDS', 'Kissing'), ('BEAT_SECONDS', 'Beating fires'),
@@ -65,7 +65,7 @@ SECTIONS = [('FRAMES', 'Walk and run'), ('IDLE_SECONDS', 'Idle'), ('DRAFT_SECOND
             ('STRIKE_FRAMES', 'Striking'), ('DRAW_FRAMES', 'Drawing')]
 CLIP_SECTION = {'gait': 'Walk and run', 'still': 'Walk and run', 'idle': 'Idle', 'drafted': 'Drafted',
                 'carry': 'Carrying', 'carried': 'Carrying', 'sit': 'Sitting', 'lie': 'Lying', 'crawl': 'Crawling',
-                'bend': 'Bending', 'hurt': 'Hurt', 'cower': 'Cowering', 'hunker': 'Cowering', 'cover': 'Taking cover', 'lead': 'Leading', 'rub': 'Rubbing the hands', 'talk': 'Talking', 'teach': 'Teaching', 'wave': 'Waving', 'sad': 'Sad', 'drunk': 'Drunk', 'stir': 'Stirring', 'stir_crouch': 'Stirring', 'stir_campfire': 'Roasting', 'stir_campfire_sit': 'Roasting', 'burning': 'On fire', 'reach': 'Reaching', 'reload': 'Reloading', 'eat_sit': 'Eating', 'eat_stand': 'Eating', 'smoke': 'Taking drugs', 'pill': 'Taking drugs', 'read': 'Reading', 'research': 'Researching', 'research_stand': 'Researching', 'research_floor': 'Researching', 'crouch': 'Working by place', 'sow': 'Working by place', 'bench': 'Working by place', 'bench_sit': 'Working by place', 'chair': 'Working by place', 'tame': 'Taming', 'tame_kneel': 'Taming', 'stomp': 'Beating fires', 'pat': 'Beating fires', 'piano': 'Playing music', 'piano_sit': 'Playing music', 'harp': 'Playing music', 'harp_sit': 'Playing music', 'drum': 'Playing music', 'drum_sit': 'Playing music', 'cast': 'Casting', 'gear': 'Hip gear', 'shield': 'Shield', 'flinch': 'Flinching', 'reel': 'Staggered', 'toss': 'Tossing', 'snowball': 'Tossing', **{'dress_' + k: 'Dressing' for k in ('legs', 'over', 'coat', 'head', 'belt')}, 'kiss': 'Kissing', 'daze': 'Stunned', 'jump': 'Jumping', 'land': 'Jumping', 'work': 'Working', 'pluck': 'Kneeling at work', 'tend': 'Kneeling at work', 'toys': 'Kneeling at work', 'chalk': 'Kneeling at work', 'play_sit': 'Kneeling at work', 'visit_sit': 'Kneeling at work', 'meditate': 'Meditating', 'pray_sit': 'Meditating', 'vomit': 'Vomiting', 'getup': 'Getting up', 'dive': 'Diving', 'duck': 'Hunkering', 'roll': 'Diving', 'sleep': 'Lying', 'baby': 'Lying', 'downed': 'Lying', 'downed_side': 'Lying', 'lovin': 'Lying', 'dead': 'Lying', 'ragdoll': 'Ragdoll', 'caged': 'Lying', 'fall': 'Lying', 'limp': 'Limping', 'hop': 'Hopping', 'wade': 'Wading', 'swim': 'Swimming', 'tread': 'Treading water', 'aim': 'Aiming', 'strike': 'Striking', 'draw': 'Drawing', 'holster': 'Drawing'}
+                'bend': 'Bending', 'hurt': 'Hurt', 'cower': 'Cowering', 'hunker': 'Cowering', 'cover': 'Taking cover', 'lead': 'Leading', 'rub': 'Rubbing the hands', 'talk': 'Talking', 'teach': 'Teaching', 'wave': 'Waving', 'sad': 'Sad', 'drunk': 'Drunk', 'stir': 'Stirring', 'stir_crouch': 'Stirring', 'stir_campfire': 'Roasting', 'stir_campfire_sit': 'Roasting', 'burning': 'On fire', 'reach': 'Reaching', 'reload': 'Reloading', 'eat_sit': 'Eating', 'eat_stand': 'Eating', 'smoke': 'Taking drugs', 'pill': 'Taking drugs', 'read': 'Reading', 'research': 'Researching', 'research_stand': 'Researching', 'research_floor': 'Researching', 'crouch': 'Working by place', 'sow': 'Working by place', 'bench': 'Working by place', 'bench_sit': 'Working by place', 'chair': 'Working by place', 'tame': 'Taming', 'tame_kneel': 'Taming', 'stomp': 'Beating fires', 'pat': 'Beating fires', 'piano': 'Playing music', 'piano_sit': 'Playing music', 'harp': 'Playing music', 'harp_sit': 'Playing music', 'drum': 'Playing music', 'drum_sit': 'Playing music', 'cast': 'Casting', 'gear': 'Hip gear', 'shield': 'Shield', 'flinch': 'Flinching', 'reel': 'Staggered', 'toss': 'Tossing', 'snowball': 'Tossing', **{'dress_' + k: 'Dressing' for k in ('legs', 'over', 'coat', 'head', 'belt')}, 'kiss': 'Kissing', 'daze': 'Stunned', 'jump': 'Jumping', 'land': 'Jumping', 'work': 'Working', 'pluck': 'Kneeling at work', 'tend': 'Kneeling at work', 'toys': 'Kneeling at work', 'chalk': 'Kneeling at work', 'play_sit': 'Kneeling at work', 'visit_sit': 'Kneeling at work', 'meditate': 'Meditating', 'pray_sit': 'Meditating', 'vomit': 'Vomiting', 'getup': 'Getting up', 'dive': 'Diving', 'duck': 'Hunkering', 'roll': 'Diving', 'sleep': 'Lying', 'baby': 'Lying', 'downed': 'Lying', 'downed_side': 'Lying', 'lovin': 'Lying', 'spoon': 'Lying', 'dead': 'Lying', 'ragdoll': 'Ragdoll', 'caged': 'Lying', 'fall': 'Lying', 'limp': 'Limping', 'hop': 'Hopping', 'wade': 'Wading', 'swim': 'Swimming', 'tread': 'Treading water', 'aim': 'Aiming', 'strike': 'Striking', 'draw': 'Drawing', 'holster': 'Drawing'}
 # The clips timed by the ground covered, posed by Phase: each one's pose at a phase, with the picked kind.
 CYCLES = {'crawl': lambda p, kind: walk.crawl_at(p), 'limp': lambda p, kind: walk.limp_at(p, kind),
           'hop': lambda p, kind: walk.hop_at(p, kind),
@@ -276,7 +276,7 @@ def loop_seconds(what, kind=''):
             'tend': getattr(walk, 'TEND_SECONDS', None), 'toys': getattr(walk, 'TEND_SECONDS', None), 'chalk': getattr(walk, 'PLUCK_SECONDS', None), 'play_sit': walk.carry_seconds('play') if hasattr(walk, 'play_sit_at') else None, 'visit_sit': getattr(walk, 'TALK_SECONDS', None), 'meditate': getattr(walk, 'MEDITATE_SECONDS', None), 'pray_sit': getattr(walk, 'PRAY_SECONDS', None), 'vomit': getattr(walk, 'VOMIT_SECONDS', None),
             'getup': getattr(walk, 'GETUP_SECONDS', None), 'dive': getattr(walk, 'DIVE_SECONDS', None), 'duck': getattr(walk, 'DUCK_SECONDS', None), 'roll': getattr(walk, 'ROLL_SECONDS', None),
             'sleep': walk.sleep_seconds() if hasattr(walk, 'sleep_seconds') and walk.SLEEP_CLIP is not None else mocap_seconds('SLEEP_CLIP'), 'baby': getattr(walk, 'BABY_SECONDS', None), 'downed': mocap_seconds('DOWNED_CLIP'),
-            'downed_side': mocap_seconds('DOWNED_SIDE_CLIP'), 'lovin': getattr(walk, 'LOVIN_SECONDS', None),
+            'downed_side': mocap_seconds('DOWNED_SIDE_CLIP'), 'lovin': getattr(walk, 'LOVIN_SECONDS', None), 'spoon': getattr(walk, 'LOVIN_SECONDS', None),
             'fall': mocap_seconds('KNOCKDOWN_CLIP' if kind == 'knockdown' else 'DIE_CLIP'),
             'work': walk.work_seconds(kind) if what == 'work' and hasattr(walk, 'WORK') and kind in walk.WORK else None}.get(what)
 
@@ -529,6 +529,9 @@ def loop_pose(what, kind, t):
         return walk.downed_side_at(t)
     if what == 'lovin':
         return walk.lovin_at(t, kind)   # on the side facing the partner on that side, upright
+    if what == 'spoon':
+        role, _, side = kind.partition('_')
+        return walk.spoon_at(t, side, role)   # spooning, the partner on that side, upright
     if what == 'dead':
         return walk.dead_at(t)
     if what == 'ragdoll':
@@ -1654,8 +1657,83 @@ def draw_load(p, what, kind):
         obj.matrix_world = mw @ chest_now() @ rock @ shrink
     obj.hide_viewport = False
 
+def body_mesh(X=None):
+    """The body posed by X (or as the rig is now, X None), armature space, as (vertices, faces). The rig is put back as
+    it was."""
+    pose = walk.arm.pose
+    kept = {pb.name: pb.matrix_basis.copy() for pb in pose.bones}
+    if X is not None:
+        walk.apply_pose(X)
+    bpy.context.view_layer.update()
+    to_arm = walk.arm.matrix_world.inverted()
+    vs, fs = [], []
+    try:
+        for body in walk.body_parts():
+            ev = body.evaluated_get(bpy.context.evaluated_depsgraph_get())
+            me = ev.to_mesh()
+            m = to_arm @ body.matrix_world
+            base = len(vs)
+            vs += [m @ v.co for v in me.vertices]
+            fs += [[base + i for i in f.vertices] for f in me.polygons]
+            ev.to_mesh_clear()
+    finally:
+        if X is not None:
+            for pb in pose.bones:
+                pb.matrix_basis = kept[pb.name]
+            bpy.context.view_layer.update()
+    return vs, fs
+
+LOVERS = 'MaruLovers'   # the pair at lovin with no blanket, laid down beside the rig (draw_lovers)
+LOVERS_BESIDE = -2.5    # cells along x the pair is drawn from the rig, clear of it
+
+GENDER_GAP = 0.1   # WalkFigures.GenderGap: a grown man drawn this much of the standard bigger than a grown woman, split between them
+
+def pair_size(p, male):
+    """A lover's drawn size against a grown pawn's in the pair preview: the man's or the woman's with Gender sizes on
+    (WalkFigures.GenderSize), else the standard."""
+    return 1.0 + (0.5 if male else -0.5) * GENDER_GAP if p.pair_genders else 1.0
+
+def draw_lovers(p, what, kind, t):
+    """The two at lovin with no blanket, laid down beside the rig as the game lays them in a double bed: the rig's
+    pose and the partner's, each placed by walk.lovin_placed (lovin_<kind>, the partner the other side) or
+    walk.spoon_placed (spoon_<role>_<side>, the partner the other role and side), at its gendered size with Gender
+    sizes on (the rig the man or the woman as picked; spooning, the big spoon the man, as WalkFigures.BigSpoon puts a
+    man and a woman), then rested on its lowest point. Hidden for any other clip or with Show load off."""
+    shown = p.load and (what == 'lovin' and kind in ('L', 'R') and hasattr(walk, 'lovin_placed') or what == 'spoon')
+    obj = bpy.data.objects.get(LOVERS)
+    if not shown:
+        if obj is not None:
+            obj.hide_viewport = True
+        return
+    cell = walk.LEG / walk.MODEL_LEG / walk.GAME_SCALE   # armature units per cell, for a grown pawn
+    if what == 'spoon':
+        role, _, side = kind.partition('_')
+        other_role, other = ('little' if role == 'big' else 'big'), ('R' if side == 'L' else 'L')
+        pair = [(walk.spoon_at(t, sd, r)[0], lambda X, sd=sd, r=r, size=None: walk.spoon_placed(sd, r, X, size), r == 'big')
+                for r, sd in ((role, side), (other_role, other))]
+    else:
+        other = 'R' if kind == 'L' else 'L'
+        rig_male = p.pair_rig == 'MALE'
+        pair = [(walk.lovin_at(t, sd)[0], lambda X, sd=sd, size=None: walk.lovin_placed(sd, X, size), male)
+                for sd, male in ((kind, rig_male), (other, not rig_male))]
+    figures = []
+    for X, place, male in pair:
+        vs, fs = body_mesh(X)
+        m = place(X, size=pair_size(p, male))
+        placed = [m @ v for v in vs]
+        low = min(v.z for v in placed)
+        figures.append(([v - Vector((0.0, 0.0, low)) for v in placed], fs))
+    obj = load_object(LOVERS, True)
+    me = obj.data
+    me.clear_geometry()
+    n = len(figures[0][0])
+    me.from_pydata(figures[0][0] + figures[1][0], [], figures[0][1] + [[i + n for i in f] for f in figures[1][1]])
+    me.update()
+    obj.matrix_world = walk.arm.matrix_world @ Matrix.Translation(Vector((LOVERS_BESIDE * cell, 0.0, 0.0)))
+    obj.hide_viewport = False
+
 def clear_load():
-    for name in (LOAD + 'Item', LOAD + 'Person', PET):
+    for name in (LOAD + 'Item', LOAD + 'Person', PET, LOVERS):
         obj = bpy.data.objects.get(name)
         if obj is not None:
             me = obj.data
@@ -2577,6 +2655,8 @@ def game_clip(what, kind):
         return 'work_sow'
     if what == 'stomp':
         return 'work_stomp'
+    if what == 'lovin':
+        return 'lovin_' + kind
     return None
 
 def clip_variants(what, kind):
@@ -2695,6 +2775,7 @@ def repose(_self=None, _context=None):
             draw_tool(what if what in ('read', 'smoke', 'chalk', 'stir', 'stir_crouch', 'stir_campfire', 'stir_campfire_sit') else kind if what == 'work' else None, p.time % 1.0, X)
             draw_instrument(what)
             draw_load(p, what, kind)
+            draw_lovers(p, what, kind, p.time % 1.0)
             place_grip(p, what, kind, write='grip' not in state['quiet'])
             state['mix'] = body_mix()
             draw_worn(p, shield_taken(what, kind, p.time % 1.0), drawn_from(what, kind, p.time % 1.0))
@@ -2753,7 +2834,7 @@ CATEGORIES = [('move', 'Moving', 'Walking, running, standing, swimming, crawling
               ('gear', 'Hip gear', 'Taking, holding and pointing a psychic lance, orbital targeter or tornado generator'),
               ('hurt', 'Hurt and reactions', 'Holding a wound, cowering, flinching, staggered and stunned')]
 CATEGORY_OF = {'drafted': 'drafted', 'carry': 'carry', 'carried': 'carry', 'bend': 'carry', 'lead': 'carry',
-               'sit': 'rest', 'lie': 'rest', 'getup': 'rest', 'sleep': 'rest', 'baby': 'rest', 'downed': 'hurt', 'downed_side': 'hurt', 'lovin': 'rest', 'dead': 'hurt', 'ragdoll': 'hurt', 'caged': 'hurt', 'fall': 'hurt', 'work': 'work', 'pluck': 'work', 'tend': 'work', 'toys': 'work', 'chalk': 'work', 'play_sit': 'rest', 'visit_sit': 'rest', 'meditate': 'rest', 'pray_sit': 'rest', 'research': 'work', 'research_stand': 'work', 'research_floor': 'work', 'crouch': 'work', 'sow': 'work', 'bench': 'work', 'bench_sit': 'work', 'chair': 'work', 'tame': 'work', 'tame_kneel': 'work', 'stomp': 'work', 'pat': 'work', 'piano': 'rest', 'piano_sit': 'rest', 'harp': 'rest', 'harp_sit': 'rest', 'drum': 'rest', 'drum_sit': 'rest', 'eat_sit': 'rest', 'eat_stand': 'rest', 'smoke': 'rest', 'pill': 'rest', 'read': 'rest', 'vomit': 'hurt', 'rub': 'hurt', 'talk': 'rest', 'teach': 'rest', 'wave': 'rest', 'sad': 'hurt', 'drunk': 'hurt', 'stir': 'work', 'stir_crouch': 'work', 'stir_campfire': 'work', 'stir_campfire_sit': 'work', 'burning': 'hurt', 'reach': 'work', 'toss': 'rest', 'snowball': 'rest', **{'dress_' + k: 'rest' for k in ('legs', 'over', 'coat', 'head', 'belt')}, 'kiss': 'rest', 'reload': 'aim', 'aim': 'aim', 'strike': 'strike', 'cast': 'cast', 'gear': 'gear', 'shield': 'drafted', 'draw': 'draw', 'holster': 'draw',
+               'sit': 'rest', 'lie': 'rest', 'getup': 'rest', 'sleep': 'rest', 'baby': 'rest', 'downed': 'hurt', 'downed_side': 'hurt', 'lovin': 'rest', 'spoon': 'rest', 'dead': 'hurt', 'ragdoll': 'hurt', 'caged': 'hurt', 'fall': 'hurt', 'work': 'work', 'pluck': 'work', 'tend': 'work', 'toys': 'work', 'chalk': 'work', 'play_sit': 'rest', 'visit_sit': 'rest', 'meditate': 'rest', 'pray_sit': 'rest', 'research': 'work', 'research_stand': 'work', 'research_floor': 'work', 'crouch': 'work', 'sow': 'work', 'bench': 'work', 'bench_sit': 'work', 'chair': 'work', 'tame': 'work', 'tame_kneel': 'work', 'stomp': 'work', 'pat': 'work', 'piano': 'rest', 'piano_sit': 'rest', 'harp': 'rest', 'harp_sit': 'rest', 'drum': 'rest', 'drum_sit': 'rest', 'eat_sit': 'rest', 'eat_stand': 'rest', 'smoke': 'rest', 'pill': 'rest', 'read': 'rest', 'vomit': 'hurt', 'rub': 'hurt', 'talk': 'rest', 'teach': 'rest', 'wave': 'rest', 'sad': 'hurt', 'drunk': 'hurt', 'stir': 'work', 'stir_crouch': 'work', 'stir_campfire': 'work', 'stir_campfire_sit': 'work', 'burning': 'hurt', 'reach': 'work', 'toss': 'rest', 'snowball': 'rest', **{'dress_' + k: 'rest' for k in ('legs', 'over', 'coat', 'head', 'belt')}, 'kiss': 'rest', 'reload': 'aim', 'aim': 'aim', 'strike': 'strike', 'cast': 'cast', 'gear': 'gear', 'shield': 'drafted', 'draw': 'draw', 'holster': 'draw',
                'hurt': 'hurt', 'cower': 'hurt', 'hunker': 'hurt', 'cover': 'drafted', 'dive': 'hurt', 'duck': 'hurt', 'roll': 'hurt', 'flinch': 'hurt', 'reel': 'hurt', 'daze': 'hurt'}
 
 def category_of(clip):
@@ -3014,6 +3095,11 @@ def clip_items():
         if hasattr(walk, 'lovin_at'):
             items += [('lovin:L', 'Lovin: partner on the left', 'On the side facing the partner, still, upright (walk.lovin_at)'),
                       ('lovin:R', 'Lovin: partner on the right', 'The same facing the right (lovin_R)')]
+        if hasattr(walk, 'spoon_at'):
+            items += [('spoon:big_L', 'Spooning: big spoon, partner on the left', 'Behind the partner, the upper arm over its waist (walk.spoon_at)'),
+                      ('spoon:big_R', 'Spooning: big spoon, partner on the right', 'The same facing the right (spoon_big_R)'),
+                      ('spoon:little_L', 'Spooning: little spoon, partner on the left', 'Facing away from the partner, its upper hand on the big spoon\'s (spoon_little_L)'),
+                      ('spoon:little_R', 'Spooning: little spoon, partner on the right', 'The same facing away to the left (spoon_little_R)')]
     if getattr(walk, 'DIE_CLIP', None) is not None:
         items += [('dead', 'Dead', 'A corpse: the death fall\'s end, upright (walk.dead_at)'),
                   ('fall:die', 'Falling: dead', 'From standing to dead, once through, by Time, upright as the lie is (walk.fall_at, die_clip.json)')]
@@ -3099,6 +3185,12 @@ def build_props():
                                              description="Preview and edit the stances, holds and aims for a weapon drawn "
                                                          "as its sprite's slab (SLAB_DRAFTED, SLAB_WEAPONS, SLAB_AIMED), "
                                                          "every weapon as its slab. Reads walk.py again: write first"),
+        'pair_genders': bpy.props.BoolProperty(name='Gender sizes', default=True, update=repose,
+                                               description='Draw the lovers at their gendered sizes, the man 5% over the standard and the '
+                                                           'woman 5% under (the game\'s genderSizes option, WalkFigures.GenderGap)'),
+        'pair_rig': bpy.props.EnumProperty(name='The rig is', items=[('MALE', 'The man', 'The rig drawn at a man\'s size, the partner a woman\'s'),
+                                                                     ('FEMALE', 'The woman', 'The rig drawn at a woman\'s size, the partner a man\'s')],
+                                           default='MALE', update=repose),
         'load': bpy.props.BoolProperty(name='Show load', default=True, update=repose,
                                        description='Draw what a carry clip holds where the game puts it: an item or the carried person'),
         'load_size': bpy.props.FloatVectorProperty(name='Item size', default=(1.0, 1.0), size=2, min=0.05, soft_max=3.0,
@@ -3865,6 +3957,30 @@ class MARU_PT_gait(bpy.types.Panel):
             self.draw_stance(p, 'DRAFTED' if what == 'drafted' else 'CARRY', kind)
         if what == 'carry':
             self.draw_load(p, kind)
+        if what == 'spoon':
+            box = self.layout.box()
+            row = box.row()
+            row.label(text='The pair in a double bed, laid down beside the rig')
+            row.prop(p, 'load', text='', icon='HIDE_OFF' if p.load else 'HIDE_ON', emboss=False)
+            col = box.column(align=True)
+            box.prop(p, 'pair_genders')
+            for name in ('SPOON_ALONG', 'SPOON_BIG_CLOSER', 'SPOON_LITTLE_CLOSER', 'SPOON_BIG_LEGS', 'SPOON_BIG_CHIN', 'SPOON_LITTLE_CHIN', 'SPOON_HOLD', 'SPOON_CURL'):
+                if 'walk_' + name in p.bl_rna.properties:
+                    col.prop(p, 'walk_' + name, text=name)
+        if what == 'lovin' and hasattr(walk, 'LOVIN_CLOSER'):
+            box = self.layout.box()
+            row = box.row()
+            row.label(text='The pair in a double bed, laid down beside the rig')
+            row.prop(p, 'load', text='', icon='HIDE_OFF' if p.load else 'HIDE_ON', emboss=False)
+            col = box.column(align=True)
+            row = box.row(align=True)
+            row.prop(p, 'pair_genders')
+            sub = row.row(align=True)
+            sub.enabled = p.pair_genders
+            sub.prop(p, 'pair_rig', text='')
+            for name in ('LOVIN_CHIN', 'LOVIN_CLOSER', 'LOVIN_SPLAY', 'LOVIN_R_ALONG', 'LOVIN_R_SPLAY', 'LOVIN_R_CHIN'):
+                if 'walk_' + name in p.bl_rna.properties:
+                    col.prop(p, 'walk_' + name, text=name)
         if what == 'drafted' and weapon_name(p, what, kind) in getattr(walk, 'WEAPONS', {}):
             self.draw_weapon(p, weapon_name(p, what, kind))
         if what == 'aim':

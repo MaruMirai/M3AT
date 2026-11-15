@@ -1045,6 +1045,7 @@ namespace M3AT
         {
             bool was = SettingsMod.Settings.bedBlankets;
             SettingsMod.Settings.bedBlankets = !bare;
+            WalkFigures.LovinSpoonTest = 0;   // (face to face, then spooning forced below)
             try
             {
                 Thing made = ThingMaker.MakeThing(ThingDef.Named("DoubleBed"), ThingDefOf.WoodLog);
@@ -1100,7 +1101,7 @@ namespace M3AT
                     if (bare)
                     {
                         string clip = Field<string>(p, "lieNow");
-                        Check("lover " + k + ": on the side", clip == "lovin_L" || clip == "lovin_R", "clip " + (clip ?? "none"));
+                        Check("lover " + k + ": on the side", clip != null && clip.StartsWith("lovin_"), "clip " + (clip ?? "none"));
                     }
                     else
                     {
@@ -1109,7 +1110,7 @@ namespace M3AT
                 }
                 if (bare)
                 {
-                    Check("lovers: facing opposite ways", Field<string>(a, "lieNow") != Field<string>(b, "lieNow"),
+                    Check("lovers: facing opposite ways", (Field<string>(a, "lieNow") ?? "").Split('~')[0] != (Field<string>(b, "lieNow") ?? "").Split('~')[0],
                         Field<string>(a, "lieNow") + " and " + Field<string>(b, "lieNow"));
                 }
                 else
@@ -1124,6 +1125,45 @@ namespace M3AT
                 lookDistance = 1.8f;
                 lookHeight = 0.4f;
                 yield return Shot("lovin_close");
+                if (bare)
+                {
+                    // The caress (lovin_L~2, lovin_R~2: the upper hand on the partner's cheek), both at once, forced.
+                    WalkFigures.LovinCaressTest = 3;
+                    for (int i = 0; i < 12; i++)
+                    {
+                        Start();
+                        yield return Ticks(10, "caress", a);
+                    }
+                    for (int k = 0; k < 2; k++)
+                    {
+                        string clip = Field<string>(two[k], "lieNow");
+                        Check("lover " + k + ": caressing", clip != null && clip.EndsWith("~2"), "clip " + (clip ?? "none"));
+                    }
+                    yield return Shot("caress_close");
+                    lookAt = bed.TrueCenter();
+                    lookPitch = LookPitch;
+                    lookDistance = LookDistance;
+                    lookHeight = LookHeight;
+                    yield return Shot("caress");
+                    Note("Look (caress): each one's upper hand laid on the other's cheek, not through the head, the arms crossing between them.");
+                    // Spooning (spoon_big_<side>, spoon_little_<side>), forced: one behind the other facing the same way.
+                    WalkFigures.LovinSpoonTest = 1;
+                    for (int i = 0; i < 12; i++)
+                    {
+                        Start();
+                        yield return Ticks(10, "spoon", a);
+                    }
+                    string sa = Field<string>(a, "lieNow") ?? "none", sb = Field<string>(b, "lieNow") ?? "none";
+                    Check("lovers: spooning, one big spoon and one little", sa.StartsWith("spoon_") && sb.StartsWith("spoon_")
+                        && sa.StartsWith("spoon_big_") != sb.StartsWith("spoon_big_"), sa + " and " + sb);
+                    yield return Shot("spoon");
+                    lookAt = bed.TrueCenter() + new Vector3(0f, 0f, 0.3f);
+                    lookPitch = 60f;
+                    lookDistance = 1.8f;
+                    lookHeight = 0.4f;
+                    yield return Shot("spoon_close");
+                    Note("Look (spoon): both on their sides facing the same way, the big spoon a little lower behind, its arm over the other's waist with the other's hand on it, knees nested, not through each other.");
+                }
                 Note(bare ? "Look: the two on their sides on top of the bed, close and facing each other, not through each other or the bed."
                     : "Look: the two heads close together on the pillows, turned to face each other, each lump of blanket moved with its head, no body poking through.");
             }
@@ -1133,6 +1173,8 @@ namespace M3AT
                 lookDistance = LookDistance;
                 lookHeight = LookHeight;
                 SettingsMod.Settings.bedBlankets = was;
+                WalkFigures.LovinCaressTest = -1;
+                WalkFigures.LovinSpoonTest = -1;
             }
         }
 
@@ -5918,12 +5960,7 @@ namespace M3AT
 
     public static partial class WalkFigures
     {
-        // The perf test (AutoTest.Perf): which figures are drawn (0 ours, 1 IsoRim's, 2 none), and the time spent in DrawFigure
-        // (Stopwatch ticks) and its calls, summed until the test takes them.
-        internal static int PerfMode;
-        internal static HashSet<int> PerfAllowed;   // the pawns drawn as the chibi while PerfMode is 0 (by id), null for all
-        internal static long PerfTicks;
-        internal static int PerfDraws;
+        // (PerfMode and its counters are in Benchmark.cs, as the players' benchmark uses them too.)
 
         // The figure's state as AutoTest probes it: one line of the Ease fields the scenarios look at.
         // Where the holding fist was in the last slab drawn for each pawn: its place in the sprite (u, v from 0 to 1, v up, as

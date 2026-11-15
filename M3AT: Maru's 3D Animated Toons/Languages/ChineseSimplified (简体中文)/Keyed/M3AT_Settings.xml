@@ -53,7 +53,7 @@
   <M3AT_GroundGarments>地上的服装使用 M3AT 模型</M3AT_GroundGarments>
   <M3AT_GroundGarmentsTip>地图上的服装绘制为小人身上所穿的同款 3D 服装，并压平摆放。关闭（默认）：使用 IsoRim 的 3D 模型。关闭此窗口后生效。</M3AT_GroundGarmentsTip>
   <M3AT_BedBlankets>床上盖被子</M3AT_BedBlankets>
-  <M3AT_BedBlanketsTip>在只露出睡觉者头部的床上，IsoRim 的被子盖在身体上，随身体隆起。其他床（如睡眠点和睡袋）没有被子。关闭：小人躺在所有床的上面。</M3AT_BedBlanketsTip>
+  <M3AT_BedBlanketsTip>在只露出睡觉者头部的床上，IsoRim 的被子盖在身体上，随身体隆起。其他床（如睡眠点和睡袋）没有被子。关闭（默认）：小人躺在所有床的上面。</M3AT_BedBlanketsTip>
   <M3AT_SleepWear>床上的穿着</M3AT_SleepWear>
   <M3AT_SleepWearTip>躺在床上的小人在身体露出时（没有被子的床，或关闭了被子）穿什么。只影响外观：游戏中并不会脱下或穿上任何东西。\n\n日常服装：平时穿的衣服。\n\n不带装备（默认）：不穿护甲、头盔和帽子、外套、腰带、背包或盾牌；衬衫、裤子等保留。\n\n睡衣：淡色睡衣；婴儿穿连体衣。\n\n不穿衣服：不穿衣服；婴儿仍穿连体衣。</M3AT_SleepWearTip>
   <M3AT_VatClothes>舱内穿衣</M3AT_VatClothes>
@@ -105,6 +105,51 @@
   <M3AT_GpuSkinningTip>在显卡上把每个小人的身体、衣服和头发摆成当前姿势，画面中小人多时快得多。如果小人看起来破碎或被拉伸，请关闭此项，改用旧方式计算动画。</M3AT_GpuSkinningTip>
   <M3AT_FewerPoses>小人多时减少更新</M3AT_FewerPoses>
   <M3AT_FewerPosesTip>画面中小人很多时降低其动画更新频率，产生类似定格动画的效果。可将 M3AT 的性能开销降低约 6–9%。关闭：小人正常播放动画。（默认）</M3AT_FewerPosesTip>
+  <M3AT_BenchmarkButton>测量帧率：M3AT 与 IsoRim 对比</M3AT_BenchmarkButton>
+  <M3AT_BenchmarkTip>在你正在查看的地图上，分别测量使用 M3AT 小人和使用 IsoRim 自带小人（即不装本模组时）时游戏的运行速度。不会改动你的游戏存档。</M3AT_BenchmarkTip>
+  <M3AT_BenchmarkNeedsGame>要测量帧率，请先载入游戏并打开 IsoRim 的 3D 视图。</M3AT_BenchmarkNeedsGame>
+  <M3AT_Benchmark>帧率测试</M3AT_Benchmark>
+  <M3AT_BenchIntro>此测试分别测量使用 M3AT 小人、使用 IsoRim 自带小人（即不装本模组时）以及完全不绘制人物时游戏的运行速度。三者轮流测量，因此场景中的变化对每一项的影响相同。
+
+开始前，请像平时游玩那样把镜头对准你的殖民者，并让游戏以你平时的速度运行。测量期间请不要移动镜头或点击任何东西。不会改动你的游戏存档。</M3AT_BenchIntro>
+  <M3AT_BenchLength>时长：</M3AT_BenchLength>
+  <M3AT_BenchQuick>快速</M3AT_BenchQuick>
+  <M3AT_BenchNormal>标准</M3AT_BenchNormal>
+  <M3AT_BenchThorough>详细</M3AT_BenchThorough>
+  <M3AT_BenchAbout>约 {0} 秒</M3AT_BenchAbout>
+  <M3AT_BenchTryFewerOn>同时测试开启"{0}"的情况</M3AT_BenchTryFewerOn>
+  <M3AT_BenchTryFewerOff>同时测试关闭"{0}"的情况</M3AT_BenchTryFewerOff>
+  <M3AT_BenchStart>开始</M3AT_BenchStart>
+  <M3AT_BenchCancel>停止</M3AT_BenchCancel>
+  <M3AT_BenchAgain>重新测量</M3AT_BenchAgain>
+  <M3AT_BenchCopy>复制结果</M3AT_BenchCopy>
+  <M3AT_BenchCopied>结果已复制到剪贴板，并保存在 {0}。</M3AT_BenchCopied>
+  <M3AT_BenchChibi>M3AT 小人</M3AT_BenchChibi>
+  <M3AT_BenchIsoRim>IsoRim 小人</M3AT_BenchIsoRim>
+  <M3AT_BenchNone>不绘制人物</M3AT_BenchNone>
+  <M3AT_BenchChibiFewerOn>M3AT 小人，开启减少更新</M3AT_BenchChibiFewerOn>
+  <M3AT_BenchChibiFewerOff>M3AT 小人，关闭减少更新</M3AT_BenchChibiFewerOff>
+  <M3AT_BenchWarming>准备中：{0}</M3AT_BenchWarming>
+  <M3AT_BenchWaitHair>正在等待 {0} 个发型生成完毕……</M3AT_BenchWaitHair>
+  <M3AT_BenchMeasuring>测量中：{0}（第 {1} 轮，共 {2} 轮）</M3AT_BenchMeasuring>
+  <M3AT_BenchLeft>剩余约 {0} 秒。请保持镜头不动。</M3AT_BenchLeft>
+  <M3AT_BenchRow>{0}：{1} FPS（1% 低帧 {2} FPS），每帧 {3} 毫秒</M3AT_BenchRow>
+  <M3AT_BenchCostMore>M3AT 小人每帧比 IsoRim 小人多花 {0} 毫秒：{1} FPS，而不是 {2} FPS（少 {3}%）。</M3AT_BenchCostMore>
+  <M3AT_BenchCostLess>M3AT 小人每帧比 IsoRim 小人少花 {0} 毫秒：{1} FPS 对 {2} FPS。</M3AT_BenchCostLess>
+  <M3AT_BenchSame>M3AT 小人与 IsoRim 小人结果相近（相差 {0} 毫秒，在约 {1} 毫秒的测量误差之内）。</M3AT_BenchSame>
+  <M3AT_BenchPeople>绘制人物每帧花费：M3AT {0} 毫秒，IsoRim {1} 毫秒；画面中约有 {2} 人，每个 M3AT 小人约 {3} 毫秒。</M3AT_BenchPeople>
+  <M3AT_BenchOn>开启</M3AT_BenchOn>
+  <M3AT_BenchOff>关闭</M3AT_BenchOff>
+  <M3AT_BenchFewerSaves>{1}"{0}"后每帧节省 {2} 毫秒（{3} FPS）。</M3AT_BenchFewerSaves>
+  <M3AT_BenchFewerNoSaving>{1}"{0}"后没有明显差别（{2} FPS）。</M3AT_BenchFewerNoSaving>
+  <M3AT_BenchNoChibis>没有绘制任何 M3AT 小人。IsoRim 的 3D 视图中是否有人物在画面内？</M3AT_BenchNoChibis>
+  <M3AT_BenchFewPeople>画面中的人物很少。请把镜头对准一群殖民者，以获得更清楚的结果。</M3AT_BenchFewPeople>
+  <M3AT_BenchCapped>绘制人物几乎没有造成任何差别。帧率可能被垂直同步或帧率上限限制，从而掩盖了差别：请关闭它们后再测量。</M3AT_BenchCapped>
+  <M3AT_BenchSpeedChanged>测量期间游戏速度被更改过，因此结果不够确定。</M3AT_BenchSpeedChanged>
+  <M3AT_BenchStoppedUser>已停止。</M3AT_BenchStoppedUser>
+  <M3AT_BenchStoppedMap>已停止：显示的地图已切换。</M3AT_BenchStoppedMap>
+  <M3AT_BenchStoppedView>已停止：IsoRim 的 3D 视图已关闭。</M3AT_BenchStoppedView>
+  <M3AT_BenchStoppedGame>已停止：已离开游戏。</M3AT_BenchStoppedGame>
   <M3AT_Problems>问题</M3AT_Problems>
   <M3AT_CopyBugReport>复制错误报告</M3AT_CopyBugReport>
   <M3AT_BugReportCopied>错误报告已复制到剪贴板。</M3AT_BugReportCopied>
@@ -128,7 +173,7 @@
   <M3AT_FreecamPointerBack>指针模式恢复指针位置</M3AT_FreecamPointerBack>
   <M3AT_FreecamPointerBackTip>进入指针模式时，指针回到开始自由镜头前的位置（默认）。关闭：从屏幕中央、准星下方开始。</M3AT_FreecamPointerBackTip>
   <M3AT_FreecamMenuFreesPointer>命令菜单释放指针</M3AT_FreecamMenuFreesPointer>
-  <M3AT_FreecamMenuFreesPointerTip>环视时打开的命令菜单会释放指针供你选择，菜单关闭后回到环视。关闭（默认）：菜单固定在打开的位置，通过转动视角对准选项来选择。</M3AT_FreecamMenuFreesPointerTip>
+  <M3AT_FreecamMenuFreesPointerTip>环视时打开的命令菜单会释放指针供你选择，菜单关闭后回到环视（默认）。关闭：菜单固定在打开的位置，通过转动视角对准选项来选择。</M3AT_FreecamMenuFreesPointerTip>
   <M3AT_LookSpeed>转向速度</M3AT_LookSpeed>
   <M3AT_LookSpeedTip>鼠标移动时视角转动的幅度，单位为度/像素（默认 {0}）。</M3AT_LookSpeedTip>
   <M3AT_InvertMouse>反转鼠标视角</M3AT_InvertMouse>

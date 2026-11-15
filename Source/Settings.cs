@@ -61,7 +61,7 @@ namespace M3AT
         public bool autoGrips = true;   // another mod's weapon held by its grip as found in its art (WalkFigures.AutoGrips, GripFinder)
         public bool retexturedWeaponModels = true;   // the game's own weapons keep IsoRim's model though another mod redraws their art (WalkFigures.RetexturedWeaponModels)
         public bool vatClothes = false;    // a pawn in a growth vat or biosculpter pod drawn in its clothes (WalkFigures.VatClothes); off: without them
-        public bool bedBlankets = true;   // IsoRim's blanket over the body in a bed that shows only the head (WalkFigures.BedBlankets); off: lying on top
+        public bool bedBlankets = false;   // IsoRim's blanket over the body in a bed that shows only the head (WalkFigures.BedBlankets); off: lying on top
         public SleepWear sleepWear = SleepWear.NoEquipment;   // what a pawn in bed is drawn wearing (WalkFigures.SleepWearOf)
         public bool groundGarments = false;   // apparel lying on the map is drawn as the chibi's own garment for it (WalkFigures.GroundGarments); off: IsoRim's look
         public bool injuryAnims = true;   // pawns limp on a bad leg and hold where they are hurt (WalkFigures.InjuryAnims); a missing leg hops regardless
@@ -84,7 +84,7 @@ namespace M3AT
         public bool freecam3D = false;   // the 3D view was on with it, so a loaded game starts in 3D (Freecam.Resume)
         public bool freecamClickOffLooks = false;   // in pointer mode, a left click on nothing goes back to looking
         public bool freecamPointerBack = true;   // the pointer freed for pointer mode goes back where it was when looking began
-        public bool freecamMenuFreesPointer = false;   // a menu of orders opened while looking frees the pointer, rather than being pinned in the view
+        public bool freecamMenuFreesPointer = true;   // a menu of orders opened while looking frees the pointer, rather than being pinned in the view
         public int freecamButton = 2;   // the mouse button that toggles pointer mode (2 middle, 3 and 4 the side buttons, -1 none)
         public float freecamSensitivity = DefaultFreecamSensitivity;
         public bool freecamInvertY = false;
@@ -123,7 +123,7 @@ namespace M3AT
             Scribe_Values.Look(ref retexturedWeaponModels, "retexturedWeaponModels", true);
             Scribe_Values.Look(ref autoGrips, "autoGrips", true);
             Scribe_Values.Look(ref groundGarments, "groundGarments", false);
-            Scribe_Values.Look(ref bedBlankets, "bedBlankets", true);
+            Scribe_Values.Look(ref bedBlankets, "bedBlankets", false);
             Scribe_Values.Look(ref sleepWear, "bedClothes", SleepWear.NoEquipment);
             if (Scribe.mode == LoadSaveMode.LoadingVars)
             {
@@ -165,7 +165,7 @@ namespace M3AT
             Scribe_Values.Look(ref freecam3D, "freecam3D", false);
             Scribe_Values.Look(ref freecamClickOffLooks, "freecamClickOffLooks", false);
             Scribe_Values.Look(ref freecamPointerBack, "freecamPointerBack", true);
-            Scribe_Values.Look(ref freecamMenuFreesPointer, "freecamMenuFreesPointer", false);
+            Scribe_Values.Look(ref freecamMenuFreesPointer, "freecamMenuFreesPointer", true);
             Scribe_Values.Look(ref freecamButton, "freecamButton", 2);
             Scribe_Values.Look(ref freecamSensitivity, "freecamSensitivity", DefaultFreecamSensitivity);
             Scribe_Values.Look(ref freecamInvertY, "freecamInvertY", false);
@@ -608,6 +608,28 @@ namespace M3AT
                 "M3AT_GpuSkinningTip".Translate());
             list.CheckboxLabeled("M3AT_FewerPoses".Translate(), ref Settings.fewerPoses,
                 "M3AT_FewerPosesTip".Translate());
+            // The frame rate test (Benchmark.cs), opened over the map with the options closed, as it measures the map's view.
+            list.Gap(6f);
+            if (BenchmarkWindow.CanRun)
+            {
+                Rect button = list.GetRect(30f);
+                TooltipHandler.TipRegion(button, "M3AT_BenchmarkTip".Translate());
+                if (Widgets.ButtonText(button, "M3AT_BenchmarkButton".Translate()))
+                {
+                    foreach (Window w in Find.WindowStack.Windows.ToList())
+                    {
+                        if (w.GetType().Name == "Dialog_ModSettings" || w.GetType().Name == "Dialog_Options")
+                        {
+                            w.Close(false);
+                        }
+                    }
+                    BenchmarkWindow.Open();
+                }
+            }
+            else
+            {
+                list.Label("M3AT_BenchmarkNeedsGame".Translate());
+            }
         }
 
         // A report for the Workshop's bug thread (BugReport.cs), and every option back to its default.

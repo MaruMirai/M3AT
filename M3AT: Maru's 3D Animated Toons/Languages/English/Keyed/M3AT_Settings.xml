@@ -53,7 +53,7 @@
   <M3AT_GroundGarments>M3AT apparel on the ground</M3AT_GroundGarments>
   <M3AT_GroundGarmentsTip>Clothes on the map will be drawn as the same 3D garment a pawn wears, squashed flat. Off (default): IsoRim's 3D models are used. Takes effect when this window closes.</M3AT_GroundGarmentsTip>
   <M3AT_BedBlankets>Blankets in bed</M3AT_BedBlankets>
-  <M3AT_BedBlanketsTip>In beds that show only the sleeper's head, IsoRim's blanket is drawn over the body, raised by it. Other beds, such as sleeping spots and bedrolls, have no blanket. Off: pawns lie on top of every bed.</M3AT_BedBlanketsTip>
+  <M3AT_BedBlanketsTip>In beds that show only the sleeper's head, IsoRim's blanket is drawn over the body, raised by it. Other beds, such as sleeping spots and bedrolls, have no blanket. Off (default): pawns lie on top of every bed.</M3AT_BedBlanketsTip>
   <M3AT_SleepWear>Clothes in bed</M3AT_SleepWear>
   <M3AT_SleepWearTip>What pawns lying in a bed are drawn wearing, wherever their body shows (a bed with no blanket, or with blankets off). Only how they look: nothing is taken off or put on in the game.\n\nNormal clothes: what they wear.\n\nNo equipment (default): without armour, helmets and hats, coats, belts, packs or shields; shirts, trousers and the like stay on.\n\nPajamas: pastel pajamas; babies in their romper.\n\nNo clothes: no clothes; babies keep their romper.</M3AT_SleepWearTip>
   <M3AT_VatClothes>Clothes in vats</M3AT_VatClothes>
@@ -105,6 +105,51 @@
   <M3AT_GpuSkinningTip>Moves each pawn's body, clothes and hair into its pose on the graphics card, which is much faster with many pawns in view. Turn it off if pawns look broken or stretched, to animate them the old way.</M3AT_GpuSkinningTip>
   <M3AT_FewerPoses>Fewer updates with many pawns</M3AT_FewerPoses>
   <M3AT_FewerPosesTip>When many pawns are in view they are animated less often, giving a stop-motion like effect. Reduces M3AT's performance overhead around 6–9%. Off: Pawn animated as normal. (Default)</M3AT_FewerPosesTip>
+  <M3AT_BenchmarkButton>Measure frame rate: M3AT against IsoRim</M3AT_BenchmarkButton>
+  <M3AT_BenchmarkTip>Measures how fast the game runs with M3AT's pawns and with IsoRim's own pawns (as without this mod), on the map you are looking at. Nothing in your game is changed.</M3AT_BenchmarkTip>
+  <M3AT_BenchmarkNeedsGame>To measure the frame rate, load a game and turn on IsoRim's 3D view.</M3AT_BenchmarkNeedsGame>
+  <M3AT_Benchmark>Frame rate test</M3AT_Benchmark>
+  <M3AT_BenchIntro>This measures how fast the game runs with M3AT's pawns, with IsoRim's own pawns (as without this mod) and with no people drawn at all. It takes turns between them, so changes in the scene count against each the same.
+
+Before you start, point the camera at your colonists the way you usually play and leave the game running at your usual speed. Don't move the camera or click anything while it measures. Nothing in your game is changed.</M3AT_BenchIntro>
+  <M3AT_BenchLength>Length:</M3AT_BenchLength>
+  <M3AT_BenchQuick>Quick</M3AT_BenchQuick>
+  <M3AT_BenchNormal>Normal</M3AT_BenchNormal>
+  <M3AT_BenchThorough>Thorough</M3AT_BenchThorough>
+  <M3AT_BenchAbout>about {0} seconds</M3AT_BenchAbout>
+  <M3AT_BenchTryFewerOn>Also try with "{0}" switched on</M3AT_BenchTryFewerOn>
+  <M3AT_BenchTryFewerOff>Also try with "{0}" switched off</M3AT_BenchTryFewerOff>
+  <M3AT_BenchStart>Start</M3AT_BenchStart>
+  <M3AT_BenchCancel>Stop</M3AT_BenchCancel>
+  <M3AT_BenchAgain>Measure again</M3AT_BenchAgain>
+  <M3AT_BenchCopy>Copy results</M3AT_BenchCopy>
+  <M3AT_BenchCopied>Results copied to the clipboard. They are also saved in {0}.</M3AT_BenchCopied>
+  <M3AT_BenchChibi>M3AT's pawns</M3AT_BenchChibi>
+  <M3AT_BenchIsoRim>IsoRim's pawns</M3AT_BenchIsoRim>
+  <M3AT_BenchNone>No people drawn</M3AT_BenchNone>
+  <M3AT_BenchChibiFewerOn>M3AT's pawns, fewer updates on</M3AT_BenchChibiFewerOn>
+  <M3AT_BenchChibiFewerOff>M3AT's pawns, fewer updates off</M3AT_BenchChibiFewerOff>
+  <M3AT_BenchWarming>Getting ready: {0}</M3AT_BenchWarming>
+  <M3AT_BenchWaitHair>Waiting for {0} hairstyles to be built first...</M3AT_BenchWaitHair>
+  <M3AT_BenchMeasuring>Measuring: {0} (round {1} of {2})</M3AT_BenchMeasuring>
+  <M3AT_BenchLeft>About {0} seconds left. Keep the camera still.</M3AT_BenchLeft>
+  <M3AT_BenchRow>{0}: {1} FPS (1% low {2} FPS), {3} ms a frame</M3AT_BenchRow>
+  <M3AT_BenchCostMore>M3AT's pawns take {0} ms longer a frame than IsoRim's: {1} FPS instead of {2} ({3}% fewer).</M3AT_BenchCostMore>
+  <M3AT_BenchCostLess>M3AT's pawns took {0} ms less a frame than IsoRim's: {1} FPS against {2}.</M3AT_BenchCostLess>
+  <M3AT_BenchSame>M3AT's pawns and IsoRim's came out about the same ({0} ms apart, within the measuring noise of about {1} ms).</M3AT_BenchSame>
+  <M3AT_BenchPeople>Drawing the people takes {0} ms a frame with M3AT and {1} ms with IsoRim, with about {2} in view: about {3} ms for each M3AT pawn.</M3AT_BenchPeople>
+  <M3AT_BenchOn>on</M3AT_BenchOn>
+  <M3AT_BenchOff>off</M3AT_BenchOff>
+  <M3AT_BenchFewerSaves>Switching "{0}" {1} saved {2} ms a frame ({3} FPS).</M3AT_BenchFewerSaves>
+  <M3AT_BenchFewerNoSaving>Switching "{0}" {1} made no clear difference ({2} FPS).</M3AT_BenchFewerNoSaving>
+  <M3AT_BenchNoChibis>No M3AT pawns were drawn. Were any people in view in IsoRim's 3D view?</M3AT_BenchNoChibis>
+  <M3AT_BenchFewPeople>Few people were in view. Point the camera at a group of colonists for a clearer result.</M3AT_BenchFewPeople>
+  <M3AT_BenchCapped>Drawing people made almost no difference at all. The frame rate may be held down by vsync or a frame limit, which hides the difference: turn those off to measure.</M3AT_BenchCapped>
+  <M3AT_BenchSpeedChanged>The game speed was changed while it measured, so the numbers are less certain.</M3AT_BenchSpeedChanged>
+  <M3AT_BenchStoppedUser>Stopped.</M3AT_BenchStoppedUser>
+  <M3AT_BenchStoppedMap>Stopped: the map shown changed.</M3AT_BenchStoppedMap>
+  <M3AT_BenchStoppedView>Stopped: IsoRim's 3D view was turned off.</M3AT_BenchStoppedView>
+  <M3AT_BenchStoppedGame>Stopped: the game was left.</M3AT_BenchStoppedGame>
   <M3AT_Problems>Problems</M3AT_Problems>
   <M3AT_CopyBugReport>Copy bug report</M3AT_CopyBugReport>
   <M3AT_BugReportCopied>Bug report copied to the clipboard.</M3AT_BugReportCopied>
@@ -128,7 +173,7 @@
   <M3AT_FreecamPointerBack>Pointer mode returns the pointer</M3AT_FreecamPointerBack>
   <M3AT_FreecamPointerBackTip>Going into pointer mode puts the pointer back where it was when looking began (default). Off: it starts in the middle of the screen, under the cross.</M3AT_FreecamPointerBackTip>
   <M3AT_FreecamMenuFreesPointer>Orders menu frees the pointer</M3AT_FreecamMenuFreesPointer>
-  <M3AT_FreecamMenuFreesPointerTip>A menu of orders opened while looking frees the pointer to pick from it, going back to looking once it closes. Off (default): the menu is pinned where it opened and you pick by turning the view onto an option.</M3AT_FreecamMenuFreesPointerTip>
+  <M3AT_FreecamMenuFreesPointerTip>A menu of orders opened while looking frees the pointer to pick from it, going back to looking once it closes (default). Off: the menu is pinned where it opened and you pick by turning the view onto an option.</M3AT_FreecamMenuFreesPointerTip>
   <M3AT_LookSpeed>Look speed</M3AT_LookSpeed>
   <M3AT_LookSpeedTip>How far the view turns for the mouse's movement, in degrees per pixel (default {0}).</M3AT_LookSpeedTip>
   <M3AT_InvertMouse>Invert mouse look</M3AT_InvertMouse>
