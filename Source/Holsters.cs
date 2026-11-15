@@ -756,13 +756,30 @@ namespace M3AT
             for (int i = 0; inventory != null && i < inventory.Count; i++)
             {
                 Thing t = inventory[i];
-                // Beer can be wielded as a club (equipmentType Primary), but a pawn carrying it in its pack hasn't
-                // armed itself with it, so food and drugs are left out.
-                if (t.def.equipmentType == EquipmentType.Primary && !t.def.IsIngestible && t != held)
+                if (t != held && Holsterable(t.def))
                 {
                     Holster(t, mask, fig, at, yaw, size, draw);
                 }
             }
+        }
+
+        private static readonly Dictionary<ThingDef, bool> holsterable = new Dictionary<ThingDef, bool>();
+
+        // Whether a thing in the inventory is a weapon to holster. The game marks some things that are not weapons as
+        // ones a pawn can wield (equipmentType Primary): beer, and wood logs, thrumbo horns and elephant and mastodon
+        // tusks as improvised clubs (ResourceVerbBase). A pawn carrying them in its pack (Combat Extended's pawns carry
+        // stacks of wood about) hasn't armed itself with them, so only a weapon proper is holstered: one under the
+        // Weapons category, or with weapon tags (Combat Extended's pila are ammo with weapon tags, and its grenades
+        // carry CE_AI_Grenade), never food or drugs. One equipped is still holstered whatever it is, as the pawn chose it.
+        internal static bool Holsterable(ThingDef def)
+        {
+            if (!holsterable.TryGetValue(def, out bool can))
+            {
+                can = def.equipmentType == EquipmentType.Primary && def.IsWeapon && !def.IsIngestible
+                    && (def.IsWithinCategory(ThingCategoryDefOf.Weapons) || !def.weaponTags.NullOrEmpty());
+                holsterable[def] = can;
+            }
+            return can;
         }
 
         // How far out the weapons holstered on the back stand there (model units along their way out, before the bone's

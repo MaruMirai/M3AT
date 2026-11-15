@@ -67,7 +67,7 @@ namespace M3AT
             Part(s, "held", () => HeldWeapon(pawn)?.def.defName ?? "none");
             Part(s, "clips", () => "drafted=" + (DraftedClip(pawn) ?? "none") + " aim=" + (AimName(pawn) ?? "none") + " carry=" + (CarryClip(pawn) ?? "none"));
             Part(s, "inventory weapons", () => pawn.inventory == null ? "none" : string.Join("; ",
-                pawn.inventory.innerContainer.OfType<ThingWithComps>().Where(t => t.def.equipmentType == EquipmentType.Primary).Select(WeaponReport)));
+                pawn.inventory.innerContainer.OfType<ThingWithComps>().Where(t => Holsterable(t.def)).Select(WeaponReport)));
             Part(s, "ease", () => EaseReport(pawn));
         }
 
