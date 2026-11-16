@@ -24,6 +24,7 @@ namespace M3AT
             public HashSet<string> groups = new HashSet<string>();
             public bool armour, noble, vacsuit, childOnly;
             public bool namedOnly;          // a garment of NoStandIn: stands in only for apparel with all its name words
+            public bool mask;               // a garment of Masks; apparel with one of MaskWords in its name or label
             public TechLevel tech;
             public HashSet<string> stuff = new HashSet<string>();
             public string[] tokens;         // a garment's: the words of its def's name (NameTokens)
@@ -79,6 +80,14 @@ namespace M3AT
             "CE_SimpleNightVision", "CE_AdvancedNightVision",
         };
 
+        // Garments over the face, which stand in only for apparel named as one (MaskWords): mods often give a plain hat
+        // FullHead, or a cap UpperHead and Eyes, which the gas mask (FullHead, Overhead, not armour) matched exactly.
+        private static readonly HashSet<string> Masks = new HashSet<string>
+        {
+            "GasMask", "ClothMask", "WarMask", "VisageMask", "WarVeil", "CultistMask", "CeremonialCultistMask",
+        };
+        private static readonly string[] MaskWords = { "mask", "respirator", "balaclava", "veil" };
+
         // The plain garments, which win a tie.
         private static readonly HashSet<string> Generic = new HashSet<string>
         {
@@ -119,6 +128,13 @@ namespace M3AT
                 return NoStandIns;
             }
             Profile a = ProfileOf(def, 0);
+            a.mask = IsMaskNamed(a.text);
+            if (!a.armour && !a.mask && a.groups.Contains("UpperHead"))
+            {
+                // A hat, however much of the head its groups say: matched as a hat, not as a mask or full helmet.
+                a.groups.Remove("Eyes");
+                a.groups.Remove("Mouth");
+            }
             if (a.groups.Count == 0)
             {
                 return NoStandIns;
@@ -127,7 +143,7 @@ namespace M3AT
             List<Profile> all = StandInProfiles();
             for (int i = 0; i < all.Count; i++)
             {
-                if (!all[i].namedOnly || NameShare(a.text, all[i].tokens) >= 1f)
+                if ((!all[i].namedOnly || NameShare(a.text, all[i].tokens) >= 1f) && (!all[i].mask || a.mask))
                 {
                     pool.Add(all[i]);
                 }
@@ -339,6 +355,18 @@ namespace M3AT
             return words.ToArray();
         }
 
+        private static bool IsMaskNamed(string text)
+        {
+            for (int i = 0; i < MaskWords.Length; i++)
+            {
+                if (text != null && text.Contains(MaskWords[i]))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         // Shields (CE's, VFE's), anything else energy-shielding and anything worn on the belt (packs, lances: IsoRim draws
         // them as worn gear, WornGears.cs, though Combat Extended adds its Backpack layer to some): never drawn as clothes.
         private static bool NeverStoodIn(ThingDef def)
@@ -451,6 +479,7 @@ namespace M3AT
                 }
                 p.name = piece.name;   // the garment's own name, which Generic goes by
                 p.namedOnly = NoStandIn.Contains(piece.name ?? "");
+                p.mask = Masks.Contains(piece.name ?? "");
                 standInProfiles.Add(p);
             }
             return standInProfiles;

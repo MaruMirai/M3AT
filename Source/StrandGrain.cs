@@ -95,6 +95,20 @@ namespace M3AT
                 return;
             }
             Piece fur = pieces[at];
+            if (fur.texture == null && CoatPiece >= 0)
+            {
+                try
+                {
+                    CoatTufts(fur);   // on the coat's image, from the skin under each (FurCoat.cs)
+                }
+                catch (Exception e)
+                {
+                    fur.uvs = null;
+                    fur.shade = null;
+                    fur.texture = null;
+                    Log.Warning(Tag + "could not lay the fur's tufts on the coat, so they are grained: " + e.Message);
+                }
+            }
             if (fur.texture == null)
             {
                 try

@@ -165,6 +165,8 @@ namespace M3AT
                 }
                 yield break;
             }
+            // The 3D view itself, as IsoRim starts every game flat (before, only the freecam saved as wanted turned it on).
+            IsoRim.Api.View3DActive = true;
             pose = IsoRim.Api.PushViewPose(PoseOwner, Pose, new IsoRim.ViewPoseOptions { Priority = 1000 });
             Find.TickManager.CurTimeSpeed = TimeSpeed.Paused;
             middle = FindPatch();
@@ -345,6 +347,11 @@ namespace M3AT
 
         private static IEnumerator Perf()
         {
+            if (IntArg("m3atPerfSwitch", 0) > 0)
+            {
+                yield return PerfSwitch(IntArg("m3atPerfSwitch", 0));
+                yield break;
+            }
             int seconds = IntArg("m3atPerfSeconds", 20), rounds = IntArg("m3atPerfRounds", 3);
             List<Pawn> colonists = new List<Pawn>(map.mapPawns.FreeColonistsSpawned);
             List<PerfCondition> conditions = PerfConditions();
@@ -426,6 +433,81 @@ namespace M3AT
                 }
             }
             report.AppendLine("- (the mod's other work runs throughout: its tick patches, map components and freecam, which are small)");
+        }
+
+        // --switch n: how long a switch between the chibi and IsoRim's figures takes to settle, for the benchmark's turns
+        // (Benchmark.cs). The two are swapped every n frames for seconds x rounds of real time, and each frame's time is
+        // averaged by how many frames after a switch it came, each way apart; the report gives each offset's mean against
+        // the steady mean (the second half of the turns), so the frames to leave out after a switch can be read off.
+        private static IEnumerator PerfSwitch(int every)
+        {
+            int seconds = IntArg("m3atPerfSeconds", 20), rounds = IntArg("m3atPerfRounds", 3);
+            List<Pawn> colonists = new List<Pawn>(map.mapPawns.FreeColonistsSpawned);
+            lookPitch = 40f;
+            lookYaw = 0f;
+            lookHeight = 0f;
+            lookAt = Centroid(colonists, out float spread);
+            lookDistance = Mathf.Clamp(spread * 2.4f, 10f, 40f);
+            pose = IsoRim.Api.PushViewPose(PoseOwner, Pose, new IsoRim.ViewPoseOptions { Priority = 1000 });
+            Find.TickManager.CurTimeSpeed = TimeSpeed.Normal;
+            WalkFigures.PerfMode = 0;
+            WalkFigures.PerfAllowed = null;
+            yield return FollowFor(colonists, 15f, null);
+            WalkFigures.PerfMode = 1;
+            yield return FollowFor(colonists, 5f, null);
+            double[][] sum = { new double[every], new double[every] };   // [0] after switching to the chibi, [1] to IsoRim's
+            double[][] sq = { new double[every], new double[every] };
+            int[][] count = { new int[every], new int[every] };
+            int frame = 0, turns = 0;
+            float until = Time.realtimeSinceStartup + seconds * rounds;
+            WalkFigures.PerfMode = 0;
+            while (Time.realtimeSinceStartup < until)
+            {
+                int way = WalkFigures.PerfMode == 0 ? 0 : 1, at = frame % every;
+                if (frame >= every)   // the first turn follows the warm-up's long run of IsoRim's, so is left out
+                {
+                    float ms = Time.unscaledDeltaTime * 1000f;
+                    sum[way][at] += ms;
+                    sq[way][at] += ms * ms;
+                    count[way][at]++;
+                }
+                Vector3 to = Centroid(colonists, out spread);
+                lookAt = Vector3.Lerp(lookAt, to, 0.02f);
+                yield return null;
+                frame++;
+                if (frame % every == 0)
+                {
+                    WalkFigures.PerfMode = 1 - WalkFigures.PerfMode;
+                    turns++;
+                }
+            }
+            WalkFigures.PerfMode = 0;
+            Pause();
+            report.AppendLine("## perf --switch " + every).AppendLine();
+            report.AppendLine("- " + colonists.Count + " colonists followed, " + turns + " turns of " + every + " frames, normal speed; screen " + Screen.width + "x" + Screen.height
+                + ", GPU skinning " + SkinnedFigure.GpuSkinning);
+            report.AppendLine("- frame time (ms) by frames since the switch, against the steady mean of the turns' second halves; frame 0 is the first measured after the switch").AppendLine();
+            for (int way = 0; way < 2; way++)
+            {
+                double steadySum = 0;
+                int steadyN = 0;
+                for (int i = every / 2; i < every; i++)
+                {
+                    steadySum += sum[way][i];
+                    steadyN += count[way][i];
+                }
+                double steady = steadySum / Math.Max(1, steadyN);
+                report.AppendLine("### to " + (way == 0 ? "the chibi" : "IsoRim's figures") + ": steady " + steady.ToString("F2") + " ms").AppendLine();
+                report.AppendLine("| frame | mean ms | +/- | over steady |");
+                report.AppendLine("|---|---|---|---|");
+                for (int i = 0; i < every; i++)
+                {
+                    int n = Math.Max(1, count[way][i]);
+                    double m = sum[way][i] / n, v = Math.Max(0, sq[way][i] / n - m * m);
+                    report.AppendLine("| " + i + " | " + m.ToString("F2") + " | " + Math.Sqrt(v / n).ToString("F2") + " | " + (m - steady).ToString("+0.00;-0.00") + " |");
+                }
+                report.AppendLine();
+            }
         }
 
         // A straight line through mean frame time against chibis drawn per frame, for the conditions with fewerPoses so: the
@@ -608,6 +690,9 @@ namespace M3AT
                 case "slicecap": return SlicecapTest();
                 case "hats": return HatsTest();
                 case "prosthetics": return ProstheticsTest();
+                case "furskin": return FurskinTest();
+                case "facefur": return FaceFurTest();
+                case "fatseam": return FatSeamTest();
                 case "faceab": return FaceAbTest();
                 case "beard": return BeardTest();
                 case "faceanim": return FaceAnimTest(null);
@@ -2420,6 +2505,181 @@ namespace M3AT
         // HatOverHair.cs): the hair left whole and the cap pushed out past it, on a few styles from short to big.
         // One bare pawn given each set of added parts in turn (Prosthetics.cs), seen from the front and the back: the
         // limbs coloured as what they are made of, the joints darker, a peg leg a peg down to the ground.
+        // A bare grown pawn with the Furskin gene, close from the front, side, back and the other side: the painted coat
+        // (FurCoat.cs) all over, its tufts coloured as the skin they grow from; then in trousers, which leave the coat's legs out.
+        // A bald Furskin pawn's face close up, from above the brow and the front: Facial Animation's lid cover drawn in the
+        // coat's colours (FaceLayers.Coat), not flat skin across the eyes.
+        private static IEnumerator FaceFurTest()
+        {
+            GeneDef gene = DefDatabase<GeneDef>.GetNamedSilentFail("Furskin");
+            Rand.PushState(20261115);
+            Pawn pawn;
+            try { pawn = NewPawn(middle, null); } finally { Rand.PopState(); }
+            pawn.genes.AddGene(gene, true);
+            pawn.apparel.DestroyAll();
+            pawn.story.hairDef = DefDatabase<HairDef>.GetNamedSilentFail("Bald") ?? pawn.story.hairDef;
+            pawn.Drawer.renderer.SetAllGraphicsDirty();
+            Hold(pawn);
+            lookDistance = 0.8f;
+            lookHeight = 1.15f;
+            lookPitch = 40f;
+            Look(pawn, 0f);
+            yield return Ticks(10, "facefur", pawn);
+            yield return Shot("forehead");
+            lookDistance = 0.9f;
+            lookHeight = 0.95f;
+            lookPitch = 15f;
+            yield return Ticks(2, "facefur", pawn);
+            yield return Shot("face");
+            Note("Look: the coat (its strand grain, the pale front about the nose) right across the face, the band about the eyes too, not a flat strip of the skin's colour (FaceLayers.CoatedMask).");
+            lookDistance = LookDistance;
+            lookHeight = LookHeight;
+            lookPitch = LookPitch;
+        }
+
+        private static IEnumerator FurskinTest()
+        {
+            GeneDef gene = DefDatabase<GeneDef>.GetNamedSilentFail("Furskin");
+            if (gene == null)
+            {
+                Check("furskin", false, "no Furskin gene (Biotech off?)");
+                yield break;
+            }
+            Rand.PushState(20261115);
+            Pawn pawn;
+            try
+            {
+                pawn = NewPawn(middle, null);
+            }
+            finally
+            {
+                Rand.PopState();
+            }
+            pawn.genes.AddGene(gene, true);
+            pawn.apparel.DestroyAll();
+            Hold(pawn);
+            Look(pawn, 0f);
+            lookDistance = 2.0f;
+            lookHeight = 0.65f;
+            lookPitch = 12f;
+            yield return Ticks(10, "furskin", pawn);
+            yield return Shot("bare_front");
+            Look(pawn, 180f);
+            yield return Ticks(2, "furskin", pawn);
+            yield return Shot("bare_back");
+            lookDistance = 1.1f;
+            lookHeight = 0.95f;
+            Look(pawn, 0f);
+            yield return Ticks(2, "furskin", pawn);
+            yield return Shot("bare_close");
+            // Bald, so the head's tufts show, close from behind and three quarters, and the arm from the side.
+            HairDef hadHair = pawn.story.hairDef;
+            pawn.story.hairDef = DefDatabase<HairDef>.GetNamedSilentFail("Bald") ?? hadHair;
+            pawn.Drawer.renderer.SetAllGraphicsDirty();
+            lookDistance = 0.9f;
+            lookHeight = 1.0f;
+            lookPitch = 25f;
+            Look(pawn, 150f);
+            yield return Ticks(5, "furskin", pawn);
+            yield return Shot("bald_head_back");
+            Look(pawn, 30f);
+            yield return Ticks(2, "furskin", pawn);
+            yield return Shot("bald_head_front");
+            // The forehead from above the brow, from the front and the side (make_fur_edges.py's FOREHEAD, --forehead).
+            lookDistance = 0.8f;
+            lookHeight = 1.15f;
+            lookPitch = 40f;
+            Look(pawn, 0f);
+            yield return Ticks(2, "furskin", pawn);
+            yield return Shot("bald_forehead");
+            Look(pawn, 90f);
+            yield return Ticks(2, "furskin", pawn);
+            yield return Shot("bald_forehead_side");
+            lookDistance = 1.0f;
+            lookHeight = 0.75f;
+            lookPitch = 12f;
+            Look(pawn, 90f);
+            yield return Ticks(2, "furskin", pawn);
+            yield return Shot("bald_arm");
+            pawn.story.hairDef = hadHair;
+            pawn.Drawer.renderer.SetAllGraphicsDirty();
+            lookPitch = 12f;
+            ThingDef pants = DefDatabase<ThingDef>.GetNamedSilentFail("Apparel_Pants");
+            if (pants != null)
+            {
+                pawn.apparel.Wear((Apparel)ThingMaker.MakeThing(pants, GenStuff.DefaultStuffFor(pants)), false);
+                Hold(pawn);
+                lookDistance = 2.0f;
+                lookHeight = 0.65f;
+                Look(pawn, 0f);
+                yield return Ticks(5, "furskin", pawn);
+                yield return Shot("trousers");
+            }
+            lookDistance = LookDistance;
+            lookHeight = LookHeight;
+            lookPitch = LookPitch;
+            Note("Look: the painted coat (pale front, stripes on the back, thighs and upper arms, strand grain) all over, no seams; "
+                + "the tufts the colour of the skin under them, lighter at their tips; in trousers no coat through them.");
+        }
+
+        // A Fat woman in a basic shirt and trousers, alone, under a jacket and under a duster, then in tribalwear, at body shape strengths 1 and
+        // 1.5, from the front and the back: nothing under a garment should come out through it (the shirt through the
+        // jacket or duster, the trousers through the duster, the body through any), as when the garments kept their own
+        // copies of the body's old Thin, Fat and Hulk keys.
+        private static IEnumerator FatSeamTest()
+        {
+            Rand.PushState(20261116);
+            Pawn pawn;
+            try
+            {
+                pawn = NewPawn(middle, null);
+            }
+            finally
+            {
+                Rand.PopState();
+            }
+            pawn.gender = Gender.Female;
+            pawn.story.bodyType = BodyTypeDefOf.Fat;
+            float strength = SettingsMod.Settings.bodyShapeStrength;
+            bool varied = SettingsMod.Settings.variedBodies;
+            SettingsMod.Settings.variedBodies = false;
+            lookDistance = 1.6f;
+            lookHeight = 0.6f;
+            lookPitch = 10f;
+            foreach (string over in new[] { null, "Apparel_Jacket", "Apparel_Duster", "Apparel_TribalA", "Apparel_Robe" })
+            {
+                pawn.apparel.DestroyAll();
+                // (the tribalwear alone, its skirt hung from its own weights over the legs)
+                string[] worn = over == "Apparel_TribalA" ? new[] { over } : new[] { "Apparel_Pants", "Apparel_BasicShirt", over };
+                foreach (string name in worn)
+                {
+                    ThingDef def = name == null ? null : DefDatabase<ThingDef>.GetNamedSilentFail(name);
+                    if (def != null)
+                    {
+                        pawn.apparel.Wear((Apparel)ThingMaker.MakeThing(def, GenStuff.DefaultStuffFor(def)), false);
+                    }
+                }
+                Hold(pawn);
+                string outfit = over == null ? "shirt" : over.Substring("Apparel_".Length).ToLowerInvariant();
+                foreach (float s in new[] { 1f, 1.5f })
+                {
+                    SettingsMod.Settings.bodyShapeStrength = s;
+                    foreach (float yaw in new[] { 0f, 180f })
+                    {
+                        Look(pawn, yaw);
+                        yield return Ticks(5, "fatseam", pawn);
+                        yield return Shot(outfit + "_s" + Mathf.RoundToInt(s * 100f) + "_" + Mathf.RoundToInt(yaw));
+                    }
+                }
+            }
+            SettingsMod.Settings.bodyShapeStrength = strength;
+            SettingsMod.Settings.variedBodies = varied;
+            lookDistance = LookDistance;
+            lookHeight = LookHeight;
+            lookPitch = LookPitch;
+            Note("Look: nothing under a garment showing through it: no shirt through the jacket or duster, no trousers through the duster, no skin on the back.");
+        }
+
         private static IEnumerator ProstheticsTest()
         {
             Rand.PushState(20261112);
@@ -4985,9 +5245,11 @@ namespace M3AT
             }
             bool blankets = SettingsMod.Settings.bedBlankets;
             SettingsMod.Settings.bedBlankets = true;   // (pillow talk lies close under the blanket as lovin does)
-            foreach (string date in only ?? new[] { "kiss", "skygaze", "music", "pillow", "snowball", "shareread" })
+            foreach (string date in only ?? new[] { "kiss", "skygaze", "music", "pillow", "pillowbare", "snowball", "shareread" })
             {
                 ClearPatch();
+                // (pillowbare: pillow talk with no blanket, so on the sides facing each other, plainly: lovin_L, lovin_R)
+                SettingsMod.Settings.bedBlankets = date != "pillowbare";
                 IEnumerator run = RomanceDate(date);
                 while (true)
                 {
@@ -5037,7 +5299,7 @@ namespace M3AT
                 }
             }
             // (spouses for pillow talk, as an ideoligion may not let lovers share a bed, and the game refuses the bed)
-            PawnRelationDef couple = date == "pillow" ? PawnRelationDefOf.Spouse : PawnRelationDefOf.Lover;
+            PawnRelationDef couple = date == "pillow" || date == "pillowbare" ? PawnRelationDefOf.Spouse : PawnRelationDefOf.Lover;
             if (!a.relations.DirectRelationExists(couple, b))
             {
                 a.relations.AddDirectRelation(couple, b);
@@ -5073,6 +5335,7 @@ namespace M3AT
                     break;
                 }
                 case "pillow":
+                case "pillowbare":
                 {
                     ThingDef bedDef = ThingDef.Named("DoubleBed");
                     Thing bed = ThingMaker.MakeThing(bedDef, ThingDefOf.WoodLog);
@@ -5189,6 +5452,8 @@ namespace M3AT
             bool interacted = false;
             float kissGap = float.MaxValue;
             float kissed = 0f, kissedB = 0f, pillowA = 0f, pillowB = 0f, looked = 0f;
+            var liesA = new HashSet<string>();
+            var liesB = new HashSet<string>();
             int throwsA = 0, throwsB = 0;
             float listened = 0f, listenLook = 0f, shown = 0f;
             string shownSide = null;
@@ -5217,6 +5482,14 @@ namespace M3AT
                 }
                 pillowA = Mathf.Max(pillowA, Field<float>(a, "lovinShift"));
                 pillowB = Mathf.Max(pillowB, Field<float>(b, "lovinShift"));
+                if (a.CurJobDef != null && a.CurJobDef.defName == "RomanceOnTheRim_PillowTalk" && a.InBed() && Field<string>(a, "lieNow") != null)
+                {
+                    liesA.Add(Field<string>(a, "lieNow"));   // (none until it is first drawn lying)
+                }
+                if (b.CurJobDef != null && b.CurJobDef.defName == "RomanceOnTheRim_PillowTalk" && b.InBed() && Field<string>(b, "lieNow") != null)
+                {
+                    liesB.Add(Field<string>(b, "lieNow"));   // (none until it is first drawn lying)
+                }
                 looked = Mathf.Max(looked, Mathf.Abs(Field<float>(a, "look")));
                 listened = Mathf.Max(listened, Field<float>(b, "listen"));
                 listenLook = Mathf.Max(listenLook, Mathf.Abs(Field<float>(b, "look")));
@@ -5262,6 +5535,16 @@ namespace M3AT
                 case "pillow":
                     Check("pillow: close under the blanket", pillowA > 0.1f && pillowB > 0.1f, "shift " + pillowA.ToString("F2") + " / " + pillowB.ToString("F2"));
                     break;
+                case "pillowbare":
+                {
+                    // Plainly face to face, never the caress (~2) or spooning, which are lovin's alone.
+                    string all = string.Join(", ", liesA) + " / " + string.Join(", ", liesB);
+                    Check("pillowbare: on the sides, drawn together", pillowA > 0.2f && pillowB > 0.2f, "shift " + pillowA.ToString("F2") + " / " + pillowB.ToString("F2"));
+                    Check("pillowbare: plainly face to face", liesA.Count > 0 && liesB.Count > 0
+                        && liesA.All(c => c == "lovin_L" || c == "lovin_R") && liesB.All(c => c == "lovin_L" || c == "lovin_R")
+                        && liesA.First() != liesB.First(), "lying " + all);
+                    break;
+                }
                 case "snowball":
                     Check("snowball: throwing", throwsA > 0 && throwsB > 0, "frames mid-throw (of every 15 ticks) " + throwsA + " / " + throwsB);
                     break;

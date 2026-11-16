@@ -679,6 +679,53 @@ namespace M3AT
         }
 
         private static readonly Dictionary<Material, Material[]> lit = new Dictionary<Material, Material[]>();
+
+        // A furred pawn's coat laid out on the face (SkinnedFigure.CoatFace), set by WalkFigures around its Draw, else null.
+        // The lid cover (mode 5) is drawn as its colour times its mask, so with the coat multiplied into the mask's colour it
+        // comes out as the coat under it rather than a flat strip of the skin's colour across the eyes.
+        internal static Color32[] Coat;
+        private static readonly Dictionary<(Texture, Color32[]), Texture> coated = new Dictionary<(Texture, Color32[]), Texture>();
+
+        private static Texture CoatedMask(Texture mask)
+        {
+            if (Coat == null || mask == null)
+            {
+                return mask;
+            }
+            Texture made;
+            if (coated.TryGetValue((mask, Coat), out made))
+            {
+                return made;
+            }
+            made = mask;
+            try
+            {
+                int n = SkinnedFigure.CoatFaceSize;
+                Color32[] px = Api.ReadSpritePixels(mask, n);   // rows bottom first, as Coat
+                if (px != null && px.Length >= n * n && Coat.Length >= n * n)
+                {
+                    Color32[] mixed = new Color32[n * n];
+                    for (int i = 0; i < mixed.Length; i++)
+                    {
+                        Color32 m = px[i], c = Coat[i];
+                        mixed[i] = new Color32((byte)(m.r * c.r / 255), (byte)(m.g * c.g / 255), (byte)(m.b * c.b / 255), m.a);
+                    }
+                    Texture2D t = new Texture2D(n, n, TextureFormat.RGBA32, false);
+                    t.name = "Marus_coated_" + mask.name;
+                    t.wrapMode = TextureWrapMode.Clamp;
+                    t.filterMode = FilterMode.Bilinear;
+                    t.SetPixels32(mixed);
+                    t.Apply(false, true);
+                    made = t;
+                }
+            }
+            catch (Exception e)
+            {
+                Log.WarningOnce(Tag + "could not lay the coat into the lid cover: " + e.Message, 61938207);
+            }
+            coated[(mask, Coat)] = made;
+            return made;
+        }
         private const int MaxLayers = 47;   // queues 2950 to 2996, under the ridges and the flat beard (RidgeQueue, FlatQueue)
         private static readonly int faceModeId = Shader.PropertyToID("_FaceMode");
 
@@ -722,7 +769,8 @@ namespace M3AT
             if (mode == ModeComplex || mode == ModeSkinOverlay || mode == ModeLidCover)
             {
                 Texture mask = source.HasProperty(ShaderPropertyIDs.MaskTex) ? source.GetTexture(ShaderPropertyIDs.MaskTex) : null;
-                m.SetTexture(ShaderPropertyIDs.MaskTex, mask != null ? mask : (mode == ModeComplex ? BaseContent.BlackTex : BaseContent.WhiteTex));
+                mask = mask != null ? mask : (mode == ModeComplex ? BaseContent.BlackTex : BaseContent.WhiteTex);
+                m.SetTexture(ShaderPropertyIDs.MaskTex, mode == ModeLidCover ? CoatedMask(mask) : mask);
             }
             return m;
         }
@@ -983,6 +1031,10 @@ namespace M3AT
                 {
                     mask = gm.HasProperty(ShaderPropertyIDs.MaskTex) ? gm.GetTexture(ShaderPropertyIDs.MaskTex) : null;
                     mask = mask != null ? mask : (mode == ModeComplex ? BaseContent.BlackTex : BaseContent.WhiteTex);
+                    if (mode == ModeLidCover)
+                    {
+                        mask = CoatedMask(mask);
+                    }
                 }
                 if (call.kind == "LidControllerComp" && call.layer == "Bottom")
                 {

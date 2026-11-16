@@ -29,6 +29,8 @@
   <M3AT_HeightVarietyTip>小人身高的差异程度（默认 {0}）。采用正态分布：大多数接近正常尺寸，少数偏离较远。0% 时同性别的人一样高。每个小人的身高由其 ID 推算，因此不需要存档数据。</M3AT_HeightVarietyTip>
   <M3AT_GenderSizes>性别体型差异</M3AT_GenderSizes>
   <M3AT_GenderSizesTip>男性与女性有 10% 的体型差异，在青春期逐渐显现。关闭：两者一样大。</M3AT_GenderSizesTip>
+  <M3AT_BodyShapeStrength>体型强度</M3AT_BodyShapeStrength>
+  <M3AT_BodyShapeStrengthTip>瘦弱、肥胖和魁梧体型的明显程度（默认 100%）。调低则更接近标准体格，调高则更夸张；超过 100% 时衣物可能穿入身体。也会缩放“体格差异”产生的体格。男性和女性体型不受影响。</M3AT_BodyShapeStrengthTip>
   <M3AT_VariedBodies>体格差异</M3AT_VariedBodies>
   <M3AT_VariedBodiesTip>每个小人在其体型附近有自己的体格：有的更瘦或更胖，有的更壮，因此标准体型的人不再千篇一律。瘦弱、肥胖和魁梧的小人仍以各自的体型为基础。关闭：同一体型的小人身材完全相同。</M3AT_VariedBodiesTip>
   <M3AT_BodyVariety>体格差异程度</M3AT_BodyVariety>
@@ -105,7 +107,7 @@
   <M3AT_GpuSkinningTip>在显卡上把每个小人的身体、衣服和头发摆成当前姿势，画面中小人多时快得多。如果小人看起来破碎或被拉伸，请关闭此项，改用旧方式计算动画。</M3AT_GpuSkinningTip>
   <M3AT_FewerPoses>小人多时减少更新</M3AT_FewerPoses>
   <M3AT_FewerPosesTip>画面中小人很多时降低其动画更新频率，产生类似定格动画的效果。可将 M3AT 的性能开销降低约 6–9%。关闭：小人正常播放动画。（默认）</M3AT_FewerPosesTip>
-  <M3AT_BenchmarkButton>测量帧率：M3AT 与 IsoRim 对比</M3AT_BenchmarkButton>
+  <M3AT_BenchmarkButton>测试 M3AT 的性能影响</M3AT_BenchmarkButton>
   <M3AT_BenchmarkTip>在你正在查看的地图上，分别测量使用 M3AT 小人和使用 IsoRim 自带小人（即不装本模组时）时游戏的运行速度。不会改动你的游戏存档。</M3AT_BenchmarkTip>
   <M3AT_BenchmarkNeedsGame>要测量帧率，请先载入游戏并打开 IsoRim 的 3D 视图。</M3AT_BenchmarkNeedsGame>
   <M3AT_Benchmark>帧率测试</M3AT_Benchmark>
@@ -119,6 +121,10 @@
   <M3AT_BenchAbout>约 {0} 秒</M3AT_BenchAbout>
   <M3AT_BenchTryFewerOn>同时测试开启"{0}"的情况</M3AT_BenchTryFewerOn>
   <M3AT_BenchTryFewerOff>同时测试关闭"{0}"的情况</M3AT_BenchTryFewerOff>
+  <M3AT_BenchTryNone>同时测量完全不绘制人物的情况</M3AT_BenchTryNone>
+  <M3AT_BenchTryNoneTip>增加一轮完全不绘制人物的测量，以显示使用 M3AT 和使用 IsoRim 时绘制人物各占每帧多少时间。</M3AT_BenchTryNoneTip>
+  <M3AT_BenchUnpaused>测量期间请不要暂停游戏。</M3AT_BenchUnpaused>
+  <M3AT_BenchFlicker>测量期间小人大约每秒来回切换一次：这是测试在轮流测量。</M3AT_BenchFlicker>
   <M3AT_BenchStart>开始</M3AT_BenchStart>
   <M3AT_BenchCancel>停止</M3AT_BenchCancel>
   <M3AT_BenchAgain>重新测量</M3AT_BenchAgain>

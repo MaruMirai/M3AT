@@ -4,7 +4,7 @@
 #       (--seed: IsoRim's -isorimseed (Api 72), so the quick test's world, colonists and every tick's random numbers are the
 #        same each run; 1 by default, none for a new world each time)
 #   ./autotest.sh shots --load <save> [--from tick] [--ticks n] [--every n] [--out folder]   (stills of a save run on, from its view)
-#   ./autotest.sh perf --load <save> [--seconds s] [--rounds n] [--counts 0,5,10,20f] [--out folder]
+#   ./autotest.sh perf --load <save> [--seconds s] [--rounds n] [--counts 0,5,10,20f] [--switch frames] [--out folder]
 #       (frame times with the chibi, IsoRim's figures and none; or with the chibi on that many colonists, f: fewer poses on,
 #        n: a draw per face layer, as before FaceLayers.DrawStacked)
 # Pictures, the probe log and report.md go to <out>/<date-time>/ (default: the game's config folder, M3AT/autotest).
@@ -28,6 +28,7 @@ while [ $# -gt 0 ]; do
         --seconds) args+=("-m3atPerfSeconds=$2"); shift ;;
         --rounds) args+=("-m3atPerfRounds=$2"); shift ;;
         --counts) args+=("-m3atPerfCounts=$2"); shift ;;
+        --switch) args+=("-m3atPerfSwitch=$2"); shift ;;
         --stack) args+=("-m3atStackSize=$2"); shift ;;
     esac
     shift

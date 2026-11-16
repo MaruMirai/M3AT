@@ -46,6 +46,7 @@ namespace M3AT
         public float heightSpread = DefaultHeightSpread;   // the standard deviation of pawns' own heights about their gender's, of the standard size (WalkFigures.HeightSize)
         public bool variedBodies = true;    // each pawn's build spread about its body type's by the Thin, Fat and Hulk keys (WalkFigures.VariedBuild)
         public float bodySpread = DefaultBodySpread;   // and the standard deviation of that spread, in key amounts
+        public float bodyShapeStrength = 1f;   // how strongly the Thin, Fat and Hulk keys are applied, 0 .. BodyShapeMost of each (WalkFigures.BodyShapeStrength)
         public bool ragdolls = true;   // pawns that go down where they stand fall limp (WalkFigures.Ragdolls)
         public float flingPower = 1f;   // how far blows throw bodies and weapons, of the standard distance (WalkFigures.FlingPower)
         public bool flingBodies = true;   // a big enough blow throws a body across the map, the game moving it (WalkFigures.FlingBodies, Flings)
@@ -108,6 +109,7 @@ namespace M3AT
             Scribe_Values.Look(ref heightSpread, "heightSpread", DefaultHeightSpread);
             Scribe_Values.Look(ref variedBodies, "variedBodies", true);
             Scribe_Values.Look(ref bodySpread, "bodySpread", DefaultBodySpread);
+            Scribe_Values.Look(ref bodyShapeStrength, "bodyShapeStrength", 1f);
             Scribe_Values.Look(ref ragdolls, "ragdolls", true);
             Scribe_Values.Look(ref flingPower, "flingPowerRescaled", 1f);   // not "flingPower": those were of a distance a sixth of this one
             Scribe_Values.Look(ref flingBodies, "flingBodies", true);
@@ -188,6 +190,7 @@ namespace M3AT
     {
         // The slider moves in these steps, as every amount it passes through makes and keeps another shape per body type.
         private const float ShrinkStep = 0.05f;
+        private const float BodyShapeStep = 0.05f;   // the body shape strength slider's step, as each amount makes its own shapes
         private const float SizeStep = 0.05f;   // the pawn size slider's steps
         private const float SizeLeast = 0.5f, SizeMost = 1.5f;
         private const float WeaponStep = 0.05f;   // the weapon size sliders' steps
@@ -425,6 +428,8 @@ namespace M3AT
             Settings.heightSpread = Mathf.Round(spread * 200f) / 200f;
             list.CheckboxLabeled("M3AT_GenderSizes".Translate(), ref Settings.genderSizes,
                 "M3AT_GenderSizesTip".Translate());
+            Settings.bodyShapeStrength = Mathf.Round(Slider(list, "M3AT_BodyShapeStrength".Translate(), Settings.bodyShapeStrength.ToStringPercent(),
+                Settings.bodyShapeStrength, 0f, WalkFigures.BodyShapeMost, "M3AT_BodyShapeStrengthTip".Translate()) / BodyShapeStep) * BodyShapeStep;
             list.CheckboxLabeled("M3AT_VariedBodies".Translate(), ref Settings.variedBodies,
                 "M3AT_VariedBodiesTip".Translate());
             if (Settings.variedBodies)
@@ -608,8 +613,22 @@ namespace M3AT
                 "M3AT_GpuSkinningTip".Translate());
             list.CheckboxLabeled("M3AT_FewerPoses".Translate(), ref Settings.fewerPoses,
                 "M3AT_FewerPosesTip".Translate());
-            // The frame rate test (Benchmark.cs), opened over the map with the options closed, as it measures the map's view.
+        }
+
+        // A report for the Workshop's bug thread (BugReport.cs), and every option back to its default.
+        private static void ProblemsSection(Listing_Standard list)
+        {
+            Header(list, "M3AT_Problems".Translate());
+            // Copied, and saved in case it is too long to paste.
+            if (list.ButtonText("M3AT_CopyBugReport".Translate()))
+            {
+                string saved = BugReport.CopyAndSave();
+                Messages.Message((saved != null ? "M3AT_BugReportCopiedSaved".Translate(saved) : "M3AT_BugReportCopied".Translate()) + " " + "M3AT_BugReportPaste".Translate(),
+                    RimWorld.MessageTypeDefOf.NeutralEvent, false);
+            }
+            list.Label("M3AT_BugReportNote".Translate());
             list.Gap(6f);
+            // The frame rate test (Benchmark.cs), opened over the map with the options closed, as it measures the map's view.
             if (BenchmarkWindow.CanRun)
             {
                 Rect button = list.GetRect(30f);
@@ -630,20 +649,6 @@ namespace M3AT
             {
                 list.Label("M3AT_BenchmarkNeedsGame".Translate());
             }
-        }
-
-        // A report for the Workshop's bug thread (BugReport.cs), and every option back to its default.
-        private static void ProblemsSection(Listing_Standard list)
-        {
-            Header(list, "M3AT_Problems".Translate());
-            // Copied, and saved in case it is too long to paste.
-            if (list.ButtonText("M3AT_CopyBugReport".Translate()))
-            {
-                string saved = BugReport.CopyAndSave();
-                Messages.Message((saved != null ? "M3AT_BugReportCopiedSaved".Translate(saved) : "M3AT_BugReportCopied".Translate()) + " " + "M3AT_BugReportPaste".Translate(),
-                    RimWorld.MessageTypeDefOf.NeutralEvent, false);
-            }
-            list.Label("M3AT_BugReportNote".Translate());
             list.Gap(6f);
             if (list.ButtonText("M3AT_RestoreDefaults".Translate()))
             {

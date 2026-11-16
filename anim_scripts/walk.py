@@ -1160,14 +1160,14 @@ LOVIN_ELBOW = (0.2, 0.6, -1.0)
 # side, y back, z up; facing SPOON_HUG_FACING, the fingers along SPOON_HUG_FINGERS), and the little one's
 # upper hand lies on the back of it (SPOON_HOLD leg lengths off it, the fingers along it). The chins: SPOON_BIG_CHIN
 # and SPOON_LITTLE_CHIN degrees tipped back, as LOVIN_CHIN (less than 0 tucked). anim.txt's spoon_pair line.
-SPOON_ALONG = 0.16
-SPOON_BIG_CLOSER = 0.39
-SPOON_LITTLE_CLOSER = 0.39
+SPOON_ALONG = 0.06
+SPOON_BIG_CLOSER = 0.38
+SPOON_LITTLE_CLOSER = 0.37
 SPOON_HUG = (0.2, -0.08, 0.0)
 SPOON_HUG_FACING = (-1.0, 0.5, 0.0)    # the palm's facing, the same frame: in onto the waist from its upper side
 SPOON_HUG_FINGERS = (-0.3, -1.0, -0.3)   # the fingers' way: round toward the front of the belly, a little down
 SPOON_HOLD = 0.06
-SPOON_BIG_CHIN = 60.0
+SPOON_BIG_CHIN = 71.6
 SPOON_LITTLE_CHIN = 20.0
 SPOON_ELBOW = (0.0, 1.0, -0.6)   # the big spoon's elbow, as LOVIN_ELBOW: over its own side and toward its hips
 SPOON_CURL = 0.2
@@ -1176,7 +1176,7 @@ SPOON_CURL = 0.2
 # within a few hundredths of each other, so the hug sits a little off there.
 SPOON_BIG_SIZE = 1.05
 SPOON_LITTLE_SIZE = 0.95
-SPOON_BIG_LEGS = 0.0   # the share of the big spoon's leg bend taken out, at the hips and the knees alike (0 as it
+SPOON_BIG_LEGS = 0.41  # the share of the big spoon's leg bend taken out, at the hips and the knees alike (0 as it
                        # lies, 1 both legs straight down the line of its trunk)
 # A baby awake on its back (baby_at): the lie loop's trunk and breathing, with the arms waving and the legs kicking laid
 # on it. The arms are posed by hand: they flail all the while (BABY_FLAIL: each arm's raise forward, swing out and

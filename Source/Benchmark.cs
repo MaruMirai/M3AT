@@ -42,22 +42,32 @@ namespace M3AT
         }
     }
 
-    // A frame rate test for players, from the mod options: the game as it is, with M3AT's chibis, with IsoRim's own
-    // figures and with no person figures drawn, each measured in turn round after round (the order turned each round),
-    // so whatever drifts over the run (pawns walking off, the time of day, the weather) falls on all of them alike.
+    // A frame rate test for players, from the mod options: the game as it is, with M3AT's chibis and with IsoRim's own
+    // figures (and if asked, with no person figures drawn, or the chibi with fewerPoses the other way), in short turns: a
+    // round gives each setting one, every other round in the reverse order, so what the pawns are doing and how many are
+    // in view is near enough the same for each, and a steady drift through a round cancels over two. Each comparison is
+    // the trimmed mean of its rounds' differences (Paired), its noise from how much those differ, which is far smaller
+    // than the spread of the frame times themselves; trimmed, a one-off stall of seconds (a garbage collection, an
+    // autosave) in one turn doesn't decide it. AutoTest's perf --switch measured a switch (Nov 2026, 15 colonists): the
+    // first 2 frames after it still cost what the last setting did, the graphics card being behind, and from then on the
+    // difference held steady, nothing being rebuilt; so SkipFrames is twice that. Frame times there also swung by up to
+    // 8 ms in a pattern repeating every 60 frames, the same for both settings, so a turn is a whole TurnFrames, the skip
+    // included, and every turn takes the same share of it.
     // Nothing in the save is changed: only which figures are drawn, and fewerPoses for its own turn, both put back after.
     // The camera is held still by the window (preventCameraMotion); the game runs on at the player's speed.
     public class BenchmarkWindow : Window
     {
         private const string Tag = "[M3AT] ";
-        private const float SettleSeconds = 2f;     // after each switch, not measured: the figures' looks and caches made
+        private const int SkipFrames = 4;           // after each switch, not measured (AutoTest's perf --switch measures it)
+        private const int TurnFrames = 60;          // each turn's frames, SkipFrames included
+        private const float Trim = 0.1f;            // of the rounds' differences, left out at each end (Paired)
+        private const int MostRounds = 2000;
         private const float WarmSeconds = 4f;       // each one's first turn, not measured
         private const float HairWaitMost = 90f;     // the longest the first turn waits on hairstyles being built
         private const int FewPeople = 3;            // fewer drawn a frame than this, and the test says so
         private const float SameShare = 0.03f;      // the chibi and no people within this of each other: likely a frame cap
 
-        private static readonly int[] Rounds = { 2, 3, 5 };
-        private static readonly float[] Seconds = { 5f, 10f, 15f };
+        private static readonly float[] Measured = { 30f, 60f, 150f };   // seconds measured in all, by length, shared by the settings
         private static readonly string[] LengthKeys = { "M3AT_BenchQuick", "M3AT_BenchNormal", "M3AT_BenchThorough" };
 
         public static string FilePath => Path.Combine(GenFilePaths.ConfigFolderPath, "M3AT", "benchmark.txt");
@@ -68,32 +78,16 @@ namespace M3AT
             public int mode;
             public bool flipFewer;     // fewerPoses the other way from the player's
             public readonly List<float> frames = new List<float>();     // ms, every measured frame
-            public readonly List<float> roundMeans = new List<float>(); // ms, each round's mean
+            public readonly Dictionary<int, float> turns = new Dictionary<int, float>(); // ms, each round's turn's mean, by round
             public double drawerMs;
             public long draws, asked;
 
-            public float Mean => BenchmarkWindow.Mean(frames);
+            public float Mean => turns.Count > 0 ? Trimmed(turns.Values.ToList()) : BenchmarkWindow.Mean(frames);   // ms, its turns' trimmed mean
             public float Fps => Mean > 0f ? 1000f / Mean : 0f;
             public float PerFrame(long n) => frames.Count == 0 ? 0f : (float)n / frames.Count;
 
-            // The standard error of the mean frame time, from the spread of the round means.
-            public float Error
-            {
-                get
-                {
-                    int n = roundMeans.Count;
-                    if (n < 2)
-                    {
-                        return 0f;
-                    }
-                    float m = BenchmarkWindow.Mean(roundMeans), v = 0f;
-                    foreach (float r in roundMeans)
-                    {
-                        v += (r - m) * (r - m);
-                    }
-                    return Mathf.Sqrt(v / (n - 1) / n);
-                }
-            }
+            // The standard error of the mean frame time, from the spread of the turns' means.
+            public float Error => StandardError(turns.Values.ToList());
 
             // The "1% low": the frame rate over the slowest 1% of frames.
             public float LowFps
@@ -129,11 +123,12 @@ namespace M3AT
 
         private Stage stage = Stage.Setup;
         private int length = 1;
-        private bool tryFewer = true;
+        private bool tryFewer = false;   // also the chibi with fewerPoses the other way from the player's
+        private bool tryNone = false;    // also no person figures at all, to show what drawing people costs
         private List<Condition> conditions;
         private List<Step> steps;
-        private int at;
-        private float elapsed, left;
+        private int at, framesIn, rounds;
+        private float elapsed, left, measured;   // measured: seconds of measured frames so far, all settings
         private readonly List<float> stepFrames = new List<float>();
         private bool fewerWas, speedChanged;
         private Map map;
@@ -187,8 +182,11 @@ namespace M3AT
             {
                 new Condition { key = "M3AT_BenchChibi", name = "M3AT's chibis", mode = 0 },
                 new Condition { key = "M3AT_BenchIsoRim", name = "IsoRim's figures", mode = 1 },
-                new Condition { key = "M3AT_BenchNone", name = "no people drawn", mode = 2 },
             };
+            if (tryNone)
+            {
+                conditions.Add(new Condition { key = "M3AT_BenchNone", name = "no people drawn", mode = 2 });
+            }
             if (tryFewer)
             {
                 conditions.Add(new Condition
@@ -203,16 +201,9 @@ namespace M3AT
             {
                 steps.Add(new Step { c = conditions[c], seconds = c == 0 ? 2f * WarmSeconds : WarmSeconds, waitHair = c == 0 });
             }
-            int rounds = Rounds[length];
-            for (int r = 0; r < rounds; r++)
-            {
-                for (int i = 0; i < conditions.Count; i++)
-                {
-                    Condition c = conditions[(i + r) % conditions.Count];
-                    steps.Add(new Step { c = c, seconds = SettleSeconds, round = r + 1 });
-                    steps.Add(new Step { c = c, seconds = Seconds[length], record = true, round = r + 1 });
-                }
-            }
+            rounds = 0;
+            measured = 0f;
+            AddRound();
             map = Find.CurrentMap;
             speedAtStart = Find.TickManager.CurTimeSpeed;
             speedChanged = false;
@@ -223,7 +214,7 @@ namespace M3AT
             preventCameraMotion = true;
             at = 0;
             Begin(steps[0]);
-            Log.Message(Tag + "benchmark started: " + conditions.Count + " settings, " + rounds + " rounds of " + Seconds[length] + " s.");
+            Log.Message(Tag + "benchmark started: " + conditions.Count + " settings, turns of " + TurnFrames + " frames, " + Measured[length] + " s measured.");
         }
 
         private void Begin(Step s)
@@ -239,16 +230,45 @@ namespace M3AT
             WalkFigures.PerfAsked = 0;
             stepFrames.Clear();
             elapsed = 0f;
+            framesIn = 0;
+        }
+
+        // A round: a turn for each setting, every other round in the reverse order. Rounds are added as they finish, until
+        // the length's measured time is reached on an even count (so each order is played as often).
+        private void AddRound()
+        {
+            rounds++;
+            for (int i = 0; i < conditions.Count; i++)
+            {
+                Condition c = conditions[rounds % 2 == 1 ? i : conditions.Count - 1 - i];
+                steps.Add(new Step { c = c, record = true, round = rounds });
+            }
+        }
+
+        private bool MoreRounds()
+        {
+            return rounds < MostRounds && (rounds % 2 == 1 || rounds < 4 || measured < Measured[length]);
+        }
+
+        // Rounds a run will take about, at the frame time so far.
+        private int RoundsAbout()
+        {
+            float turn = TurnFrames * Mathf.Max(1f, conditions[0].Mean > 0f ? conditions[0].Mean : 16.7f) / 1000f;
+            int n = Mathf.CeilToInt(Measured[length] / (turn * (TurnFrames - SkipFrames) / TurnFrames * conditions.Count));
+            return Math.Max(rounds, Math.Max(4, n + n % 2));
         }
 
         private float SecondsLeft()
         {
-            float sum = Mathf.Max(0f, steps[at].seconds - elapsed);
-            for (int i = at + 1; i < steps.Count; i++)
+            float sum = 0f;
+            for (int i = at; i < steps.Count; i++)
             {
-                sum += steps[i].seconds;
+                if (!steps[i].record)
+                {
+                    sum += Mathf.Max(0f, steps[i].seconds - (i == at ? elapsed : 0f));
+                }
             }
-            return sum;
+            return sum + Mathf.Max(0f, Measured[length] - measured) * TurnFrames / (TurnFrames - SkipFrames);
         }
 
         private string WhyStop()
@@ -288,13 +308,26 @@ namespace M3AT
             }
             Step s = steps[at];
             float dt = Time.unscaledDeltaTime;
+            framesIn++;
+            if (s.record && framesIn <= SkipFrames)
+            {
+                // Settling after the switch: the counters start with the first measured frame.
+                if (framesIn == SkipFrames)
+                {
+                    WalkFigures.PerfTicks = 0;
+                    WalkFigures.PerfDraws = 0;
+                    WalkFigures.PerfAsked = 0;
+                }
+                left = SecondsLeft();
+                return;
+            }
             if (s.record)
             {
                 stepFrames.Add(dt * 1000f);
             }
             elapsed += dt;
             bool waiting = s.waitHair && WalkFigures.HairBuilding > 0 && elapsed < HairWaitMost;
-            if (elapsed < s.seconds || waiting)
+            if (s.record ? framesIn < TurnFrames : elapsed < s.seconds || waiting)
             {
                 left = SecondsLeft();
                 return;
@@ -302,12 +335,17 @@ namespace M3AT
             if (s.record)
             {
                 s.c.frames.AddRange(stepFrames);
-                s.c.roundMeans.Add(Mean(stepFrames));
+                s.c.turns[s.round] = Mean(stepFrames);
                 s.c.drawerMs += WalkFigures.PerfTicks * 1000.0 / Stopwatch.Frequency;
                 s.c.draws += WalkFigures.PerfDraws;
                 s.c.asked += WalkFigures.PerfAsked;
+                measured += Mean(stepFrames) * stepFrames.Count / 1000f;
             }
             at++;
+            if (at >= steps.Count && MoreRounds())
+            {
+                AddRound();
+            }
             if (at >= steps.Count)
             {
                 Finish(null);
@@ -376,6 +414,49 @@ namespace M3AT
             return (float)(sum / xs.Count);
         }
 
+        internal static float StandardError(List<float> xs)
+        {
+            int n = xs.Count;
+            if (n < 2)
+            {
+                return 0f;
+            }
+            float m = Mean(xs), v = 0f;
+            foreach (float x in xs)
+            {
+                v += (x - m) * (x - m);
+            }
+            return Mathf.Sqrt(v / (n - 1) / n);
+        }
+
+        // The mean of xs without the Trim share at each end.
+        internal static float Trimmed(List<float> xs)
+        {
+            List<float> sorted = new List<float>(xs);
+            sorted.Sort();
+            int cut = Mathf.FloorToInt(sorted.Count * Trim);
+            return Mean(sorted.GetRange(cut, sorted.Count - 2 * cut));
+        }
+
+        // How much slower a is than b (ms a frame), as the mean of each round's difference between their turns, and the
+        // noise in that: twice its standard error, within which the two can't be told apart.
+        private static float Paired(Condition a, Condition b, out float noise)
+        {
+            List<float> d = new List<float>();
+            foreach (KeyValuePair<int, float> turn in a.turns)
+            {
+                if (b.turns.TryGetValue(turn.Key, out float other))
+                {
+                    d.Add(turn.Value - other);
+                }
+            }
+            d.Sort();
+            int cut = Mathf.FloorToInt(d.Count * Trim);
+            List<float> kept = d.GetRange(cut, d.Count - 2 * cut);
+            noise = 2f * StandardError(kept);
+            return Mean(kept);
+        }
+
         private static float Median(List<float> xs)
         {
             if (xs.Count == 0)
@@ -387,21 +468,31 @@ namespace M3AT
             return sorted[sorted.Count / 2];
         }
 
+        // Within CapShare of a refresh rate or frame limit a monitor or driver commonly holds the game to.
+        private static readonly float[] Caps = { 30f, 60f, 72f, 75f, 90f, 100f, 120f, 144f, 165f, 170f, 180f, 240f, 360f };
+        private const float CapShare = 0.015f;
+
+        private static bool NearCap(float fps)
+        {
+            foreach (float cap in Caps)
+            {
+                if (Mathf.Abs(fps - cap) < CapShare * cap)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         private static string F(float x, int places = 1)
         {
             return x.ToString(places == 0 ? "0" : places == 1 ? "0.0" : "0.00");
         }
 
-        // Two conditions' mean frame times told apart from the noise: twice their combined standard error.
-        private static float Noise(Condition a, Condition b)
-        {
-            return 2f * Mathf.Sqrt(a.Error * a.Error + b.Error * b.Error);
-        }
-
         private void Results()
         {
-            Condition chibi = conditions[0], iso = conditions[1], none = conditions[2];
-            Condition fewer = conditions.Count > 3 ? conditions[3] : null;
+            Condition chibi = conditions[0], iso = conditions[1];
+            Condition none = conditions.Find(c => c.mode == 2), fewer = conditions.Find(c => c.flipFewer);
             summary = new List<string>();
             StringBuilder s = new StringBuilder();
             s.AppendLine("## M3AT frame rate benchmark");
@@ -412,7 +503,7 @@ namespace M3AT
                 summary.Add("M3AT_BenchRow".Translate(c.key.Translate(), F(c.Fps), F(c.LowFps), F(c.Mean, 2)));
             }
             float people = chibi.PerFrame(chibi.asked);
-            float cost = chibi.Mean - iso.Mean, noise = Noise(chibi, iso);
+            float cost = Paired(chibi, iso, out float noise);
             if (Mathf.Abs(cost) <= noise)
             {
                 summary.Add("M3AT_BenchSame".Translate(F(Mathf.Abs(cost), 2), F(noise, 2)));
@@ -425,16 +516,16 @@ namespace M3AT
             {
                 summary.Add("M3AT_BenchCostLess".Translate(F(-cost, 2), F(chibi.Fps), F(iso.Fps)));
             }
-            float ours = chibi.Mean - none.Mean, theirs = iso.Mean - none.Mean;
-            if (people >= 1f)
+            float ours = none != null ? Paired(chibi, none, out _) : 0f, theirs = none != null ? Paired(iso, none, out _) : 0f;
+            if (none != null && people >= 1f)
             {
                 summary.Add("M3AT_BenchPeople".Translate(F(ours, 2), F(theirs, 2), F(people, 0), F(Mathf.Max(0f, ours) / people, 3)));
             }
             if (fewer != null)
             {
-                float saved = chibi.Mean - fewer.Mean;
+                float saved = Paired(chibi, fewer, out float fewerNoise);
                 string option = "M3AT_FewerPoses".Translate(), way = (fewerWas ? "M3AT_BenchOff" : "M3AT_BenchOn").Translate();
-                summary.Add(saved > Noise(chibi, fewer)
+                summary.Add(saved > fewerNoise
                     ? "M3AT_BenchFewerSaves".Translate(option, way, F(saved, 2), F(fewer.Fps))
                     : "M3AT_BenchFewerNoSaving".Translate(option, way, F(fewer.Fps)));
             }
@@ -446,7 +537,10 @@ namespace M3AT
             {
                 summary.Add("M3AT_BenchFewPeople".Translate());
             }
-            if (chibi.draws > 0 && Mathf.Abs(chibi.Mean - none.Mean) < SameShare * none.Mean)
+            // A frame cap: no people drawn came out as fast as the chibi, or both settings sat on a common refresh rate.
+            bool capped = none != null ? Mathf.Abs(chibi.Mean - none.Mean) < SameShare * none.Mean
+                : NearCap(chibi.Fps) && NearCap(iso.Fps) && Mathf.Abs(cost) <= Mathf.Max(noise, SameShare * iso.Mean);
+            if (chibi.draws > 0 && capped)
             {
                 summary.Add("M3AT_BenchCapped".Translate());
             }
@@ -456,7 +550,8 @@ namespace M3AT
             }
 
             // The report to share, in English like the bug report.
-            s.AppendLine("Rounds: " + Rounds[length] + " x " + Seconds[length] + " s per setting, order turned each round, " + SettleSeconds + " s settle after each switch");
+            s.AppendLine("Rounds: " + rounds + ", a turn of " + TurnFrames + " frames per setting each (the first " + SkipFrames + " after the switch left out), every other round in reverse order; "
+                + "frame times and differences are trimmed means (" + F(100f * Trim, 0) + "% off each end) of the turns' and the rounds' differences");
             s.AppendLine("Game speed: " + speedAtStart + (speedChanged ? " (changed during the run)" : ""));
             s.AppendLine("People drawn per frame: " + F(people) + " (" + map.mapPawns.AllPawnsSpawned.Count(p => p.RaceProps.Humanlike) + " humanlike pawns on the map)");
             s.AppendLine();
@@ -466,10 +561,13 @@ namespace M3AT
                 s.AppendLine(string.Format("{0,-36} {1,7} {2,8} {3,8} {4,8} {5,8} {6,10}", c.name, F(c.Fps), F(c.LowFps), F(c.Mean, 2), F(Median(c.frames), 2),
                     F(c.Error, 2), c.mode == 0 ? F((float)(c.drawerMs / Math.Max(1, c.frames.Count)), 2) : "-"));
             }
-            s.AppendLine("(+/- is the standard error of the mean frame time across rounds; our CPU ms is the time in M3AT's figure drawer a frame)");
+            s.AppendLine("(+/- is the standard error of the mean frame time from the spread of its turns; our CPU ms is the time in M3AT's figure drawer a frame)");
             s.AppendLine();
             s.AppendLine("M3AT over IsoRim's figures: " + (cost >= 0f ? "+" : "") + F(cost, 2) + " ms a frame" + (Mathf.Abs(cost) <= noise ? " (within noise, +/-" + F(noise, 2) + ")" : ""));
-            s.AppendLine("People with M3AT: " + F(ours, 2) + " ms a frame; with IsoRim's figures: " + F(theirs, 2) + " ms" + (people >= 1f ? "; per chibi: " + F(Mathf.Max(0f, ours) / people, 3) + " ms" : ""));
+            if (none != null)
+            {
+                s.AppendLine("People with M3AT: " + F(ours, 2) + " ms a frame; with IsoRim's figures: " + F(theirs, 2) + " ms" + (people >= 1f ? "; per chibi: " + F(Mathf.Max(0f, ours) / people, 3) + " ms" : ""));
+            }
             s.AppendLine();
             s.AppendLine("Screen: " + Screen.width + "x" + Screen.height);
             s.AppendLine("GPU: " + SystemInfo.graphicsDeviceName + ", " + SystemInfo.graphicsMemorySize + " MB");
@@ -531,6 +629,7 @@ namespace M3AT
             }
             list.Gap(6f);
             list.CheckboxLabeled((FewerOnNow ? "M3AT_BenchTryFewerOff" : "M3AT_BenchTryFewerOn").Translate("M3AT_FewerPoses".Translate()), ref tryFewer);
+            list.CheckboxLabeled("M3AT_BenchTryNone".Translate(), ref tryNone, "M3AT_BenchTryNoneTip".Translate());
             list.Gap(10f);
             if (!CanRun)
             {
@@ -545,8 +644,8 @@ namespace M3AT
         // Seconds a run of that length takes, besides waiting on hair.
         private float Estimate(int which)
         {
-            int n = tryFewer ? 4 : 3;
-            return WarmSeconds * (n + 1) + Rounds[which] * n * (SettleSeconds + Seconds[which]);
+            int n = 2 + (tryNone ? 1 : 0) + (tryFewer ? 1 : 0);
+            return WarmSeconds * (n + 1) + Measured[which] * TurnFrames / (TurnFrames - SkipFrames);
         }
 
         private void Running(Listing_Standard list, float width)
@@ -562,9 +661,11 @@ namespace M3AT
             }
             else
             {
-                list.Label("M3AT_BenchMeasuring".Translate(s.c.key.Translate(), s.round, Rounds[length]));
+                list.Label("M3AT_BenchMeasuring".Translate(s.c.key.Translate(), s.round, RoundsAbout()));
             }
             list.Label("M3AT_BenchLeft".Translate(F(left, 0)));
+            list.Label("M3AT_BenchUnpaused".Translate());
+            list.Label("M3AT_BenchFlicker".Translate());
             Rect bar = list.GetRect(22f);
             float total = 0f, done = 0f;
             for (int i = 0; i < steps.Count; i++)

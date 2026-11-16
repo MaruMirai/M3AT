@@ -803,6 +803,23 @@ namespace M3AT
             pinned.windowRect = r;
         }
 
+        // Whether any selected pawn is drafted (the player's own, as only theirs can be).
+        private static bool DraftedSelected()
+        {
+            if (Find.Selector == null)
+            {
+                return false;
+            }
+            foreach (object o in Find.Selector.SelectedObjectsListForReading)
+            {
+                if (o is Pawn p && p.Drafted)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         private static bool MenuOpen()
         {
             if (Find.WindowStack == null)
@@ -879,7 +896,13 @@ namespace M3AT
                     return false;
                 }
                 // An order: kept from closing the architect, so the game gives it (the tab is closed going back to looking).
+                // One given to drafted colonists stays in pointer mode, as a fight is directed by one order after another.
                 KeepTabsOpen();
+                if (DraftedSelected())
+                {
+                    rightPending = false;
+                    return true;
+                }
                 rightPending = true;
                 rightUpFrame = -1;
             }

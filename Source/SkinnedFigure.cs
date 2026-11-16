@@ -129,6 +129,7 @@ namespace M3AT
             public float[] weight;
             public readonly Dictionary<string, Vector3[]> keys = new Dictionary<string, Vector3[]>(StringComparer.OrdinalIgnoreCase);   // each vertex's move, cells
             public Vector2[] uvs;       // texture places (hair); null: none
+            public float[] shade;       // each vertex's colour against the tint (the Furskin tufts on the coat, CoatTufts); null: the tint alone
             public Vector3[] normal;    // normals from the file (hair, whose vertices are split where its sprites meet); null: worked out
             public Texture2D texture;   // hair: its sprites; a garment: its image
             public Material material;   // hair or a textured garment: its own textured material, made when first drawn
@@ -685,6 +686,14 @@ namespace M3AT
             }
         }
 
+        // The worn-garment bits of the garments that hide nothing under them: the held ones and the packs. A pack is drawn
+        // whole, pushed out past what is under it and scaled (Packed), so the body triangles and garment triangles under it
+        // at rest, which the export lists, are not what it covers as drawn, and leaving them out cut holes in the back.
+        private GarmentMask NoHideMask
+        {
+            get { return HeldMask | PackMask; }
+        }
+
         public Color? ColourOf(int piece)
         {
             return pieces[piece].colour;
@@ -750,6 +759,7 @@ namespace M3AT
                     Log.Warning(Tag + "the export has " + (all.Count - 1) + " garments, but worn-garment masks hold " + MaxHiding
                         + ": those past it (by name, from " + all[MaxHiding + 1].name + ") hide nothing and are hidden by nothing.");
                 }
+                s.ReadCoat();
                 s.FindHeadHiders();
                 s.ReadAnim(animPath);
                 s.GrainFur();
@@ -1422,12 +1432,14 @@ namespace M3AT
         // The shape for a body type's key (null or one the body lacks: the base body) with the head shrunk by shrink
         // (0 .. 1 of the Shrinkhead key). genderKey (Male or Female, or null) is added on top of a body type that is not
         // itself a gender's (Thin, Fat, Hulk) at genderAmount; a key named for the pair ("Hulk_Female") is added as well
-        // if the body has one, to correct what the two summed get wrong. bodyAmount (0 .. 1) is how much of the body
+        // if the body has one, to correct what the two summed get wrong. bodyAmount (0 .. MostKeyAmount) is how much of the body
         // type's key, pregnant (0 .. 1) how much of the Pregnant key is added on top, and babyLimbs (0 .. 1) how much of
         // the Babylimbs key. builds are more keys added on top at their amounts (WalkFigures.VariedBuild: Thin, Fat, Hulk
         // mixed per pawn), each that the body lacks or at 0 left out. geneKeys are keys
         // added whole for the pawn's genes (WalkFigures.GeneKeysOf), any the body lacks left out. Made once per mix;
         // its garments' shapes only when first worn in it (ShapedPiece).
+        // The most of a body type's or build's key ShapeOf takes (the options' body shape strength can carry one past 1).
+        private const float MostKeyAmount = 2f;
         public Shape ShapeOf(string bodyKey, string genderKey, float genderAmount, float shrink, float bodyAmount = 1f, float pregnant = 0f,
             float babyLimbs = 0f, List<KeyValuePair<string, float>> builds = null, List<string> geneKeys = null)
         {
@@ -1442,12 +1454,13 @@ namespace M3AT
             string pairKey = genderKey != null && HasKey(bodyKey + "_" + genderKey) ? bodyKey + "_" + genderKey : null;
             genderAmount = HasKey(genderKey) ? Mathf.Round(Mathf.Clamp01(genderAmount) * 100f) / 100f : 0f;
             shrink = HasKey(ShrinkKey) ? Mathf.Round(Mathf.Clamp01(shrink) * 100f) / 100f : 0f;
-            bodyAmount = Mathf.Round(Mathf.Clamp01(bodyAmount) * 100f) / 100f;
+            bodyAmount = Mathf.Round(Mathf.Clamp(bodyAmount, 0f, MostKeyAmount) * 100f) / 100f;
             pregnant = HasKey(PregnantKey) ? Mathf.Round(Mathf.Clamp01(pregnant) * 100f) / 100f : 0f;
             babyLimbs = HasKey(BabyLimbsKey) ? Mathf.Round(Mathf.Clamp01(babyLimbs) * 100f) / 100f : 0f;
             if (bodyAmount <= 0f)
             {
                 bodyKey = null;
+                pairKey = null;
             }
             string id = (bodyKey ?? "") + "|" + bodyAmount.ToString(CultureInfo.InvariantCulture) + "|" + (genderAmount > 0f || pairKey != null ? genderKey : "") + "|"
                 + genderAmount.ToString(CultureInfo.InvariantCulture) + "|" + shrink.ToString(CultureInfo.InvariantCulture) + "|"
@@ -1470,7 +1483,7 @@ namespace M3AT
             {
                 foreach (KeyValuePair<string, float> k in builds)
                 {
-                    float amount = Mathf.Round(Mathf.Clamp01(k.Value) * 100f) / 100f;
+                    float amount = Mathf.Round(Mathf.Clamp(k.Value, 0f, MostKeyAmount) * 100f) / 100f;
                     if (amount > 0f && HasKey(k.Key))
                     {
                         extra.Add(new KeyValuePair<string, float>(k.Key, amount));
@@ -1494,7 +1507,7 @@ namespace M3AT
             }
             if (pairKey != null)
             {
-                mix.Add(new KeyValuePair<string, float>(pairKey, 1f));
+                mix.Add(new KeyValuePair<string, float>(pairKey, bodyAmount));   // its correction goes with the body type's key
             }
             if (shrink > 0f)
             {
@@ -2894,7 +2907,7 @@ namespace M3AT
                 m = NewPieceMeshes(pieces[index]);
                 p.pieces[index] = m;
             }
-            m.dressed = index != 0;
+            m.dressed = index != 0 && index != CoatPiece;   // the coat is the skin, thinned with it
             PackRig rig = (PackMask & (index <= MaxHiding ? GarmentBit(index) : 0)) != 0 ? PackRigOf(index) : null;
             if (rig != null)
             {
@@ -3066,7 +3079,7 @@ namespace M3AT
             bool[] hide = new bool[pieces[0].tris.Length / 3];
             for (int g = 1; g < pieces.Length && g <= MaxHiding; g++)
             {
-                if ((mask & (GarmentBit(g))) != 0)
+                if ((mask & ~NoHideMask & (GarmentBit(g))) != 0)
                 {
                     bool[] on = bare != 0 && pieces[g].withLegwear ? OnBareLeg(pieces[0], bare) : null;
                     int[] all = pieces[0].tris;
@@ -3175,7 +3188,7 @@ namespace M3AT
                 bool[] hide = new bool[pieces[fur].tris.Length / 3];
                 for (int h = 1; h < pieces.Length && h <= MaxHiding; h++)
                 {
-                    if ((mask & ~HeldMask & (GarmentBit(h))) != 0)
+                    if ((mask & ~NoHideMask & (GarmentBit(h))) != 0)
                     {
                         Hide(hide, FurUnder(fur, pieces[h]));
                     }
@@ -3292,7 +3305,7 @@ namespace M3AT
             GarmentMask over = 0;
             for (int h = 1; h < pieces.Length && h <= MaxHiding; h++)
             {
-                if (h != g && (mask & (GarmentBit(h))) != 0 && (HeldMask & (GarmentBit(h))) == 0 && worn[h] != null && worn[h] != worn[g]
+                if (h != g && (mask & (GarmentBit(h))) != 0 && (NoHideMask & (GarmentBit(h))) == 0 && worn[h] != null && worn[h] != worn[g]
                     && GoesOver(worn[h].def.apparel, worn[g].def.apparel))
                 {
                     over |= GarmentBit(h);
@@ -3558,9 +3571,11 @@ namespace M3AT
             m.isSkin = isSkin;
             // Fetched each time: IsoRim makes its materials once the 3D view is up, which may be after this pawn was first seen.
             Material textured = g.texture != null ? TexturedMaterial(g) : null;
+            Color32[] shaded = g.shade != null ? ShadedPaint(g, tint) : null;
             if (textured == null)
             {
-                DrawMeshes(p, m, g.rest.Length, SolidMaterial(), position, yaw, size, g.texture != null ? tint * g.mean : tint);
+                DrawMeshes(p, m, g.rest.Length, SolidMaterial(), position, yaw, size, g.texture != null ? tint * g.mean : tint, null, default(Color),
+                    null, default(Color), null, shaded);
             }
             else
             {
@@ -3570,7 +3585,7 @@ namespace M3AT
                     m.parts.Add(new MeshPart { mesh = m.solid, material = g.mark, outline = false });
                     m.textureMarked = true;
                 }
-                DrawMeshes(p, m, g.rest.Length, textured, position, yaw, size, tint, null, default(Color), null, default(Color), tint * g.mean);
+                DrawMeshes(p, m, g.rest.Length, textured, position, yaw, size, tint, null, default(Color), null, default(Color), tint * g.mean, shaded);
             }
             if (g.visor != null)
             {

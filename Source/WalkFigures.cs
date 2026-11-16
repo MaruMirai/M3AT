@@ -97,6 +97,15 @@ namespace M3AT
         private const float HandGrip = 0.03f;   // model units from the wrist along the forearm to where the hand closes
         private const float WeaponShown = 0.5f;   // how far into the stance the weapon is put in its hands
         private const bool Skinned = true;   // the runtime-skinned figure (SkinnedFigure), when the export has it; false: the baked frames
+        // The mod options' body shape strength: each of the Thin, Fat and Hulk keys a pawn's build has is taken this far
+        // (the gender keys, the baby's fat, pregnancy and the gene keys are left whole). Past 1 the keys are carried on
+        // further than they were made, which the garments' fitted keys follow but may sink into the body more.
+        public const float BodyShapeMost = 1.5f;
+        private static readonly string[] BuildKeys = { "Thin", "Fat", "Hulk" };
+        private static float BodyShapeStrength
+        {
+            get { return SettingsMod.Settings != null ? Mathf.Clamp(SettingsMod.Settings.bodyShapeStrength, 0f, BodyShapeMost) : 1f; }
+        }
         private const float GenderOnBuilds = 1f;   // 0 .. 1 of the Male or Female key added to a Thin, Fat or Hulk body (skinned figure only)
         private const float BirthSize = 0.25f;   // a newborn's size against a grown figure's (before ScaleUp), growing along Growth to a grown one's
                                                  // by the race's last life stage, in place of IsoRim's size by life stage
@@ -126,6 +135,10 @@ namespace M3AT
         private const uint BuildSeed = 0x2b9e3u;   // and its build (VariedBuild), so a tall pawn isn't also always a heavy one
         private const float BuildSteps = 8f;   // varied bodies: each key's amount goes in eighths, so pawns share shapes
         private const float BuildMost = 2.5f;   // standard deviations: the furthest a varied build is put from its body type's
+        private const float WeightKeep = 0.8f;   // of a varied build's move from its body type's along the weight axis, and
+        private const float MuscleKeep = 0.3f;   // along the muscle axis: the Thin and Fat keys were made about 1.25 times as strong
+                                                 // and the Hulk key about 3 times (it now moves the whole body), so the options'
+                                                 // spread, in the old keys' amounts, looks as it did
         private const float FatShare = 0.4f;   // of the spread: how far a varied build that isn't the Fat body type goes into the Fat key,
                                                // which is extreme, so its full share made too many plain pawns look heavy
         private const float BabyYears = 3f;   // years: the age the baby's shape grows over
@@ -1868,14 +1881,21 @@ namespace M3AT
             string gender = pawn.gender == Gender.Female ? "Female" : pawn.gender == Gender.Male ? "Male" : null;
             float spread = SettingsMod.Settings != null && SettingsMod.Settings.variedBodies ? SettingsMod.Settings.bodySpread : 0f;
             List<KeyValuePair<string, float>> builds;
+            float strength = BodyShapeStrength;
             if (spread > 0f && body != null && (builds = VariedBuild(pawn, body.defName, spread)) != null)
             {
+                for (int i = 0; i < builds.Count; i++)
+                {
+                    builds[i] = new KeyValuePair<string, float>(builds[i].Key, builds[i].Value * strength);
+                }
                 // The gender's key whole, as a Male or Female body has it and a build is added on (GenderOnBuilds), and the
                 // builds on top; a child's on the base body, with no gender's.
                 string key = body.defName == "Child" ? null : gender ?? (body.defName == "Male" || body.defName == "Female" ? body.defName : null);
                 return skin.ShapeOf(key, null, 0f, shrink, 1f, PregnancyOf(pawn), limbs, builds, genes);
             }
-            return skin.ShapeOf(body != null ? body.defName : null, gender, GenderOnBuilds, shrink, 1f, PregnancyOf(pawn), limbs, null, genes);
+            // A Thin, Fat or Hulk body's own key at the strength; a Male or Female one is a gender's shape, left whole.
+            float bodyAmount = body != null && System.Array.IndexOf(BuildKeys, body.defName) >= 0 ? strength : 1f;
+            return skin.ShapeOf(body != null ? body.defName : null, gender, GenderOnBuilds, shrink, bodyAmount, PregnancyOf(pawn), limbs, null, genes);
         }
 
         // Varied bodies (the mod options): the pawn's build as amounts of the Thin, Fat and Hulk keys, spread about its body
@@ -1914,6 +1934,13 @@ namespace M3AT
             muscle = Mathf.Max(0f, Within(muscle + spread * Mathf.Clamp(r * Mathf.Sin(2f * Mathf.PI * u2), -BuildMost, BuildMost), float.NegativeInfinity, 1f));
             weight = Mathf.Round(weight * BuildSteps) / BuildSteps;
             muscle = Mathf.Round(muscle * BuildSteps) / BuildSteps;
+            // The spread is in the keys' amounts as they were before they were made stronger: each axis's move from the
+            // body type's own place is cut down to match (after the steps, so pawns share as many shapes as before), and
+            // the body types themselves keep their whole keys.
+            float ownWeight = bodyType == "Thin" ? -1f : bodyType == "Fat" ? 1f : 0f;
+            float ownMuscle = bodyType == "Hulk" ? 1f : 0f;
+            weight = ownWeight + (weight - ownWeight) * WeightKeep;
+            muscle = ownMuscle + (muscle - ownMuscle) * MuscleKeep;
             return new List<KeyValuePair<string, float>>
             {
                 new KeyValuePair<string, float>("Thin", -weight),   // ShapeOf leaves out keys at 0 or less
@@ -6286,7 +6313,15 @@ namespace M3AT
             string earFile = headless ? null : EarFileOf(pawn);
             skin.HideGarments(fig, mask, wornBuffer, wornVersion);
             int fur = FurOf(pawn);
-            skin.DrawBody(fig, hair, at, yaw, size, skinColour, pawn.story.HairColor, fur > 0);   // furred: the hair's strand grain all over (StrandGrain.cs)
+            int coat = fur > 0 ? skin.CoatPiece : -1;
+            if (coat > 0)
+            {
+                skin.DrawCoat(fig, coat, mask, hair, at, yaw, size, skinColour);   // furred: the painted coat (FurCoat.cs)
+            }
+            else
+            {
+                skin.DrawBody(fig, hair, at, yaw, size, skinColour, pawn.story.HairColor, fur > 0);   // furred without a coat: the hair's strand grain all over (StrandGrain.cs)
+            }
             if (fur > 0)
             {
                 // In the skin's colour, which is the hair's on this gene (skinIsHairColor), so its roots melt into the skin.
@@ -6337,7 +6372,9 @@ namespace M3AT
                 Ease said;
                 float speaking = eases.TryGetValue(pawn.thingIDNumber, out said) && said.speakingFrame == Time.frameCount ? said.speaking : 0f;
                 speaking = Mathf.Max(speaking, SayOf(pawn));   // its part in a social interaction
+                FaceLayers.Coat = coat > 0 ? skin.CoatFace() : null;   // the lid cover in the coat's colours (FurCoat.cs)
                 FaceLayers.Draw(pawn, fig.face, at, yaw, size, Wounds.EyeWoundsOn(fig), HasGeneKey(pawn, NosePig), speaking);
+                FaceLayers.Coat = null;
             }
             FaceLayers.Flash = 0f;
             return mask;
@@ -7277,10 +7314,11 @@ namespace M3AT
         }
 
         // The lying clip at lovin with no blanket, picked per couple and night (from noon to noon), so the two agree and
-        // keep it through the night: a third of nights spooning (spoon_big_<side>, spoon_little_<side>: the man, else the
-        // bigger drawn of the two, the big spoon, BigSpoon), else face to face, lovin_R (the partner on its right) or lovin_L, or its
-        // caress (~2: the upper hand on the partner's cheek, walk.LOVIN_CARESS): neither caresses, one or the other, or
-        // both, a quarter of those nights each.
+        // keep it through the night: half of nights spooning (spoon_big_<side>, spoon_little_<side>: the man, else the
+        // bigger drawn of the two, the big spoon, BigSpoon), else face to face with the caress (lovin_L~2, lovin_R~2: the
+        // upper hand on the partner's cheek, walk.LOVIN_CARESS; side as the partner's), one or the other caressing or
+        // both, a third of those nights each. Romance on the Rim's pillow talk always lies plainly face to face (lovin_L,
+        // lovin_R).
         internal static int LovinCaressTest = -1;   // the autotest's pick in place of the night's (1 lovin_L's caress, 2 lovin_R's, 3 both)
         internal static int LovinSpoonTest = -1;    // the autotest's: 1 spooning, 0 not
 
@@ -7289,16 +7327,16 @@ namespace M3AT
             string side = partnerRight ? "R" : "L";
             string clip = "lovin_" + side;
             Job job = pawn.CurJob;
-            Pawn partner = job == null ? null : job.def == JobDefOf.Lovin ? job.targetA.Pawn : job.def.defName == "RomanceOnTheRim_PillowTalk" ? job.targetB.Pawn : null;
+            Pawn partner = job == null || job.def != JobDefOf.Lovin ? null : job.targetA.Pawn;
             if (partner == null)
             {
-                return clip;
+                return clip;   // (pillow talk)
             }
             uint low = (uint)Mathf.Min(pawn.thingIDNumber, partner.thingIDNumber);
             uint high = (uint)Mathf.Max(pawn.thingIDNumber, partner.thingIDNumber);
             uint night = (uint)((Find.TickManager.TicksAbs + GenDate.TicksPerDay / 2) / GenDate.TicksPerDay);   // (from noon to noon)
             uint roll = Mix(Mix(Mix(low) ^ high) ^ night);
-            bool spoons = LovinSpoonTest >= 0 ? LovinSpoonTest > 0 : (roll >> 2) % 3u == 0u;
+            bool spoons = LovinSpoonTest >= 0 ? LovinSpoonTest > 0 : (roll >> 2) % 2u == 0u;   // (the caress's three ways one choice)
             if (spoons && skin.Has("spoon_big_" + side) && skin.Has("spoon_little_" + side))
             {
                 return (BigSpoon(pawn, partner) ? "spoon_big_" : "spoon_little_") + side;
@@ -7307,7 +7345,7 @@ namespace M3AT
             {
                 return clip;
             }
-            uint caress = LovinCaressTest >= 0 ? (uint)LovinCaressTest : roll;
+            uint caress = LovinCaressTest >= 0 ? (uint)LovinCaressTest : 1u + (roll >> 4) % 3u;   // 1 lovin_L's, 2 lovin_R's, 3 both
             return (caress & (partnerRight ? 2u : 1u)) != 0u ? clip + "~2" : clip;
         }
 

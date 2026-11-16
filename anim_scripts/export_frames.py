@@ -189,6 +189,7 @@ GARMENT_PROPS['Robe'] = {'defs': 'Apparel_Robe, Apparel_PsyfocusRobe'}
 GARMENT_PROPS['RobeRoyal'] = {'defs': 'Apparel_RobeRoyal'}
 # The collared shirt is also drawn for Royalty's eltex shirt.
 GARMENT_PROPS['CollarShirt'] = {'defs': 'Apparel_CollarShirt, Apparel_PsyfocusShirt'}
+GARMENT_PROPS['TribalA'] = {'bridge': True}   # cut skin-tight from the body, so lifted out of its creases (bridged)
 GARMENT_PROPS['Shoes'] = {'with_legwear': True, 'colour': (0.30, 0.21, 0.15)}
 # The baby romper (make_baby_romper.py: the kid romper sleeveless and short in the leg) is apparel of no def: "baby_romper"
 # has the game put it on a baby a few hours old wearing nothing over its trunk or legs (WalkFigures.BabyRomperOf), in its
@@ -233,6 +234,36 @@ HIDE_HEAD = 'Head'
 # moves (a Hulk's wider shoulders) without growing or shrinking with the flesh. Keys in HARD_FITTED are fitted from the
 # body as on any garment (a smaller head takes a smaller helmet).
 HARD_FITTED = ('shrinkhead',)   # lower case: matched without regard to case, as the rig's key has been spelt both ways
+# Keys always fitted from the body, whatever a garment has of its own by that name. The make scripts (make_from_groups,
+# make_duster, make_parka, ...) write a copy of each body key into the garment as the body had it then, which then
+# counts as a hand fix and wins; when the body's Thin, Fat and Hulk were made stronger (Hulk about three times, over the
+# whole body) those copies stayed as they were, and a basic shirt or the body fitted anew came out through a jacket or
+# duster still on the old ones. A garment whose GARMENT_PROPS (or custom property) "own_keys" names keys keeps its own of
+# those (comma separated, any case).
+ALWAYS_FITTED = ('thin', 'fat', 'hulk')   # lower case
+# A fitted key on what hangs clear of the body (a skirt, a coat's tail, a parka's puff) is smoothed over the garment, as
+# each vertex following the patch of body nearest it pulled a skirt's neighbours over the two thighs apart or folded them
+# together (edges a tenth or three times their length in Fat). Only over the legs (by the body's weights on HANG_BONES
+# under it), as what stands off the trunk (a parka) has to keep the belly's growth, which smoothing spread round it.
+# Nothing within HANG_FROM cells of the skin is touched, so what lies on the body keeps its fit; from HANG_FULL off it
+# is smoothed fully, HANG_PASSES times.
+HANG_BONES = ('thigh', 'shin', 'foot', 'toe')   # bone names starting with these
+HANG_NOT = ('shoulder', 'upper_arm', 'forearm', 'hand', 'palm', 'thumb', 'f_')   # nor where the garment's own weights are half or more on these
+HANG_FROM = 0.02
+HANG_FULL = 0.05
+HANG_PASSES = 30
+HANG_KEEP = 0.03   # cells: the least a smoothed vertex is kept off the reshaped body (its own gap if less)
+# A fitted key's dents filled: where a vertex's move falls behind its neighbours' mean (along the skin's outward way under
+# it), it is lifted that share of the way toward it, FILL_PASSES times; never pulled in. Cloth bridges a crease the body
+# deepens (the cleft between the buttocks in Fat, which the skin-tight tribalwear and the robe's back sank 0.06 cells into),
+# where following each vertex's patch of skin pressed it in.
+FILL_SHARE = 0.5
+FILL_PASSES = 8
+BRIDGE_BONES = ('thigh',)   # with walk.HIPS: where bridged() lifts a garment out of the body's creases
+BRIDGE_SLACK = 0.004   # cells: a curve in no deeper than this is left (the garment's own shape)
+BRIDGE_SHARE = 0.5
+BRIDGE_PASSES = 30
+FILL_WAY_PASSES = 4   # the outward ways averaged over neighbours this many times first
 # Glass visors: a garment's triangles on a material named VISOR (any case, ".001" and so on after it allowed) are its
 # glass, written as visor lines and drawn see-through in the game (SkinnedFigure.DrawVisor). They hide nothing of the
 # body, so the face behind them is drawn (and the face layers, which go by how much of the face is hidden).
@@ -755,11 +786,66 @@ def bone_anchors():
                             for n in deform]
     return bone_anchor_list
 
+def hung(moves, hang, neighbours):
+    """A fitted key's moves smoothed over the garment where it hangs clear of the body (hang, 0 .. 1 a vertex), each
+    pass moving a vertex that share of the way to its neighbours' mean."""
+    moves = list(moves)
+    if not any(h > 0.0 for h in hang):
+        return moves
+    for _ in range(HANG_PASSES):
+        moves = [m + (sum((moves[j] for j in nb), Vector()) / len(nb) - m) * h if h > 0.0 and nb else m
+                 for m, h, nb in zip(moves, hang, neighbours)]
+    return moves
+
+def bridged(places, over, outward, neighbours):
+    """A garment's rest places lifted out of the creases it follows over the hips and thighs (BRIDGE_BONES), as cloth
+    lies across them: each place further in than its neighbours' mean by more than BRIDGE_SLACK cells, along the outward
+    way averaged over the garment (FILL_WAY_PASSES), lifted BRIDGE_SHARE of the rest of the way, BRIDGE_PASSES times; never
+    lowered. For a garment cut skin-tight from the body (the tribalwear, which dipped into the cleft between the buttocks
+    and the groin's creases, dark dimples at any body shape); a garment's "bridge" prop."""
+    bones = {i for i, n in enumerate(deform) if n == walk.HIPS or n.startswith(BRIDGE_BONES)}
+    share = [min(1.0, sum(bw * w for i, bw in zip(tri, bws) for b, w in weights[i] if b in bones)) for tri, bws in over]
+    for _ in range(FILL_WAY_PASSES):
+        outward = [(n + sum((outward[j] for j in nb), Vector())).normalized() for n, nb in zip(outward, neighbours)]
+    places = list(places)
+    slack = BRIDGE_SLACK / scale
+    for _ in range(BRIDGE_PASSES):
+        out = []
+        for p, n, nb, h in zip(places, outward, neighbours, share):
+            if nb and h > 0.0:
+                behind = (sum((places[j] for j in nb), Vector()) / len(nb) - p).dot(n) - slack
+                if behind > 0.0:
+                    p = p + n * (behind * BRIDGE_SHARE * h)
+            out.append(p)
+        places = out
+    return places
+
+def filled(moves, outward, neighbours):
+    """A fitted key's moves with its dents filled (FILL_SHARE, FILL_PASSES): each lifted along its outward way toward its
+    neighbours' mean move where that is further out, never lowered."""
+    moves = list(moves)
+    # (the outward ways averaged over the garment first: in a crease the skin faces across it, each side the other way,
+    # and only together do they face out of it)
+    for _ in range(FILL_WAY_PASSES):
+        outward = [(n + sum((outward[j] for j in nb), Vector())).normalized() for n, nb in zip(outward, neighbours)]
+    for _ in range(FILL_PASSES):
+        out = []
+        for m, n, nb in zip(moves, outward, neighbours):
+            if nb:
+                behind = (sum((moves[j] for j in nb), Vector()) / len(nb) - m).dot(n)
+                if behind > 0.0:
+                    m = m + n * (behind * FILL_SHARE)
+            out.append(m)
+        moves = out
+    return moves
+
 def write_garment(g, path):
     """A garment: its base shape, its bone weights, its triangles, and a move per vertex for every body key."""
     props = Props(g)
     g_rest = base_shape(g)
     own = key_deltas(g)
+    kept = set(x.strip().lower() for x in str(props.get('own_keys', '')).split(',') if x.strip())
+    own = {name: d for name, d in own.items() if name.lower() not in ALWAYS_FITTED or name.lower() in kept}
     defs = [x.strip() for x in props.get('defs', default_defs(g.name)).split(',') if x.strip()]
     layer, groups = GARMENTS.get(g.name, (None, ''))
     layer = props.get('layer', layer)
@@ -774,6 +860,39 @@ def write_garment(g, path):
         tri = rest_tris[ti]
         over.append((tri, poly_3d_calc([rest[i] for i in tri], loc)))
         gap.append(dist)
+    # How far each vertex hangs clear of the body (0 .. 1, HANG_FROM .. HANG_FULL), and its neighbours, for hung().
+    # (the skin's outward way under each vertex, for filled())
+    outward = [sum((rest_normals[i] * w for i, w in zip(tri, bws)), Vector()).normalized() for tri, bws in over]
+    legs = {i for i, n in enumerate(deform) if n.startswith(HANG_BONES)}
+    hang = [walk.smooth(min(1.0, max(0.0, (d * scale - HANG_FROM) / (HANG_FULL - HANG_FROM))))
+            * sum(bw * w for i, bw in zip(tri, bws) for b, w in weights[i] if b in legs)
+            for d, (tri, bws) in zip(gap, over)]
+    # (by place: copies split at a texture seam share their neighbours, so they move alike and the seam holds)
+    at = {}
+    place = [at.setdefault(tuple(round(c, 5) for c in p), len(at)) for p in g_rest]
+    near = [set() for _ in at]
+    for e in g.data.edges:
+        a, b = (place[v] for v in e.vertices)
+        if a != b:
+            near[a].add(b)
+            near[b].add(a)
+    first = {}
+    for v, k in enumerate(place):
+        first.setdefault(k, v)
+    neighbours = [[first[k] for k in near[place[v]]] for v in range(len(g_rest))]
+    if props.get('bridge', False):
+        # Its rest shape lifted out of the body's creases over the hips (bridged()), then laid over the body again.
+        g_rest = bridged(g_rest, over, outward, neighbours)
+        over, gap = [], []
+        for p in g_rest:
+            loc, _, ti, dist = body_tree.find_nearest(p)
+            tri = rest_tris[ti]
+            over.append((tri, poly_3d_calc([rest[i] for i in tri], loc)))
+            gap.append(dist)
+        outward = [sum((rest_normals[i] * w for i, w in zip(tri, bws)), Vector()).normalized() for tri, bws in over]
+        hang = [walk.smooth(min(1.0, max(0.0, (d * scale - HANG_FROM) / (HANG_FULL - HANG_FROM))))
+                * sum(bw * w for i, bw in zip(tri, bws) for b, w in weights[i] if b in legs)
+                for d, (tri, bws) in zip(gap, over)]
     g.data.calc_loop_triangles()
     tris = [tuple(t.vertices) for t in g.data.loop_triangles]
     glass = {i for i, slot in enumerate(g.material_slots) if slot.material and slot.material.name.lower().split('.')[0] == VISOR}
@@ -921,6 +1040,9 @@ def write_garment(g, path):
                 f.write('n %.5f %.5f %.5f\n' % tuple(game_vector(sum((rest_normals[k] * b for k, b in zip(tri, bw)), Vector()).normalized())))
         for a, b, c in out_tris:
             f.write('f %d %d %d\n' % (a, c, b))
+        # (not a sleeve: at rest the arms hang by the hips, so the body nearest a sleeve's end can be the thigh)
+        arms = {i for i, n in enumerate(deform) if n.startswith(HANG_NOT)}
+        hang = [h * max(0.0, 1.0 - 2.0 * sum(w for b, w in ws if b in arms)) for h, ws in zip(hang, g_weights)]
         for name, deltas in body_keys.items():
             mine = own.get(name)
             if mine and any(d.length > 1e-6 for d in mine):
@@ -937,6 +1059,7 @@ def write_garment(g, path):
                     mean = sum(fitted, Vector()) / len(fitted)
                     fitted = [mean] * len(fitted)
                 else:
+                    fitted = hung(fitted, hang, neighbours)
                     # Where the body under a vertex changed which way it faces (between the thighs), following the
                     # nearest triangle can leave it under the reshaped skin: pushed back out to the gap it had.
                     shaped = [p + d for p, d in zip(rest, deltas)]
@@ -946,8 +1069,14 @@ def write_garment(g, path):
                         loc, _, ti, dist = tree.find_nearest(q)
                         a, b, c = (shaped[j] for j in rest_tris[ti])
                         n = (b - a).cross(c - a).normalized()
-                        if n.dot(q - loc) < 0:
-                            fitted[i] = loc + n * gap[i] - p
+                        # (a smoothed one kept as far off as it stood, up to HANG_KEEP, so the legs and what is
+                        # worn on them don't come through a skirt drawn in by its neighbours)
+                        least = min(gap[i], HANG_KEEP / scale) if hang[i] > 0.0 else 0.0
+                        if n.dot(q - loc) < least:
+                            fitted[i] = loc + n * (gap[i] if least == 0.0 else least) - p
+                    # (after the push, which in a deepened crease shoves a vertex across it, as the skin there faces
+                    # sideways; filling only lifts, so nothing goes back under)
+                    fitted = filled(fitted, outward, neighbours)
                 # A piece with its own weights (a launcher, a booster) is solid: each key moves it whole, by the mean of
                 # what the skin under it does, as fitting each vertex bent the grenadier's tube near the shrunk head.
                 for piece in pieces.values():

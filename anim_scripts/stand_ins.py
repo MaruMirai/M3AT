@@ -50,6 +50,9 @@ NO_STAND_IN = {
     'CE_SimpleNightVision', 'CE_AdvancedNightVision'}
 GENERIC = {'BasicShirt', 'Pants', 'Jacket', 'Duster', 'FlakVest', 'SimpleHelmet', 'AdvancedHelmet', 'Tuque', 'CollarShirt',
            'PowerArmor', 'Parka', 'GasMask', 'ClothMask'}
+# Garments over the face, standing in only for apparel named as one (MASK_WORDS): mods give plain hats FullHead.
+MASKS = {'GasMask', 'ClothMask', 'WarMask', 'VisageMask', 'WarVeil', 'CultistMask', 'CeremonialCultistMask'}
+MASK_WORDS = ('mask', 'respirator', 'balaclava', 'veil')
 COMMON_WORDS = {'hat', 'helmet', 'armor', 'armour', 'apparel', 'kid'}
 
 
@@ -102,7 +105,8 @@ def groups_of(gs):
 
 
 def profile(d):
-    return dict(name=d['name'], layers=d['layers'], groups=groups_of(d['groups']),
+    return dict(mask=any(w in (d['name'] + ' ' + d['label']).lower() for w in MASK_WORDS),
+                name=d['name'], layers=d['layers'], groups=groups_of(d['groups']),
                 armour=any('armor' in c.lower() for c in d['cats']), noble=any('noble' in c.lower() for c in d['cats']),
                 vacsuit='Vacsuit' in d['tags'] or 'vacsuit' in d['name'].lower(), child='Adult' not in d['stage'],
                 tech=d['tech'], stuff=set(d['stuff']), text=(d['name'] + ' ' + d['label']).lower())
@@ -159,8 +163,15 @@ def name_share(a, g):
 
 
 def usable(a, g):
-    """A garment of NO_STAND_IN stands in only for apparel with all its name words."""
-    return not g['named_only'] or name_share(a, g) == 1
+    """A garment of NO_STAND_IN stands in only for apparel with all its name words, one of MASKS only for a mask."""
+    return (not g['named_only'] or name_share(a, g) == 1) and (g['garment'] not in MASKS or a['mask'])
+
+
+def as_hat(a):
+    """Unarmoured headgear not named as a mask is matched as a hat, whatever of the face its groups say."""
+    if not a['armour'] and not a['mask'] and 'UpperHead' in a['groups']:
+        a['groups'] = a['groups'] - {'Eyes', 'Mouth'}
+    return a
 
 
 def coverage(groups, covered):
@@ -236,7 +247,7 @@ def main():
         if name in own and not loo:
             print(f'{name:45} own {own[name]}')
             continue
-        a = profile(d)
+        a = as_hat(profile(d))
         found = [] if never(d) else stand_ins(a, garments, own.get(name))
         top = sorted(((score(a, a['groups'], g), g['garment']) for g in garments if g['garment'] != own.get(name) and usable(a, g)), reverse=True)[:3]
         print(f"{'LOO ' if name in own else ''}{name:45} {'+'.join(found) or '-':28} " + '  '.join(f'{n}:{s:.2f}' for s, n in top))

@@ -29,6 +29,8 @@
   <M3AT_HeightVarietyTip>How much pawns' heights vary (default {0}). A normal distribution is used, with most near the usual size and a few further off. 0% makes everyone of a gender the same size. Each pawn's height is derived from the pawn's id, so no save data is needed.</M3AT_HeightVarietyTip>
   <M3AT_GenderSizes>Gender size difference</M3AT_GenderSizes>
   <M3AT_GenderSizesTip>Renders men and women with a 10% size difference eased in over teenage years. Off: they are the same size.</M3AT_GenderSizesTip>
+  <M3AT_BodyShapeStrength>Body shape strength</M3AT_BodyShapeStrength>
+  <M3AT_BodyShapeStrengthTip>How strongly thin, fat and hulk bodies are shaped (default 100%). Lower makes them closer to an average build, higher exaggerates them; past 100% clothes may clip into the body. Also scales the builds from Varied bodies. Male and female shapes are unchanged.</M3AT_BodyShapeStrengthTip>
   <M3AT_VariedBodies>Varied bodies</M3AT_VariedBodies>
   <M3AT_VariedBodiesTip>Each pawn gets a build of its own, somewhere around its body type: some thinner or heavier, some more muscular, so not every average body looks the same. Thin, fat and hulk pawns are still based on those bodies. Off: every pawn of a body type has the same body.</M3AT_VariedBodiesTip>
   <M3AT_BodyVariety>Body variety</M3AT_BodyVariety>
@@ -105,7 +107,7 @@
   <M3AT_GpuSkinningTip>Moves each pawn's body, clothes and hair into its pose on the graphics card, which is much faster with many pawns in view. Turn it off if pawns look broken or stretched, to animate them the old way.</M3AT_GpuSkinningTip>
   <M3AT_FewerPoses>Fewer updates with many pawns</M3AT_FewerPoses>
   <M3AT_FewerPosesTip>When many pawns are in view they are animated less often, giving a stop-motion like effect. Reduces M3AT's performance overhead around 6–9%. Off: Pawn animated as normal. (Default)</M3AT_FewerPosesTip>
-  <M3AT_BenchmarkButton>Measure frame rate: M3AT against IsoRim</M3AT_BenchmarkButton>
+  <M3AT_BenchmarkButton>Benchmark M3AT impact</M3AT_BenchmarkButton>
   <M3AT_BenchmarkTip>Measures how fast the game runs with M3AT's pawns and with IsoRim's own pawns (as without this mod), on the map you are looking at. Nothing in your game is changed.</M3AT_BenchmarkTip>
   <M3AT_BenchmarkNeedsGame>To measure the frame rate, load a game and turn on IsoRim's 3D view.</M3AT_BenchmarkNeedsGame>
   <M3AT_Benchmark>Frame rate test</M3AT_Benchmark>
@@ -119,6 +121,10 @@ Before you start, point the camera at your colonists the way you usually play an
   <M3AT_BenchAbout>about {0} seconds</M3AT_BenchAbout>
   <M3AT_BenchTryFewerOn>Also try with "{0}" switched on</M3AT_BenchTryFewerOn>
   <M3AT_BenchTryFewerOff>Also try with "{0}" switched off</M3AT_BenchTryFewerOff>
+  <M3AT_BenchTryNone>Also measure with no people drawn</M3AT_BenchTryNone>
+  <M3AT_BenchTryNoneTip>Adds a turn with no people drawn at all, to show how much of the frame drawing people takes with M3AT and with IsoRim.</M3AT_BenchTryNoneTip>
+  <M3AT_BenchUnpaused>Keep the game unpaused while it measures.</M3AT_BenchUnpaused>
+  <M3AT_BenchFlicker>The pawns switch back and forth about once a second while it measures: that is the test taking turns.</M3AT_BenchFlicker>
   <M3AT_BenchStart>Start</M3AT_BenchStart>
   <M3AT_BenchCancel>Stop</M3AT_BenchCancel>
   <M3AT_BenchAgain>Measure again</M3AT_BenchAgain>

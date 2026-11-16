@@ -1,6 +1,11 @@
 """Makes the Furskin gene's fur by pulling a few of the body's own edges out into triangles, in place of make_furskin.py's spikes.
 
-    blender -b Models/pawnHumanRig.blend --python anim_scripts/make_fur_edges.py -- <out.glb> [out.blend]
+    blender -b Models/pawnHumanRig.blend --python anim_scripts/make_fur_edges.py -- <out.glb> [out.blend] [--like <tufts.glb>] [--forehead] [--crown] [--hairline <cells>]
+
+With --like, the tufts are placed where another fur mesh has its own (each piece of it a tuft, its root the corners nearest the
+skin): for each in turn, the nearest body edges within LIKE_REACH of its root are tried, nearest first, and the first that makes a
+tuft (and its twin) here is used, so a hand-placed layout keeps its places with this script's wedges. Its tufts' shapes are not read. With --forehead the top of the forehead is not left bare (FOREHEAD), with --crown nor the very top (CROWN), and with
+--hairline the face's middle (FACE_OPEN) is bare only below that many cells under the head's top, so the fur comes down onto the brow.
 
 Each tuft stands on one edge of the body: a low wedge of three triangles, its base and its point pulled out down the fur and up
 off the skin, closed behind on a point on the skin. An edge that runs across the way the fur grows is the base itself. Most of the body's edges
@@ -37,6 +42,15 @@ EAR_X, EAR_LOW, EAR_HIGH, EAR_BACK, EAR_FRONT = 0.135, 0.92, 1.03, -0.065, 0.01 
 EAR_CLEAR = 0.035   # cells: a tuft whose middle or tip is this near the ear would lie over it
 INSIDE = -0.1       # least share of a hip or thigh's normal pointing away from the figure's middle that gets fur
 TOP = 0.55          # most share of the normal pointing up that gets fur on the trunk and shoulders: on the flat of a shoulder it would stick straight out
+LIKE_REACH = 0.05   # cells: how far from a --like tuft's root the edge it is put on may be
+LIKE_GAP = 0.6     # share of a region's gap that --like tufts keep apart, as they were placed closer by hand
+FACE_SOURCE = 0.35  # cells in front of the head's middle that the head's fur grows away from, so it sweeps up and back off the forehead and back off the sides
+BACK_DOWN = 0.6     # how much of the old back-and-down way is added, by how far the skin faces back (where the way from the face runs into the skin)
+CHEEK_FROM = 0.25   # cells below the head's top that the cheeks start: their tufts are whiskers, short and out sideways
+CHEEK_FRONT = 0.2   # least share of the normal facing forward that is cheek rather than the side of the head
+CHEEK_OPEN = 0.62   # on the cheeks the face is bare only past this share facing forward (FACE_OPEN elsewhere)
+WHISKER = 0.6       # a whisker's length, as a share of the head's
+WHISKER_BACK = 0.5  # and how far back it points, against 1 out sideways
 MIRROR = 0.012      # cells: how far off the mirror of a vertex its twin may be
 
 # Each bone's region: a tuft's length in cells and the least distance between tufts in cells. The first match on the start of
@@ -55,6 +69,22 @@ REGIONS = (
 )
 
 argv = sys.argv[sys.argv.index('--') + 1:]
+like = None
+if '--like' in argv:
+    k = argv.index('--like')
+    like = argv[k + 1]
+    argv = argv[:k] + argv[k + 2:]
+if '--forehead' in argv:
+    argv.remove('--forehead')
+    FOREHEAD = 2.0    # never: no share of a normal is over 1
+if '--crown' in argv:
+    argv.remove('--crown')
+    CROWN = 2.0
+HAIRLINE = None     # cells below the head's top that the face's middle still gets fur (--hairline); None: FACE_OPEN all the way up
+if '--hairline' in argv:
+    k = argv.index('--hairline')
+    HAIRLINE = float(argv[k + 1])
+    argv = argv[:k] + argv[k + 2:]
 out_glb = argv[0]
 out_blend = argv[1] if len(argv) > 1 else None
 
@@ -126,10 +156,16 @@ for i, p in enumerate(ears):
 ear_tree.balance()
 print('FUR %d vertices on the ears' % len(ears))
 
-def growth(bone, n):
-    """The way the fur lies on this bone's skin, on the skin. Down the limbs, down the trunk, back and down off the face."""
+def growth(bone, n, p):
+    """The way the fur lies on this bone's skin at p, on the skin. Down the limbs and the trunk; on the head away from a point in front of
+    the face, so up and back over the forehead and back off the sides, with some of back and down where the skin faces back; on the
+    cheeks out sideways and a little back, as whiskers."""
     if bone == walk.HEAD:
-        way = -head_front * 0.8 - head_up * 0.6
+        if is_cheek(n, p):
+            side = Vector((math.copysign(1, p.x), 0, 0))
+            way = side - head_front * WHISKER_BACK
+        else:
+            way = (p - face_source).normalized() + (-head_front * 0.8 - head_up * 0.6) * BACK_DOWN * max(0.0, -n.dot(head_front))
     else:
         b = rig.data.bones[bone]
         way = (rig.matrix_world.to_3x3() @ (b.tail_local - b.head_local)).normalized()
@@ -139,6 +175,14 @@ def growth(bone, n):
     if way.length < 1e-4:
         way = Vector((0, 0, -1)) - n * -n.z
     return way.normalized()
+
+def is_cheek(n, p):
+    return n.dot(head_front) > CHEEK_FRONT and (head_top - p.z) / cell > CHEEK_FROM
+
+head_top = max(p.z for i, p in enumerate(rest) if bone_of[i] == walk.HEAD)
+head_box = [p for i, p in enumerate(rest) if bone_of[i] == walk.HEAD]
+head_middle = Vector([(min(q[k] for q in head_box) + max(q[k] for q in head_box)) / 2 for k in range(3)])
+face_source = head_middle + head_front * FACE_SOURCE * cell
 
 # Each vertex's twin across the figure's middle, or None.
 mirror_tree = KDTree(len(rest))
@@ -161,19 +205,21 @@ def tuft_of(a, b, spread):
         return None
     mid = (rest[a] + rest[b]) / 2
     n = (normals[a] + normals[b]).normalized()
-    if bone == walk.HEAD and (n.dot(head_front) > FACE_OPEN or n.dot(head_up) > CROWN or (n.dot(head_front) > 0 and n.dot(head_up) > FOREHEAD)):
+    cheek = bone == walk.HEAD and is_cheek(n, mid)
+    in_face = n.dot(head_front) > (CHEEK_OPEN if cheek else FACE_OPEN) and (HAIRLINE is None or (head_top - mid.z) / cell > HAIRLINE)
+    if bone == walk.HEAD and (in_face or n.dot(head_up) > CROWN or (n.dot(head_front) > 0 and n.dot(head_up) > FOREHEAD)):
         return None
     if bone != walk.HEAD and bone.startswith(('spine', 'shoulder', 'pelvis')) and n.z > TOP:
         return None
     if bone.startswith(('pelvis', 'thigh')) and n.x * math.copysign(1, mid.x) < INSIDE:
         return None
-    way = growth(bone, n)
+    way = growth(bone, n, mid)
     left, right = rest[a], rest[b]
     if length > EDGE_LONG or abs((left - right).normalized().dot(way)) > ACROSS:
         length = min(length, TURNED)
         half = n.cross(way).normalized() * length * cell / 2
         left, right = tree.find_nearest(mid - half)[0], tree.find_nearest(mid + half)[0]
-    pull = min(region[0] * cell, length * cell * SLIM) * (1 + spread[0] * LENGTH_SPREAD)
+    pull = min(region[0] * cell * (WHISKER if cheek else 1.0), length * cell * SLIM) * (1 + spread[0] * LENGTH_SPREAD)
     lift = math.radians(LIFT + spread[1] * LIFT_SPREAD)
     tip = mid + way * pull * math.cos(lift) + n * pull * math.sin(lift)
     height = pull * math.sin(lift)
@@ -194,11 +240,61 @@ def tuft_of(a, b, spread):
         left, right = right, left
     return left, right, back, tip
 
+def like_roots(path):
+    """Each piece of the fur mesh in path, its root: the mean of its corners no further off the skin than half its furthest."""
+    before = set(bpy.data.objects)
+    bpy.ops.import_scene.gltf(filepath=path, disable_bone_shape=True)
+    new = [o for o in bpy.data.objects if o not in before]
+    o = next(x for x in new if x.type == 'MESH')
+    places = [o.matrix_world @ v.co for v in o.data.vertices]
+    links = {i: set() for i in range(len(places))}
+    for e in o.data.edges:
+        links[e.vertices[0]].add(e.vertices[1])
+        links[e.vertices[1]].add(e.vertices[0])
+    for x in new:
+        bpy.data.objects.remove(x)
+    seen, roots = set(), []
+    for i in range(len(places)):
+        if i in seen:
+            continue
+        piece, stack = [], [i]
+        while stack:
+            j = stack.pop()
+            if j in seen:
+                continue
+            seen.add(j)
+            piece.append(j)
+            stack += links[j]
+        off = [tree.find_nearest(places[j])[3] for j in piece]
+        near = [places[j] for j, d in zip(piece, off) if d <= max(off) * 0.5]
+        roots.append(sum(near, Vector()) / len(near))
+    return roots
+
 verts, faces, placed, where = [], [], [], {}
 edges = list(bm.edges)
 random.shuffle(edges)
+if like:
+    # The edges nearest each root in turn, each root's nearest first; the rest after, unused (one per root at most).
+    by_mid = KDTree(len(edges))
+    for k, e in enumerate(edges):
+        by_mid.insert((rest[e.verts[0].index] + rest[e.verts[1].index]) / 2, k)
+    by_mid.balance()
+    roots = like_roots(like)
+    print('FUR %d tufts to place like %s' % (len(roots), like))
+    edges = [[edges[k] for _, k, _ in by_mid.find_range(r, LIKE_REACH * cell)] for r in roots]
+    for group, r in zip(edges, roots):
+        group.sort(key=lambda e: ((rest[e.verts[0].index] + rest[e.verts[1].index]) / 2 - r).length)
+else:
+    edges = [[e] for e in edges]
 unmatched = 0
-for edge in edges:
+def candidates():
+    for group in edges:
+        for edge in group:
+            yield group, edge
+done = set()
+for group, edge in candidates():
+    if id(group) in done:
+        continue
     a, b = edge.verts[0].index, edge.verts[1].index
     if twin[a] is None or twin[b] is None:
         unmatched += 1
@@ -214,12 +310,13 @@ for edge in edges:
         mids, wedges = mids[:1], [one]
     else:
         wedges = [one, other]
-    gap = region_of(bone_of[a])[1] * cell
+    gap = region_of(bone_of[a])[1] * cell * (LIKE_GAP if like else 1.0)
     if any((q - m).length < gap for m in mids for q in placed):
         continue
     if len(mids) == 2 and (mids[0] - mids[1]).length < gap:
         continue
     placed += mids
+    done.add(id(group))
     kind = 'head' if bone_of[a] == walk.HEAD else bone_of[a].split('.')[0]
     where[kind] = where.get(kind, 0) + len(mids)
     # Each tuft has vertices of its own and is its own island (SkinnedFigure.FurUnder).
