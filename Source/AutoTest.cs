@@ -52,6 +52,7 @@ namespace M3AT
         private static bool started;
         private static IDisposable pose;
         private static bool poseOff;   // the test's camera pose lets go of the view (Pose gives none)
+        private static bool oneView;   // Shot takes only the scenario's own side, not the second view 90 degrees round
         private static Vector3 lookAt;
         private static float lookYaw;
         private static float lookPitch = LookPitch;   // degrees down (a scenario may look down more steeply, and puts it back)
@@ -693,10 +694,15 @@ namespace M3AT
                 case "furskin": return FurskinTest();
                 case "facefur": return FaceFurTest();
                 case "fatseam": return FatSeamTest();
+                case "builds": return BuildsTest(null);
                 case "faceab": return FaceAbTest();
                 case "beard": return BeardTest();
                 case "faceanim": return FaceAnimTest(null);
                 case "faceshapes": return FaceShapesTest(null);
+            }
+            if (name.StartsWith("builds_"))
+            {
+                return BuildsTest(name.Substring("builds_".Length).Split('+'));   // (builds_bare+clothes: those outfits only)
             }
             if (name.StartsWith("feed_"))
             {
@@ -2620,6 +2626,309 @@ namespace M3AT
             lookPitch = LookPitch;
             Note("Look: the painted coat (pale front, stripes on the back, thighs and upper arms, strand grain) all over, no seams; "
                 + "the tufts the colour of the skin under them, lighter at their tips; in trousers no coat through them.");
+        }
+
+        // The Hulk and Fat keys (made stronger) on the move: a Hulk man, a Hulk woman, a Fat man and a Fat woman in a row
+        // three cells apart, the varied builds off, bare, in a shirt and trousers and with a parka over them, each at body
+        // shape strengths 1 and 1.5, through standing, carrying, walking, running, drafted with a rifle, aiming it, seated
+        // on a chair and downed under anaesthetic: for limbs going into the trunk or each other, garments torn through or
+        // folded, the hands off what they hold and the feet off the ground. Each stage the row from the front, then each
+        // one close from the front and its right side (from the west, so the next in the row is behind the camera).
+        private static IEnumerator BuildsTest(string[] only)
+        {
+            string[] outfits = { "bare", "clothes", "parka" };
+            BodyTypeDef[] bodies = { BodyTypeDefOf.Hulk, BodyTypeDefOf.Hulk, BodyTypeDefOf.Fat, BodyTypeDefOf.Fat };
+            Gender[] genders = { Gender.Male, Gender.Female, Gender.Male, Gender.Female };
+            string[] names = { "hulk_m", "hulk_f", "fat_m", "fat_f" };
+            float strength = SettingsMod.Settings.bodyShapeStrength;
+            bool varied = SettingsMod.Settings.variedBodies;
+            SettingsMod.Settings.variedBodies = false;
+            oneView = true;
+            const int Front = 2;   // the row's z off the middle, so it can walk south past it
+            Func<int, int> column = k => middle.x + 3 * k - 4;
+            foreach (string outfit in outfits)
+            {
+                if (only != null && Array.IndexOf(only, outfit) < 0)
+                {
+                    continue;
+                }
+                foreach (float s in new[] { 1f, 1.5f })
+                {
+                    SettingsMod.Settings.bodyShapeStrength = s;
+                    string run = outfit + "_s" + Mathf.RoundToInt(s * 100f) + "_";
+                    ClearPatch();
+                    // (the map's own colonists kept out of the pictures)
+                    foreach (Pawn other in new List<Pawn>(map.mapPawns.FreeColonistsSpawned))
+                    {
+                        if (other.Position.InHorDistOf(middle, Clear + 10))
+                        {
+                            other.Position = CellFinder.RandomClosewalkCellNear(middle + new IntVec3(0, 0, Clear + 14), map, 4);
+                            other.Notify_Teleported();
+                        }
+                        Hold(other);
+                    }
+                    Pawn[] pawns = new Pawn[4];
+                    Rand.PushState(20261117);
+                    try
+                    {
+                        for (int k = 0; k < 4; k++)
+                        {
+                            for (int tries = 0; tries < 20; tries++)
+                            {
+                                PawnGenerationRequest request = new PawnGenerationRequest(PawnKindDefOf.Colonist, Faction.OfPlayer,
+                                    fixedBiologicalAge: 30f, fixedChronologicalAge: 30f, fixedGender: genders[k],
+                                    developmentalStages: DevelopmentalStage.Adult, forcedXenotype: XenotypeDefOf.Baseliner);
+                                pawns[k] = PawnGenerator.GeneratePawn(request);
+                                if (!pawns[k].WorkTagIsDisabled(WorkTags.Violent))
+                                {
+                                    break;   // (so each shoots)
+                                }
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        Rand.PopState();
+                    }
+                    for (int k = 0; k < 4; k++)
+                    {
+                        Pawn p = pawns[k];
+                        p.story.bodyType = bodies[k];
+                        p.equipment.DestroyAllEquipment();
+                        p.apparel.DestroyAll();
+                        p.inventory.innerContainer.ClearAndDestroyContents();
+                        string[] worn = outfit == "bare" ? new string[0]
+                            : outfit == "clothes" ? new[] { "Apparel_BasicShirt", "Apparel_Pants" }
+                            : new[] { "Apparel_BasicShirt", "Apparel_Pants", "Apparel_Parka" };
+                        foreach (string w in worn)
+                        {
+                            p.apparel.Wear((Apparel)ThingMaker.MakeThing(ThingDef.Named(w), ThingDefOf.Cloth), false);
+                        }
+                        Spawn(p, new IntVec3(column(k), 0, middle.z + Front));
+                        p.Rotation = Rot4.South;
+                        p.Drawer.renderer.SetAllGraphicsDirty();
+                        Hold(p);
+                        Note(run + names[k] + ": " + p.LabelShort + ", " + p.gender + ", body " + p.story.bodyType.defName + ", head " + p.story.headType?.defName);
+                    }
+                    Action<IntVec3[]> place = cells =>
+                    {
+                        for (int k = 0; k < 4; k++)
+                        {
+                            pawns[k].Position = cells[k];
+                            pawns[k].Notify_Teleported();
+                            pawns[k].Rotation = Rot4.South;
+                            Hold(pawns[k]);
+                        }
+                    };
+                    Func<int, IntVec3[]> row = z => Enumerable.Range(0, 4).Select(k => new IntVec3(column(k), 0, z)).ToArray();
+
+                    // Standing, and from the back too.
+                    yield return Ticks(30, "builds_idle", null);
+                    yield return WaitReal(1f);
+                    yield return BuildsShots(run + "idle", pawns, names, 0.65f, 10f);
+                    lookYaw = 180f;
+                    yield return Shot(run + "idle_back");
+
+                    // Carrying a stack (carry_item: the forearms across in front of the belly).
+                    foreach (Pawn p in pawns)
+                    {
+                        Thing steel = ThingMaker.MakeThing(ThingDefOf.Steel);
+                        steel.stackCount = 30;
+                        p.carryTracker.TryStartCarry(steel);
+                    }
+                    yield return Ticks(60, "builds_carry", null);
+                    yield return WaitReal(1f);
+                    yield return BuildsShots(run + "carry", pawns, names, 0.65f, 10f);
+                    foreach (Pawn p in pawns)
+                    {
+                        p.carryTracker.DestroyCarriedThing();
+                    }
+
+                    // Walking, then running, south toward the camera; part way, the row and each close.
+                    foreach (bool running in new[] { false, true })
+                    {
+                        string gait = running ? "run" : "walk";
+                        place(row(middle.z + Front + 1));
+                        yield return Ticks(20, "builds_" + gait, null);
+                        for (int k = 0; k < 4; k++)
+                        {
+                            Job go = JobMaker.MakeJob(JobDefOf.Goto, new IntVec3(column(k), 0, middle.z - 4));
+                            go.playerForced = true;
+                            go.locomotionUrgency = running ? LocomotionUrgency.Sprint : LocomotionUrgency.Walk;
+                            pawns[k].jobs.StartJob(go, JobCondition.InterruptForced);
+                        }
+                        bool pictured = false;
+                        int[] stops = { 17, 23 };   // (two moments, a part stride apart)
+                        int stop = 0;
+                        for (int i = 0; i < 60 && stop < stops.Length; i++)
+                        {
+                            yield return Ticks(1, "builds_" + gait, null);
+                            if (i == stops[stop])
+                            {
+                                if (pawns.All(p => p.pather.Moving))
+                                {
+                                    pictured = true;
+                                    yield return BuildsShots(run + gait + "_" + stop, pawns, names, 0.65f, 10f);
+                                }
+                                stop++;
+                            }
+                        }
+                        Check(run + gait + ": pictured on the move", pictured, "moving " + string.Join(", ", pawns.Select(p => p.pather.Moving)));
+                    }
+
+                    // Drafted with an assault rifle (on the back first), then shooting it at a wall each, south of it.
+                    place(row(middle.z + Front));
+                    Thing[] walls = new Thing[4];
+                    for (int k = 0; k < 4; k++)
+                    {
+                        pawns[k].equipment.AddEquipment((ThingWithComps)ThingMaker.MakeThing(ThingDef.Named("Gun_AssaultRifle")));
+                        GiveAmmo(pawns[k]);
+                        Thing wall = ThingMaker.MakeThing(ThingDefOf.Wall, ThingDefOf.BlocksGranite);
+                        wall.SetFaction(Faction.OfPlayer);
+                        walls[k] = Spawn(wall, new IntVec3(column(k), 0, middle.z - 5));
+                    }
+                    yield return Ticks(10, "builds_holster", null);
+                    lookAt = Centre(pawns);
+                    lookDistance = 8f;
+                    lookYaw = 180f;
+                    yield return Shot(run + "holstered_back");
+                    foreach (Pawn p in pawns)
+                    {
+                        p.drafter.Drafted = true;
+                        p.Rotation = Rot4.South;
+                    }
+                    // (the draw from the holster runs on frame time, StepDraw: played out at normal speed, as at the start
+                    // it reads as not drawing yet)
+                    yield return Unpaused(null, () => false, 3f);
+                    foreach (Pawn p in pawns)
+                    {
+                        p.Rotation = Rot4.South;
+                    }
+                    // (Combat Extended reloads a drafted pawn's empty rifle first, the reload clip: waited out)
+                    for (int i = 0; i < 60 && pawns.Any(p => p.CurJobDef?.defName == "ReloadWeapon"); i++)
+                    {
+                        yield return Ticks(10, "builds_reload", null);
+                    }
+                    foreach (Pawn p in pawns)
+                    {
+                        p.Rotation = Rot4.South;
+                    }
+                    yield return Ticks(90, "builds_drafted", null);
+                    yield return BuildsShots(run + "drafted", pawns, names, 0.65f, 10f);
+                    float[] aims = new float[4];
+                    for (int i = 0; i < 80 && aims.Min() < 0.99f; i++)
+                    {
+                        for (int k = 0; k < 4; k++)
+                        {
+                            Pawn p = pawns[k];
+                            if (p.CurJobDef != JobDefOf.AttackStatic && p.CurJobDef?.defName != "ReloadWeapon")
+                            {
+                                Job job = JobMaker.MakeJob(JobDefOf.AttackStatic, walls[k]);
+                                job.playerForced = true;
+                                p.jobs.StartJob(job, JobCondition.InterruptForced);
+                            }
+                        }
+                        yield return Ticks(3, "builds_aim", null);
+                        for (int k = 0; k < 4; k++)
+                        {
+                            aims[k] = Field<float>(pawns[k], "aim");
+                        }
+                    }
+                    yield return BuildsShots(run + "aim", pawns, names, 0.65f, 10f);
+                    Check(run + "aiming", aims.Min() >= 0.99f, string.Join(", ", Enumerable.Range(0, 4).Select(k => names[k] + " " + aims[k].ToString("F2")
+                        + " " + (pawns[k].CurJobDef?.defName ?? "no job"))));
+                    foreach (Pawn p in pawns)
+                    {
+                        p.drafter.Drafted = false;
+                        p.jobs.StopAll();
+                        p.equipment.DestroyAllEquipment();
+                    }
+                    foreach (Thing w in walls)
+                    {
+                        if (w != null && !w.Destroyed)
+                        {
+                            w.Destroy();
+                        }
+                    }
+
+                    // Seated on a dining chair each (IsoRim seats a figure stood still on a seat).
+                    ThingDef chair = DefDatabase<ThingDef>.GetNamed("DiningChair");
+                    IntVec3[] seats = row(middle.z);
+                    foreach (IntVec3 seat in seats)
+                    {
+                        Thing c = ThingMaker.MakeThing(chair, ThingDefOf.WoodLog);
+                        c.SetFaction(Faction.OfPlayer);
+                        Spawn(c, seat, Rot4.South);
+                    }
+                    place(seats);
+                    yield return Ticks(90, "builds_sit", null);
+                    yield return WaitReal(1f);
+                    yield return BuildsShots(run + "seated", pawns, names, 0.5f, 10f);
+
+                    // Downed under anaesthetic, off the chairs (the fall, then lying asleep on the ground).
+                    place(row(middle.z - 2));
+                    yield return Ticks(30, "builds_stand", null);
+                    foreach (Pawn p in pawns)
+                    {
+                        HealthUtility.AdjustSeverity(p, HediffDefOf.Anesthetic, 1f);
+                    }
+                    yield return Ticks(5, "builds_down", null);
+                    yield return Unpaused(null, () => false, 4f);   // (the fall and any ragdoll run on frame time)
+                    yield return Ticks(120, "builds_down", null);
+                    yield return BuildsShots(run + "downed", pawns, names, 0.2f, 35f);
+                    Check(run + "downed", pawns.All(p => p.Downed), string.Join(", ", pawns.Select(p => p.GetPosture().ToString())));
+                }
+            }
+            CleanUp();
+            oneView = false;
+            SettingsMod.Settings.bodyShapeStrength = strength;
+            SettingsMod.Settings.variedBodies = varied;
+            lookDistance = LookDistance;
+            lookHeight = LookHeight;
+            lookPitch = LookPitch;
+            lookYaw = 0f;
+            Note("Look: hulk_m, hulk_f, fat_m, fat_f left to right from the front. Arms clear of the trunk and the thighs clear of each other standing, "
+                + "walking and running; the hands on the load, the rifle and the stock; nothing poking through the shirt, trousers or parka; "
+                + "seated on the chair, not sunk through it; lying on the ground, not under it.");
+        }
+
+        private static Vector3 Centre(Pawn[] pawns)
+        {
+            Vector3 sum = Vector3.zero;
+            foreach (Pawn p in pawns)
+            {
+                sum += p.DrawPos;
+            }
+            return sum / pawns.Length;
+        }
+
+        // The row from the front, then each close from the front and from its right (west), the camera looking at the given
+        // height and pitch; the camera put back to the row's after.
+        private static IEnumerator BuildsShots(string name, Pawn[] pawns, string[] names, float height, float pitch)
+        {
+            lookAt = Centre(pawns);
+            lookDistance = 8f;
+            lookHeight = 0.6f;
+            lookPitch = Mathf.Max(pitch, 14f);
+            lookYaw = 0f;
+            yield return Shot(name);
+            lookDistance = 2.2f;
+            lookHeight = height;
+            lookPitch = pitch;
+            for (int k = 0; k < pawns.Length; k++)
+            {
+                Probe(name, pawns[k]);
+                lookAt = pawns[k].DrawPos;
+                lookYaw = 0f;
+                yield return Shot(name + "_" + names[k] + "_front");
+                lookYaw = 90f;
+                yield return Shot(name + "_" + names[k] + "_side");
+            }
+            lookAt = Centre(pawns);
+            lookDistance = 8f;
+            lookHeight = 0.6f;
+            lookPitch = 14f;
+            lookYaw = 0f;
         }
 
         // A Fat woman in a basic shirt and trousers, alone, under a jacket and under a duster, then in tribalwear, at body shape strengths 1 and
@@ -5319,6 +5628,8 @@ namespace M3AT
                     // stale one once took the drawing's place chain ahead of the kiss, which then left them a cell apart.
                     WalkFigures.AutoSetField(a, "workKind", "bench");
                     WalkFigures.AutoSetField(b, "workKind", "bench");
+                    // One drawn well shorter, so each must tip its head to look at the other's face (KissNodOf).
+                    WalkFigures.AutoSizes[b.thingIDNumber] = 0.7f;
                     lordJob = MakeLordJob("LordJob_Kiss", a, b, Enum.ToObject(GenTypes.GetTypeInAnyAssembly("RomanceOnTheRim.KissUtility").GetNestedType("KissType"), 1), 3f);
                     break;
                 case "skygaze":
@@ -5451,6 +5762,7 @@ namespace M3AT
             var seenB = new HashSet<string>();
             bool interacted = false;
             float kissGap = float.MaxValue;
+            float nodA = 0f, nodB = 0f;   // degrees each kisser's head is tipped down, B drawn shorter (AutoSizes)
             float kissed = 0f, kissedB = 0f, pillowA = 0f, pillowB = 0f, looked = 0f;
             var liesA = new HashSet<string>();
             var liesB = new HashSet<string>();
@@ -5479,6 +5791,8 @@ namespace M3AT
                 {
                     Vector3 apart = Field<Vector3>(a, "drawnAt") - Field<Vector3>(b, "drawnAt");
                     kissGap = Mathf.Min(kissGap, new Vector2(apart.x, apart.z).magnitude);
+                    nodA = Field<float>(a, "nod");
+                    nodB = Field<float>(b, "nod");
                 }
                 pillowA = Mathf.Max(pillowA, Field<float>(a, "lovinShift"));
                 pillowB = Mathf.Max(pillowB, Field<float>(b, "lovinShift"));
@@ -5526,6 +5840,8 @@ namespace M3AT
                 case "kiss":
                     Check("kiss: both kiss", kissed > 0.9f && kissedB > 0.9f, "kiss weight " + kissed.ToString("F2") + " / " + kissedB.ToString("F2"));
                     // Drawn KissGap (0.42 for grown pawns) apart, not the cell the mod stands them apart.
+                    Check("kiss: the taller looks down, the shorter up", nodA > 3f && nodB < -3f, "nod " + nodA.ToString("F1") + " / " + nodB.ToString("F1") + " degrees (B drawn 0.7 of its size; " + WalkFigures.AutoSizeReport(a) + "; " + WalkFigures.AutoSizeReport(b) + ")");
+                    WalkFigures.AutoSizes.Remove(b.thingIDNumber);
                     Check("kiss: drawn together", kissGap < 0.6f, "nearest drawn apart " + (kissGap < float.MaxValue ? kissGap.ToString("F2") + " cells" : "never both kissing"));
                     break;
                 case "music":
@@ -5937,7 +6253,7 @@ namespace M3AT
             }
             string prefix = CurrentPrefix();
             float yaw = lookYaw;
-            for (int view = 0; view < 2; view++)
+            for (int view = 0; view < (oneView ? 1 : 2); view++)
             {
                 lookYaw = yaw + view * 90f;
                 yield return null;
@@ -6598,6 +6914,13 @@ namespace M3AT
             }
             FieldInfo field = typeof(Ease).GetField(name);
             return field != null ? field.GetValue(e) : null;
+        }
+
+        // A pawn drawn this much bigger or smaller than its own size (SizeOf), by id: two of different heights.
+        internal static readonly Dictionary<int, float> AutoSizes = new Dictionary<int, float>();
+        internal static string AutoSizeReport(Pawn pawn)
+        {
+            return pawn.LabelShort + " " + pawn.gender + " age " + pawn.ageTracker.AgeBiologicalYears + " size " + SizeOf(pawn).ToString("F3") + " head " + skin.HeadHeight(ShapeFor(pawn)).ToString("F3");
         }
 
         // Sets one of the pawn's Ease fields (making its Ease if it has none yet), to stage what it was doing before.

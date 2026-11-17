@@ -356,6 +356,7 @@ namespace M3AT
             public Quaternion[] nudge;   // the clips added on top (Nudge), per bone: a turn from each clip's first frame
             public float twist;   // degrees the trunk is turned about the vertical over the hips (Twist)
             public float look;    // degrees the head is turned about the vertical on the chest (Look)
+            public float nod;     // degrees the head is tipped down (+) or up (-) on top of the clips (Look), about the figure's sideways
             public float lean;    // degrees the trunk is leant sideways over the hips, + to the figure's left (Lean)
             public GarmentMask wornMask;       // the garments it has on this draw (Wearing)
             public bool gearPack;      // and whether an equipment pack is drawn on its back
@@ -1771,6 +1772,7 @@ namespace M3AT
             p.total = 0f;
             p.twist = 0f;
             p.look = 0f;
+            p.nod = 0f;
             p.lean = 0f;
             p.standOn = -1;
             p.balance = 0f;
@@ -1893,6 +1895,13 @@ namespace M3AT
         public void Look(Posed p, float degrees)
         {
             p.look = degrees;
+        }
+
+        // Tips the head down (+ degrees) or up (-) about the figure's sideways, spread down the neck as Look is, on top of
+        // whatever the clips do: a tall kisser bowing to a short one, who looks up (WalkFigures.KissNodOf).
+        public void Nod(Posed p, float degrees)
+        {
+            p.nod = degrees;
         }
 
         // Puts the weight on one leg ("L" or "R") whatever the clips do, for a figure with the other gone: amount (0 .. 1)
@@ -2285,7 +2294,7 @@ namespace M3AT
             {
                 Bend(p, p.recline);
             }
-            Place(p, whole, p.head[root] / p.total + p.shape.boneMove[root], p.twist, p.look, p.lean);
+            Place(p, whole, p.head[root] / p.total + p.shape.boneMove[root], p.twist, p.look, p.lean, p.nod);
             if (p.standOn >= 0)
             {
                 OverFoot(p, whole);
@@ -2598,7 +2607,7 @@ namespace M3AT
 
         // Puts the turns (each on top of its parent's) together down the chain from the root's head at root (model units,
         // before whole), and works out each bone's matrix.
-        private void Place(Posed p, Matrix4x4 whole, Vector3 root, float twist, float look = 0f, float lean = 0f)
+        private void Place(Posed p, Matrix4x4 whole, Vector3 root, float twist, float look = 0f, float lean = 0f, float nod = 0f)
         {
             Vector3[] shapedHead = p.shape.boneHead;
             for (int i = 0; i < boneOrder.Length; i++)
@@ -2623,6 +2632,13 @@ namespace M3AT
                     // Its share of the lean, about the way the figure faces (model space's +z): a turn about it by +
                     // degrees takes up toward -x, the figure's left.
                     p.turn[b] = Quaternion.AngleAxis(lean * twistShare[b], Vector3.forward) * p.turn[b];
+                }
+                if (nod != 0f && lookShare[b] > 0f)
+                {
+                    // About the figure's sideways as the twist and look leave it facing: a turn about model space's +x by
+                    // + degrees takes the way it faces (+z) down.
+                    Vector3 across = Quaternion.AngleAxis(twist + look, Vector3.up) * Vector3.right;
+                    p.turn[b] = Quaternion.AngleAxis(nod * lookShare[b], across) * p.turn[b];
                 }
                 if (look != 0f && lookShare[b] > 0f)
                 {

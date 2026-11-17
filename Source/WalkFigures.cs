@@ -217,6 +217,7 @@ namespace M3AT
         private const float TossOut = 0.85f;   // and back out to it from here, as the foot steps back
         private const int SnowInterval = 40;   // walk.SNOW_INTERVAL: game ticks between snowballs (Romance on the Rim's JobDriver_SnowballFight)
         private const float SnowRelease = 0.55f;   // walk.SNOW_RELEASE: how far through the snowball clip it leaves the hand
+        private const float KissNodMost = 35f;   // degrees a kisser's head tips down or up at most toward one of another height
         private const float KissGap = 0.42f;   // cells between two grown kissers' middles as drawn (KissOf), so the faces meet
         private const float ShareLook = 0.6f;   // share of the way a pawn sat beside a reader turns its head toward the book (LessonLookOf)
         private const float ShareBook = 0.3f;   // cells in front of the reader the book is looked at
@@ -517,6 +518,7 @@ namespace M3AT
             public string tossClip;   // toss, or snowball for Romance on the Rim's snowball fight (kept while it eases out)
             public Vector3 eatWay;   // the way to the table a pawn sat eats at (EatCloser), flat, unit; kept as it eases out
             public Vector3 kissWay;   // the way and distance to the partner while kissing (KissOf), flat, cells
+            public float nod;   // degrees the head tips down (+) or up (-) toward a kisser of another height at a full kiss (KissNodOf); kept as it eases out
             public float share;   // 0 .. 1: how far a reader and its watcher have drawn together (SharePartnerOf), eased
             public Vector3 shareWay;   // the way and distance to the other, flat, cells
             public float readShow;   // 0 .. 1: how far the book is held out to a watcher sat beside (ShowSideOf), eased
@@ -1652,6 +1654,16 @@ namespace M3AT
 
         private static float SizeOf(Pawn pawn)
         {
+#if AUTOTEST
+            float test;
+            if (AutoSizes.TryGetValue(pawn.thingIDNumber, out test))
+            {
+                AutoSizes.Remove(pawn.thingIDNumber);
+                float own = SizeOf(pawn);
+                AutoSizes[pawn.thingIDNumber] = test;
+                return own * test;
+            }
+#endif
             float grown = GrownAge(pawn);
             if (grown > 0f)
             {
@@ -2884,13 +2896,17 @@ namespace M3AT
         // ground (downed_side); downed and unconscious (under anaesthetic, a catatonic breakdown, psychic shock), as
         // asleep (sleep: the downed loops writhe in pain); asleep (sleep, or a side-lying variant off a couch), else the plain lie; the plain lie wherever the export has no such clip. A baby
         // is always downed (its life stage's alwaysDowned), so unless in pain shock it sleeps, or awake waves and kicks (baby),
-        // but lies still (the plain lie) while resting: awake in a lie-down job (LayDown, LayDownAwake, LayDownResting).
+        // but lies still while resting. Resting (awake in a lie-down job: LayDown before it drops off, LayDownAwake,
+        // LayDownResting) is drawn as asleep, the same variant it would sleep in, as the plain lie's straight-legged pose on
+        // its back looked stiff for a pawn meant to be taking it easy; Facial Animation keeps its eyes open, as it closes
+        // them only for the LayDown job.
         private static string LieClip(Pawn pawn, bool dead, bool inBed, bool held)
         {
+            bool sleeps = !pawn.Awake() || pawn.jobs?.curDriver is JobDriver_LayDown;
             string clip = dead ? "dead" : Baby(pawn) && !pawn.health.InPainShock
-                ? (!pawn.Awake() ? "sleep" : pawn.jobs?.curDriver is JobDriver_LayDown ? "lie" : "baby")
-                : inBed ? (!pawn.Awake() ? "sleep" : "lie")
-                : pawn.Downed ? (!pawn.Awake() ? "sleep" : held || OnBack(pawn) ? "downed" : "downed_side") : !pawn.Awake() ? "sleep" : "lie";
+                ? (sleeps ? "sleep" : "baby")
+                : inBed ? (sleeps ? "sleep" : "lie")
+                : pawn.Downed ? (!pawn.Awake() ? "sleep" : held || OnBack(pawn) ? "downed" : "downed_side") : sleeps ? "sleep" : "lie";
             if (!skin.Has(clip))
             {
                 return "lie";
@@ -3417,6 +3433,30 @@ namespace M3AT
             }
             string name = job.def.defName;
             return name == "RomanceOnTheRim_InitiateKiss" || name == "RomanceOnTheRim_ReceiveKiss" ? "kiss" : null;
+        }
+
+        // Degrees a kisser's head tips down (+) or up (-) so it looks at its partner's face rather than straight ahead: the
+        // kiss clip is made for two of a height, so with one drawn taller (gender sizes, the height spread, age, a mod's
+        // body sizes) the faces met at the taller's chin. Each looks along the line between the two heads' middles as
+        // drawn (the face patch's middle, HeadHeight, times the drawn size; both lean in alike for their size, so it holds
+        // through the lean), the two heads' middles about KissGap for their sizes apart once drawn together. As far as
+        // the kiss is taken up (Ease.eat), so it eases in and out with it (the full nod kept in Ease.nod as the kiss ends);
+        // 0 for anyone not kissing.
+        private static float KissNodOf(Pawn pawn, Ease ease, SkinnedFigure.Shape shape, float size)
+        {
+            if (ease.eatClip != "kiss" || ease.eat <= 0f)
+            {
+                ease.nod = 0f;
+                return 0f;
+            }
+            if (KissOf(pawn) != null && pawn.CurJob.targetA.Thing is Pawn lover && lover.Spawned && lover.story != null)
+            {
+                float loverSize = SizeOf(lover);
+                float rise = skin.HeadHeight(ShapeFor(lover)) * loverSize - skin.HeadHeight(shape) * size;   // cells the partner's head is higher
+                float apart = KissGap * 0.5f * (size + loverSize);
+                ease.nod = Mathf.Clamp(-Mathf.Atan2(rise, apart) * Mathf.Rad2Deg, -KissNodMost, KissNodMost);
+            }
+            return ease.nod * Mathf.SmoothStep(0f, 1f, ease.eat);
         }
 
         // Degrees the head turns about the vertical from the figure's yaw at a lesson: the teacher TeachLook of the way
@@ -7602,6 +7642,7 @@ namespace M3AT
                 float lovinBare = lying && !dead ? LovinBareOf(pawn, placed, yaw) : 0f;   // (or with no blanket, on the side facing them)
                 float looked = !lying && !crawling && flight < 0f ? LessonLookOf(pawn, ease, yaw) : lovinSide * LovinLook;
                 ease.look = Mathf.MoveTowards(ease.look, looked, LookSpeed * Time.deltaTime);
+                float nodded = !lying && !crawling && flight < 0f ? KissNodOf(pawn, ease, shape, size) : 0f;
                 float headHeight = skin.HeadHeight(shape);
                 float floor = 0f;   // cells: what it lies on
                 float sat = seated && skin.Has("sit") ? seatAmount : 0f;   // without the clip: standing on the seat
@@ -7612,6 +7653,7 @@ namespace M3AT
                 CutLimbs(pawn, fig);
                 skin.Twist(fig, twist);
                 skin.Look(fig, ease.look);
+                skin.Nod(fig, nodded);
                 if (seated && ease.share > 0f && ease.shareWay.sqrMagnitude > 1e-4f)
                 {
                     // At a shared reading: leant toward the other (on the figure's right if it lies to +x as the figure faces).
