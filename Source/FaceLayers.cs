@@ -783,6 +783,8 @@ namespace M3AT
         // syllables (MouthOpen), Facial Animation's "open" mouth shape swapped in for whatever mouth it shows.
         public static void Draw(Pawn pawn, Patch patch, Vector3 position, float yaw, float size, EyeWound[] wounds = null, bool lowMouth = false, float speaking = 0f)
         {
+            float measured;
+            drawSpread = raceEyeSpreads.TryGetValue(pawn.def, out measured) ? measured : 0f;   // its eyes' layers, whichever comes first
             if (patch == null || !Available || !Api.ViewReady)
             {
                 return;
@@ -845,6 +847,14 @@ namespace M3AT
                     overrideRotField.SetValue(node, rot);   // as it was, for the game's own drawing (portraits)
                     string kind = f.kinds[i];
                     Vector2 shift = ShiftOf(node, g, kind, f.layers[i]);
+                    if (kind == "MouthControllerComp")
+                    {
+                        shift.y += RaceMouthShift(pawn, g);   // another race's mouth on a human's row
+                    }
+                    else if (kind == "EyeballControllerComp")
+                    {
+                        drawSpread = RaceEyeSpread(pawn, g);   // another race's eyes as far apart as a human's
+                    }
                     if (kind == "EyeballControllerComp" && f.layers[i].EndsWith("_Basic", StringComparison.Ordinal))
                     {
                         NoteEyeLayer(g, f.layers[i], shift);   // for a prosthetic eye's iris
@@ -954,6 +964,7 @@ namespace M3AT
             public bool mouth;
             public int call;   // its LayerCall, for one drawn on its own (Solo)
             public Vector2 shift;
+            public float spread;   // its halves moved apart (RaceEyeSpread)
         }
 
         private static readonly List<LayerCall> calls = new List<LayerCall>();
@@ -1040,7 +1051,7 @@ namespace M3AT
                 {
                     colour *= whiteTint;
                 }
-                stack.Add(new Stacked { tex = gm.mainTexture, mask = mask, colour = colour, colourTwo = two, mode = mode, cut = call.cut, mouth = call.kind == "MouthControllerComp", call = i, shift = call.shift });
+                stack.Add(new Stacked { tex = gm.mainTexture, mask = mask, colour = colour, colourTwo = two, mode = mode, cut = call.cut, mouth = call.kind == "MouthControllerComp", call = i, shift = call.shift, spread = SpreadOf(call.kind) });
             }
             Vector4 mouthMap = MouthMap(mouth == patch.mouthLow ? MouthRaisePig : MouthRaise);
 #if AUTOTEST
@@ -1362,7 +1373,7 @@ namespace M3AT
                 mat.color *= whiteTint;   // (LitFor copies the colour afresh each draw)
             }
             MaterialPropertyBlock block = mode >= 0 ? BlockFor(patch, patch.smooth, cut) : null;
-            SetShift(block, shift);
+            SetShift(block, shift, SpreadOf(kind));
             Api.SubmitFigureMesh(kind == "MouthControllerComp" ? mouth : patch.face, mat, placed * local, block,
                 FigureMeshFlags.NoCull, 0, mode >= 0 ? Flash : 0f);
             place++;
@@ -1445,7 +1456,7 @@ namespace M3AT
                     woundMaterials[key] = m;
                 }
                 MaterialPropertyBlock block = BlockFor(patch, patch.smooth, cut);
-                SetShift(block, shift);
+                SetShift(block, shift, drawSpread);   // on the eye, so moved out with it
                 Api.SubmitFigureMesh(patch.face, m, drawn, block, FigureMeshFlags.NoCull);
                 place++;
             }

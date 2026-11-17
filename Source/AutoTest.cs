@@ -720,6 +720,10 @@ namespace M3AT
             {
                 return BowTest(name.Substring("bows_".Length));
             }
+            if (name.StartsWith("race_"))
+            {
+                return RaceTest(name.Substring("race_".Length));
+            }
             if (name.StartsWith("romance_"))
             {
                 return RomanceTest(name.Substring("romance_".Length).Split('+'));
@@ -2538,6 +2542,108 @@ namespace M3AT
             yield return Ticks(2, "facefur", pawn);
             yield return Shot("face");
             Note("Look: the coat (its strand grain, the pale front about the nose) right across the face, the band about the eyes too, not a flat strip of the skin's colour (FaceLayers.CoatedMask).");
+            lookDistance = LookDistance;
+            lookHeight = LookHeight;
+            lookPitch = LookPitch;
+        }
+
+        // A race's pawns (race_<defName>, e.g. race_Kiiro_Race): four of its kind spawned in a row, each pictured close
+        // from the front, three quarters, the side, behind and IsoRim's camera, once its hair is built (a Humanoid Alien
+        // Races race's hair add-ons, AddonHair.cs; its face mod's layers).
+        private static IEnumerator RaceTest(string race)
+        {
+            ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail(race);
+            PawnKindDef kind = def == null ? null : DefDatabase<PawnKindDef>.AllDefs.FirstOrDefault(k => k.race == def);
+            if (kind == null)
+            {
+                Check("race", false, "no race " + race + " with a pawn kind (its mod off?)");
+                yield break;
+            }
+            Note("race " + race + ", kind " + kind.defName);
+            List<Pawn> pawns = new List<Pawn>();
+            Rand.PushState(20261117);
+            try
+            {
+                for (int i = 0; i < 4; i++)
+                {
+                    Pawn pawn = PawnGenerator.GeneratePawn(new PawnGenerationRequest(kind, Faction.OfPlayer, forceGenerateNewPawn: true));
+                    pawn.equipment.DestroyAllEquipment();
+                    Spawn(pawn, middle + new IntVec3(2 * i - 3, 0, 0));
+                    pawn.Rotation = Rot4.South;
+                    Hold(pawn);
+                    pawns.Add(pawn);
+                    HairDef drawn = HairBuilder.HairOf(pawn);
+                    Note("pawn " + i + ": hairstyle " + (pawn.story.hairDef != null ? pawn.story.hairDef.defName : "none") + ", drawn as " + (drawn != null ? drawn.texPath : "none")
+                        + ", head " + (pawn.story.headType != null ? pawn.story.headType.graphicPath : "none"));
+                }
+            }
+            finally
+            {
+                Rand.PopState();
+            }
+            // A human with the cat ears gene beside them, to compare the ears in the same light.
+            GeneDef catEars = DefDatabase<GeneDef>.GetNamedSilentFail("Ears_Cat");
+            Pawn human = null;
+            if (catEars != null)
+            {
+                human = NewPawn(middle + new IntVec3(5, 0, 0), null);
+                human.genes.AddGene(catEars, true);
+                Hold(human);
+            }
+            Look(pawns[0], 0f);
+            yield return Ticks(5, "race", pawns[0]);
+            for (int wait = 0; wait < 60 && WalkFigures.HairBuilding > 0; wait++)
+            {
+                yield return WaitReal(1f);
+            }
+            for (int i = 0; i < pawns.Count; i++)
+            {
+                Pawn pawn = pawns[i];
+                HairDef drawn = HairBuilder.HairOf(pawn);
+                Check("race_hair_" + i, drawn != null && drawn != pawn.story.hairDef, "drawn as " + (drawn != null ? drawn.texPath : "none"));
+                lookDistance = 1.3f;
+                lookHeight = 0.9f;
+                lookPitch = 12f;
+                float[] yaws = { 0f, 35f, 90f, 180f };
+                string[] names = { "front", "three_quarter", "side", "back" };
+                for (int k = 0; k < yaws.Length; k++)
+                {
+                    Look(pawn, yaws[k]);
+                    yield return Ticks(2, "race", pawn);
+                    yield return Shot(i + "_" + names[k]);
+                }
+                lookDistance = 2.2f;
+                lookHeight = 0.6f;
+                lookPitch = 55f;
+                Look(pawn, 20f);
+                yield return Ticks(2, "race", pawn);
+                yield return Shot(i + "_isorim");
+                if (i < 2)
+                {
+                    // The ears close, and the tail from behind and the side.
+                    lookDistance = 0.8f;
+                    lookHeight = 1.2f;
+                    lookPitch = 15f;
+                    Look(pawn, 25f);
+                    yield return Ticks(2, "race", pawn);
+                    yield return Shot(i + "_ears");
+                    lookDistance = 1.3f;
+                    lookHeight = 0.5f;
+                    lookPitch = 10f;
+                    Look(pawn, 140f);
+                    yield return Ticks(2, "race", pawn);
+                    yield return Shot(i + "_tail");
+                }
+            }
+            if (human != null)
+            {
+                lookDistance = 0.8f;
+                lookHeight = 1.2f;
+                lookPitch = 15f;
+                Look(human, 25f);
+                yield return Ticks(2, "race", human);
+                yield return Shot("human_cat_ears");
+            }
             lookDistance = LookDistance;
             lookHeight = LookHeight;
             lookPitch = LookPitch;

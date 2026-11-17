@@ -72,6 +72,16 @@ layout(std430, set = 2, binding = 7) readonly buffer _MarusFaceShift
     vec4 faceShift[];
 };
 
+// Another race's eyes set as far apart as a human's (FaceGaze.RaceEyeSpread): the layer's left half read further right
+// and its right half further left by spread (texture widths), so its art moves out, the move easing to none over
+// SpreadEase either side of the middle so the strip between the eyes is stretched rather than shown twice.
+const float SpreadEase = 0.03;
+
+float SpreadAt(float x, float spread)
+{
+    return spread * clamp((0.5 - x) / SpreadEase, -1.0, 1.0);
+}
+
 const float DEG = 0.017453292519943295;
 
 // The scar filter (mode 6). The sheet's wounds are dark: their brightness runs from about 0.03 to 0.15.
@@ -159,6 +169,8 @@ void main()
 
     // Where the layer is read: moved by Facial Animation's offset (where its eyes look, its brows and mouth shift).
     vec2 place = faceShift.length() > 0 ? vUv - faceShift[0].xy : vUv;
+    if (faceShift.length() > 0)
+        place.x += SpreadAt(vUv.x, faceShift[0].z);
     vec2 uv = place * uMaterial._MainTex_ST.zw + uMaterial._MainTex_ST.xy;
     vec4 t = texture(_MainTex, uv);
     vec4 tint = uMaterial._Color * vColor;

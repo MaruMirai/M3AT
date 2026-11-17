@@ -481,18 +481,19 @@ namespace M3AT
                 tailGenes = found.ToArray();
                 furTailGene = DefDatabase<GeneDef>.GetNamedSilentFail("Tail_Furry");
             }
-            if (pawn.genes == null || !skin.HasTail)
+            if (!skin.HasTail)
             {
                 return false;
             }
             foreach (GeneDef def in tailGenes)
             {
-                if (pawn.genes.HasActiveGene(def))
+                if (pawn.genes != null && pawn.genes.HasActiveGene(def))
                 {
                     return true;
                 }
             }
-            return false;
+            // A race with a Humanoid Alien Races tail add-on (Kiiro's slender one) gets the smooth tail.
+            return HairBuilder.RaceHasAddon(pawn.def, "tail");
         }
 
         // How the pawn's state holds its tail: how much it sways (0 still, 1 a pawn at ease) and the turn of the root
@@ -611,7 +612,7 @@ namespace M3AT
         // off, though still stepped, so it doesn't jump when the armour comes off.
         private static void DrawCatTail(Pawn pawn, SkinnedFigure.Posed fig, GarmentMask mask, Apparel[] worn, Vector3 at, float yaw, float size, float sat, float floor, bool onGround)
         {
-            fig.furTail = furTailGene != null && pawn.genes.HasActiveGene(furTailGene);
+            fig.furTail = furTailGene != null && pawn.genes != null && pawn.genes.HasActiveGene(furTailGene);
             StepTail(pawn, fig, at, yaw, size, sat, onGround);
             if (ArmourHidesTail && skin.HidesTail(mask, worn))
             {

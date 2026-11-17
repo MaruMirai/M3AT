@@ -26,6 +26,20 @@ namespace M3AT
     public sealed partial class SkinnedFigure
     {
         public const string CatEarFile = "ears.txt", PigEarFile = "ears_pig.txt", FloppyEarFile = "ears_floppy.txt";
+        // A race's ears drawn from its Humanoid Alien Races ear add-on (Kiiro's: small pointed ears with a fluffy pale
+        // lining): the cat ears, each shrunk RaceEarScale about its own root, the forward-facing side (LiningFacing) made
+        // the lining, and tufts of fluff grown out of the lining's lower part (RaceEarTufts). Not a file of its own.
+        public const string RaceEarFile = "ears.txt#race";
+        private const float RaceEarScale = 0.8f;
+        private const float LiningFacing = 0.45f;       // a vertex's normal along the front (+z) past this is the lining
+        private const int RaceEarTufts = 7;             // tufts per ear
+        // Short and lying close along the lining, so they stay inside the ear's own outline: longer ones leaning out of it
+        // (0.3 of the ear, half out) stood past the ear as grey shards, outlined dark against the sky.
+        private const float TuftLow = 0.05f, TuftHigh = 0.45f;  // where along the ear they grow from, root to tip
+        private const float TuftLong = 0.16f, TuftWide = 0.05f; // their length and half width at the base, of the ear's length
+        private const float TuftOut = 0.18f;            // how far they lean out of the lining (1: straight out), the rest up the ear
+        private static readonly Color RaceLining = new Color(1f, 0.9f, 0.88f);   // pale, nearly white
+        private const float RacePink = 0.85f;           // the skin's colour this share of the way to RaceLining
         private const float EarPink = 0.5f;   // the lining's colour: the skin's, this share of the way to EarLining
         private static readonly Color EarLining = new Color(1f, 0.74f, 0.72f);
         private static readonly float[] EarShare = { 0.5f, 0.3f, 0.2f };   // each joint's share of a three-boned ear's swing, root first
@@ -100,14 +114,15 @@ namespace M3AT
                 return ears;
             }
             earFiles[file] = null;
-            string path = Path.Combine(folder, file);
+            bool race = file == RaceEarFile;
+            string path = Path.Combine(folder, race ? CatEarFile : file);
             if (!File.Exists(path))
             {
                 return null;
             }
             try
             {
-                ears = ReadEars(path);
+                ears = ReadEars(path, race);
                 if (file == FloppyEarFile)
                 {
                     ears.flops = true;
@@ -122,7 +137,147 @@ namespace M3AT
             return ears;
         }
 
-        private Ears ReadEars(string path)
+        // Makes the cat ears a race's (RaceEarFile): each ear shrunk about its root, its lining marked, and tufts of fluff
+        // added out of the lining, each a wedge (both ways round, as it is seen from either side) weighted as the lining
+        // vertex it grows from, so it moves with the ear. bones, weights: each vertex's, extended for the new ones.
+        private void RaceEars(Ears e, List<int>[] bones, List<float>[] weights)
+        {
+            Piece piece = e.piece;
+            int n = piece.rest.Length;
+            int[] sideOf = new int[n];
+            for (int v = 0; v < n; v++)
+            {
+                sideOf[v] = bones[v][0] < EarMostBones ? 0 : 1;
+                Vector3 root = e.joints[sideOf[v]][0];
+                piece.rest[v] = root + (piece.rest[v] - root) * RaceEarScale;
+            }
+            foreach (Vector3[] key in piece.keys.Values)
+            {
+                for (int v = 0; v < key.Length; v++)
+                {
+                    key[v] *= RaceEarScale;
+                }
+            }
+            for (int side = 0; side < 2; side++)
+            {
+                Vector3 root = e.joints[side][0];
+                for (int j = 0; j < e.joints[side].Length; j++)
+                {
+                    e.joints[side][j] = root + (e.joints[side][j] - root) * RaceEarScale;
+                }
+            }
+            // The normals as the triangles wind, which may be inward: each ear's are turned outward if most point in toward
+            // its own middle, so its lining is the side facing forward whatever way the file winds them.
+            Vector3[] normal = Normals(piece.rest, piece.tris);
+            for (int side = 0; side < 2; side++)
+            {
+                Vector3 middle = Vector3.zero;
+                int count = 0;
+                for (int v = 0; v < n; v++)
+                {
+                    if (sideOf[v] == side)
+                    {
+                        middle += piece.rest[v];
+                        count++;
+                    }
+                }
+                middle /= Mathf.Max(count, 1);
+                float outward = 0f;
+                for (int v = 0; v < n; v++)
+                {
+                    if (sideOf[v] == side)
+                    {
+                        outward += Vector3.Dot(normal[v], piece.rest[v] - middle);
+                    }
+                }
+                if (outward < 0f)
+                {
+                    for (int v = 0; v < n; v++)
+                    {
+                        if (sideOf[v] == side)
+                        {
+                            normal[v] = -normal[v];
+                        }
+                    }
+                }
+            }
+            for (int v = 0; v < n; v++)
+            {
+                e.inner[v] = normal[v].z > LiningFacing;
+            }
+            List<Vector3> rest = new List<Vector3>(piece.rest);
+            List<int> tris = new List<int>(piece.tris);
+            List<bool> inner = new List<bool>(e.inner);
+            List<int> from = new List<int>();   // each new vertex's lining vertex
+            for (int side = 0; side < 2; side++)
+            {
+                Vector3 root = e.joints[side][0], tip = e.joints[side][e.joints[side].Length - 1];
+                float length = (tip - root).magnitude;
+                Vector3 along = (tip - root) / Mathf.Max(length, 1e-5f);
+                List<int> lining = new List<int>();
+                for (int v = 0; v < n; v++)
+                {
+                    float t = Vector3.Dot(piece.rest[v] - root, along) / Mathf.Max(length, 1e-5f);
+                    if (sideOf[v] == side && e.inner[v] && t >= TuftLow && t <= TuftHigh)
+                    {
+                        lining.Add(v);
+                    }
+                }
+                // Spread evenly over the lining by where they are along and across it.
+                lining.Sort((a, b) => Vector3.Dot(piece.rest[a] - root, along).CompareTo(Vector3.Dot(piece.rest[b] - root, along)));
+                int count = Math.Min(RaceEarTufts, lining.Count);
+                for (int k = 0; k < count; k++)
+                {
+                    int v = lining[(int)((k + 0.5f) * lining.Count / count)];
+                    Vector3 at = piece.rest[v], out_ = normal[v];
+                    Vector3 across = Vector3.Cross(along, out_).normalized;
+                    float lean = (k % 3 - 1) * 0.35f;   // fanned a little to either side, so they don't line up
+                    Vector3 to = (out_ * TuftOut + along * (1f - TuftOut) + across * lean).normalized;
+                    float longer = 0.8f + 0.4f * ((k * 7) % 5) / 4f;
+                    int a = rest.Count;
+                    rest.Add(at - across * TuftWide * length + out_ * 0.002f);
+                    rest.Add(at + across * TuftWide * length + out_ * 0.002f);
+                    rest.Add(at + to * TuftLong * length * longer);
+                    for (int i = 0; i < 3; i++)
+                    {
+                        inner.Add(true);
+                        from.Add(v);
+                    }
+                    tris.AddRange(new[] { a, a + 1, a + 2, a, a + 2, a + 1 });
+                }
+            }
+            int added = from.Count;
+            piece.rest = rest.ToArray();
+            piece.tris = tris.ToArray();
+            e.inner = inner.ToArray();
+            foreach (string name in new List<string>(piece.keys.Keys))
+            {
+                Vector3[] key = piece.keys[name], longer = new Vector3[n + added];
+                Array.Copy(key, longer, Math.Min(key.Length, n));
+                for (int i = 0; i < added; i++)
+                {
+                    longer[n + i] = key.Length > from[i] ? key[from[i]] : Vector3.zero;
+                }
+                piece.keys[name] = longer;
+            }
+            if (piece.normal != null)
+            {
+                piece.normal = null;   // worked out again with the tufts
+            }
+            Array.Resize(ref bones, n + added);
+            Array.Resize(ref weights, n + added);
+            for (int i = 0; i < added; i++)
+            {
+                bones[n + i] = bones[from[i]];
+                weights[n + i] = weights[from[i]];
+            }
+            raceEarBones = bones;
+            raceEarWeights = weights;
+        }
+        private List<int>[] raceEarBones;
+        private List<float>[] raceEarWeights;
+
+        private Ears ReadEars(string path, bool race = false)
         {
             Ears e = new Ears();
             e.piece = ReadMesh(path, false, null);
@@ -177,6 +332,20 @@ namespace M3AT
             for (int side = 0; side < 2; side++)
             {
                 e.joints[side] = new List<Vector3>(joints[side].Values).ToArray();
+            }
+            for (int v = 0; v < n; v++)
+            {
+                if (bones[v] == null || bones[v].Count == 0)
+                {
+                    throw new InvalidDataException(path + ": vertex " + v + " has no weights");
+                }
+            }
+            if (race)
+            {
+                RaceEars(e, bones, weights);
+                bones = raceEarBones;
+                weights = raceEarWeights;
+                n = e.piece.rest.Length;
             }
             e.share = SharesOf(boneCount);
             List<int> allBones = new List<int>();
@@ -442,7 +611,7 @@ namespace M3AT
             Material solid = GrainedMaterial(piece, p.ears);
             PoseEars(p, e, s, goneL, goneR);
             // The lining goes in the scalp's place: DrawMeshes shades that ScalpShade, which is taken back out here.
-            Color inner = Color.Lerp(skin, EarLining, EarPink) / ScalpShade;
+            Color inner = (file == RaceEarFile ? Color.Lerp(skin, RaceLining, RacePink) : Color.Lerp(skin, EarLining, EarPink)) / ScalpShade;
             DrawMeshes(p, p.ears, piece.rest.Length, solid, position, yaw, size, tint, null, default(Color), e.inner, inner);
         }
 
@@ -565,12 +734,18 @@ namespace M3AT
             }
             if (pawn.genes == null)
             {
-                return null;
+                return RaceEars(pawn);
             }
             string file = catEarsGene != null && pawn.genes.HasActiveGene(catEarsGene) ? SkinnedFigure.CatEarFile
                 : pigEarsGene != null && pawn.genes.HasActiveGene(pigEarsGene) ? SkinnedFigure.PigEarFile
                 : floppyEarsGene != null && pawn.genes.HasActiveGene(floppyEarsGene) ? SkinnedFigure.FloppyEarFile : null;
-            return file != null && skin.HasEars(file) ? file : null;
+            return file != null && skin.HasEars(file) ? file : RaceEars(pawn);
+        }
+
+        // A race's own ears, for one with an ear add-on (HairBuilder.RaceHasAddon), or null.
+        private static string RaceEars(Pawn pawn)
+        {
+            return HairBuilder.RaceHasAddon(pawn.def, "ear") && skin.HasEars(SkinnedFigure.RaceEarFile) ? SkinnedFigure.RaceEarFile : null;
         }
 
         // How the pawn's state holds its ears: the up key's and the down key's amounts.

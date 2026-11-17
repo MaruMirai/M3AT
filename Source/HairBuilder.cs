@@ -39,7 +39,7 @@ namespace M3AT
     // sprite is only a blob at the lip, which would cut away all of it but the middle as the chibi's face curves back from
     // there. It stands a little off the skin (BeardPuff), a long one out past the clothes on the chest (ChestClear), and its
     // outline is its own mesh's: a shell closed round the head would draw a line round all of it.
-    internal sealed class HairBuilder
+    internal sealed partial class HairBuilder
     {
         private const string Tag = "[M3AT] ";
         public const int Version = 40;   // raise when the build changes, so cached hair is made again
@@ -422,6 +422,11 @@ namespace M3AT
         // the west one mirrored, as the game draws them. A beard's north one is left empty, whatever the texture has.
         public static Sprites Read(string texPath, bool beard = false)
         {
+            Sprites made;
+            if (!beard && Combined(texPath, out made))
+            {
+                return made;   // a race's hair add-ons put together (AddonHair.cs)
+            }
             Texture2D s = Tex(texPath + "_south"), e = Tex(texPath + "_east"), n = beard ? null : Tex(texPath + "_north");
             Texture2D w = beard || e == null ? null : Tex(texPath + "_west");
             bool mirror = false;

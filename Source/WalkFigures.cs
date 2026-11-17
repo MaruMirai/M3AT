@@ -6347,7 +6347,7 @@ namespace M3AT
             // A full helmet or armour that hides the head leaves the hair (and its scalp colour) or the face off, as does
             // having no head at all (CutLimbs has cut it off). A baby has none. A hat only cuts it (DrawHair).
             bool headless = pawn.health != null && !pawn.health.hediffSet.HasHead;
-            HairDef hair = skin.HidesHair(mask) || headless || Baby(pawn) ? null : pawn.story.hairDef;
+            HairDef hair = skin.HidesHair(mask) || headless || Baby(pawn) ? null : HairBuilder.HairOf(pawn);   // with a race's hair add-ons (AddonHair.cs)
             skin.HairUnderHats(fig, hair, mask);
             skin.HideUnder(fig, mask, hair);
             string earFile = headless ? null : EarFileOf(pawn);

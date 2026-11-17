@@ -90,6 +90,24 @@ layout(std430, set = 2, binding = 18) readonly buffer _MarusFaceShift
     vec4 faceShift[];
 };
 
+// Then each layer's spread from faceShift[4] (FaceGaze's ShiftSlots), four a vec4.
+float SpreadOf(int layer)
+{
+    if (faceShift.length() <= 4 + layer / 4)
+        return 0.0;
+    return faceShift[4 + layer / 4][layer % 4];
+}
+
+// Another race's eyes set as far apart as a human's (FaceGaze.RaceEyeSpread): the layer's left half read further right
+// and its right half further left by spread (texture widths), so its art moves out, the move easing to none over
+// SpreadEase either side of the middle so the strip between the eyes is stretched rather than shown twice.
+const float SpreadEase = 0.03;
+
+float SpreadAt(float x, float spread)
+{
+    return spread * clamp((0.5 - x) / SpreadEase, -1.0, 1.0);
+}
+
 vec2 ShiftOf(int layer)
 {
     if (faceShift.length() <= layer / 2)
@@ -162,7 +180,9 @@ bool LayerColour(sampler2D tex, vec4 texST, sampler2D mask, vec4 maskST, vec4 co
     vec2 place = mouth ? vUv * uMaterial._MouthMap.xy + uMaterial._MouthMap.zw : vUv;
     if (((cut & 1) != 0 && place.x < 0.5) || ((cut & 2) != 0 && place.x >= 0.5))
         return false;
+    float across = place.x;
     place -= ShiftOf(layer);
+    place.x += SpreadAt(across, SpreadOf(layer));
     vec4 t = texture(tex, place * texST.zw + texST.xy);
     vec4 tint = colour * vColor;
     if (mode == 1)

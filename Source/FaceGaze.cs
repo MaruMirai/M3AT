@@ -30,8 +30,11 @@ namespace M3AT
 
         private static readonly int shiftId = Shader.PropertyToID("_MarusFaceShift");
         private const int ShiftSlots = 4;   // vec4s: two layers each, eight layers (MarusFaceStack's StackSize)
-        private static readonly Vector4[] shifts = new Vector4[ShiftSlots];
-        private static readonly Vector4[] noShifts = new Vector4[ShiftSlots];
+        // Then each stacked layer's spread (RaceEyeSpread), a float each, four a vec4, from slot ShiftSlots (MarusFaceStack's
+        // SpreadOf); a single layer's is its own slot's z.
+        private const int SpreadSlots = 2;
+        private static readonly Vector4[] shifts = new Vector4[ShiftSlots + SpreadSlots];
+        private static readonly Vector4[] noShifts = new Vector4[ShiftSlots + SpreadSlots];
 
 #if AUTOTEST
         // A shift added to every eye layer, in Facial Animation's offset units (cells on the 2D head, x right, z up), to
@@ -42,14 +45,14 @@ namespace M3AT
         // A layer's shift on the face texture for its draw (one layer: the first slot), or none. Set on every block these
         // shaders are given, as the engine binds a storage slot a block leaves unset to the first one it does set (the
         // bones), which would read as a shift.
-        private static void SetShift(MaterialPropertyBlock block, Vector2 shift)
+        private static void SetShift(MaterialPropertyBlock block, Vector2 shift, float spread = 0f)
         {
             if (block == null)
             {
                 return;
             }
-            shifts[0] = new Vector4(shift.x, shift.y, 0f, 0f);
-            for (int i = 1; i < ShiftSlots; i++)
+            shifts[0] = new Vector4(shift.x, shift.y, spread, 0f);
+            for (int i = 1; i < shifts.Length; i++)
             {
                 shifts[i] = Vector4.zero;
             }
@@ -67,12 +70,13 @@ namespace M3AT
         // Layers stack[from .. from + count) (DrawStacked), two to a vec4.
         private static void SetStackShifts(MaterialPropertyBlock block, int from, int count)
         {
-            for (int i = 0; i < ShiftSlots; i++)
+            for (int i = 0; i < shifts.Length; i++)
             {
                 shifts[i] = Vector4.zero;
             }
             for (int i = 0; i < count && i < 2 * ShiftSlots; i++)
             {
+                shifts[ShiftSlots + i / 4][i % 4] = stack[from + i].spread;
                 Vector2 s = stack[from + i].shift;
                 if ((i & 1) == 0)
                 {
@@ -164,6 +168,174 @@ namespace M3AT
             Vector2 size = g.drawSize;
             float w = size.x > 0.01f ? size.x : 1.5f, h = size.y > 0.01f ? size.y : 1.5f;
             return new Vector2(o.x / w, o.z / h);
+        }
+
+        // ---- Another race's mouth, put where a human's is.
+
+        // The face patch is laid out for Facial Animation's human textures, whose mouths all sit about MouthCentre's row
+        // (rows 0.614 .. 0.637 of the texture from the top in vanilla, Experimentals and its retexture). A race's own face
+        // mod may draw its mouth elsewhere for its own 2D head (Kiiro Race Facial Animation's at 0.601, so on the chibi it
+        // sat well up toward the eyes), so a race other than the human has its mouth moved to that row: measured once per
+        // race from the first mouth texture drawn for it that can be (alpha-weighted middle row), and the same move kept for all its
+        // shapes, so opening and closing it doesn't jump. A move under MouthRowSlack is left alone.
+        private const int MouthReadMost = 256;   // pixels across a mouth texture is read at, at most
+        private const float MouthRowSlack = 0.004f;   // texture widths
+        private const float MouthLeastAlpha = 0.5f;   // pixels' alpha summed, at the size read, to go by
+        private static readonly Dictionary<ThingDef, float> raceMouthRows = new Dictionary<ThingDef, float>();
+        private static readonly HashSet<Texture> mouthUnmeasured = new HashSet<Texture>();
+
+        // The move (texture widths, v up) for this race's mouth layers.
+        internal static float RaceMouthShift(Pawn pawn, Graphic g)
+        {
+            ThingDef race = pawn.def;
+            if (race == RimWorld.ThingDefOf.Human)
+            {
+                return 0f;
+            }
+            float shift;
+            if (!raceMouthRows.TryGetValue(race, out shift))
+            {
+                Texture tex = LayerTexture(g);
+                if (tex == null || mouthUnmeasured.Contains(tex))
+                {
+                    return 0f;   // measured from the next mouth texture drawn for it
+                }
+                bool measured = false;
+                string why = "unreadable";
+                try
+                {
+                    // Every pixel by its alpha, with no cut-off: Kiiro's closed mouth is a faint line whose alpha reaches
+                    // only 0.36, which a cut-off at 0.3 all but missed.
+                    int read = Math.Min(MouthReadMost, Math.Max(16, tex.width));
+                    Color32[] px = Api.ReadSpritePixels(tex, read);   // rows bottom first
+                    if (px != null && px.Length >= read * read)
+                    {
+                        double sum = 0, sv = 0;
+                        for (int i = 0; i < read * read; i++)
+                        {
+                            float a = px[i].a / 255f;
+                            sum += a;
+                            sv += a * ((i / read) + 0.5) / read;
+                        }
+                        why = "alpha " + sum.ToString("F1");
+                        if (sum > MouthLeastAlpha)
+                        {
+                            float row = (float)(sv / sum);   // v up
+                            shift = MouthCentre.y - row;
+                            if (Math.Abs(shift) < MouthRowSlack)
+                            {
+                                shift = 0f;
+                            }
+                            measured = true;
+                            why = "middle at row " + (1f - row).ToString("F3") + " from the top";
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    why = e.Message;
+                }
+                if (!measured)
+                {
+                    // Not taken as no move: another of its mouth shapes (the open one) is tried when drawn.
+                    mouthUnmeasured.Add(tex);
+                    Log.Warning(Tag + "couldn't measure " + race.defName + "'s Facial Animation mouth from " + tex.name + " (" + why + "); its next mouth texture will be tried.");
+                    return 0f;
+                }
+                raceMouthRows[race] = shift;
+                Log.Message(Tag + race.defName + "'s Facial Animation mouth (" + tex.name + ", " + why + ") " + (shift == 0f ? "left where it is, as a human's." : "moved " + (shift < 0 ? "down " : "up ") + Math.Abs(shift).ToString("F3") + " of the face texture, to where a human's is."));
+            }
+            return shift;
+        }
+
+        // ---- Another race's eyes, set as far apart as a human's.
+
+        // A race's own face mod may set the eyes closer together than the human faces the patch is laid out for (Kiiro Race
+        // Facial Animation's irises are 0.100 of the texture apart, the human sets' 0.114 .. 0.120: on the chibi its eyes
+        // looked pinched together). So for a race other than the human, the eye, lid, brow and lid option layers are read
+        // with each half moved out by its spread (the shader's Spread): measured once per race from its first eyeball
+        // texture with both irises (each half's alpha-weighted middle column), half the difference from HumanIrisApart.
+        private const float HumanIrisApart = 0.118f;   // texture widths between the irises' middles, a human face's
+        private const float EyeSpreadSlack = 0.003f;   // a spread under this is left alone
+        private const float EyeSpreadMost = 0.03f;
+        private static readonly Dictionary<ThingDef, float> raceEyeSpreads = new Dictionary<ThingDef, float>();
+        private static readonly HashSet<Texture> eyesUnmeasured = new HashSet<Texture>();
+        private static float drawSpread;   // the pawn being drawn's (Draw), for its eye layers (SpreadOf)
+
+        // True for the layers that are moved with the eyes.
+        private static bool SpreadsWithEyes(string kind)
+        {
+            return kind == "EyeballControllerComp" || kind == "LidControllerComp" || kind == "BrowControllerComp" || kind == "LidOptionControllerComp";
+        }
+
+        private static float SpreadOf(string kind)
+        {
+            return SpreadsWithEyes(kind) ? drawSpread : 0f;
+        }
+
+        // The spread (texture widths each half is moved out) for this race, measured from g (an eyeball layer's graphic)
+        // the first time one can be; 0 for the human or until measured.
+        internal static float RaceEyeSpread(Pawn pawn, Graphic g)
+        {
+            ThingDef race = pawn.def;
+            if (race == RimWorld.ThingDefOf.Human)
+            {
+                return 0f;
+            }
+            float spread;
+            if (raceEyeSpreads.TryGetValue(race, out spread))
+            {
+                return spread;
+            }
+            Texture tex = LayerTexture(g);
+            if (tex == null || eyesUnmeasured.Contains(tex))
+            {
+                return 0f;
+            }
+            string why = "unreadable";
+            bool measured = false;
+            try
+            {
+                int read = Math.Min(MouthReadMost, Math.Max(16, tex.width));
+                Color32[] px = Api.ReadSpritePixels(tex, read);
+                if (px != null && px.Length >= read * read)
+                {
+                    double[] sum = new double[2], su = new double[2];
+                    for (int i = 0; i < read * read; i++)
+                    {
+                        int c = i % read;
+                        int half = c < read / 2 ? 0 : 1;
+                        float a = px[i].a / 255f;
+                        sum[half] += a;
+                        su[half] += a * (c + 0.5) / read;
+                    }
+                    why = "alpha " + sum[0].ToString("F1") + " and " + sum[1].ToString("F1");
+                    if (sum[0] > MouthLeastAlpha && sum[1] > MouthLeastAlpha)
+                    {
+                        float apart = (float)(su[1] / sum[1] - su[0] / sum[0]);
+                        spread = Mathf.Clamp((HumanIrisApart - apart) / 2f, -EyeSpreadMost, EyeSpreadMost);
+                        if (Math.Abs(spread) < EyeSpreadSlack)
+                        {
+                            spread = 0f;
+                        }
+                        measured = true;
+                        why = "irises " + apart.ToString("F3") + " apart";
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                why = e.Message;
+            }
+            if (!measured)
+            {
+                eyesUnmeasured.Add(tex);
+                Log.Warning(Tag + "couldn't measure " + race.defName + "'s Facial Animation eyes from " + tex.name + " (" + why + "); its next eye texture will be tried.");
+                return 0f;
+            }
+            raceEyeSpreads[race] = spread;
+            Log.Message(Tag + race.defName + "'s Facial Animation eyes (" + tex.name + ", " + why + ") " + (spread == 0f ? "left as they are, as a human's." : "each moved " + (spread > 0 ? "out " : "in ") + Math.Abs(spread).ToString("F3") + " of the face texture, as far apart as a human's."));
+            return spread;
         }
 
         // ---- Facial Animation's iris, measured.
