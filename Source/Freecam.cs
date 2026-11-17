@@ -200,6 +200,15 @@ namespace M3AT
                 {
                     harmony.Patch(rootUpdate, postfix: new HarmonyMethod(typeof(Freecam), nameof(RootUpdatePostfix)));
                 }
+                // Other mods set Cursor.visible every frame (Perspective Shift sets it true from Root_Play.Update and
+                // UIRootOnGUI whenever it has no pawn in hand). Locked but visible, the engine shows the pointer held in
+                // the window, and the warp to the middle each frame then jitters it about; so while looking it is hidden
+                // again after them (HoldHidden, last, and from GuiPostfix on every event).
+                MethodInfo playUpdate = AccessTools.Method(typeof(Root_Play), nameof(Root_Play.Update));
+                if (playUpdate != null)
+                {
+                    harmony.Patch(playUpdate, postfix: new HarmonyMethod(typeof(Freecam), nameof(HoldHidden)) { priority = Priority.Last });
+                }
                 // The game's jumps to a thing or cell (the colonist bar's double click, letters, alerts, the select
                 // that changes map), which the freecam would otherwise overwrite with its own place the next frame.
                 MethodInfo jump = AccessTools.Method(typeof(CameraJumper), "TryJumpInternal",
@@ -1404,8 +1413,27 @@ namespace M3AT
             return BoostKey != null && IsoRim.Api.KeyHeld(BoostKey, false) ? BoostTimes : 1f;
         }
 
+        // While looking, the pointer hidden and locked again, should another mod have shown it this frame. Setting the
+        // same mode again costs nothing: the engine's HardwareCursor.SetMode does nothing when it is unchanged.
+        public static void HoldHidden()
+        {
+            if (!on || !looking || !lockedLast)
+            {
+                return;
+            }
+            if (Cursor.visible)
+            {
+                Cursor.visible = false;
+            }
+            if (Cursor.lockState != CursorLockMode.Locked)
+            {
+                Cursor.lockState = CursorLockMode.Locked;
+            }
+        }
+
         public static void GuiPostfix()
         {
+            HoldHidden();
             if (!on || !looking || Event.current.type != EventType.Repaint)
             {
                 return;
