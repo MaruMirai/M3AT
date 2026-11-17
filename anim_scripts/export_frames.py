@@ -8,7 +8,7 @@
 # IsoRim's model space: one unit = one map cell, +Y up, the figure facing -Z in the file (north once IsoRim flips z).
 # Blender's model faces -Y with +Z up, so (x, y, z) -> (-x, z, y): a half turn as well as the axis swap. IsoRim's loader
 # mirrors z and takes its face normals from the winding, so the triangles are written in reverse order to come out facing out.
-import bpy, json, math, numpy, os, sys
+import bpy, hashlib, json, math, numpy, os, sys
 from mathutils import Euler, Matrix, Vector, kdtree
 from mathutils.bvhtree import BVHTree
 from mathutils.interpolate import poly_3d_calc
@@ -742,9 +742,12 @@ def base_colour_image(g):
     return None
 
 written_textures = {}   # image name: the file it was written to, so garments sharing an image share the file
+written_pixels = {}     # the written pixels' hash: the file, so a copy of an image (a make script's) shares it too
 
 def write_texture(image, path, opaque):
-    """Writes the image as a PNG no more than TEXTURE_SIZE across (the pixels as stored, so sRGB stays sRGB)."""
+    """Writes the image as a PNG no more than TEXTURE_SIZE across (the pixels as stored, so sRGB stays sRGB). A garment
+    whose image is the same pixels as one already written (the make scripts copy the base garment's image: the ruffled
+    shirt the collared shirt's, the locust armour the recon's) shares that file, as the game loads each file once."""
     if image.name in written_textures:
         return written_textures[image.name]
     copy = image.copy()
@@ -752,17 +755,22 @@ def write_texture(image, path, opaque):
     if max(w, h) > TEXTURE_SIZE:
         copy.scale(max(1, w * TEXTURE_SIZE // max(w, h)), max(1, h * TEXTURE_SIZE // max(w, h)))
     w, h = copy.size
-    px = list(copy.pixels)
+    px = numpy.empty(w * h * 4, dtype=numpy.float32)
+    copy.pixels.foreach_get(px)
+    bpy.data.images.remove(copy)
     if opaque:
-        px[3::4] = [1.0] * (w * h)
+        px[3::4] = 1.0
+    key = (w, h, hashlib.sha1(px.tobytes()).hexdigest())
+    if key in written_pixels:
+        written_textures[image.name] = written_pixels[key]
+        return written_pixels[key]
     out_image = bpy.data.images.new(os.path.basename(path), w, h, alpha=True)
-    out_image.pixels = px
+    out_image.pixels.foreach_set(px)
     out_image.filepath_raw = path
     out_image.file_format = 'PNG'
     out_image.save()
     bpy.data.images.remove(out_image)
-    bpy.data.images.remove(copy)
-    written_textures[image.name] = os.path.basename(path)
+    written_textures[image.name] = written_pixels[key] = os.path.basename(path)
     return written_textures[image.name]
 
 class Props:

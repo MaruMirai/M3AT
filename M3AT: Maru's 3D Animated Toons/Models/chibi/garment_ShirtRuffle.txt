@@ -3,7 +3,7 @@
 # its own worn on that layer and covering one of those body part groups.
 defs Apparel_ShirtRuffle
 # texture: its image (t lines, a place on it per vertex); tint: whether the apparel's colour tints it.
-texture garment_ShirtRuffle.png
+texture garment_CollarShirt.png
 # hide k ...: body triangles (skin.txt's f lines, from 0) left out while it is worn.
 hide 0 2 3 8 9 10 11 12 14 15 16 17 27 28 31 32 33 52 54 157 161 162 163 167 170 180 183 188 189 191 192 197
 hide 198 199 200 203 204 208 215 220 221 223 225 228 229 234 236 237 238 240 245 247 253 258 260 262 263 269 270 272 276 279 280 281

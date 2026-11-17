@@ -3,7 +3,7 @@
 # its own worn on that layer and covering one of those body part groups.
 defs Apparel_ArmorHelmetMechlordHelmet
 # texture: its image (t lines, a place on it per vertex); tint: whether the apparel's colour tints it.
-texture garment_ArmorHelmetMechlordHelmet.png
+texture garment_ArmorHelmetMechCommander.png
 hide_hair yes
 hide_face no
 # visor k ...: its own triangles (its f lines, from 0) that are glass, drawn see-through.

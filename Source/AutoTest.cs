@@ -690,6 +690,7 @@ namespace M3AT
                 case "feed": return FeedTest(null);
                 case "slicecap": return SlicecapTest();
                 case "hats": return HatsTest();
+                case "garmenttex": return GarmentTexTest();
                 case "prosthetics": return ProstheticsTest();
                 case "furskin": return FurskinTest();
                 case "facefur": return FaceFurTest();
@@ -3301,6 +3302,71 @@ namespace M3AT
         // Every hat that tucks the hair under it (hide_hair tuck), worn in turn by one pawn with hair, the same pawn each run
         // (a fixed seed), so a run with M3AT_LEGACY_HATS=1 (the rims and scalp hiding before the slicecap's fix) can be
         // compared picture by picture with one without. The report gives each hat's rim both ways and what it hides.
+        // Garments whose image is another's (the exporter writes one file for images of the same pixels, as the make
+        // scripts copy the base garment's): each pair worn in turn on one pawn, checking each garment's texture loaded
+        // from the file its texture line names and that the two of a pair hold the one texture, pictured front and back.
+        private static IEnumerator GarmentTexTest()
+        {
+            string[][] pairs =
+            {
+                new[] { "Apparel_CollarShirt", "Apparel_ShirtRuffle" },
+                new[] { "Apparel_ArmorRecon", "Apparel_ArmorLocust", "Apparel_MechlordSuit" },
+                new[] { "Apparel_PowerArmor", "Apparel_ArmorMarineGrenadier" },
+                new[] { "Apparel_ArmorCataphract", "Apparel_ArmorCataphractPhoenix" },
+                new[] { "Apparel_ArmorHelmetMechCommander", "Apparel_ArmorHelmetMechlordHelmet" },
+                new[] { "Apparel_Gunlink", "Apparel_AirwireHeadset" },
+                new[] { "Apparel_CultistMask", "Apparel_CeremonialCultistMask" },
+                new[] { "CE_Apparel_SimpleNightVision", "CE_Apparel_AdvancedNightVision" },
+                new[] { "CE_Apparel_MeleeShield", "CE_Apparel_BallisticShield" },
+            };
+            Rand.PushState(20261117);
+            Pawn pawn;
+            try
+            {
+                pawn = NewPawn(middle, null);
+            }
+            finally
+            {
+                Rand.PopState();
+            }
+            pawn.apparel.DestroyAll();
+            Hold(pawn);
+            Look(pawn, 0f);
+            lookDistance = 2.2f;
+            yield return WaitReal(3f);
+            foreach (string[] pair in pairs)
+            {
+                List<string> files = new List<string>();
+                foreach (string name in pair)
+                {
+                    ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail(name);
+                    if (def == null)
+                    {
+                        Note(name + ": not loaded, skipped.");
+                        continue;
+                    }
+                    pawn.apparel.DestroyAll();
+                    pawn.apparel.Wear((Apparel)ThingMaker.MakeThing(def, GenStuff.DefaultStuffFor(def)), false);
+                    pawn.Drawer.renderer.SetAllGraphicsDirty();
+                    yield return Ticks(5, "garmenttex", pawn);
+                    string tex = WalkFigures.AutoGarmentTexture(def);
+                    Note(name + ": " + tex);
+                    Check(name + ": its garment's texture loaded", tex != null && !tex.StartsWith("none") && !tex.StartsWith("no "), tex);
+                    files.Add(tex);
+                    lookYaw = 0f;
+                    yield return Shot(name + "_front");
+                    lookYaw = 180f;
+                    yield return Shot(name + "_back");
+                }
+                if (files.Count > 1)
+                {
+                    Check(pair[0] + " and the rest share one texture", files.TrueForAll(f => f == files[0]), string.Join(", ", files));
+                }
+            }
+            lookDistance = LookDistance;
+            lookYaw = 0f;
+        }
+
         private static IEnumerator HatsTest()
         {
             Note(SkinnedFigure.Legacy ? "Legacy rims (M3AT_LEGACY_HATS=1)." : "Current rims.");
@@ -6541,6 +6607,17 @@ namespace M3AT
 
     public sealed partial class SkinnedFigure
     {
+        internal string TextureReport(ThingDef def)
+        {
+            int g = GarmentOf(def);
+            if (g < 0)
+            {
+                return "no garment";
+            }
+            Piece piece = pieces[g];
+            return piece.texture == null ? "none (" + piece.textureFile + ")" : piece.textureFile + " (" + piece.texture.name + " " + piece.texture.GetInstanceID() + ")";
+        }
+
         // A hat worn over the hair, in the base shape: whether the hair is left whole under it, and how far each of the
         // hat's places is outside the hair's outermost on its line from the head's middle once pushed (the least, cells),
         // and the most it was pushed.
@@ -6986,6 +7063,12 @@ namespace M3AT
         internal static string AutoOverHair(ThingDef def, HairDef style)
         {
             return skin != null ? skin.OverHairReport(def, style) : null;
+        }
+
+        // The garment for this apparel's image: "<file> (<texture name> <id>)", "none" without one.
+        internal static string AutoGarmentTexture(ThingDef def)
+        {
+            return skin != null ? skin.TextureReport(def) : "no figure";
         }
 
         internal static List<string> AutoTuckers()
