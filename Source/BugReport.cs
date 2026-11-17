@@ -261,6 +261,10 @@ namespace M3AT
             {
                 built = File.GetLastWriteTimeUtc(own.Location).ToString("yyyy-MM-dd HH:mm") + " UTC";
             }
+            // The <modVersion> in About.xml, raised with each Workshop upload, so a report says which upload it came from.
+            ModMetaData meta = ModLister.GetActiveModWithIdentifier(OwnId, true);
+            string version = meta == null || string.IsNullOrEmpty(meta.ModVersion) ? "?" : meta.ModVersion;
+            s.AppendLine("M3AT version: " + version + (meta == null ? "" : SourceOf(meta)));
             s.AppendLine("M3AT dll built: " + built);
             s.AppendLine("RimWorld: " + RimWorld.VersionControl.CurrentVersionStringWithRev);
             s.AppendLine("IsoRim Api: " + IsoRimApi());
@@ -271,6 +275,8 @@ namespace M3AT
             s.AppendLine("CPU: " + SystemInfo.processorType + ", " + SystemInfo.processorCount + " threads, " + SystemInfo.systemMemorySize + " MB");
             s.AppendLine("In a game: " + (Current.ProgramState == ProgramState.Playing));
         }
+
+        private const string OwnId = "marumirai.M3AT";
 
         // Read by reflection, so an IsoRim too old to have the Api this mod compiled against still gives an answer.
         private static string IsoRimApi()

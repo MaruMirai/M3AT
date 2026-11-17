@@ -3,6 +3,7 @@
   <name>M3AT: Maru's 3D Animated Toons</name>
   <author>maru mirai</author>
   <packageId>marumirai.M3AT</packageId>
+  <modVersion>0.2.0</modVersion>
   <supportedVersions>
     <li>1.7</li>
   </supportedVersions>
