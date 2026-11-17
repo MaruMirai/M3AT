@@ -742,10 +742,10 @@ namespace M3AT
             return file != null && skin.HasEars(file) ? file : RaceEars(pawn);
         }
 
-        // A race's own ears, for one with an ear add-on (HairBuilder.RaceHasAddon), or null.
+        // A race's own ears, for a cat-like one with an ear add-on (HairBuilder.CatLikeAddon), or null.
         private static string RaceEars(Pawn pawn)
         {
-            return HairBuilder.RaceHasAddon(pawn.def, "ear") && skin.HasEars(SkinnedFigure.RaceEarFile) ? SkinnedFigure.RaceEarFile : null;
+            return HairBuilder.CatLikeAddon(pawn.def, "ear") && skin.HasEars(SkinnedFigure.RaceEarFile) ? SkinnedFigure.RaceEarFile : null;
         }
 
         // How the pawn's state holds its ears: the up key's and the down key's amounts.

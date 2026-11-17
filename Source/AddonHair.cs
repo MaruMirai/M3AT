@@ -201,6 +201,17 @@ namespace M3AT
 
         private static readonly Dictionary<string, bool> raceHasAddon = new Dictionary<string, bool>();
 
+        // The races whose ears and tail have been looked at and are cat-like enough to be drawn as the chibi's cat ears
+        // and tail. Any race with an ear or tail add-on would get them otherwise, which for rabbit or fox ears or a lizard's
+        // tail would look like poor support rather than a stand-in, so a race not here keeps neither until it is checked.
+        private static readonly HashSet<string> CatLikeRaces = new HashSet<string> { "Kiiro_Race" };
+
+        // True if the race is one of CatLikeRaces and has an add-on with this word ("ear", "tail"): RaceHasAddon.
+        internal static bool CatLikeAddon(ThingDef race, string word)
+        {
+            return race != null && CatLikeRaces.Contains(race.defName) && RaceHasAddon(race, word);
+        }
+
         // True if the race has a Humanoid Alien Races add-on with this word (lower case) in its file name, split at
         // capitals and anything not a letter ("RightEar": right, ear), plural or not: its ears or tail, which the chibi
         // draws as its own cat ears and tail (CatEars.cs, CatTail.cs).

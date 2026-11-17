@@ -492,8 +492,8 @@ namespace M3AT
                     return true;
                 }
             }
-            // A race with a Humanoid Alien Races tail add-on (Kiiro's slender one) gets the smooth tail.
-            return HairBuilder.RaceHasAddon(pawn.def, "tail");
+            // A cat-like race with a Humanoid Alien Races tail add-on (Kiiro's slender one) gets the smooth tail.
+            return HairBuilder.CatLikeAddon(pawn.def, "tail");
         }
 
         // How the pawn's state holds its tail: how much it sways (0 still, 1 a pawn at ease) and the turn of the root
