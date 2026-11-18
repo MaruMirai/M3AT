@@ -1370,8 +1370,8 @@ namespace M3AT
         //     the weapon's own or the model's draws the sprite instead. Combat Extended ships its own art at the vanilla guns'
         //     paths, so with it every vanilla gun and grenade lost its model. The RetexturedWeaponModels option keeps it for
         //     the game's own weapons (Core and the DLCs, whose models were made for art of that shape), bound by their own name,
-        //     a model rule or their picture; another mod's weapon is left to IsoRim. With it off, a weapon whose ModelDef
-        //     RestoredModels put back (another mod had removed it) shows its sprite, as that mod meant.
+        //     a model rule or their picture; another mod's weapon is left to IsoRim. With it off, the rule says nothing and
+        //     IsoRim's art check draws the other mod's sprite.
         // A plain lookup (the option, the binding, the def): IsoRim may ask it off the main thread. It answers on every call,
         // so the option takes at once for what is drawn each frame; the map's baked weapons are written again when it changes
         // (RebakeGroundWeapons).
@@ -1396,10 +1396,6 @@ namespace M3AT
                 bool official = def.modContentPack != null && def.modContentPack.IsOfficialMod;
                 bool own = how == "thingDef" || how.StartsWith("rule:") || how.StartsWith("graphicPath:");
                 answer = official && own ? true : (bool?)null;
-            }
-            else if (RestoredModels.Has(def))
-            {
-                answer = false;
             }
             if (Prefs.DevMode && UnityData.IsInMainThread && artNoted.Add(def))
             {

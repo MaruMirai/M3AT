@@ -241,7 +241,6 @@ namespace M3AT
             Settings = GetSettings<Settings>();
             HairDetail = Settings.hairDetail;
             groundGarmentsBaked = Settings.groundGarments;
-            RestoredModels.Patch();   // before IsoRim's startup binds its models
             weaponModelsBaked = Settings.retexturedWeaponModels;
         }
 

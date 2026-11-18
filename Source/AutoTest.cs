@@ -685,6 +685,7 @@ namespace M3AT
                 case "tend": return TendTest(null);
                 case "bows": return BowTest(null);
                 case "weaponkinds": return WeaponKindsTest();
+                case "retextured": return RetexturedTest();
                 case "standins": return StandInsTest();
                 case "tendbed": return TendBedTest();
                 case "feed": return FeedTest(null);
@@ -5519,6 +5520,83 @@ namespace M3AT
         // Every gun loaded (not thrown), with how long its art is drawn and the kind it is sorted as, to set
         // WalkFigures.PistolLongest between the sidearms and the long guns. No pawn; notes only, and one check that
         // the game's own pistols and long guns fall either side of it.
+        // retextured: no pawn. Every weapon of the game's own (Core and the DLCs) a pawn can hold, with how IsoRim binds its
+        // model (Api.HowBound), what WeaponRule answers and whether it is drawn as its model (WalkFigures.ShowsModel), with the
+        // retexturedWeaponModels option on and then off (put back after; not saved). With the IsoRim Waylith CE pack keeping
+        // the vanilla ModelDefs (since its release of 2026-11-18), every weapon CE redraws should be bound by its own name and
+        // drawn as its model with the option on, and as CE's sprite with it off; other weapons the same both ways.
+        private static IEnumerator RetexturedTest()
+        {
+            yield return WaitReal(1f);
+            Settings st = SettingsMod.Settings;
+            bool was = st.retexturedWeaponModels;
+            int official = 0, modelOn = 0, spriteOff = 0, unbound = 0, flipped = 0;
+            List<string> wrong = new List<string>();
+            try
+            {
+                foreach (ThingDef def in DefDatabase<ThingDef>.AllDefsListForReading)
+                {
+                    if (!def.IsWeapon || def.equipmentType != EquipmentType.Primary || def.graphicData == null || def.destroyOnDrop
+                        || def.modContentPack == null || !def.modContentPack.IsOfficialMod
+                        || !def.IsWithinCategory(ThingCategoryDefOf.Weapons))   // (CE makes a wood log and beer weapons too)
+                    {
+                        continue;
+                    }
+                    official++;
+                    Thing thing = ThingMaker.MakeThing(def, def.MadeFromStuff ? GenStuff.DefaultStuffFor(def) : null);
+                    string how = IsoRim.Api.HowBound(def);
+                    st.retexturedWeaponModels = true;
+                    bool? ruleOn = WalkFigures.AutoWeaponRule(def);
+                    bool onModel = WalkFigures.AutoShowsModel(thing);
+                    st.retexturedWeaponModels = false;
+                    bool? ruleOff = WalkFigures.AutoWeaponRule(def);
+                    bool offModel = WalkFigures.AutoShowsModel(thing);
+                    if (how == null)
+                    {
+                        unbound++;
+                    }
+                    if (onModel)
+                    {
+                        modelOn++;
+                    }
+                    if (!offModel)
+                    {
+                        spriteOff++;
+                    }
+                    if (onModel != offModel)
+                    {
+                        flipped++;
+                    }
+                    Note(def.defName + " [" + def.modContentPack.PackageId + "] bound by " + (how ?? "nothing") + "; on: rule "
+                        + (ruleOn.HasValue ? ruleOn.Value.ToString() : "null") + ", " + (onModel ? "model" : "sprite") + "; off: rule "
+                        + (ruleOff.HasValue ? ruleOff.Value.ToString() : "null") + ", " + (offModel ? "model" : "sprite"));
+                    // A weapon bound by its own name keeps its model with the option on; off, it is never forced to the
+                    // model (the rule says nothing, or false), and the option never makes one the sprite.
+                    if (how == "thingDef" && !onModel)
+                    {
+                        wrong.Add(def.defName + ": bound by its own name but no model with the option on");
+                    }
+                    if (offModel && !onModel)
+                    {
+                        wrong.Add(def.defName + ": a model only with the option off");
+                    }
+                    if (ruleOff.HasValue && ruleOff.Value && !how.StartsWith("category:"))
+                    {
+                        wrong.Add(def.defName + ": the rule forces its model with the option off");
+                    }
+                }
+            }
+            finally
+            {
+                st.retexturedWeaponModels = was;
+            }
+            Note(official + " official weapons: " + unbound + " bound by nothing; " + modelOn + " drawn as models with the option on, "
+                + spriteOff + " as sprites with it off, " + flipped + " changed by the option.");
+            Check("official weapons found", official > 0, official.ToString());
+            Check("every weapon bound by its own name has its model with the option on, and the option off never adds one",
+                wrong.Count == 0, string.Join("; ", wrong));
+        }
+
         private static IEnumerator WeaponKindsTest()
         {
             yield return WaitReal(1f);
@@ -6920,6 +6998,16 @@ namespace M3AT
                 tagged |= def.weaponTags[i].Contains("Pistol") || def.weaponTags[i].Contains("Revolver");
             }
             named = kind == "bow" ? "bow" : name.Contains("pistol") || name.Contains("revolver") || tagged ? "pistol" : null;
+        }
+
+        internal static bool? AutoWeaponRule(ThingDef def)
+        {
+            return WeaponRule(def);
+        }
+
+        internal static bool AutoShowsModel(Thing weapon)
+        {
+            return ShowsModel(weapon);
         }
 
         internal static bool AutoThrown(ThingDef def)
