@@ -127,6 +127,15 @@ namespace M3AT
         private static FieldInfo intX, intY;
         private static object bridge;
         private static FieldInfo bridgeCursor, bridgeHas;
+        // The same on the engine since RimWorld 1.7.5013 (its own X11, Wayland and Win32 windows in place of GLFW): the
+        // window has no settable cursor, but a WarpPointer(LogicalPosition), and the input bridge (a decorator on the
+        // window's handler) keeps the pointer's place itself while locked, adding each movement to it (_position, Unity's
+        // screen pixels, y up) and sending clicks from there; left alone it drifted from the middle, so the view spun and
+        // clicks missed the cross.
+        private static FieldInfo bridgePosition;
+        private static MethodInfo warpPointer;
+        private static ConstructorInfo logicalPosition;
+        private static PropertyInfo surfaceSize, scaleFactor, surfaceHeight;
         private static bool warpFailed;
 
         public static bool On
@@ -1111,7 +1120,28 @@ namespace M3AT
             }
             try
             {
-                if (window != null && cursorPos != null && windowSize != null && double2 != null)
+                if (window != null && bridgePosition != null)
+                {
+                    // Locked, the system's pointer is held by the window itself, so only the bridge's place is set;
+                    // freed, the system's pointer is moved too (the bridge then follows its next movement from there).
+                    if (!lockedLast && warpPointer != null && logicalPosition != null)
+                    {
+                        double scale = scaleFactor != null ? (double)scaleFactor.GetValue(window) : 1.0;
+                        if (scale <= 0.0)
+                        {
+                            scale = 1.0;
+                        }
+                        double height = Screen.height;
+                        if (surfaceSize != null && surfaceHeight != null)
+                        {
+                            height = (int)surfaceHeight.GetValue(surfaceSize.GetValue(window));
+                        }
+                        object at = logicalPosition.Invoke(new object[] { to.x / scale, (height - 1.0 - to.y) / scale });
+                        warpPointer.Invoke(window, new object[] { at });
+                    }
+                    bridgePosition.SetValue(bridge, to);
+                }
+                else if (window != null && cursorPos != null && windowSize != null && double2 != null)
                 {
                     object at = atWindow;
                     if (at == null)
@@ -1150,7 +1180,12 @@ namespace M3AT
                 }
                 cursorPos = AccessTools.Property(window.GetType(), "CursorPos");
                 windowSize = AccessTools.Property(window.GetType(), "Size");
-                if (cursorPos == null || windowSize == null)
+                if (cursorPos == null)
+                {
+                    FindBridgeOnHandler();
+                    return;
+                }
+                if (windowSize == null)
                 {
                     return;
                 }
@@ -1178,6 +1213,46 @@ namespace M3AT
             {
                 window = null;
                 Log.Warning(Tag + "The engine's window was not found, so the freecam's pointer may drift while looking round: " + e);
+            }
+        }
+
+        // The engine since 1.7.5013: the input bridge is found down the window's handler chain (WindowBase._handler,
+        // then each WindowHandlerDecorator's Inner), and the pointer is moved by the window's WarpPointer.
+        private static void FindBridgeOnHandler()
+        {
+            FieldInfo handlerField = AccessTools.Field(window.GetType(), "_handler");
+            object handler = handlerField != null ? handlerField.GetValue(window) : null;
+            for (int i = 0; handler != null && i < 16; i++)
+            {
+                FieldInfo position = AccessTools.Field(handler.GetType(), "_position");
+                if (handler.GetType().Name == "WindowInputBridge" && position != null && position.FieldType == typeof(Vector2))
+                {
+                    bridge = handler;
+                    bridgePosition = position;
+                    break;
+                }
+                PropertyInfo inner = AccessTools.Property(handler.GetType(), "Inner");
+                handler = inner != null ? inner.GetValue(handler) : null;
+            }
+            if (bridge == null)
+            {
+                window = null;
+                Log.Warning(Tag + "The engine's input bridge was not found, so the freecam's pointer may drift while looking round.");
+                return;
+            }
+            warpPointer = AccessTools.Method(window.GetType(), "WarpPointer");
+            ParameterInfo[] ps = warpPointer != null ? warpPointer.GetParameters() : null;
+            logicalPosition = ps != null && ps.Length == 1 ? ps[0].ParameterType.GetConstructor(new[] { typeof(double), typeof(double) }) : null;
+            scaleFactor = AccessTools.Property(window.GetType(), "ScaleFactor");
+            if (scaleFactor != null && scaleFactor.PropertyType != typeof(double))
+            {
+                scaleFactor = null;
+            }
+            surfaceSize = AccessTools.Property(window.GetType(), "SurfaceSize");
+            surfaceHeight = surfaceSize != null ? AccessTools.Property(surfaceSize.PropertyType, "Height") : null;
+            if (surfaceHeight != null && surfaceHeight.PropertyType != typeof(int))
+            {
+                surfaceHeight = null;
             }
         }
 
