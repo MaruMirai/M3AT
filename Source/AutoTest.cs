@@ -5530,7 +5530,7 @@ namespace M3AT
             yield return WaitReal(1f);
             Settings st = SettingsMod.Settings;
             bool was = st.retexturedWeaponModels;
-            int official = 0, modelOn = 0, spriteOff = 0, unbound = 0, flipped = 0;
+            int official = 0, modelOn = 0, spriteOff = 0, unbound = 0, flipped = 0, restoredSeen = 0;
             List<string> wrong = new List<string>();
             try
             {
@@ -5572,9 +5572,14 @@ namespace M3AT
                         + (ruleOff.HasValue ? ruleOff.Value.ToString() : "null") + ", " + (offModel ? "model" : "sprite"));
                     // A weapon bound by its own name keeps its model with the option on; off, it is never forced to the
                     // model (the rule says nothing, or false), and the option never makes one the sprite.
-                    if (how == "thingDef" && !onModel)
+                    bool own = how == "thingDef" || (how != null && how.StartsWith("rule:"));   // a rule: RestoredModels' (an older CE pack)
+                    if (own && !onModel)
                     {
                         wrong.Add(def.defName + ": bound by its own name but no model with the option on");
+                    }
+                    if (how != null && how.StartsWith("rule:M3AT_Restored_"))
+                    {
+                        restoredSeen++;
                     }
                     if (offModel && !onModel)
                     {
@@ -5590,6 +5595,7 @@ namespace M3AT
             {
                 st.retexturedWeaponModels = was;
             }
+            Note(restoredSeen + " given back their model by RestoredModels (an older IsoRim Waylith CE pack removed it; none with the Workshop pack).");
             Note(official + " official weapons: " + unbound + " bound by nothing; " + modelOn + " drawn as models with the option on, "
                 + spriteOff + " as sprites with it off, " + flipped + " changed by the option.");
             Check("official weapons found", official > 0, official.ToString());
