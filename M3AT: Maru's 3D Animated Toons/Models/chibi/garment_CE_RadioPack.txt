@@ -5,7 +5,9 @@ defs CE_Apparel_RadioPack
 # texture: its image (t lines, a place on it per vertex); tint: whether the apparel's colour tints it.
 texture garment_CE_RadioPack.png
 # hide k ...: body triangles (skin.txt's f lines, from 0) left out while it is worn.
-hide 2 572 573 582 594 596 710 786
+hide 594 596 710 786
+# opens k ...: body triangles it covers at rest that a pose brings out from under its edge (hide_edges.py), drawn though it is worn.
+opens 2 572 573 582
 v 0.08042 0.82260 -0.05908
 v 0.10207 0.65542 -0.08150
 v 0.08945 0.63116 -0.06157

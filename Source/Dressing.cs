@@ -270,14 +270,14 @@ namespace M3AT
             }
             List<ApparelLayerDef> layers = a != null ? a.layers : null;
             bool belt = layers != null && layers.Contains(ApparelLayerDefOf.Belt);
-            bool shirt = layers != null && layers.Contains(ApparelLayerDefOf.OnSkin) && !layers.Contains(ApparelLayerDefOf.Shell);
+            bool shirt = SkinnedFigure.OnTheSkin(a) && !layers.Contains(ApparelLayerDefOf.Shell);   // (underwear too: a vest is pulled over the head)
             string upper = shirt ? "dress_over" : "dress_coat";
             List<string> list = new List<string>();
             if (belt)
             {
                 list.Add("dress_belt");
             }
-            else if (torso && legs && layers != null && (layers.Contains(ApparelLayerDefOf.OnSkin) || layers.Contains(ApparelLayerDefOf.Middle)))
+            else if (torso && legs && layers != null && (SkinnedFigure.OnTheSkin(a) || layers.Contains(ApparelLayerDefOf.Middle)))
             {
                 list.Add("dress_legs");   // (a whole suit: stepped into, then the arms in or pulled over the head; a long coat
                                           // on the shell layer alone, a duster or a parka, is only swung on, below)

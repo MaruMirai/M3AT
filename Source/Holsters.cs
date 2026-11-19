@@ -97,8 +97,9 @@ namespace M3AT
 
         // Webbing that holsters, packs and gear lie over rather than are pushed out by: the heavy bandolier and Combat
         // Extended's tactical vest are thin straps and pouches, and pushing a weapon or pack out past their pouches left it
-        // standing well off the back.
-        private static readonly string[] NoClearanceDefs = { "Apparel_Bandolier", "CE_Apparel_TacVest" };
+        // standing well off the back. The scarf too: a pack's top comes up to the back of the neck, where it is wound thin,
+        // and a pack pushed off the back by it would hang away from the shoulders.
+        private static readonly string[] NoClearanceDefs = { "Apparel_Bandolier", "CE_Apparel_TacVest", "Apparel_Scarf" };
 
         // The worn-garment bits of the garments in no clearance: packs (placed by it), shields (they go with the hand) and
         // the NoClearanceDefs webbing.
@@ -726,6 +727,10 @@ namespace M3AT
         // slots out. With draw false they are only given their slots (slotWeapon, slotExtra), not drawn.
         private static void DrawHolstered(Pawn pawn, bool inHands, GarmentMask mask, SkinnedFigure.Posed fig, Vector3 at, float yaw, float size, bool draw = true)
         {
+            if (draw)
+            {
+                drawnHolsters.Clear();
+            }
             if (!Holsters || skin.Holsters == 0 || !HeldWeapons3D)
             {
                 return;
@@ -821,6 +826,7 @@ namespace M3AT
             SlotPlace(weapon, fig, slot, mask, slotExtra[slot], size, out grip, out a, out top, out behind);
             Vector3 tip;
             DrawSlab(weapon, ScaleOf(weapon), grip, a, top, behind, at, yaw, size, out tip);   // as big as it is held
+            drawnHolsters.Add(new HolsterSeen { weapon = weapon, slot = slot, extra = slotExtra[slot] });   // for the free hands next draw (HandsClear.cs)
         }
 
         // Where a weapon lies in a slot, as DrawSlab takes it: the place its slab's middle is measured from, the way it runs,
@@ -1108,7 +1114,9 @@ namespace M3AT
                 step = Mathf.Max(step, game / HolsterRush);
             }
             e.drawAt += hand ? step : -step;
-            if (e.drawAt >= 1f || e.drawAt < 0f)
+            // Done at the end it is heading for only: a holster starts at 1, and while the game is paused (no step)
+            // it has to wait there, as a draw waits at 0, rather than count as a finished draw.
+            if (hand ? e.drawAt >= 1f : e.drawAt < 0f)
             {
                 e.drawAt = -1f;
                 e.drafted = target;

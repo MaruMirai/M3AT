@@ -62,11 +62,32 @@ dotnet build Source/M3AT.csproj -p:DefineConstants=AUTOTEST -v q -nologo 9>&- | 
 trap 'dotnet build Source/M3AT.csproj -v q -nologo 9>&- | grep -E " error |Build succeeded" | sort -u' EXIT
 log="$HOME/.config/unity3d/Ludeon Studios/RimWorld by Ludeon Studios/Logs/Player.log"
 start=(-quicktest); [ -n "$load" ] && start=("-m3atTestLoad=$load")
-(cd ~/.local/share/Steam/steamapps/common/RimWorld && timeout 1800 ./RimWorld "${start[@]}" "-m3atTest=$which" "${args[@]}" -m3atTestQuit >/dev/null 2>&1) || true
+# Through Steam (steam -applaunch, its own launch options added), when it is running: since the update of 2026-11-19 the
+# launcher links libsteamoverlayxlib.so, a stand-in Xlib that passes calls on only once Steam's overlay has hooked it,
+# so started any other way NVIDIA's driver calls through a null pointer in Vulkan's start-up. Straight otherwise.
+steam_bin=$(command -v steam || true)
+launch=(./RimWorld); [ -n "$steam_bin" ] && pgrep -x steam >/dev/null && launch=("$steam_bin" -applaunch 294100)
+launched=$(date +%s)
+(cd ~/.local/share/Steam/steamapps/common/RimWorld && timeout 1800 "${launch[@]}" "${start[@]}" "-m3atTest=$which" "${args[@]}" -m3atTestQuit >/dev/null 2>&1) || true
 # The launcher can hand the game on to another process and return at once (Waylith's Vulkan fallback relaunch), which
 # would put the normal build back while the game still loads mods, so the test never runs: wait for the game itself.
+# Since the 2026-11-19 update the game's process shows no arguments, so it is known by the pid its Player.log names, once a
+# log of this run's (written since the launch, its command line with -m3atTest=) is there; a relaunch writes a new one.
+gamepid() {
+    [ "$(stat -c %Y "$log" 2>/dev/null || echo 0)" -ge "$launched" ] || return 1
+    head -12 "$log" | grep -aq -- "-m3atTest=" || return 1
+    head -12 "$log" | sed -n 's/^Process: *pid \([0-9]*\).*/\1/p'
+}
+gone=0
 for _ in $(seq 1 1800); do
-    pgrep -f -- "^[^ ]*RimWorld[^ ]* .*-m3atTest=" >/dev/null || break
+    pid=$(gamepid || true)
+    if [ -n "$pid" ]; then
+        # (Over only once the pid the log names has stayed gone a while: a process can write it and hand on to another,
+        # whose own log comes after.)
+        if kill -0 "$pid" 2>/dev/null; then gone=0; else gone=$((gone + 1)); [ "$gone" -ge 15 ] && break; fi
+    elif ! pgrep -f -- "^[^ ]*RimWorld[^ ]* .*-m3atTest=" >/dev/null && [ $(( $(date +%s) - launched )) -gt 60 ]; then
+        break   # no log of this run's within a minute, and no game: it never started
+    fi
     sleep 1
 done
 grep -a "\[AutoTest\]" "$log" | sed 's/^.*\[AutoTest\] //'

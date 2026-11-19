@@ -29,6 +29,10 @@
 # each other (holster_push.py, the game's Clearance, HolsterOver, PackSide ...).
 # "Mirror from" takes another slot of its size's place across the figure's middle, a handgun's spun for a cross draw.
 # "Write to walk.py" puts the numbers back into the file; "Reload walk.py" picks up hand edits to it, code included.
+# Expansions: another mod's clips made on this rig (an anim_scripts/preview_expansion.py in a repository beside this one,
+# EXPANSION_API below) are listed under a category of their own, posed by that module, with whoever it poses with them
+# (a pair's partner) drawn where the game puts them and the numbers of its NUMBERS_FILE as sliders, which Write puts
+# back into that file and Reload reads again with the expansion's code.
 # Nothing is keyed, and the settings are not saved in the .blend.
 import ast, bpy, contextlib, copy, glob, importlib, math, os, re, sys
 import xml.etree.ElementTree as ET
@@ -44,6 +48,49 @@ if HERE not in sys.path:
     sys.path.insert(0, HERE)
 import walk
 import holster_push
+
+# Expansions (see the top): each module found is loaded as preview_expansion_<its folder>. EXPANSION_API, what one has:
+#   NAME            its title: the Category menu's entry for its clips
+#   NUMBERS_FILE    the file whose top-level numbers (NAME = 1.5  # comment, nothing but a comment after) get sliders
+#   clips()         [(id, label, description)], ids without ':'
+#   seconds(id)     the loop's length in game seconds
+#   pose(id, t)     (X, overreach, others): the rig's pose at t (0 .. 1 round the loop) and the poses of any others
+#                   drawn with it (a pair's partner), all in the rig's armature space as the game places them together
+#   numbers(id)     the names of the numbers that shape that clip, shown with it
+#   get_number(name), set_number(name, value)   (set_number drops what the module worked out from the old value)
+#   surface(id)     'bed' to draw a double bed's mattress at z 0 (its middle BED_ALONG cells toward +y), else None
+#   info(id)        lines for the panel
+#   reload()        reads its files again, code included
+EXPANSION_GLOB = os.path.join(os.path.dirname(os.path.dirname(HERE)), '*', 'anim_scripts', 'preview_expansion.py')
+EXPANSION_NUMBER = re.compile(r'^([A-Z][A-Z_0-9]*)(\s*=\s*)(-?\d+\.\d*)(\s*(?:#.*)?)$', re.M)
+BED_ALONG = 0.12   # the expansion's Poser.BedAlong: cells from a pair's anchor toward the bed's head to its middle
+BED_CELLS = (2.0, 2.0)   # a double bed, cells across and along
+EXPANSIONS = {}   # 'x0', 'x1' ...: the module
+
+def load_expansions():
+    import importlib.util
+    EXPANSIONS.clear()
+    for i, path in enumerate(sorted(glob.glob(EXPANSION_GLOB))):
+        if os.path.dirname(os.path.dirname(path)) == os.path.dirname(HERE):
+            continue
+        name = 'preview_expansion_' + os.path.basename(os.path.dirname(os.path.dirname(path)))
+        try:
+            spec = importlib.util.spec_from_file_location(name, path)
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules[name] = mod
+            spec.loader.exec_module(mod)
+        except Exception as e:
+            print('PREVIEW expansion %s not loaded: %s: %s' % (path, type(e).__name__, e))
+            continue
+        EXPANSIONS['x%d' % len(EXPANSIONS)] = mod
+        print('PREVIEW expansion %s: %d clips' % (mod.NAME, len(mod.clips())))
+
+def expansion_numbers(mod):
+    """An expansion's numbers file's numbers in file order: (name, comment)."""
+    with open(mod.NUMBERS_FILE) as f:
+        return [(m.group(1), m.group(4).strip().lstrip('#').strip()) for m in EXPANSION_NUMBER.finditer(f.read())]
+
+load_expansions()
 
 ISO_PITCH = 35.3   # IsoRim's isometric camera: degrees below level (View3D isoPitch) ...
 ISO_YAW = 45.0     # ... and turned from north (View3D.IsoYaw)
@@ -104,7 +151,7 @@ LINES = [('hands', 'Through both fists', 'From the holding fist through the othe
          ('aim', 'Fixed direction', 'Along Aim (x left, y back, z up), whatever the arms do'),
          ('hand', 'With the hand', 'Rides the holding hand and turns as it turns (switching to it keeps the weapon where it is)')]
 
-state = {'clamp': 0.0, 'error': '', 'timer': False, 'chest': None, 'handles': {}, 'grip': None, 'holster': None, 'gear': None, 'quiet': set(),
+state = {'clamp': 0.0, 'error': '', 'timer': False, 'chest': None, 'handles': {}, 'grip': None, 'holster': None, 'gear': None, 'fist': None, 'fist0': None, 'quiet': set(),
          'busy': False}
 registered = {}
 # Slab holds: whether walk's tables are the slab's (SLAB_TABLES laid over the plain ones), set before walk is read again.
@@ -257,6 +304,8 @@ def mocap_seconds(name):
 
 def loop_seconds(what, kind=''):
     """How long a clock-timed loop is in game seconds, or None for one timed by the ground covered."""
+    if what in EXPANSIONS:
+        return EXPANSIONS[what].seconds(kind)
     carry = walk.carry_seconds(kind) if what in ('carry', 'carried') and hasattr(walk, 'carry_seconds') else walk.CARRY_SECONDS
     return {'idle': walk.IDLE_SECONDS, 'drafted': walk.DRAFT_SECONDS, 'carry': carry,
             'carried': carry, 'sit': walk.SIT_SECONDS, 'lie': walk.LIE_SECONDS,
@@ -285,8 +334,14 @@ def draw_seconds(kind):
     return walk.DRAW_SIZES[walk.HOLSTERS[walk.draw_names()[kind][0]]['size']]['seconds'] if kind in walk.draw_names() else None
 
 def push_settings(p):
-    """Copies the sliders into walk: its numbers, places and stance tables."""
+    """Copies the sliders into walk: its numbers, places and stance tables; and an expansion's into it."""
     names, run, _ = tuned()
+    for x, mod in EXPANSIONS.items():
+        for name, _ in registered['expansion_numbers'][x]:
+            v = getattr(p, '%s_%s' % (x, name))
+            if v != registered['expansion_set'].get((x, name)):   # (set_number drops what was worked out from it)
+                registered['expansion_set'][(x, name)] = v
+                mod.set_number(name, v)
     for name, _, is_tuple in names:
         if is_tuple:
             setattr(walk, name, tuple(getattr(p, 'tup_' + name)))
@@ -295,6 +350,9 @@ def push_settings(p):
             walk.RUN[name] = getattr(p, 'run_' + name)
         else:
             setattr(walk, name, getattr(p, 'walk_' + name))
+    if state.get('fist0') is not None:
+        for name, v in zip(FIST_NUMBERS, state['fist0']):
+            setattr(walk, name, v)   # the hands posed with the fist they had when the edit began (tool_fist_edit)
     full = {}
     for (table, kind), info in registered['stances'].items():
         entry = {}
@@ -398,6 +456,10 @@ def draw_phase(what, t):
 def loop_pose(what, kind, t):
     """The picked loop's pose at t (0 .. 1 round it) at the walk's numbers, as export_loop bakes it."""
     walk.set_gait(0.0)
+    if what in EXPANSIONS:
+        X, clamp, others = EXPANSIONS[what].pose(kind, t)
+        state['others'] = others   # drawn by draw_others
+        return X, clamp
     if what == 'idle':
         return walk.stand_at(t)
     if what == 'drafted':
@@ -1401,13 +1463,14 @@ def draw_tool(kind, t, X=None):
         obj.matrix_world = walk.arm.matrix_world @ X['hand.R'] @ walk.stir_rest(kind)   # the spoon or the roasting stick, as the tool stir line
         return
     if X is not None and kind in getattr(walk, 'TOOL_CLIPS', {}) and walk.work_mocap(kind) is walk.TOOL_CLIPS[kind]:
-        obj.matrix_world = walk.arm.matrix_world @ X['hand.R'] @ walk.take_held(kind)   # a tracker take's own hold
+        M = X['hand.R'] @ walk.take_held(kind)   # a tracker take's own hold
     elif X is not None and getattr(walk, 'work_mocap', lambda k: None)(kind) is not None:
         rest, _ = walk.tool_stroke_at(0.0, kind)
         held = rest['hand.R'].inverted() @ walk.tool_matrix(kind, walk.work_key(w, walk.work_stroke(0.0, w)))
-        obj.matrix_world = walk.arm.matrix_world @ X['hand.R'] @ held
+        M = X['hand.R'] @ held
     else:
-        obj.matrix_world = walk.arm.matrix_world @ walk.tool_matrix(kind, walk.work_key(w, walk.work_stroke(t, w)))
+        M = walk.tool_matrix(kind, walk.work_key(w, walk.work_stroke(t, w)))
+    obj.matrix_world = walk.arm.matrix_world @ fist_held(X, M)   # (moved in the fist while the fist is edited)
 
 INSTRUMENT = 'MaruInstrument'
 # Each music clip's instrument: IsoRim's model of it and how far its middle is from the middle of the pawn's cell
@@ -1734,8 +1797,54 @@ def draw_lovers(p, what, kind, t):
     obj.matrix_world = walk.arm.matrix_world @ Matrix.Translation(Vector((LOVERS_BESIDE * cell, 0.0, 0.0)))
     obj.hide_viewport = False
 
+OTHERS = 'MaruOthers'   # whoever an expansion's clip is posed with (a pair's partner), where the game puts them (draw_others)
+SURFACE = 'MaruSurface'   # and the bed's mattress under them
+
+def draw_others(p, what, kind):
+    """An expansion's clip: those posed with the rig (EXPANSION_API's pose: a pair's partner) drawn as they are, in the
+    rig's space, as the game draws the two at one anchor; at their gendered sizes with Gender sizes on (the rig the
+    man or the woman as picked, the partner the other), each scaled about the anchor as the game scales a figure about
+    where it puts it. With a mattress under them for a clip in bed. Hidden for any other clip or with Show load off."""
+    others = state.get('others') if what in EXPANSIONS else None
+    obj, slab = bpy.data.objects.get(OTHERS), bpy.data.objects.get(SURFACE)
+    if not (p.load and others):
+        for o in (obj, slab):
+            if o is not None:
+                o.hide_viewport = True
+        if not (p.load and what in EXPANSIONS):
+            return
+    rig_male = p.pair_rig == 'MALE'
+    rig_size, other_size = pair_size(p, rig_male), pair_size(p, not rig_male)
+    if others:
+        vs, fs = [], []
+        for X in others:
+            v, f = body_mesh(X)
+            fs += [[i + len(vs) for i in face] for face in f]
+            vs += v
+        obj = load_object(OTHERS, True)
+        me = obj.data
+        me.clear_geometry()
+        me.from_pydata(vs, [], fs)
+        me.update()
+        obj.matrix_world = walk.arm.matrix_world @ Matrix.Scale(other_size / rig_size, 4)
+        obj.hide_viewport = False
+    cell = walk.LEG / walk.MODEL_LEG / walk.GAME_SCALE / rig_size   # armature units per cell, at the rig's size
+    if EXPANSIONS[what].surface(kind) == 'bed':
+        w, l = BED_CELLS[0] * cell / 2, BED_CELLS[1] * cell / 2
+        y = BED_ALONG * cell
+        slab = load_object(SURFACE, False)
+        me = slab.data
+        me.clear_geometry()
+        me.from_pydata([(-w, y - l, 0.0), (w, y - l, 0.0), (w, y + l, 0.0), (-w, y + l, 0.0)], [], [(0, 1, 2, 3)])
+        me.update()
+        slab.matrix_world = walk.arm.matrix_world.copy()
+        slab.display_type = 'WIRE'
+        slab.hide_viewport = False
+    elif slab is not None:
+        slab.hide_viewport = True
+
 def clear_load():
-    for name in (LOAD + 'Item', LOAD + 'Person', PET, LOVERS):
+    for name in (LOAD + 'Item', LOAD + 'Person', PET, LOVERS, OTHERS, SURFACE):
         obj = bpy.data.objects.get(name)
         if obj is not None:
             me = obj.data
@@ -2377,6 +2486,109 @@ def place_handles(p, what, kind, X, write=True):
         obj.location, obj.rotation_quaternion = loc, q
         state['handles'][side] = stored(obj)
 
+TOOL_FIST = 'MaruToolFist'   # the handle on the right fist where a tool's handle runs through it: x along the handle
+FIST_NUMBERS = ('TOOL_FIST_ALONG', 'TOOL_FIST_IN', 'TOOL_FIST_TILT', 'TOOL_FIST_CANT')
+
+def fist_live(p):
+    """The tool fist numbers as the sliders have them (walk's hold the frozen ones while the fist is edited)."""
+    return tuple(getattr(p, 'walk_' + n) for n in FIST_NUMBERS)
+
+def fist_frame(numbers):
+    """The right fist's frame on a tool's handle at rest (armature space) for the given tool fist numbers: at the
+    point walk.tool_fist gives, x along the handle toward the thumb's end, z out of the palm square to it."""
+    keep = tuple(getattr(walk, n) for n in FIST_NUMBERS)
+    try:
+        for n, v in zip(FIST_NUMBERS, numbers):
+            setattr(walk, n, v)
+        at, way = walk.tool_fist('R', -1)
+    finally:
+        for n, v in zip(FIST_NUMBERS, keep):
+            setattr(walk, n, v)
+    hn = 'hand.R'
+    n0 = Vector((-walk.HAND_PALM[0], walk.HAND_PALM[1], walk.HAND_PALM[2]))
+    z = (n0 - n0.dot(way) * way).normalized()
+    M = Matrix((way, z.cross(way), z)).transposed().to_4x4()
+    M.translation = walk.head[hn] + at
+    return M
+
+def fist_kind(what, kind):
+    """Whether the clip shown closes the right fist round a tool's handle (a WORK kind with a tool)."""
+    return (what == 'work' and hasattr(walk, 'tool_fist') and kind in getattr(walk, 'WORK', {})
+            and walk.WORK[kind].get('tool') is not None and 'R' in walk.work_grips(kind))
+
+def tool_fist_edit(self, context):
+    """Editing the tool fist: the hands held as they are (posed with the numbers they have now) while the handle and
+    sliders move the tool in the right fist; leaving it poses the hands round the tool with the new numbers."""
+    state['fist0'] = fist_live(self) if self.tool_fist_edit else None
+    state['fist'] = None
+    repose()
+
+def fist_held(X, M):
+    """While the tool fist is edited, the tool's matrix M (armature space) moved in the right hand from the fist it was
+    posed with to the one the sliders give, the hand left as it is."""
+    p = props()
+    if state.get('fist0') is None or X is None:
+        return M
+    H = X['hand.R']
+    return H @ fist_frame(fist_live(p)) @ fist_frame(state['fist0']).inverted() @ H.inverted() @ M
+
+def place_tool_fist(p, what, kind, X, write=True):
+    """An arrows empty where the shown tool's handle runs through the right fist, x along it toward the thumb's end,
+    while the tool fist is edited (left where it is while it is being moved)."""
+    obj = bpy.data.objects.get(TOOL_FIST)
+    if not p.tool_fist_edit or X is None or not fist_kind(what, kind):
+        if obj is not None:
+            bpy.data.objects.remove(obj)
+        state['fist'] = None
+        return
+    if obj is None:
+        obj = bpy.data.objects.new(TOOL_FIST, None)
+        obj.empty_display_type = 'ARROWS'
+        obj.rotation_mode = 'QUATERNION'
+        obj.hide_render = True
+        bpy.context.scene.collection.objects.link(obj)
+        state['fist'] = None
+    mw = walk.arm.matrix_world
+    obj.empty_display_size = walk.LEG * mw.to_scale().y * 0.2
+    if state.get('fist') is not None and (p.playing or not write):
+        return
+    M = X['hand.R'] @ fist_frame(fist_live(p))
+    loc, q, _ = (mw @ M).decompose()
+    obj.location, obj.rotation_quaternion = loc, q
+    state['fist'] = stored(obj)
+    state['fist_hand'] = X['hand.R'].copy()
+
+def tool_fist_moved(p):
+    """The tool fist handle moved (G) sets where the handle runs through the fist (TOOL_FIST_ALONG, TOOL_FIST_IN: its
+    place along the handle is kept), and turned (R) its slant (TOOL_FIST_TILT, TOOL_FIST_CANT: its x, the handle's way;
+    the turn about it is the hold's, worked out). Whether it was."""
+    obj = bpy.data.objects.get(TOOL_FIST)
+    if obj is None or state.get('fist') is None or state.get('fist_hand') is None:
+        return False
+    loc0, q0 = state['fist']
+    loc, q = obj.location.copy(), obj.rotation_quaternion.normalized()
+    mw = walk.arm.matrix_world
+    if (loc - loc0).length <= 1e-5 * mw.to_scale().y and abs(q.dot(q0)) >= TURNED:
+        return False
+    state['fist'] = (loc, q)
+    back = (mw @ state['fist_hand']).inverted()
+    hn, leg = 'hand.R', walk.LEG
+    at = back @ loc - walk.head[hn]
+    way = (back.to_3x3() @ (q.to_matrix() @ Vector((1, 0, 0)))).normalized()   # the handle's way, at rest
+    d0 = (walk.tail[hn] - walk.head[hn]).normalized()
+    n0 = Vector((-walk.HAND_PALM[0], walk.HAND_PALM[1], walk.HAND_PALM[2]))
+    t0 = d0.cross(n0)
+    t0 = (t0 - t0.dot(d0) * d0).normalized()
+    n0 = (n0 - n0.dot(d0) * d0).normalized()
+    tilt = math.degrees(math.atan2(way.dot(d0), way.dot(t0)))
+    cant = math.degrees(math.asin(max(-1.0, min(1.0, -way.dot(n0)))))
+    # The place as so far along the hand and out of the palm, less however far along the handle it was moved.
+    a, b, _ = Matrix((d0, n0, way)).transposed().inverted() @ at
+    p['walk_TOOL_FIST_ALONG'] = a / leg - walk.WORK_GRIP
+    p['walk_TOOL_FIST_IN'] = walk.WORK_PALM - b / leg
+    p['walk_TOOL_FIST_TILT'], p['walk_TOOL_FIST_CANT'] = tilt, cant
+    return True
+
 def place_grip(p, what, kind, write=True):
     """An arrows empty where a weapon on the 'hand' line is held, x along it and z out of its top, for the stance
     shown on its own (left where it is while playing, or when it was just moved)."""
@@ -2410,11 +2622,12 @@ def stored(obj):
     return obj.location.copy(), obj.rotation_quaternion.normalized()
 
 def clear_handles():
-    for name in (HANDLE + 'L', HANDLE + 'R', GRIP, HOLSTER_GRIP, GEAR_GRIP):
+    for name in (HANDLE + 'L', HANDLE + 'R', GRIP, HOLSTER_GRIP, GEAR_GRIP, TOOL_FIST):
         obj = bpy.data.objects.get(name)
         if obj is not None:
             bpy.data.objects.remove(obj)
     state['handles'].clear()
+    state['fist'] = None
     state['grip'] = None
     state['holster'] = None
     state['gear'] = None
@@ -2537,7 +2750,7 @@ def handles_moved(*_):
         finally:
             state['busy'] = False
         return
-    if not state.get('holster') and not state.get('gear') and (not (state['handles'] or state['grip']) or state['chest'] is None):
+    if not state.get('holster') and not state.get('gear') and not state.get('fist') and (not (state['handles'] or state['grip']) or state['chest'] is None):
         return
     state['busy'] = True   # the re-pose updates the scene itself (draw_weapon): don't look again from inside it
     try:
@@ -2547,6 +2760,13 @@ def handles_moved(*_):
 
 def moved_handles():
     p = props()
+    if tool_fist_moved(p):
+        state['quiet'] = {'fist'}   # leave the fist handle where it was put
+        try:
+            repose()
+        finally:
+            state['quiet'] = set()
+        return
     if gear_moved(p):
         state['quiet'] = {'gear'}   # leave the gear handle where it was put
         try:
@@ -2679,6 +2899,7 @@ def repose(_self=None, _context=None):
     p = props()
     push_settings(p)
     what, kind = clip_of(p)
+    state['others'] = None
     if what == 'aim':
         entry = walk.aimed_entry(kind.partition('/')[0]) or {}
         for key, _, _ in AIM_NUMBERS:
@@ -2775,9 +2996,11 @@ def repose(_self=None, _context=None):
                         else walk.draw_keys(kind)['guard'] if what in ('draw', 'holster') else None,
                         drawn=drawn_from(what, kind, p.time % 1.0))
             draw_tool(what if what in ('read', 'smoke', 'chalk', 'stir', 'stir_crouch', 'stir_campfire', 'stir_campfire_sit') else kind if what == 'work' else None, p.time % 1.0, X)
+            place_tool_fist(p, what, kind, X, write='fist' not in state['quiet'])
             draw_instrument(what)
             draw_load(p, what, kind)
             draw_lovers(p, what, kind, p.time % 1.0)
+            draw_others(p, what, kind)
             place_grip(p, what, kind, write='grip' not in state['quiet'])
             state['mix'] = body_mix()
             draw_worn(p, shield_taken(what, kind, p.time % 1.0), drawn_from(what, kind, p.time % 1.0))
@@ -2840,13 +3063,16 @@ CATEGORY_OF = {'drafted': 'drafted', 'carry': 'carry', 'carried': 'carry', 'bend
                'hurt': 'hurt', 'cower': 'hurt', 'hunker': 'hurt', 'cover': 'drafted', 'dive': 'hurt', 'duck': 'hurt', 'roll': 'hurt', 'flinch': 'hurt', 'reel': 'hurt', 'daze': 'hurt'}
 
 def category_of(clip):
-    """The category a clip's id ('drafted:rifle', 'gait' ...) is listed under; anything not named is Moving."""
-    return CATEGORY_OF.get(clip.partition(':')[0], 'move')
+    """The category a clip's id ('drafted:rifle', 'gait' ...) is listed under; anything not named is Moving. An
+    expansion's clips are under its own."""
+    what = clip.partition(':')[0]
+    return what if what in EXPANSIONS else CATEGORY_OF.get(what, 'move')
 
 def category_items():
-    """The categories that have clips, in CATEGORIES' order."""
+    """The categories that have clips, in CATEGORIES' order, then the expansions'."""
     have = {category_of(c) for c, _, _ in clip_items()}
-    return [c for c in CATEGORIES if c[0] in have]
+    return [c for c in CATEGORIES if c[0] in have] + [(x, mod.NAME, 'Clips of %s (an expansion)' % mod.NAME)
+                                                      for x, mod in EXPANSIONS.items() if x in have]
 
 clip_in_cache = {}   # Blender's dynamic menus need their item strings kept alive
 
@@ -3143,6 +3369,11 @@ def clip_items():
             weapon = walk.HOLSTER_WEAPON[t]
             items.append(('draw:' + k, 'Draw: %s, %s' % (slot, t), 'Taking a %s from %s, by Time, as the export finds its handle (walk.draw_at)' % (weapon, slot)))
             items.append(('holster:' + k, 'Holster: %s, %s' % (slot, t), 'Putting a %s back in %s, by Time: the draw backwards' % (weapon, slot)))
+    for x, mod in EXPANSIONS.items():
+        try:
+            items += [('%s:%s' % (x, c), label, text) for c, label, text in mod.clips()]
+        except Exception as e:
+            print('PREVIEW expansion %s: no clips: %s: %s' % (mod.NAME, type(e).__name__, e))
     return items
 
 def build_props():
@@ -3221,6 +3452,11 @@ def build_props():
     for g in garment_names():
         ann[worn_prop(g)] = bpy.props.BoolProperty(name=g, default=False, update=repose, description='Wear %s (garment_%s.txt)' % (g, g))
     ann.update({
+        'tool_fist_edit': bpy.props.BoolProperty(name='Adjust the fist on the handle', default=False, update=tool_fist_edit,
+                                                 description="Hold the hands still and move the tool in the right fist with "
+                                                             "the MaruToolFist handle (G: where the handle runs through the fist, "
+                                                             "R: its slant) or the TOOL_FIST sliders; untick to pose the hands "
+                                                             "round it again. Write saves the numbers"),
         'gear_show': bpy.props.BoolProperty(name='Show worn gear', default=True, update=repose,
                                             description="Draw IsoRim's pack, belt and hip tool models on the body (walk.GEAR) on whatever clip is shown"),
         'gear_mount': bpy.props.EnumProperty(name='Mount', items=gear_mount_items, update=repose,
@@ -3329,6 +3565,13 @@ def build_props():
                                                       description="The weapon def's equippedAngleOffset (degrees): most melee weapons -65")
     for i, _ in enumerate(sections):
         ann['show_%d' % i] = bpy.props.BoolProperty(default=i == 0)
+    for x, mod in EXPANSIONS.items():
+        for name, comment in expansion_numbers(mod):
+            v = float(mod.get_number(name))
+            lo, hi = soft_range(v, signed='less than 0' in comment)
+            ann['%s_%s' % (x, name)] = bpy.props.FloatProperty(name=name, description=comment, default=v, soft_min=lo,
+                                                               soft_max=hi, step=10 if hi > 1 else 1, precision=3,
+                                                               update=repose)
     for name, comment, is_tuple in names:
         if is_tuple:
             v = getattr(walk, name)
@@ -3839,14 +4082,33 @@ class MARU_OT_write(bpy.types.Operator):
         src = write_gear(src, changed)
         with open(WALK_PY, 'w') as f:
             f.write(src)
+        report = ['walk.py: ' + (', '.join(changed) if changed else 'nothing changed')]
+        for x, mod in EXPANSIONS.items():
+            with open(mod.NUMBERS_FILE) as f:
+                src = f.read()
+            changed = []
+            def expansion_number(m, x=x):
+                if not hasattr(p, '%s_%s' % (x, m.group(1))):
+                    return m.group(0)
+                v = getattr(p, '%s_%s' % (x, m.group(1)))
+                if same([v], [float(m.group(3))]):
+                    return m.group(0)
+                changed.append(m.group(1))
+                new = fmt(v)
+                return m.group(1) + m.group(2) + new + realign(m.group(3), new, m.group(4))
+            src = EXPANSION_NUMBER.sub(expansion_number, src)
+            if changed:
+                with open(mod.NUMBERS_FILE, 'w') as f:
+                    f.write(src)
+                report.append('%s: %s' % (os.path.basename(mod.NUMBERS_FILE), ', '.join(changed)))
         reload_walk()
-        self.report({'INFO'}, 'walk.py: ' + (', '.join(changed) if changed else 'nothing changed'))
+        self.report({'INFO'}, '; '.join(report))
         return {'FINISHED'}
 
 class MARU_OT_reload(bpy.types.Operator):
     bl_idname = 'maru.gait_reload'
     bl_label = 'Reload walk.py'
-    bl_description = 'Read walk.py again (its numbers and its code), dropping slider changes not yet written'
+    bl_description = 'Read walk.py again (its numbers and its code), and any expansion\'s files, dropping slider changes not yet written'
 
     def execute(self, context):
         reload_walk()
@@ -3957,6 +4219,19 @@ class MARU_PT_gait(bpy.types.Panel):
 
         if what in ('drafted', 'carry'):
             self.draw_stance(p, 'DRAFTED' if what == 'drafted' else 'CARRY', kind)
+        if fist_kind(what, kind):
+            box = self.layout.box()
+            box.label(text='The fist on the handle (every tool, both hands)')
+            box.prop(p, 'tool_fist_edit')
+            row = box.row()
+            row.enabled = p.tool_fist_edit
+            row.operator('maru.gait_grab', text='Select fist handle', icon='EMPTY_ARROWS').target = TOOL_FIST
+            col = box.column(align=True)
+            for name in FIST_NUMBERS:
+                if 'walk_' + name in p.bl_rna.properties:
+                    col.prop(p, 'walk_' + name, text=name)
+            if p.tool_fist_edit:
+                box.label(text='Hands held still: the tool moves in the right fist', icon='INFO')
         if what == 'carry':
             self.draw_load(p, kind)
         if what == 'spoon':
@@ -3983,6 +4258,8 @@ class MARU_PT_gait(bpy.types.Panel):
             for name in ('LOVIN_CHIN', 'LOVIN_CLOSER', 'LOVIN_SPLAY', 'LOVIN_R_ALONG', 'LOVIN_R_SPLAY', 'LOVIN_R_CHIN'):
                 if 'walk_' + name in p.bl_rna.properties:
                     col.prop(p, 'walk_' + name, text=name)
+        if what in EXPANSIONS:
+            self.draw_expansion(p, what, kind)
         if what == 'drafted' and weapon_name(p, what, kind) in getattr(walk, 'WEAPONS', {}):
             self.draw_weapon(p, weapon_name(p, what, kind))
         if what == 'aim':
@@ -4030,6 +4307,31 @@ class MARU_PT_gait(bpy.types.Panel):
                     split.prop(p, 'run_' + name, text='')
                 elif two:
                     split.label(text='(both)')
+
+    def draw_expansion(self, p, x, kind):
+        """An expansion's clip: whoever is drawn with it, the gender sizes, its lines and its numbers."""
+        mod = EXPANSIONS[x]
+        box = self.layout.box()
+        row = box.row()
+        row.label(text='Drawn with its partner as the game places them')
+        row.prop(p, 'load', text='', icon='HIDE_OFF' if p.load else 'HIDE_ON', emboss=False)
+        row = box.row(align=True)
+        row.prop(p, 'pair_genders')
+        sub = row.row(align=True)
+        sub.enabled = p.pair_genders
+        sub.prop(p, 'pair_rig', text='')
+        try:
+            for line in mod.info(kind):
+                box.label(text=line)
+            shown = mod.numbers(kind)
+        except Exception as e:
+            box.label(text='%s: %s' % (type(e).__name__, e), icon='ERROR')
+            shown = []
+        col = box.column(align=True)
+        for name in shown:
+            if hasattr(p, '%s_%s' % (x, name)):
+                col.prop(p, '%s_%s' % (x, name), text=name)
+        box.label(text='Write puts these into %s' % os.path.basename(mod.NUMBERS_FILE))
 
     def draw_aim(self, p, kind):
         name, _, stage = kind.partition('/')
@@ -4336,6 +4638,11 @@ def reload_walk():
     walk = importlib.reload(walk)
     walk.__dict__.pop('_plain_tables', None)   # (a reload keeps old attributes: the plain tables are read from the file again)
     importlib.reload(holster_push)
+    for mod in EXPANSIONS.values():
+        try:
+            mod.reload()
+        except Exception as e:
+            print('PREVIEW expansion %s not reloaded: %s: %s' % (mod.NAME, type(e).__name__, e))
     registered.pop('figure', None)
     keep = props()
     playing, gait, phase, time, over, clip = keep.playing, keep.gait, keep.phase, keep.time, keep.over, keep.clip
@@ -4390,6 +4697,8 @@ def swap_props():
     slab_tables()
     registered['names'] = read_tuned()
     registered['stances'] = read_stances()
+    registered['expansion_numbers'] = {x: expansion_numbers(mod) for x, mod in EXPANSIONS.items()}
+    registered['expansion_set'] = {}
     registered['props'] = build_props()
     bpy.utils.register_class(registered['props'])
     bpy.types.WindowManager.maru_gait = bpy.props.PointerProperty(type=registered['props'])

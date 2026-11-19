@@ -2,7 +2,8 @@
 
     python3 anim_scripts/stand_ins.py [defs folder ...] [--loo]
 
-Reads every apparel ThingDef in the folders (default: the game's Data/*/Defs and the Workshop mods), resolving ParentName
+Reads every apparel ThingDef in the folders (default: the game's Data/*/Defs and the Workshop mods, each mod only as the
+game loads it for 1.7: its LoadFolders.xml's newest version up to 1.7, else its root and newest version folder, mod_folders), resolving ParentName
 roughly as the game does (lists added to, the rest overridden), and the export's garment_*.txt for each garment's defs.
 Prints each apparel with its stand-ins, best first, and the top three scores. --loo also scores the apparel that do have a
 garment as if they had none, which shows what the scoring makes of the game's own clothes. The scores shown are single
@@ -32,11 +33,21 @@ SAME_STUFF = 0.03
 NAME_WORDS = 0.15
 GENERIC_BONUS = 0.03
 CHILD_ONLY_SHARE = 0.7
+NARROW_SHARE = 0.7
+# A narrower kind of a plain garment: behind it on coverage alone, unless the apparel's name says so (StandIns.cs).
+NARROW = {'CropTop', 'Shorts', 'ShortShorts'}
 WEIGHT = {'Torso': 3, 'Legs': 3, 'Arms': 2, 'Shoulders': 1, 'Neck': 0.5, 'Waist': 1, 'Hands': 1, 'Feet': 1,
           'UpperHead': 3, 'Eyes': 2, 'Mouth': 2, 'FullHead': 1}
 SAME = {'Teeth': 'Mouth', 'LeftShoulder': 'Shoulders', 'RightShoulder': 'Shoulders', 'LeftHand': 'Hands',
         'RightHand': 'Hands', 'MiddleFingers': 'Hands'}
-BODY = ['OnSkin', 'Middle', 'Shell']
+# A mod's layer is taken as the body layer it counts as (under, SkinnedFigure.BodyLayerOf): 'Underwear' for any
+# underwear layer (UnderWhere's Underwear and UnderwearTop, Kiiro's Kiiro_Underwear), OnSkin for Kiiro's trousers layer.
+BODY = ['Underwear', 'OnSkin', 'Middle', 'Shell']
+LAYER_ORDER = {'OnSkin': 0}   # each ApparelLayerDef's drawOrder, as the Defs are read
+LAYER_LABEL = {}              # and its label
+# A body layer, then the words in a layer's name or label that make it that layer (SkinnedFigure.BodyLayerWords).
+BODY_LAYER_WORDS = [('OnSkin', ('onskin', 'skin', 'pants', 'trouser', 'skirt', 'shorts', 'legwear')),
+                    ('Middle', ('middle',)), ('Shell', ('shell', 'outer'))]
 HEAD = ['Overhead', 'OnHead', 'StrappedHead', 'EyeCover']
 TECH = ['Animal', 'Neolithic', 'Medieval', 'Industrial', 'Spacer', 'Ultra', 'Archotech']
 NO_STAND_IN = {
@@ -47,7 +58,15 @@ NO_STAND_IN = {
     'ArmorHelmetCataphractPrestige', 'ArmorHelmetReconPrestige', 'ArmorMarineHelmetPrestige',
     'ArmorHelmetMechCommander', 'ArmorHelmetMechlordHelmet', 'RobeRoyal', 'ShirtRuffle', 'Shadecone', 'Tailcap',
     'TribalHeaddress', 'PsychicFoilHelmet', 'EltexSkullcap', 'Headwrap', 'WarVeil', 'HatTop', 'HatLadies',
-    'CE_SimpleNightVision', 'CE_AdvancedNightVision'}
+    'CE_SimpleNightVision', 'CE_AdvancedNightVision', 'Scarf'}
+# Other words naming the same thing as a NO_STAND_IN garment's name word, and phrases holding it that don't (StandIns.cs).
+NAME_ALIKE = {'scarf': ('neckerchief', 'kerchief', 'muffler', 'shemagh', 'keffiyeh', 'snood'),
+              'short': ('hotpant', 'hot pant'),   # hotpants are the short shorts, not the shorts
+              'crop': ('tank top', 'tanktop', 'halter', 'tube top')}
+NAME_NOT = {'scarf': ('headscarf', 'head scarf'), 'pants': ('hotpant', 'underpant')}
+# A NO_STAND_IN garment named by the apparel is the thing itself: coverage at least NAMED_COVER, NAMED_BONUS ahead.
+NAMED_COVER = 0.5
+NAMED_BONUS = 1.0
 GENERIC = {'BasicShirt', 'Pants', 'Jacket', 'Duster', 'FlakVest', 'SimpleHelmet', 'AdvancedHelmet', 'Tuque', 'CollarShirt',
            'PowerArmor', 'Parka', 'GasMask', 'ClothMask'}
 # Garments over the face, standing in only for apparel named as one (MASK_WORDS): mods give plain hats FullHead.
@@ -56,16 +75,55 @@ MASK_WORDS = ('mask', 'respirator', 'balaclava', 'veil')
 COMMON_WORDS = {'hat', 'helmet', 'armor', 'armour', 'apparel', 'kid'}
 
 
+def mod_folders(mod, version='1.7'):
+    """The folders the game loads of a mod for this version: its LoadFolders.xml's entry for the newest version up to
+    it (each li, those for a mod's IfModActive too), else its root, Common and its newest version folder up to it."""
+    def ver(t):
+        m = re.fullmatch(r'v?(\d+)\.(\d+)', t)
+        return (int(m.group(1)), int(m.group(2))) if m else None
+    want = ver(version)
+    lf = os.path.join(mod, 'LoadFolders.xml')
+    if os.path.exists(lf):
+        try:
+            root = ET.parse(lf).getroot()
+            best = max(((ver(e.tag), e) for e in root if ver(e.tag) and ver(e.tag) <= want), key=lambda x: x[0], default=None)
+            if best:
+                out = []
+                for li in best[1].findall('li'):
+                    t = (li.text or '').strip().strip('/')
+                    out.append(os.path.join(mod, t) if t else mod)
+                return out
+        except ET.ParseError:
+            pass
+    # Without one the game loads the root, Common and the newest version folder.
+    vs = [(ver(n), n) for n in os.listdir(mod) if ver(n) and ver(n) <= want and os.path.isdir(os.path.join(mod, n))]
+    common = [os.path.join(mod, 'Common')] if os.path.isdir(os.path.join(mod, 'Common')) else []
+    return [mod] + common + ([os.path.join(mod, max(vs)[1])] if vs else [])
+
+
+def files_of(folder):
+    """Its XML files: a mod's root only its own Defs (its version folders are read as mod_folders says), any other
+    folder all of them."""
+    if os.path.exists(os.path.join(folder, 'About', 'About.xml')):
+        return glob.glob(os.path.join(folder, 'Defs', '**', '*.xml'), recursive=True)
+    return glob.glob(os.path.join(folder, '**', '*.xml'), recursive=True)
+
+
 def read_defs(folders):
     nodes = {}
     for r in folders:
-        for f in glob.glob(os.path.join(r, '**', '*.xml'), recursive=True):
+        for f in files_of(r):
             if os.sep + 'Patches' + os.sep in f:
                 continue
             try:
                 root = ET.parse(f).getroot()
             except Exception:
                 continue
+            for d in root.findall('ApparelLayerDef'):
+                if d.findtext('defName') and d.findtext('drawOrder'):
+                    LAYER_ORDER[d.findtext('defName')] = float(d.findtext('drawOrder'))
+                if d.findtext('defName'):
+                    LAYER_LABEL[d.findtext('defName')] = d.findtext('label') or ''
             for d in root.findall('ThingDef'):
                 if d.get('Name'):
                     nodes[('n', d.get('Name'))] = d
@@ -104,9 +162,21 @@ def groups_of(gs):
     return out
 
 
+def under(layer):
+    """The body layer a layer counts as (SkinnedFigure.BodyLayerOf): 'under' in its name or label Underwear, a word of
+    BODY_LAYER_WORDS that layer, else drawn under the skin layer Underwear, else itself."""
+    text = (layer + ' ' + LAYER_LABEL.get(layer, '')).lower()
+    if 'under' in text:
+        return 'Underwear'
+    for body, words in BODY_LAYER_WORDS:
+        if any(w in text for w in words):
+            return body
+    return 'Underwear' if LAYER_ORDER.get(layer, 0) < LAYER_ORDER['OnSkin'] else layer
+
+
 def profile(d):
     return dict(mask=any(w in (d['name'] + ' ' + d['label']).lower() for w in MASK_WORDS),
-                name=d['name'], layers=d['layers'], groups=groups_of(d['groups']),
+                name=d['name'], layers=list(dict.fromkeys(under(x) for x in d['layers'])), groups=groups_of(d['groups']),
                 armour=any('armor' in c.lower() for c in d['cats']), noble=any('noble' in c.lower() for c in d['cats']),
                 vacsuit='Vacsuit' in d['tags'] or 'vacsuit' in d['name'].lower(), child='Adult' not in d['stage'],
                 tech=d['tech'], stuff=set(d['stuff']), text=(d['name'] + ' ' + d['label']).lower())
@@ -144,6 +214,9 @@ def factors(a, g):
         times *= NOT_VACSUIT
     if g['child']:
         times *= CHILD_ONLY_SHARE
+    named = name_share(a, g)
+    if g['garment'] in NARROW and named <= 0:
+        times *= NARROW_SHARE
     if g['vacsuit'] and a['vacsuit']:
         plus += BOTH_VACSUIT
     if a['noble'] and g['noble']:
@@ -152,19 +225,28 @@ def factors(a, g):
         plus += SAME_TECH * max(0, 1 - abs(TECH.index(a['tech']) - TECH.index(g['tech'])) / TECH_STEP)
     if a['stuff'] & g['stuff']:
         plus += SAME_STUFF
-    plus += NAME_WORDS * name_share(a, g)
+    plus += NAME_WORDS * named
     if g['garment'] in GENERIC:
         plus += GENERIC_BONUS
     return times, plus
 
 
+def name_found(text, t):
+    for x in NAME_NOT.get(t, ()):
+        text = text.replace(x, ' ')
+    return t in text or any(w in text for w in NAME_ALIKE.get(t, ()))
+
+
 def name_share(a, g):
-    return sum(1 for t in g['tokens'] if t in a['text']) / len(g['tokens']) if g['tokens'] else 0
+    return sum(1 for t in g['tokens'] if name_found(a['text'], t)) / len(g['tokens']) if g['tokens'] else 0
 
 
 def usable(a, g):
-    """A garment of NO_STAND_IN stands in only for apparel with all its name words, one of MASKS only for a mask."""
-    return (not g['named_only'] or name_share(a, g) == 1) and (g['garment'] not in MASKS or a['mask'])
+    """A garment of NO_STAND_IN stands in only for apparel with all its name words, one of MASKS only for a mask, and one
+    over the skull (not a mask, which FullHead only says is, nor one the apparel is named as) only for apparel over it: a
+    scarf over the mouth or neck scored just enough for the power armour helmet."""
+    return (not g['named_only'] or name_share(a, g) == 1) and (g['garment'] not in MASKS or a['mask']) \
+        and ('UpperHead' not in g['groups'] or 'UpperHead' in a['groups'] or g['garment'] in MASKS or g['named_only'])
 
 
 def as_hat(a):
@@ -182,10 +264,13 @@ def coverage(groups, covered):
 def score(a, groups, g):
     lf = layer_share(a['layers'], g['layers'])
     c = coverage(groups, g['groups'])
+    named = g['named_only'] and name_share(a, g) == 1
+    if named:
+        c = max(c, NAMED_COVER)
     if lf == 0 or c == 0:
         return 0
     times, plus = factors(a, g)
-    return c * lf * times + plus
+    return c * lf * times + plus + (NAMED_BONUS if named else 0)
 
 
 def pair_score(a, g, h):
@@ -223,32 +308,48 @@ def stand_ins(a, garments, skip=None):
 def main():
     args = [x for x in sys.argv[1:] if not x.startswith('--')]
     loo = '--loo' in sys.argv
-    defs = read_defs(args or glob.glob(os.path.join(GAME, '*', 'Defs')) + glob.glob(os.path.join(WORKSHOP, '*')))
-    garments, own = [], {}
+    defs = read_defs(args or glob.glob(os.path.join(GAME, '*', 'Defs'))
+                     + [f for m in sorted(glob.glob(os.path.join(WORKSHOP, '*'))) for f in mod_folders(m)])
+    garments, own, named = [], {}, {}
     for f in sorted(glob.glob(os.path.join(CHIBI, 'garment_*.txt'))):
         name = os.path.basename(f)[len('garment_'):-4]
         lines = {}
         with open(f) as fh:
             for line in fh:
                 p = line.split()
-                if p and p[0] in ('defs', 'held', 'with_legwear', 'baby_romper'):
+                if p and p[0] in ('defs', 'held', 'with_legwear', 'baby_romper', 'layer', 'groups', 'like', 'stands_for'):
                     lines[p[0]] = p[1:]
         for x in lines.get('defs', []):
             own[x] = name
+        for x in lines.get('stands_for', []):
+            named.setdefault(x, []).append(name)
         if set(lines) & {'held', 'with_legwear', 'baby_romper'}:
             continue
         d = next((defs[x] for x in lines.get('defs', []) if x in defs), None)
         if d:
             g = profile(d)
-            g.update(garment=name, tokens=tokens(d['name']), named_only=name in NO_STAND_IN)
-            garments.append(g)
+            g['layers'] += [x for x in lines.get('layer', []) if x not in g['layers']]   # its lines add layers and groups
+            g['groups'] |= groups_of(lines.get('groups', []))
+        elif lines.get('layer') and lines.get('groups'):
+            # No apparel of its own on disk: by its layer (one or more) and groups lines, as StandIns.cs.
+            g = dict(mask=False, armour=False, noble=False, vacsuit=False, child=False, tech=None, stuff=set(),
+                     layers=lines['layer'], groups=groups_of(lines['groups']), text=name.lower())
+        else:
+            continue
+        # Its kind (tech level, stuff, armour) from the apparel its like line names, if there, over its def's.
+        like = defs.get((lines.get('like') or [None])[0])
+        if like:
+            k = profile(like)
+            g.update(tech=k['tech'], stuff=k['stuff'], armour=k['armour'], noble=k['noble'])
+        g.update(name=name, garment=name, tokens=tokens(name), named_only=name in NO_STAND_IN)
+        garments.append(g)
     for name in sorted(defs):
         d = defs[name]
         if name in own and not loo:
             print(f'{name:45} own {own[name]}')
             continue
         a = as_hat(profile(d))
-        found = [] if never(d) else stand_ins(a, garments, own.get(name))
+        found = [] if never(d) else named.get(name) or stand_ins(a, garments, own.get(name))
         top = sorted(((score(a, a['groups'], g), g['garment']) for g in garments if g['garment'] != own.get(name) and usable(a, g)), reverse=True)[:3]
         print(f"{'LOO ' if name in own else ''}{name:45} {'+'.join(found) or '-':28} " + '  '.join(f'{n}:{s:.2f}' for s, n in top))
 

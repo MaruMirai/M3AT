@@ -34,6 +34,11 @@ The steps that took the planting take (`plant`) into the game, for the next clip
    SteamVR's floor is ... off`: taken from the feet), the hands (`--wrist <share>` of the wrist's bend, 0.5 by default)
    and how near the ground the hands and knees come (measure each fingertip's height over the loop in Blender).
 
+5. Tracking glitches (a part jumping and back, the two wands on a tool leaving their spacing, a tracker jumping and
+   staying off, a tracker not worn): `python3 anim_scripts/mocap/fix_take.py <take.csv> <take>_fixed.csv --despike
+   [...]` (its docstring has the steps) and import the fixed copy. A tool take with the hips tracker at the front wants
+   `--forward-tool`.
+
 ## Into the game
 
 1. walk.py: `<NAME>_CLIP = clip_file('<name>')`, `<NAME>_SECONDS` from its frames and fps, and `<name>_at(t)`

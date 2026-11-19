@@ -7,7 +7,9 @@ texture garment_CeremonialCultistMask.png
 hide_hair no
 hide_face no
 # hide k ...: body triangles (skin.txt's f lines, from 0) left out while it is worn.
-hide 864 945 946 947 974 982 1008 1009 1010 1011 1012 1025 1102 1103 1105 1127 1128 1136 1145 1180 1181 1182
+hide 864 945 947 974 982 1008 1009 1010 1011 1012 1025 1103 1105 1127 1128 1136 1145 1180 1181 1182
+# opens k ...: body triangles it covers at rest that a pose brings out from under its edge (hide_edges.py), drawn though it is worn.
+opens 946 1102
 v -0.00000 1.08677 0.18728
 v -0.00000 0.80070 0.10921
 v 0.01826 0.74832 0.11085

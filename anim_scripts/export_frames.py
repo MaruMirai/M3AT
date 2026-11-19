@@ -44,7 +44,7 @@ JOINT_NEAREST = 16       # body vertices each joint is tied to
 # name; this goes for a mesh, a .glb's file name and a dashed vertex group alike. Its custom property "defs" (defNames,
 # comma separated) names others instead, such as a variant of the same shape. A garment listed here (or given custom
 # properties "layer" and "groups", comma separated) also stands in for any apparel with no garment of its own that is
-# worn on that layer and covers one of those body part groups.
+# worn on that layer (or one of those, space separated) and covers one of those body part groups.
 GARMENTS = {'BasicShirt': ('OnSkin', 'Torso'), 'Pants': ('OnSkin', 'Legs')}
 DEF_PREFIXES = ('CE_',)   # Combat Extended's
 
@@ -176,6 +176,11 @@ GARMENT_PROPS['Burka'] = {'hide_hair': True, 'hide_face': False}
 # The slave collar (make_hats.py) is a band round the neck: it takes the body's weights rather than riding a bone, so it
 # bends with the neck and the body keys fatten it with the neck, and it leaves the hair and the face on.
 GARMENT_PROPS['Collar'] = {'hide_hair': False, 'hide_face': False}
+# The scarf (make_hats.py): built and weighted as the collar. The game has no scarf, so it stands in for other mods' (by
+# name only, StandIns.cs's NoStandIn and NameAlike) on whatever layer they are worn (its layer line names them all); its
+# palette is pale, so always tinted, as a mod's scarf may be neither made of stuff nor dyed.
+GARMENT_PROPS['Scarf'] = {'hide_hair': False, 'hide_face': False, 'tint': True}
+GARMENTS['Scarf'] = ('Overhead OnSkin Middle Shell', 'Neck')
 # The Furskin gene's tufts (anim_scripts/make_fur_edges.py): drawn for the gene, not for apparel (its def is no apparel's, and
 # SkinnedFigure.FurPiece finds it by that name). "fur": the body stays whole under it, as its skin is the undercoat, and
 # it is written with the normals of the skin under each vertex, so the tufts are lit as the skin is and their roots melt into it.
@@ -207,9 +212,47 @@ for _shield, _standoff in (('CE_MeleeShield', 1.25), ('CE_BallisticShield', 1.75
 # in the file (the body's less the arms', neck's and head's, as the skin over the shoulder blades is mostly the arms'),
 # the leg struts and joint discs whole on their bones, so "part_weights" keeps them all but the belt's and cuffs'.
 GARMENT_PROPS['CE_ExoFrame'] = {'hard': True, 'part_weights': True}
+# Underwear and light clothes (Models/garments: briefs, a bandeau, a sleeveless crop top, mid-thigh shorts and short
+# shorts). Four are UnderWhere's own (Malistaticy.UnderWhere: its Underwear and UnderwearTop layers, under the skin
+# layer): the briefs its panties, the shorts its boxers, the crop top its tank top, the bandeau its chest wrap; its bra,
+# loincloth take stand-ins. The long johns (make_underwear.py's, the collared shirt's and trousers' body faces whole,
+# painted a waffle-knit union suit by paint_long_johns.py) are its long johns. Each also stands in for other mods' apparel by its layer and groups
+# (GARMENTS; the game takes any layer drawn under OnSkin as "Underwear", StandIns.cs), the crop top and shorts as
+# outer clothes too. A garment whose def is loaded is described by that def, its layer line adding layers, as
+# StandIns.cs does; one without takes its kind (tech level, stuff) from its "like" def, so the shorts aren't behind the
+# trousers on those alone.
+for _under, _def, _layers, _groups, _like in (('Underwear', 'UnderWhere_Panties', 'Underwear', 'Legs', 'Apparel_Pants'),
+                                              ('Shorts', 'UnderWhere_Boxers', 'Underwear OnSkin', 'Legs', 'Apparel_Pants'),
+                                              ('CropTop', 'UnderWhere_Tanktop', 'Underwear OnSkin', 'Torso,Shoulders', 'Apparel_BasicShirt'),
+                                              ('Chestwrap', 'UnderWhere_Chestwrap', 'Underwear', 'Torso', 'Apparel_BasicShirt'),
+                                              ('ShortShorts', None, 'OnSkin', 'Legs', 'Apparel_Pants'),
+                                              ('LongJohns', 'UnderWhere_LongJohns', 'Underwear', 'Torso,Legs', 'Apparel_Pants')):
+    GARMENT_PROPS[_under] = {'like': _like}
+    if _def:
+        GARMENT_PROPS[_under]['defs'] = _def
+    GARMENTS[_under] = (_layers, _groups)
+# Apparel stood in for by name, whatever the scoring says (a "stands_for" line; every garment naming it is drawn): what
+# the defs can't tell apart. Kiiro's (Kiiro_Race) underwear is a bra and briefs, its simple underwear a bandeau and
+# briefs, its stockings a bra, briefs and thigh-high stockings and its pantyhose a bra and tights (the trousers), and
+# its short T-shirt a cropped tee, by their sprites.
+STANDS_FOR = {
+    'CropTop': ('Kiiro_Underwear_Normal', 'Kiiro_Stocking_Black', 'Kiiro_Stocking_White', 'Kiiro_Pantynose_Black',
+                'Kiiro_Pantynose_White', 'Kiiro_TShirtShort'),
+    'Chestwrap': ('Kiiro_SimpleUnderwear',),
+    'Underwear': ('Kiiro_Underwear_Normal', 'Kiiro_SimpleUnderwear', 'Kiiro_Stocking_Black', 'Kiiro_Stocking_White'),
+    'Pants': ('Kiiro_Stocking_Black', 'Kiiro_Stocking_White', 'Kiiro_Pantynose_Black', 'Kiiro_Pantynose_White'),
+}
+for _name, _defs in STANDS_FOR.items():
+    GARMENT_PROPS.setdefault(_name, {})['stands_for'] = ' '.join(_defs)
 # Garments that keep the weights on them: loose ones standing well off the skin, which on the body's weights stretch
 # badly (a long skirt would follow each thigh and tear between the legs). Every other garment's are ignored.
 KEEP_WEIGHTS = ('Duster', 'TribalA', 'Parka', 'Cape', 'Robe', 'RobeRoyal', 'Burka', 'LabCoat')
+# Of those, the ones cut from the body's own faces (a tunic, a coat's top) with a skirt or hood of their own built on: the
+# faces on the skin always take the body's weights as they are now (body_cut_weights), so a re-weighted body can't leave
+# them bending as the skin used to (the tribalwear's bodice went with the raised arm and the chest came through it). On
+# the skin is within BODY_CUT_BAND of the distance off it most of the garment's vertices share (the make script's offset).
+BODY_CUT = ('Duster', 'TribalA', 'Robe', 'RobeRoyal', 'Burka', 'LabCoat')
+BODY_CUT_BAND = 1.25
 # Textured garments: a garment with a UV map and an image on its material's Base Color is drawn with that image. It is
 # written as garment_<name>.png, at most TEXTURE_SIZE pixels across, opaque unless the garment has the custom property
 # "cutout" (then cut out below alpha 0.5, as the hair is). In the game it is tinted by the apparel's colour if the apparel
@@ -847,6 +890,65 @@ def filled(moves, outward, neighbours):
         moves = out
     return moves
 
+def body_cut_weights(name, own, over, gap, neighbours):
+    """A BODY_CUT garment's weights: each vertex on the skin (its distance off it within BODY_CUT_BAND of the commonest,
+    the offset its make script pushed the body's faces out by) the body's at the place under it, as they are now; every
+    other vertex (the skirt, the hood) its own, moved by as much of the change its nearest such vertex got (through the
+    mesh) as it still carries of that vertex's weights, so a skirt blended from its top edge's weights to the thighs goes
+    on from the edge's new ones."""
+    def body_under(tri, bws):
+        ws = {}
+        for i, t in zip(tri, bws):
+            for b, w in weights[i]:
+                ws[b] = ws.get(b, 0.0) + w * t
+        total = sum(ws.values())
+        return {b: w / total for b, w in ws.items() if w > 1e-4}
+    cells = [d * scale for d in gap]
+    step = 0.0005
+    counts = {}
+    for d in cells:
+        counts[int(d / step)] = counts.get(int(d / step), 0) + 1
+    mode = (max(counts, key=counts.get) + 0.5) * step
+    on = [d <= mode * BODY_CUT_BAND for d in cells]
+    old = [dict(ws) for ws in own]
+    new = [body_under(tri, bws) if o else None for o, (tri, bws) in zip(on, over)]
+    # Each other vertex's nearest vertex on the skin, by steps through the mesh.
+    source = [v if o else None for v, o in enumerate(on)]
+    front = [v for v, o in enumerate(on) if o]
+    while front:
+        nxt = []
+        for v in front:
+            for j in neighbours[v]:
+                if source[j] is None:
+                    source[j] = source[v]
+                    nxt.append(j)
+        front = nxt
+    for v in range(len(source)):   # (a copy at a texture seam is no one's neighbour, as neighbours go by place)
+        if source[v] is None:
+            source[v] = next((source[j] for j in neighbours[v] if source[j] is not None), None)
+    changed = []
+    out = []
+    for v, ws in enumerate(old):
+        if on[v]:
+            out.append(sorted(new[v].items()))
+            changed.append(sum(abs(new[v].get(b, 0.0) - ws.get(b, 0.0)) for b in set(new[v]) | set(ws)))
+            continue
+        s = source[v]
+        if s is None:   # (a piece joined to nothing on the skin keeps its own)
+            out.append(sorted(ws.items()))
+            continue
+        carried = sum(min(w, old[s].get(b, 0.0)) for b, w in ws.items())
+        moved = dict(ws)
+        for b in set(new[s]) | set(old[s]):
+            moved[b] = moved.get(b, 0.0) + carried * (new[s].get(b, 0.0) - old[s].get(b, 0.0))
+        moved = {b: w for b, w in moved.items() if w > 1e-4}
+        total = sum(moved.values())
+        out.append(sorted((b, w / total) for b, w in moved.items()))
+    print('BODY_CUT %s: %d of %d vertices on the skin (within %.4f cells) take the body\'s weights, %d of them changed '
+          'by over 0.05 (most %.2f); the rest moved with them' % (name, sum(on), len(on), mode * BODY_CUT_BAND,
+          sum(1 for c in changed if c > 0.05), max(changed, default=0.0)))
+    return out
+
 def write_garment(g, path):
     """A garment: its base shape, its bone weights, its triangles, and a move per vertex for every body key."""
     props = Props(g)
@@ -888,6 +990,7 @@ def write_garment(g, path):
     for v, k in enumerate(place):
         first.setdefault(k, v)
     neighbours = [[first[k] for k in near[place[v]]] for v in range(len(g_rest))]
+    cut_gap = list(gap)   # (body_cut_weights: how far off the skin as made, before any bridging)
     if props.get('bridge', False):
         # Its rest shape lifted out of the body's creases over the hips (bridged()), then laid over the body again.
         g_rest = bridged(g_rest, over, outward, neighbours)
@@ -950,6 +1053,8 @@ def write_garment(g, path):
                   if x.weight > 0 and g.vertex_groups[x.group].name in bone_index]
             total = sum(w for _, w in ws)
             g_weights.append([(b, w / total) for b, w in ws] if total > 0 else [(bone_index[walk.HIPS], 1.0)])
+        if g.name in BODY_CUT:
+            g_weights = body_cut_weights(g.name, g_weights, over, cut_gap, neighbours)
     else:
         # A garment with the custom property "part_weights" keeps the weights on the vertices that have any (the
         # locust armour's boosters, whole on their shins, so they stay straight as the knee and ankle bend); the rest
@@ -994,6 +1099,12 @@ def write_garment(g, path):
         f.write('defs %s\n' % ' '.join(defs))
         if layer:
             f.write('layer %s\ngroups %s\n' % (layer, ' '.join(groups)))
+        if props.get('like'):
+            f.write('# like: the apparel its kind (tech level, stuff) is taken from when none of its defs is loaded.\n')
+            f.write('like %s\n' % props['like'])
+        if props.get('stands_for'):
+            f.write('# stands_for: apparel it is drawn for as a stand-in whatever the scoring says.\n')
+            f.write('stands_for %s\n' % props['stands_for'])
         if image:
             f.write('# texture: its image (t lines, a place on it per vertex); tint: whether the apparel\'s colour tints it.\n')
             f.write('texture %s\n' % texture)
@@ -1035,6 +1146,8 @@ def write_garment(g, path):
         f.write('# hide k ...: body triangles (skin.txt\'s f lines, from 0) left out while it is worn.\n')
         for k in range(0, len(hide), 32):
             f.write('hide %s\n' % ' '.join(str(x) for x in hide[k:k + 32]))
+        if hide_groups:
+            f.write('hide_edges no\n')   # its hiding is chosen (hide_groups, hide_body, hide_head): hide_edges.py leaves it be
         for i in order:
             f.write('v %.5f %.5f %.5f\n' % tuple(to_game(g_rest[i])))
         for i in order:
@@ -1278,6 +1391,11 @@ def write_anim(path, clips):
             f.write('# draw_timing at: walk.DRAW_AT, where a draw clip\'s hand closes on the handle. draw_slide clip share: the share\n')
             f.write('# of the clip the game swings the weapon to the hand over, ending there (walk.DRAW_SIZES).\n')
             f.write('draw_timing %.4f\n' % walk.DRAW_AT)
+            pick = getattr(walk, 'TOOL_CLIPS', {}).get('pickaxe')
+            if pick is not None and 'hit' in pick:
+                f.write('# pick_hit share: where the blow falls in work_pickaxe, 0 .. 1 through it (walk.TOOL_TAKES\' pickaxe), which the\n')
+                f.write('# game lays on its strike (WalkFigures.PickPhase), work_pickaxe_idle looped between strokes.\n')
+                f.write('pick_hit %.4f\n' % (pick['hit'] / pick['frames']))
             if hasattr(walk, 'HIP_GRAB'):
                 f.write('# hip_timing grab slide: walk.HIP_GRAB, where hip_draw\'s hand closes on the hip gear in its slot, and\n')
                 f.write('# walk.HIP_SLIDE, the share of the clip after that the game moves it from the slot into the hand over.\n')
@@ -1894,6 +2012,10 @@ with open(os.path.join(out, 'clip.txt'), 'w') as f:
     f.write('wade_ground_per_cycle %.4f\n' % wade_ground)
     f.write('swim_ground_per_cycle %.4f\n' % swim_ground)
 write_anim(os.path.join(out, 'anim.txt'), clips)
+# The body under a garment's edges that a pose brings out from under it, kept drawn (hide_edges.py: rewrites the
+# garments' hide lines and adds opens lines, from the clips just written).
+import hide_edges
+hide_edges.run(out)
 print('SKIN %s: %d vertices, %d bones, keys %s; skinning matches Blender within %.5f cells'
       % (body.name, len(rest), len(deform), ', '.join(body_keys) or 'none', skin_worst))
 if not CHECK_FITS:

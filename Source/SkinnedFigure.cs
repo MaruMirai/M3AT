@@ -101,6 +101,8 @@ namespace M3AT
             public string[] defs;     // a garment's: the apparel (ThingDef names) it is drawn for
             public string layer;      // and the apparel layer (ApparelLayerDef) it stands in on for apparel with no garment of its own, "" none (used only without a def the game has: StandIns.cs)
             public string[] groups;   // and the body part groups (BodyPartGroupDef) it stands in for, any of them
+            public string like;       // a garment with no def the game has: the apparel its kind (tech level, stuff, armour) is taken from (StandIns.cs)
+            public string[] standsFor;   // apparel it is drawn for as a stand-in whatever the scoring says (a two-piece set as two garments)
             public string textureFile;   // a garment's image, next to its file; null: none, drawn in the apparel's colour
             public int tint = -1;        // a textured garment's: 1 tinted by the apparel's colour, 0 not, -1 as the apparel is (Tinted)
             public Color mean = Color.white;   // a textured garment's mean colour, which its outline is drawn in (times the tint)
@@ -116,6 +118,9 @@ namespace M3AT
             public Matrix4x4? heldGrip; // and its held_grip line: from there to its rest place on hand.L as shield_draw takes it by its edge
             public Color? colour;       // a garment's own colour, in place of the apparel's (the shoes); null: the apparel's
             public int[] hides;       // a garment's: the body triangles (numbered as skin.txt's) under it, left out while it is worn
+            public int[] opens;       // a garment's: the body triangles it covers at rest that a pose brings out from under its edge
+                                      // (its opens lines, anim_scripts/hide_edges.py), drawn though it is worn; UnderOf keeps a
+                                      // garment under it drawn over them too
             public int wallsFrom = -1;   // built hair's: its first wall triangle (its walls line), which Decimated keeps whole
             public Vector2? wallUv;      // built hair's: the texture place every hairline wall takes (its wall_uv line, HairlineWalled)
             public WallAtlas wallAtlas;  // hair: its image's art, which its hairline walls keep their texture places on; null: not read
@@ -427,6 +432,10 @@ namespace M3AT
             return clips.ContainsKey(name) ? name : clip;
         }
 
+        // Where the blow falls in work_pickaxe, 0 .. 1 through it (anim.txt's pick_hit line, walk.TOOL_TAKES' pickaxe); -1
+        // for an export without it.
+        public float PickHitShare { get; private set; } = -1f;
+
         public int FramesOf(string clip)
         {
             Clip c;
@@ -635,6 +644,86 @@ namespace M3AT
             return false;
         }
 
+        // True if the layer is underwear (UnderWhere's Underwear and UnderwearTop, and other mods' layers like them), worn
+        // on the skin under a shirt and trousers: BodyLayerOf's "Underwear".
+        public static bool UnderSkin(ApparelLayerDef layer)
+        {
+            return BodyLayerOf(layer) == UnderwearLayer;
+        }
+
+        // The body layer a layer counts as, for what is kept on in bed, the shoes and the stand-ins: the game's own as they
+        // are; a mod's by what it is called first, as Kiiro draws its trousers and skirts on a layer of its own (Kiiro_Pants)
+        // under the skin layer, only so a shirt hangs over them, and has its own OnSkin, Middle and Shell layers beside the
+        // game's: "under" in its name or label is "Underwear", a word of BodyLayerWords that body layer; else, drawn under
+        // the skin layer, "Underwear"; else its own name (a belt, a backpack, webbing: a layer of its own). Cached per layer.
+        public static string BodyLayerOf(ApparelLayerDef layer)
+        {
+            if (layer == null)
+            {
+                return null;
+            }
+            string found;
+            if (bodyLayers.TryGetValue(layer, out found))
+            {
+                return found;
+            }
+            string text = (layer.defName + " " + (layer.label ?? "")).ToLowerInvariant();
+            if (text.Contains("under"))
+            {
+                found = UnderwearLayer;
+            }
+            for (int i = 0; found == null && i < BodyLayerWords.Length; i++)
+            {
+                for (int k = 1; k < BodyLayerWords[i].Length; k++)
+                {
+                    if (text.Contains(BodyLayerWords[i][k]))
+                    {
+                        found = BodyLayerWords[i][0];
+                        break;
+                    }
+                }
+            }
+            if (found == null)
+            {
+                found = layer.drawOrder < ApparelLayerDefOf.OnSkin.drawOrder ? UnderwearLayer : layer.defName;
+            }
+            bodyLayers[layer] = found;
+            return found;
+        }
+
+        public const string UnderwearLayer = "Underwear";
+        private static readonly Dictionary<ApparelLayerDef, string> bodyLayers = new Dictionary<ApparelLayerDef, string>();
+        // A body layer, then the words in a layer's name or label that make it that layer (the game's own match their own).
+        private static readonly string[][] BodyLayerWords =
+        {
+            new[] { "OnSkin", "onskin", "skin", "pants", "trouser", "skirt", "shorts", "legwear" },
+            new[] { "Middle", "middle" },
+            new[] { "Shell", "shell", "outer" },
+        };
+
+        // True if the apparel is underwear: worn only on layers under the skin layer.
+        public static bool IsUnderwear(ApparelProperties ap)
+        {
+            if (ap == null || ap.layers == null || ap.layers.Count == 0)
+            {
+                return false;
+            }
+            for (int i = 0; i < ap.layers.Count; i++)
+            {
+                if (!UnderSkin(ap.layers[i]))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        // True if the apparel is worn on the skin: on the skin layer (or a mod's counting as it) or under it.
+        public static bool OnTheSkin(ApparelProperties ap)
+        {
+            return ap != null && ap.layers != null && ap.layers.Exists(l => BodyLayerOf(l) == "OnSkin" || UnderSkin(l));
+        }
+
         // The draw order of the outermost layer the apparel is worn on.
         private static float OuterLayer(ApparelProperties ap)
         {
@@ -837,7 +926,7 @@ namespace M3AT
             Piece piece = new Piece { name = Path.GetFileNameWithoutExtension(path), layer = "", groups = new string[0], defs = null };
             List<Vector3> v = new List<Vector3>();
             List<int> first = new List<int>(), bone = new List<int>(), t = new List<int>(), fFrom = new List<int>(), fTris = new List<int>();
-            List<int> hides = new List<int>(), skinVerts = new List<int>(), glass = new List<int>();
+            List<int> hides = new List<int>(), opens = new List<int>(), skinVerts = new List<int>(), glass = new List<int>();
             List<float> w = new List<float>();
             List<Vector3> fRest = new List<Vector3>();
             List<Vector2> fUvs = new List<Vector2>(), uvs = new List<Vector2>();
@@ -939,11 +1028,18 @@ namespace M3AT
                         piece.colour = new Color(Num(p[1]), Num(p[2]), Num(p[3]));
                         break;
                     case "layer":
-                        piece.layer = p[1];
+                        piece.layer = string.Join(" ", p, 1, p.Length - 1);   // one or more, space separated
                         break;
                     case "groups":
                         piece.groups = new string[p.Length - 1];
                         Array.Copy(p, 1, piece.groups, 0, p.Length - 1);
+                        break;
+                    case "like":
+                        piece.like = p.Length > 1 ? p[1] : null;
+                        break;
+                    case "stands_for":
+                        piece.standsFor = new string[p.Length - 1];
+                        Array.Copy(p, 1, piece.standsFor, 0, p.Length - 1);
                         break;
                     case "walls":
                         piece.wallsFrom = int.Parse(p[1]);
@@ -955,6 +1051,12 @@ namespace M3AT
                         for (int i = 1; i < p.Length; i++)
                         {
                             hides.Add(int.Parse(p[i]));
+                        }
+                        break;
+                    case "opens":
+                        for (int i = 1; i < p.Length; i++)
+                        {
+                            opens.Add(int.Parse(p[i]));
                         }
                         break;
                     case "skin":
@@ -1047,6 +1149,7 @@ namespace M3AT
             piece.weight = w.ToArray();
             piece.tris = t.ToArray();
             piece.hides = hides.ToArray();
+            piece.opens = opens.ToArray();
             if (glass.Count > 0)
             {
                 piece.glass = new bool[piece.tris.Length / 3];
@@ -1163,6 +1266,10 @@ namespace M3AT
                 else if (p[0] == "draw_timing" && p.Length > 1)
                 {
                     DrawGrab = Num(p[1]);
+                }
+                else if (p[0] == "pick_hit" && p.Length > 1)
+                {
+                    PickHitShare = Num(p[1]);
                 }
                 else if (p[0] == "draw_slide" && p.Length > 2)
                 {
@@ -2866,21 +2973,88 @@ namespace M3AT
             return PosedOnCpu(p, 0).verts;
         }
 
-        // How high the seat is under the figure as End left it (upright), model units: the lowest point of the body no
-        // further forward than the hips, so the thighs, shins and feet held out in front are not sat on.
-        public float SeatOf(Posed p)
+        // How high the seat is under the figure as End left it (upright), model units: the lowest point of what it sits on,
+        // the body vertices mostly on the hips or a thigh (not the arms, nor the calves hanging over the seat's front), so
+        // the thighs rest on the seat too. Measured behind the hips alone, the sit's thighs, tipped down toward the knee,
+        // went 0.04 cells into IsoRim's dining chair. SeatClothes over that, for the trousers on them.
+        // calfBack: how far forward (model +z) the back of the calves is within slab (model units) under that, where the
+        // seat's front edge must not be, or they go through it; float.MaxValue if nothing of them is that high.
+        public float SeatOf(Posed p, float slab, out float calfBack)
         {
             Vector3[] verts = PosedOnCpu(p, 0).verts;
-            float hips = p.pos[boneOrder[0]].z + 0.02f;
-            float seat = float.MaxValue;
-            for (int i = 0; i < verts.Length; i++)
+            if (seatVerts == null)
             {
-                if (verts[i].z <= hips)
+                SortSeatVerts();
+            }
+            float seat = float.MaxValue;
+            for (int i = 0; i < verts.Length && i < seatVerts.Length; i++)
+            {
+                if (seatVerts[i] == SatOn)
                 {
                     seat = Mathf.Min(seat, verts[i].y);
                 }
             }
-            return seat < float.MaxValue ? seat : 0f;
+            if (seat == float.MaxValue)
+            {
+                // (No weights to go by: the lowest point no further forward than the hips, as before.)
+                float hips = p.pos[boneOrder[0]].z + 0.02f;
+                for (int i = 0; i < verts.Length; i++)
+                {
+                    if (verts[i].z <= hips)
+                    {
+                        seat = Mathf.Min(seat, verts[i].y);
+                    }
+                }
+                if (seat == float.MaxValue)
+                {
+                    calfBack = float.MaxValue;
+                    return 0f;
+                }
+            }
+            calfBack = float.MaxValue;
+            for (int i = 0; i < verts.Length && i < seatVerts.Length; i++)
+            {
+                if (seatVerts[i] == Calf && verts[i].y >= seat - slab)
+                {
+                    calfBack = Mathf.Min(calfBack, verts[i].z);
+                }
+            }
+            return seat - SeatClothes;
+        }
+
+        private const byte SatOn = 1, Calf = 2;   // seatVerts
+        private const float SeatClothes = 0.012f;   // model units: trousers stand about this far off the skin under the thighs
+        private byte[] seatVerts;   // per body vertex: SatOn (mostly on the hips bone or a thigh), Calf (mostly the shin down), else 0
+
+        private void SortSeatVerts()
+        {
+            Piece body = pieces[0];
+            int count = body.firstWeight.Length - 1;
+            seatVerts = new byte[count];
+            bool[] sat = new bool[boneHead.Length];
+            sat[boneOrder[0]] = true;
+            foreach (KeyValuePair<string, int> pair in boneIndex)
+            {
+                string part = pair.Key.Split('.')[0];
+                sat[pair.Value] |= part == "thigh" || part == "pelvis";
+            }
+            for (int i = 0; i < count; i++)
+            {
+                float on = 0f, calf = 0f;
+                for (int k = body.firstWeight[i]; k < body.firstWeight[i + 1]; k++)
+                {
+                    int b = body.weightBone[k];
+                    if (sat[b])
+                    {
+                        on += body.weight[k];
+                    }
+                    else if (legBone[b])
+                    {
+                        calf += body.weight[k];
+                    }
+                }
+                seatVerts[i] = on > 0.5f ? SatOn : calf > 0.5f ? Calf : (byte)0;
+            }
         }
 
         // The height of the middle of the head in this shape standing at rest, model units.
@@ -3435,12 +3609,17 @@ namespace M3AT
             // A garment riding one bone whole moves apart from what moves with other bones, so only what moves with it can
             // stay under it, or over it (RidesWith).
             int outerBone = RiddenBone(pieces[h]), innerBone = RiddenBone(inner);
+            bool[] opening = OverOpens(inner, pieces[h]);
             bool[] covered = new bool[inner.rest.Length];
             for (int i = 0; i < covered.Length; i++)
             {
                 if (outerBone >= 0 && WeightBelow(inner, i, outerBone) < RidesWith)
                 {
                     continue;
+                }
+                if (opening != null && opening[i])
+                {
+                    continue;   // over skin a pose brings out from under h's edge (its opens): left drawn, as that skin is
                 }
                 int hit = Hit(outerRest, outerTris, low, high, inner.rest[i], normal[i]);
                 if (hit >= 0 && innerBone >= 0 && outerBone < 0)
@@ -3467,6 +3646,40 @@ namespace M3AT
             }
             garmentUnder[key] = hide;
             return hide;
+        }
+
+        // Which of inner's vertices lie over the body triangles a pose brings out from under outer's edge (outer's opens,
+        // hide_edges.py): those whose nearest body vertex at rest is a corner of one. Null if outer has none. So a shirt's
+        // cuff stays drawn inside a parka's cuff, which swings off the wrist, as the skin there does.
+        private bool[] OverOpens(Piece inner, Piece outer)
+        {
+            if (outer.opens == null || outer.opens.Length == 0)
+            {
+                return null;
+            }
+            Piece body = pieces[0];
+            bool[] corner = new bool[body.rest.Length];
+            foreach (int k in outer.opens)
+            {
+                corner[body.tris[3 * k]] = corner[body.tris[3 * k + 1]] = corner[body.tris[3 * k + 2]] = true;
+            }
+            bool[] over = new bool[inner.rest.Length];
+            for (int i = 0; i < over.Length; i++)
+            {
+                int nearest = -1;
+                float best = float.MaxValue;
+                for (int j = 0; j < body.rest.Length; j++)
+                {
+                    float d = (body.rest[j] - inner.rest[i]).sqrMagnitude;
+                    if (d < best)
+                    {
+                        best = d;
+                        nearest = j;
+                    }
+                }
+                over[i] = nearest >= 0 && corner[nearest];
+            }
+            return over;
         }
 
         // The bone every vertex of the piece rides whole (a hat or a mask on the head bone), -1 if it isn't one piece on one bone.

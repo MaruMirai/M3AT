@@ -5737,12 +5737,14 @@ garment CE_SimpleNightVision garment_CE_SimpleNightVision.txt
 garment CE_TacVest garment_CE_TacVest.txt
 garment CE_TribalBackpack garment_CE_TribalBackpack.txt
 garment CeremonialCultistMask garment_CeremonialCultistMask.txt
+garment Chestwrap garment_Chestwrap.txt
 garment ClothMask garment_ClothMask.txt
 garment Collar garment_Collar.txt
 garment CollarShirt garment_CollarShirt.txt
 garment Coronet garment_Coronet.txt
 garment Corset garment_Corset.txt
 garment CowboyHat garment_CowboyHat.txt
+garment CropTop garment_CropTop.txt
 garment Crown garment_Crown.txt
 garment CrownStellic garment_CrownStellic.txt
 garment CultistMask garment_CultistMask.txt
@@ -5763,6 +5765,7 @@ garment IntegratorHeadset garment_IntegratorHeadset.txt
 garment Jacket garment_Jacket.txt
 garment KidRomper garment_KidRomper.txt
 garment LabCoat garment_LabCoat.txt
+garment LongJohns garment_LongJohns.txt
 garment MechlordSuit garment_MechlordSuit.txt
 garment Pants garment_Pants.txt
 garment Parka garment_Parka.txt
@@ -5776,9 +5779,12 @@ garment PsyfocusVest garment_PsyfocusVest.txt
 garment Robe garment_Robe.txt
 garment RobeRoyal garment_RobeRoyal.txt
 garment Sash garment_Sash.txt
+garment Scarf garment_Scarf.txt
 garment Shadecone garment_Shadecone.txt
 garment ShirtRuffle garment_ShirtRuffle.txt
 garment Shoes garment_Shoes.txt
+garment Shorts garment_Shorts.txt
+garment ShortShorts garment_ShortShorts.txt
 garment SimpleHelmet garment_SimpleHelmet.txt
 garment Slicecap garment_Slicecap.txt
 garment Tailcap garment_Tailcap.txt
@@ -5786,6 +5792,7 @@ garment TortureCrown garment_TortureCrown.txt
 garment TribalA garment_TribalA.txt
 garment TribalHeaddress garment_TribalHeaddress.txt
 garment Tuque garment_Tuque.txt
+garment Underwear garment_Underwear.txt
 garment Vacsuit garment_Vacsuit.txt
 garment VacsuitHelmet garment_VacsuitHelmet.txt
 garment VestRoyal garment_VestRoyal.txt

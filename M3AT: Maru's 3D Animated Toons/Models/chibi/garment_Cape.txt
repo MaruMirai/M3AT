@@ -5,7 +5,9 @@ defs Apparel_Cape
 # texture: its image (t lines, a place on it per vertex); tint: whether the apparel's colour tints it.
 texture garment_Cape.png
 # hide k ...: body triangles (skin.txt's f lines, from 0) left out while it is worn.
-hide 307 370 572 595 596 712 747 786
+hide 596 786
+# opens k ...: body triangles it covers at rest that a pose brings out from under its edge (hide_edges.py), drawn though it is worn.
+opens 307 370 572 595 712 747
 v 0.06968 0.83204 0.00965
 v 0.07301 0.83677 0.00966
 v 0.11344 0.82119 0.00505

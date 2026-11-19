@@ -23,7 +23,8 @@ airwire headset is a unit over the right ear with an antenna up from it, crossed
 round the temple; it leaves the hair and the face on. Its array headset is a visor round the front over the eyes, out to
 a pod over each ear with an antenna up from it leaning back, and its integrator headset a bar hooked over the right of
 the crown down to the ear, with a boom round the jaw to a ball microphone. The slave collar is no hat: a band round the
-neck, built round the neck's own upright axis, with a riveted plate on either side and a ring at the throat. The tailcap, torture crown and headsets are
+neck, built round the neck's own upright axis, with a riveted plate on either side and a ring at the throat. The scarf, for other
+mods' scarves, is built round the neck the same way: a lumpy roll knotted at the front, its two ends down the chest. The tailcap, torture crown and headsets are
 coloured, as the cap is. Ideology's visage mask is a rigid shield over the face with round eye holes and a nose, a sheet
 given a thickness; Biotech's gas mask a rubber face piece with two lenses of glass (GLASS: the Visor material, which the
 game draws see-through with the eyes behind), a snout to a filter canister and a harness of straps, coloured; and
@@ -1770,6 +1771,148 @@ def slave_collar():
           % (axis.y, lows[0], highs[0], lows[n // 2], highs[n // 2], min(inner[0] + inner[1]), max(inner[0] + inner[1])))
     return made(s, 'Collar')
 
+SCARF_COLUMNS = 24            # points round the wrap
+SCARF_SECTION = 8             # points round its rolled cross-section
+SCARF_BOTTOM = band(-0.32, -0.16, -0.07)   # head radii its bottom edge is above the neck's joint, front, sides and back:
+                                           # high at the back, clear of a backpack's top (about 0.13 below the joint)
+SCARF_HIGH = band(0.3, 0.3, 0.24)          # head radii tall, front, sides and back
+SCARF_GAP = 0.03              # head radii its inside stands off the skin
+SCARF_THICK = band(0.2, 0.15, 0.09)        # head radii thick: full at the front, thin behind, where a pack's top is
+SCARF_FOLDS = 3               # lumps round the wrap, so it reads as cloth wound round rather than a ring
+SCARF_LUMP = 0.25             # of its thickness each lump stands out (and each hollow sinks)
+SCARF_KNOT_AZ = 28            # degrees round from the front the knot is, to the figure's left
+SCARF_KNOT = (0.3, 0.22, 0.2) # head radii across, tall and deep, the knot
+SCARF_TAILS = ((-0.1, 1.05, -0.08), (0.1, 0.8, 0.04))   # each end: head radii across from the knot, long below it, and
+                                                         # its tip's sideways swing (the figure's left +)
+SCARF_TAIL_WIDE = (0.26, 0.3) # head radii across each end, at the knot and at its tip
+SCARF_TAIL_THICK = 0.05       # head radii thick
+SCARF_TAIL_OFF = 0.06         # head radii its inside stands off the skin (or the wrap) under it
+SCARF_TAIL_STEPS = 6          # stations down each end
+SCARF_STRIPE = (0.72, 0.86)   # the stripe across each end, from and to (0 at the knot, 1 at the tip)
+
+def chest_skin(x, z):
+    """The front of the body at (x, z): the first surface met coming back from in front of it, and its normal."""
+    global body_tree
+    if body_tree is None:
+        body_tree = BVHTree.FromPolygons(verts, [tuple(p.vertices) for p in body.data.polygons])
+    hit = body_tree.ray_cast(Vector((x, CENTRE.y - 6 * R, z)), Vector((0, 1, 0)), 12 * R)
+    if hit[0] is not None:
+        return hit[0], hit[1]
+    near = body_tree.find_nearest(Vector((x, CENTRE.y, z)))   # past the chest's side: the nearest skin
+    return near[0], near[1]
+
+# A scarf for other mods' scarves (the game has none: its garment stands in only for apparel named as one, StandIns.cs):
+# a soft roll wound round the neck, lumpy so it reads as cloth, knotted at the front to the figure's left with its two
+# ends hanging down the chest, a stripe across each near its tip. Built round the neck's own upright axis as the slave
+# collar is, and like it taking the body's weights, so it bends with the neck and the ends ride the chest. Thin and high
+# at the back, where a backpack's top comes up to the neck, and nothing hangs behind; worn over a coat or armour it is let
+# out past them (SkinnedFigure.LetOutDefs). Coloured, pale, and always tinted by the apparel's colour (tint).
+def scarf():
+    s = Shape()
+    s.palette = {'cloth': (0.93, 0.93, 0.93), 'stripe': (0.7, 0.7, 0.7)}
+    up = Vector((0, 0, 1))
+    joint = rig.matrix_world @ rig.data.bones[walk.NECK].tail_local
+    middle = joint.z + (SCARF_BOTTOM(0) + SCARF_BOTTOM(180)) / 2 * R + 0.12 * R
+    probe = Vector((0, joint.y, 0))
+    ahead, behind = neck_skin(0, middle, probe), neck_skin(180, middle, probe)
+    axis = Vector((0, joint.y + (behind - ahead) / 2, 0))
+    n, k = SCARF_COLUMNS, SCARF_SECTION
+    azs = [360.0 * i / n for i in range(n)]
+    lows = [joint.z + SCARF_BOTTOM(az) * R for az in azs]
+    highs = [z + SCARF_HIGH(az) * R for az, z in zip(azs, lows)]
+    # The inside at each height of the section: off the skin, smoothed round the ring, never into it.
+    shares = [0.5 - 0.5 * math.cos(2 * math.pi * j / k) for j in range(k)]   # 0 at the bottom, 1 at the top
+    inner = []
+    for share in shares:
+        raw = [neck_skin(az, lo + (hi - lo) * share, axis) + SCARF_GAP * R for az, lo, hi in zip(azs, lows, highs)]
+        r = list(raw)
+        for _ in range(4):
+            r = [max(raw[i], (r[i - 1] + 2 * r[i] + r[(i + 1) % n]) / 4) for i in range(n)]
+        inner.append(r)
+    points = []
+    outside = []   # by column: the wrap's outermost reach, for the ends to lie over
+    for i, az in enumerate(azs):
+        lump = 1 + SCARF_LUMP * math.sin(SCARF_FOLDS * math.radians(az) + 0.6)
+        thick = SCARF_THICK(az) * lump * R
+        reach = 0.0
+        for j in range(k):
+            a = 2 * math.pi * j / k
+            z = lows[i] + (highs[i] - lows[i]) * shares[j]
+            r = inner[j][i] + thick * (0.5 + 0.5 * math.sin(a))   # out on one side of the roll, in on the other
+            reach = max(reach, r)
+            points.append(Vector((axis.x, axis.y, z)) + way(az, 0) * r)
+        outside.append(reach)
+    s.part(points, [[i * k + j, i * k + (j + 1) % k, ((i + 1) % n) * k + (j + 1) % k, ((i + 1) % n) * k + j]
+                    for i in range(n) for j in range(k)], 'cloth')
+    # The knot, a squashed lumpy ball on the wrap's outside low at the front.
+    c = int(round(SCARF_KNOT_AZ / 360.0 * n)) % n
+    out = way(SCARF_KNOT_AZ, 0)
+    across = up.cross(out).normalized()
+    w, h, d = SCARF_KNOT
+    knot = Vector((axis.x, axis.y, lows[c] + 0.35 * (highs[c] - lows[c]))) + out * (outside[c] + 0.3 * d * R)
+    rings, segs = 4, 8
+    kp = [knot - up * h / 2 * R]
+    for r in range(1, rings):
+        e = math.pi * r / rings - math.pi / 2
+        for q in range(segs):
+            t = 2 * math.pi * q / segs
+            bump = 1 + 0.12 * math.sin(3 * t + r)
+            kp.append(knot + (across * math.cos(t) * w / 2 + out * math.sin(t) * d / 2) * math.cos(e) * bump * R
+                      + up * math.sin(e) * h / 2 * R)
+    kp.append(knot + up * h / 2 * R)
+    top = len(kp) - 1
+    kf = [[0, 1 + (q + 1) % segs, 1 + q] for q in range(segs)]
+    for r in range(rings - 2):
+        a, b = 1 + r * segs, 1 + (r + 1) * segs
+        kf += [[a + q, a + (q + 1) % segs, b + (q + 1) % segs, b + q] for q in range(segs)]
+    last = 1 + (rings - 2) * segs
+    kf += [[last + q, last + (q + 1) % segs, top] for q in range(segs)]
+    s.part(kp, kf, 'cloth')
+    # The two ends: flat strips from under the knot down the chest, laid over the skin (or the wrap, where they cross it).
+    wrap_tree = BVHTree.FromPolygons(points, [[i * k + j, i * k + (j + 1) % k, ((i + 1) % n) * k + (j + 1) % k,
+                                                ((i + 1) % n) * k + j] for i in range(n) for j in range(k)])
+    for along_x, long, swing in SCARF_TAILS:
+        start = knot + across * along_x * R - up * 0.3 * h * R
+        stations = []
+        for m in range(SCARF_TAIL_STEPS + 1):
+            t = m / SCARF_TAIL_STEPS
+            x = start.x + swing * t * t * R
+            z = start.z - long * t * R
+            skin_at, normal = chest_skin(x, z)
+            front = skin_at.y - SCARF_TAIL_OFF * R
+            hit = wrap_tree.ray_cast(Vector((x, CENTRE.y - 6 * R, z)), Vector((0, 1, 0)), 12 * R)
+            if hit[0] is not None:
+                front = min(front, hit[0].y - 0.3 * SCARF_TAIL_OFF * R)
+            if m == 0:
+                front = min(front, start.y)
+            stations.append((Vector((x, front, z)), normal))
+        corners = []
+        for m, (p, normal) in enumerate(stations):
+            t = m / SCARF_TAIL_STEPS
+            nxt, prv = stations[min(m + 1, SCARF_TAIL_STEPS)][0], stations[max(m - 1, 0)][0]
+            along = (nxt - prv).normalized()
+            o = Vector((normal.x * 0.3, -1, normal.z * 0.3)).normalized()   # mostly forward, a little along the skin's way
+            side = along.cross(o).normalized()
+            wide = (SCARF_TAIL_WIDE[0] + (SCARF_TAIL_WIDE[1] - SCARF_TAIL_WIDE[0]) * t) / 2 * R
+            corners += [p - side * wide, p + side * wide, p + side * wide + o * SCARF_TAIL_THICK * R,
+                        p - side * wide + o * SCARF_TAIL_THICK * R]
+        lo, hi = SCARF_STRIPE
+        faces = {'cloth': [], 'stripe': []}
+        for m in range(SCARF_TAIL_STEPS):
+            a, b = 4 * m, 4 * m + 4
+            mid = (m + 0.5) / SCARF_TAIL_STEPS
+            colour = 'stripe' if lo <= mid <= hi else 'cloth'
+            for q in range(4):
+                faces[colour].append([a + q, a + (q + 1) % 4, b + (q + 1) % 4, b + q])
+        faces['cloth'] += [[3, 2, 1, 0], [4 * SCARF_TAIL_STEPS, 4 * SCARF_TAIL_STEPS + 1, 4 * SCARF_TAIL_STEPS + 2,
+                                          4 * SCARF_TAIL_STEPS + 3]]
+        for colour, fs in faces.items():
+            if fs:
+                s.part(corners, fs, colour)
+    print('SCARF axis y %.3f, front %.3f..%.3f, back %.3f..%.3f (world units), knot at %s'
+          % (axis.y, lows[0], highs[0], lows[n // 2], highs[n // 2], tuple(round(v, 2) for v in knot)))
+    return made(s, 'Scarf')
+
 def slanted(az, el, half_long, half_wide, tilt, count):
     """A polygon round (az, el), half_long by half_wide degrees, its long way tipped tilt degrees up from level."""
     c, k = math.cos(math.radians(tilt)), math.sin(math.radians(tilt))
@@ -2002,7 +2145,7 @@ HATS = {'SimpleHelmet': simple_helmet, 'AdvancedHelmet': advanced_helmet, 'Tuque
         'Headwrap': headwrap, 'Shadecone': shadecone, 'Slicecap': slicecap,
         'Tailcap': tailcap, 'TortureCrown': torture_crown, 'AirwireHeadset': airwire_headset,
         'ArrayHeadset': array_headset, 'IntegratorHeadset': integrator_headset,
-        'VisageMask': visage_mask, 'GasMask': gas_mask, 'Broadwrap': broadwrap, 'Collar': slave_collar,
+        'VisageMask': visage_mask, 'GasMask': gas_mask, 'Broadwrap': broadwrap, 'Collar': slave_collar, 'Scarf': scarf,
         'CultistMask': cultist_mask, 'CeremonialCultistMask': ceremonial_cultist_mask,
         'CE_SimpleNightVision': ce_simple_night_vision, 'CE_AdvancedNightVision': ce_advanced_night_vision}
 

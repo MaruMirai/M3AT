@@ -1365,12 +1365,29 @@ GATHER_CLIP = clip_file('gather')
 # the way it faces so the head's point lands that many cells ahead of the pawn's middle at the blow. The stroke
 # (take_stroke, TOOL_CLIPS) is the raw clip played 'pace' times as fast; with 'hit' it is laid so the blow is that share
 # of the way round, from rest to rest (the game strikes then, WalkFigures.PickHit).
-# Each entry: 'clip' (the json), 'blow' (seconds into the take of the blow), 'hit', 'pace', 'grip', 'other', 'head'
+# 'swing' (from, to, times), seconds into the take, plays that stretch 'times' as fast again as the rest (the axe's swing
+# from the top of the backswing to just after the blade stops in the trunk, both ends where it is nearly still, so the
+# change of pace doesn't show); not with 'hit'.
+# 'head_turn' (degrees, + to the left) turns the head and neck back by that much all through (TOOL_HEAD_SHARES).
+# 'plant' (a kind) sets the feet where that kind's stroke starts in every frame, the legs reaching by IK (take_plant).
+# Each entry: 'clip' (the json), 'blow' (seconds into the take of the blow), 'hit', 'pace', 'swing', 'place', 'holds_of', 'head_turn', 'grip', 'other', 'head'
 # (model units up the handle to the head) and 'blade' (model units out from the handle to each end of the head that may
 # be the point: both ends of a pick, the edge alone of an axe, both edges of a spade), 'face', 'lands', 'holds', 'edge'.
-# - pickaxe: take_07.csv 13.1 .. 17.1 s, resting low beside the right foot, swung back, over the shoulder into an
-#   imagined rock face at about head height (the head stops dead at 15.12 s), brought back round and down to rest. IsoRim's
-#   rock narrows upward, so at head height its face is about 0.75 cells ahead.
+# - pickaxe: 2026-11-19/mine_06.csv (--calibrate 2.6 3.9; the head tracker held all through), 9.15 .. 12.55 s, its
+#   second of three strokes (the fastest, its ready holds before and after the most alike): from the pick held ready over
+#   the right shoulder, wound up, swung down into an imagined rock face (the head stops dead at 10.90 s) and brought back
+#   up to the ready hold, all as recorded. IsoRim's rock narrows upward, so its face is about 0.75 cells ahead. The game
+#   plays it once a strike, the blow on the strike (the pick_hit line), and pickaxe_idle between strikes. The earlier
+#   stroke (take_03_fixed.csv 13.85 .. 16.45 s, its head tracker lost and the head turned back 40 degrees by 'head_turn',
+#   the downswing 1.6 times as fast) is kept as pick2_clip.json and pick2_idle_clip.json; the oldest (take_07.csv,
+#   resting the pick by the foot) as pick_clip.json.
+# - pickaxe_idle: the same take's long ready hold after its last stroke (--loop 2.0 4.0 in 16.4 .. 24.4 s, the cycle
+#   17.47 .. 19.47 s, imported --as pick3_idle; the chest tracker was lost from 19.13 s, carried on the hips), which the
+#   game loops while a slower miner waits for its next strike (WalkFigures.PickPhase, crossfaded over PickIdleBlend: it
+#   holds the pick a little higher than the stroke's ends), so the skill sets how long it holds between swings, not how
+#   fast it swings. 'place' and 'holds_of' name the kind whose figure placing and hand holds it takes, so it lines up
+#   with the stroke and holds the tool the same way (one tool line). Both are 'plant'ed in the ready hold's stance, so
+#   the feet stay put.
 # - axe: woodchop_02.csv 11.30 .. 13.83 s, a loop from a hold at the top of the backswing round to the next (--loop 2.3
 #   2.9 in 8 .. 14 s, calibrated on 3 .. 4 s, where the upright pose had settled), swung level into a trunk at about
 #   waist height (the blade stops dead at 11.98 s); a tree stands in the next cell, its trunk about 0.85 cells ahead.
@@ -1381,9 +1398,11 @@ GATHER_CLIP = clip_file('gather')
 #   its tool is this mod's own (make_spade.py, tool_spade), the blade centred where the stick's head was. Held head-down,
 #   the right hand at the top by the T grip and the left nearer the blade: imported with --swap (--hands 0.19 0.17). The wands were 0.29 m apart on it rather than 0.26, so the hands' places on the stick are a guess.
 TOOL_TAKES = {
-    'pickaxe': dict(clip='pick', blow=15.12, hit=0.5, pace=1.6, grip=0.15, other=-0.035, head=0.53, blade=(0.25, -0.25),
-                    face='trunk', lands=0.75),
-    'axe': dict(clip='chop_take', blow=11.98, pace=1.3, grip=0.151, other=-0.034, head=0.481, blade=(0.11,), face=None,
+    'pickaxe': dict(clip='pick3', blow=10.90, pace=1.0, plant='pickaxe_idle', grip=0.15, other=-0.035, head=0.53,
+                    blade=(0.25, -0.25), face='trunk', lands=0.75),
+    'pickaxe_idle': dict(clip='pick3_idle', blow=10.90, plant='pickaxe_idle', pace=1.0, grip=0.15, other=-0.035, head=0.53,
+                         blade=(0.25, -0.25), face='trunk', lands=0.75, place='pickaxe', holds_of='pickaxe'),
+    'axe': dict(clip='chop_take', blow=11.98, pace=1.3, swing=(11.30, 12.03, 1.6), grip=0.151, other=-0.034, head=0.481, blade=(0.11,), face=None,
                 lands=0.85),
     'dig': dict(clip='dig', blow=15.6, pace=1.3, grip=-0.034, other=0.151, head=0.637, blade=(0.065, -0.065), face=None,
                 lands=0.6),
@@ -1392,6 +1411,11 @@ TOOL_CLIPS = {}     # take_stroke's by kind, made at the end of this file, as it
 # The chibi's arms are short for its head: a fist further than TOOL_REACH leg lengths from its shoulder has the whole
 # tool slid along toward it (keeping its way), a few times over, so both hands close round it.
 TOOL_REACH = 0.6
+# ... and its handle at least TOOL_HEAD_CLEAR leg lengths from the middle of the head's ball (LOVIN_HEAD_MIDDLE; the head's
+# skin is 0.40 to 0.46 out from it, and built hair stands a little further), pushed straight out from it.
+TOOL_HEAD_CLEAR = 0.52
+# A take's 'head_turn' (degrees about the upright, + to the left) spread over the neck's bones and the head, these shares.
+TOOL_HEAD_SHARES = (('spine.004', 0.25), ('spine.005', 0.35), (HEAD, 0.4))
 TOOL_HOLD_SAMPLES = 16   # points round the stroke a hold is tried at (take_holds)
 TOOL_POLE_SMOOTH = 2.0   # frames of the stroke the elbow poles are smoothed over (take_stroke)
 # Each hand's hold is searched with its thumb toward the tool's head (as both of the performer's are), and with its
@@ -2807,6 +2831,16 @@ def varied(numbers):
 #   'shift' or 'hips'), laid over the sit from the waist up in the game (EAT_UPPER).
 WORK_GRIP = 0.06     # leg lengths from the wrist along the hand to the middle of the fist round a handle
 WORK_PALM = 0.05     # and out of the palm to the handle's middle, so the curled fingers close round it, not through it
+# A tool's handle runs through the chibi's closed fist (a mitten of 47 vertices, the fingers curled into a block) not
+# square across the palm at those two but through the curled fingers' middle and slanted across them, as a hand holds a
+# handle in a power grip: measured on the closed mesh, the finger block's middle is about 0.08 leg lengths further along
+# the hand than that and inside the palm's surface, and it runs across the knuckles about 36 degrees toward the
+# fingertips at the thumb's end and 17 toward the back of the hand. Square across the palm, the handle lay along the
+# outside of the fist. Tools only (grip_handle's tool: work_grip, take_grip); a gun's support hand keeps the plain fist.
+TOOL_FIST_ALONG = 0.06   # leg lengths further along the hand than WORK_GRIP
+TOOL_FIST_IN = 0.025     # leg lengths less far out of the palm than WORK_PALM, into the fist
+TOOL_FIST_TILT = 36.0    # degrees the handle leans from square to the hand toward the fingertips, at the thumb's end
+TOOL_FIST_CANT = 17.0    # degrees the thumb's end dips toward the back of the hand
 MODEL_LEG = 0.4964   # model units per leg length (export_frames.py prints the true figure: keep it in step)
 WORK_LOOK = 0.6      # share of the lean and twist the head takes back
 # A hand round a handle has its turn set by the tool but for its turn about the handle ('wrap'), so that turn and the
@@ -2931,6 +2965,8 @@ WORK = {
                   struck=dict(L=(0.12, -0.38, 0.12), R=(-0.12, -0.38, 0.08), lean=10.0, twist=0.0, drop=0.03),
                   raised=dict(L=(0.12, -0.38, 0.08), R=(-0.12, -0.38, 0.12), lean=10.0, twist=0.0, drop=0.03)),
 }
+# The pick held ready between strokes (TOOL_TAKES' pickaxe_idle) is the same tool held the same way.
+WORK['pickaxe_idle'] = WORK['pickaxe']
 
 def set_gait(g):
     """0 walks, 1 runs, in between blends the two."""
@@ -6578,25 +6614,48 @@ def tool_matrix(kind, k):
     origin = head[HIPS] + k['fist'] * LEG - d * w['grip'] * size
     return T(origin) @ R @ Matrix.Scale(size, 4)
 
-def grip_handle(side, sign, fist, d, edge, wrap, X, lift=None, swing=0.0, palm=0.0, pole=None):
+def tool_fist(side, sign):
+    """Where a tool's handle runs through one closed hand at rest (armature space, the hand's rest frame): the point on
+    its line from the wrist (TOOL_FIST_ALONG further along the hand than WORK_GRIP, TOOL_FIST_IN less far out of the
+    palm than WORK_PALM, through the curled fingers) and its way, toward the thumb's end (TOOL_FIST_TILT toward the
+    fingertips, TOOL_FIST_CANT toward the back of the hand)."""
+    hn = 'hand.' + side
+    d0 = (tail[hn] - head[hn]).normalized()
+    n0 = Vector((sign * HAND_PALM[0], HAND_PALM[1], HAND_PALM[2]))
+    t0 = -sign * d0.cross(n0)
+    t0 = (t0 - t0.dot(d0) * d0).normalized()
+    n0 = (n0 - n0.dot(d0) * d0).normalized()
+    a, c = math.radians(TOOL_FIST_TILT), math.radians(TOOL_FIST_CANT)
+    way = ((t0 * math.cos(a) + d0 * math.sin(a)) * math.cos(c) - n0 * math.sin(c)).normalized()
+    at = d0 * (WORK_GRIP + TOOL_FIST_ALONG) * LEG + n0 * (WORK_PALM - TOOL_FIST_IN) * LEG
+    return at, way
+
+def grip_handle(side, sign, fist, d, edge, wrap, X, lift=None, swing=0.0, palm=0.0, pole=None, tool=False):
     """Places one arm by IK so its fist closes round a handle at fist (armature space) running along d (toward the tool's
     head, which the thumb points at), the fingers pointing the way edge does turned wrap degrees about the handle, the
     handle palm leg lengths out of the palm, the elbow lifted as arm_to's lift, or swung swing degrees about the line
     from the shoulder to the wrist (out from the body when the hand is in front, a fixed way round so it eases evenly),
-    or toward pole (arm_to's, in the chest's frame). Returns how far the wrist was out of reach."""
+    or toward pole (arm_to's, in the chest's frame). With tool, the handle runs through the fist as tool_fist has it
+    (palm is then WORK_PALM's place there) rather than square across the palm. Returns how far the wrist was out of
+    reach."""
     hn = 'hand.' + side
     d0 = (tail[hn] - head[hn]).normalized()
     n0 = Vector((sign * HAND_PALM[0], HAND_PALM[1], HAND_PALM[2]))
     t0 = -sign * d0.cross(n0)   # the thumb at rest
     t0 = (t0 - t0.dot(d0) * d0).normalized()
     n0 = (n0 - n0.dot(d0) * d0).normalized()
+    at = d0 * WORK_GRIP * LEG + n0 * palm * LEG   # where the handle's line passes at rest, from the wrist
+    if tool:
+        at, t0 = tool_fist(side, sign)
+    # The hand's rest frame about that line: along it, and the hand's own way square to it (what the fingers point).
+    h0 = (d0 - d0.dot(t0) * t0).normalized()
     d = d.normalized()
     f = Matrix.Rotation(math.radians(wrap), 3, d) @ edge
     f = (f - f.dot(d) * d).normalized()
-    R = Matrix((f, d, f.cross(d))).transposed() @ Matrix((d0, t0, d0.cross(t0)))
+    R = Matrix((f, d, f.cross(d))).transposed() @ Matrix((h0, t0, h0.cross(t0)))
     chest = X[CHEST_BONE].to_quaternion().to_matrix()
     turn = (chest.inverted() @ R).to_euler('XYZ')
-    wrist = fist - f * WORK_GRIP * LEG - (R @ n0) * palm * LEG
+    wrist = fist - R @ at
     if swing:
         line = (wrist - X['shoulder.' + side] @ head['upper_arm.' + side]).normalized()
         pole = chest.inverted() @ Matrix.Rotation(math.radians(swing * sign), 3, line) @ chest @ Vector((sign * ELBOW_OUT, 0.25, -1.0))
@@ -6665,10 +6724,10 @@ def work_grip(kind, k, side, X, hold, swing=0.0):
     d, edge = R @ Vector((0, 0, thumb)), R @ Vector((0, -1, 0))
     fist = head[HIPS] + k['fist'] * LEG
     if side == 'R':
-        clamp = grip_handle('R', -1, fist, d, edge, wrap, X, swing=swing, palm=WORK_PALM)
+        clamp = grip_handle('R', -1, fist, d, edge, wrap, X, swing=swing, palm=WORK_PALM, tool=True)
     else:
         size = w['scale'] * LEG / MODEL_LEG
-        clamp = grip_handle('L', 1, fist + d * thumb * (k.get('other', w['other']) - w['grip']) * size, d, edge, wrap, X, swing=swing, palm=WORK_PALM)
+        clamp = grip_handle('L', 1, fist + d * thumb * (k.get('other', w['other']) - w['grip']) * size, d, edge, wrap, X, swing=swing, palm=WORK_PALM, tool=True)
     close_hand(X, side, -1 if side == 'R' else 1)
     return clamp
 
@@ -6688,7 +6747,8 @@ def work_holds(kind):
     over the whole stroke without winging the elbow, the swing kept from jumping between points (a shortest path over
     the swings tried), so the elbow moves smoothly. Returns {side: (hold, swings)}; a hold the WORK entry gives is kept."""
     key = (kind, repr(WORK[kind]), GRIP_SWING, GRIP_STEP, GRIP_FREE, GRIP_LOW, GRIP_RAISE, GRIP_SAMPLES, GRIP_EASE, GRIP_KEEP,
-           GRIP_WRAP_STEP, GRIP_COARSE, GRIP_FLEX, GRIP_DEVIATE, WORK_GRIP, WORK_PALM, FIST, FOREARM_TWIST, FOREARM_TWIST_MID)
+           GRIP_WRAP_STEP, GRIP_COARSE, GRIP_FLEX, GRIP_DEVIATE, WORK_GRIP, WORK_PALM, FIST, FOREARM_TWIST, FOREARM_TWIST_MID,
+           TOOL_FIST_ALONG, TOOL_FIST_IN, TOOL_FIST_TILT, TOOL_FIST_CANT)
     if key in work_hold_cache:
         return work_hold_cache[key]
     w = WORK[kind]
@@ -6806,6 +6866,8 @@ def take_place(kind):
     (None: so the head's point is straight ahead at the blow; 'trunk': back by the trunk's turn at the blow), then, with 'lands', along the way it faces so the point lands that many
     cells ahead at the blow."""
     take = TOOL_TAKES[kind]
+    if take.get('place') is not None:
+        return take_place(take['place'])   # placed as another kind's stroke of the same take (the pick held ready)
     key = (kind, take['face'], take['lands'], take['blow'], take['grip'], TOOL_RAW[kind]['action'], TOOL_RAW[kind]['first'])
     if key not in take_placed:
         raw, blow = TOOL_RAW[kind], take_raw_blow(kind)
@@ -6826,40 +6888,117 @@ def take_place(kind):
         take_placed[key] = (M, face, moved)
     return take_placed[key][0]
 
-def take_targets(kind, t, clip=None):
+take_planted = {}   # take_stance's answers, by kind
+
+def take_stance(kind):
+    """Where a kind's stroke has the feet at its start (each foot's and toe's matrix, armature space), unplanted."""
+    if kind not in take_planted:
+        X = take_targets(kind, 0.0, plant=False)[0]
+        take_planted[kind] = {s: (X['foot.' + s].copy(), X['toe.' + s].copy()) for s in 'LR'}
+    return take_planted[kind]
+
+def take_plant(X, stance):
+    """Both feet set where stance has them (take_stance), each leg reaching by IK from its hip with the knee bent the
+    way the pose had it. Returns how far an ankle was out of reach."""
+    clamp = 0.0
+    for side in 'LR':
+        foot, toe = stance[side]
+        hip = X[HIPS] @ head['thigh.' + side]
+        knee = X['shin.' + side] @ head['shin.' + side]
+        ankle = foot @ head['foot.' + side]
+        # Out of the leg's reach (the hips driven forward off a back foot into the blow): the heel lifted, the foot
+        # pivoting on its ball (the toe's joint), the least that lets it reach.
+        ball = toe @ head['toe.' + side]
+        across = foot.to_3x3().normalized() @ Vector((1, 0, 0))
+        for step in range(241):   # a quarter degree at a time, up to 60, so it rises smoothly frame to frame
+            for sign in (1, -1):
+                lift = about(ball, across, sign * step * 0.25)
+                if (lift @ ankle - hip).length <= L1 + L2 - 1e-3 and (lift @ ankle).z >= ankle.z:
+                    break
+            else:
+                continue
+            foot = lift @ foot
+            ankle = foot @ head['foot.' + side]
+            break
+        way = (ankle - hip).normalized()
+        pole = (knee - hip) - (knee - hip).dot(way) * way
+        clamp = max(clamp, leg_to(side, hip, ankle, pole, X, turn=foot.to_3x3().normalized().to_4x4()))
+        X['foot.' + side] = foot.copy()
+        X['heel.02.' + side] = foot.copy()
+        X['toe.' + side] = toe.copy()
+    return clamp
+
+def take_targets(kind, t, clip=None, plant=True):
     """A kind's stroke at t (TOOL_CLIPS by default), placed by take_place, and where the tool is for the hands: (pose, right
     fist, handle way toward the head, point way, elbow poles by side in the chest's frame, each fist's place along the
     handle from the right one's)."""
     X, fist, way, edge, poles = take_base(clip or TOOL_CLIPS[kind], t, take_place(kind))
     take = TOOL_TAKES[kind]
+    if take.get('head_turn'):
+        # The head turned back about the upright, spread down the neck (TOOL_HEAD_SHARES), the same all through: for a
+        # take whose head tracker was lost, carried on the chest at the turn it had then.
+        for b, share in TOOL_HEAD_SHARES:
+            turn_branch(X, b, about(X[b] @ head[b], (0, 0, 1), take['head_turn'] * share))
+    if plant and take.get('plant'):
+        # The feet held where the named kind's stroke starts, so they neither creep through the stroke nor slide as
+        # the game crossfades into another clip of the take (the ready hold).
+        take_plant(X, take_stance(take['plant']))
     shoulders = {s: X['shoulder.' + s] @ head['upper_arm.' + s] for s in 'LR'}
-    along = {'R': 0.0, 'L': (take['other'] - take['grip']) * take_size(kind)}
+    size = take_size(kind)
+    along = {'R': 0.0, 'L': (take['other'] - take['grip']) * size}
+    middle = X[HEAD] @ (head[HEAD] + Vector(LOVIN_HEAD_MIDDLE) * LEG)   # the middle of the head's ball
     for _ in range(4):
         for side in 'LR':
             at = fist + way * along[side]
             far = (at - shoulders[side]).length - TOOL_REACH * LEG
             if far > 0:
                 fist += (shoulders[side] - at).normalized() * far
+        # The handle kept TOOL_HEAD_CLEAR off the head's middle, pushed straight out from it: the performer rested the
+        # pick by their own head, which on the chibi's big head put the handle through the face.
+        butt = fist - way * take['grip'] * size
+        span = way * take['head'] * size
+        u = min(max((middle - butt).dot(span) / span.length_squared, 0.0), 1.0)
+        off = butt + span * u - middle
+        if off.length < TOOL_HEAD_CLEAR * LEG:
+            fist += off.normalized() * (TOOL_HEAD_CLEAR * LEG - off.length)
     return X, fist, way, edge, poles, along
+
+def take_raw_frame(raw, f):
+    """A tracker clip's body and recorded tool at frame f (fractional, eased between the frames either side)."""
+    i = int(math.floor(f)) % raw['frames']
+    j, v = (i + 1) % raw['frames'], f - math.floor(f)
+    return clip_frame(raw, f), {k: list(Vector(raw['tool'][i][k]).lerp(Vector(raw['tool'][j][k]), v)) for k in raw['tool'][i]}
 
 def take_stroke(kind):
     """A kind's stroke made from its raw clip: played 'pace' times as fast as recorded, and with 'hit' laid so the blow
-    comes that share of the way round, from rest to rest."""
+    comes that share of the way round, from rest to rest. Its 'hit' (frames) is where the blow falls in it."""
     take, raw = TOOL_TAKES[kind], TOOL_RAW[kind]
-    n = max(2, int(round(raw['frames'] / take['pace'])))
     blow, hit = take_raw_blow(kind), take.get('hit')
+    fps = raw['fps']
     frames = []
+    # With 'swing', its stretch (a .. b of the raw clip) takes 1 / times as long, the rest as recorded (then all
+    # 'pace' times as fast): length is the played length as a share of the raw clip's.
+    a, b, times, length = 0.0, 0.0, 1.0, 1.0
+    if take.get('swing') is not None and hit is None:
+        start, end, times = take['swing']
+        a = min(max((start * fps - raw['first']) / raw['frames'], 0.0), 1.0)
+        b = min(max((end * fps - raw['first']) / raw['frames'], a), 1.0)
+        length = 1.0 - (b - a) * (1.0 - 1.0 / times)
+    n = max(2, int(round(raw['frames'] * length / take['pace'])))
     for k in range(n):
         u = k / n
         if hit is not None:
             r = blow * u / hit if u < hit else blow + (1 - blow) * (u - hit) / (1 - hit)
         else:
-            r = u
-        f = r * raw['frames']
-        i = int(math.floor(f)) % raw['frames']
-        j, v = (i + 1) % raw['frames'], f - math.floor(f)
-        frames.append((clip_frame(raw, f), {k: list(Vector(raw['tool'][i][k]).lerp(Vector(raw['tool'][j][k]), v))
-                                            for k in raw['tool'][i]}))
+            o = u * length
+            fast = (b - a) / times
+            r = o if o < a else a + (o - a) * times if o < a + fast else b + (o - a - fast)
+        frames.append(take_raw_frame(raw, r * raw['frames']))
+    if hit is None and take.get('blow') is not None:
+        # Where the blow falls in the played stroke, as a share of it (the swing's stretch taking less of it).
+        fast = (b - a) / times
+        o = blow if blow < a else a + (blow - a) / times if blow < b else blow - (b - a) + fast
+        hit = o / length
     tool = [f[1] for f in frames]
     # The elbow poles smoothed round the loop (TOOL_POLE_SMOOTH frames, a Gaussian's spread), so the elbows don't jump.
     reach = int(math.ceil(3 * TOOL_POLE_SMOOTH))
@@ -6869,8 +7008,10 @@ def take_stroke(kind):
         for f, e in enumerate(tool):
             e[key] = list(sum((ways[(f + d) % n] * math.exp(-0.5 * (d / TOOL_POLE_SMOOTH) ** 2)
                                for d in range(-reach, reach + 1)), Vector()).normalized())
-    out = dict(raw, action='mocap %s stroke %s %.2f' % (kind, hit, take['pace']), frames=n,
+    out = dict(raw, action='mocap %s stroke %s %.2f %s' % (kind, hit, take['pace'], take.get('swing')), frames=n,
                turns={b: [f[0][0][b] for f in frames] for b in raw['turns']}, hips=[f[0][1] for f in frames], tool=tool)
+    if 'trunk' in raw:
+        out['trunk'] = [f[0][2] for f in frames]
     if hit is not None:
         out['hit'] = hit * n
     return out
@@ -6882,7 +7023,7 @@ def take_grip(X, side, target, hold, edge_sign):
     wrap, thumb = hold
     sign = -1 if side == 'R' else 1
     clamp = grip_handle(side, sign, fist + way * along[side], way * thumb, edge * edge_sign, wrap, X, palm=WORK_PALM,
-                        pole=poles[side])
+                        pole=poles[side], tool=True)
     close_hand(X, side, sign)
     return clamp
 
@@ -6894,10 +7035,13 @@ def take_holds(kind):
     the head and the wrist on its shoulder's side; a double-ended tool (two 'blade's) may take either end for the point,
     a bladed one only its edge. Returns ({side: (wrap, thumb)}, edge sign)."""
     take = TOOL_TAKES[kind]
+    if take.get('holds_of') is not None:
+        return take_holds(take['holds_of'])   # held as another kind's stroke holds it (the same tool line)
     if take.get('holds') is not None:
         return {s: tuple(h) for s, h in take['holds'].items()}, take.get('edge') or 1
     key = (kind, TOOL_CLIPS[kind]['action'], repr(take), TOOL_REACH, TOOL_THUMB, TOOL_SIDE_COST, GRIP_WRAP_STEP,
-           GRIP_FREE, GRIP_FLEX, GRIP_DEVIATE, WORK_GRIP, WORK_PALM, TOOL_HOLD_SAMPLES)
+           GRIP_FREE, GRIP_FLEX, GRIP_DEVIATE, WORK_GRIP, WORK_PALM, TOOL_HOLD_SAMPLES,
+           TOOL_FIST_ALONG, TOOL_FIST_IN, TOOL_FIST_TILT, TOOL_FIST_CANT)
     if key not in take_hold_cache:
         targets = [take_targets(kind, k / TOOL_HOLD_SAMPLES) for k in range(TOOL_HOLD_SAMPLES)]
         best = None

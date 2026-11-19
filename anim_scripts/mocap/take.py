@@ -27,9 +27,10 @@ def facing(trackers, wands, wand_turns=None):
     return None
 
 
-def assign(trackers, wands, wand_turns=None):
+def assign(trackers, wands, wand_turns=None, forward=None):
     """Names each device from its mean rest-pose place ({serial: xyz}, SteamVR space), and the wands' turns then
-    ({serial: wxyz}) for which way is forward. Returns ({serial: part}, a list of problems)."""
+    ({serial: wxyz}) for which way is forward, or forward itself (SteamVR space, across the ground) if given. Returns
+    ({serial: part}, a list of problems)."""
     problems = []
     parts = {}
     if len(trackers) != 7:
@@ -58,7 +59,7 @@ def assign(trackers, wands, wand_turns=None):
     rest = [s for s in middle if s not in elbows]
     chest, hips = sorted(rest, key=lambda s: -trackers[s][1])
     limb = 'knee' if max(trackers[s][1] for s in elbows) < trackers[hips][1] else 'elbow'
-    forward = facing(trackers, wands, wand_turns)
+    forward = np.array(forward, float) if forward is not None else facing(trackers, wands, wand_turns)
     if forward is None:
         forward = trackers[chest] - trackers[hips]
         forward[1] = 0.0

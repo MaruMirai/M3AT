@@ -682,6 +682,7 @@ namespace M3AT
                 case "music": return MusicTest();
                 case "rolljoint": return RollJointTest();
                 case "drunk": return DrunkTest();
+                case "handholster": return HandHolsterTest();
                 case "socialfight": return SocialFightTest();
                 case "dress": return DressTest();
                 case "shields": return ShieldTest();
@@ -719,6 +720,8 @@ namespace M3AT
                 case "furskin": return FurskinTest();
                 case "facefur": return FaceFurTest();
                 case "fatseam": return FatSeamTest();
+                case "sleeve": return SleeveTest();
+                case "underwear": return UnderwearTest();
                 case "builds": return BuildsTest(null);
                 case "faceab": return FaceAbTest();
                 case "beard": return BeardTest();
@@ -1809,7 +1812,7 @@ namespace M3AT
         }
 
         // A colonist mining a block of granite in the next cell north (JobDriver_Mine), checking it plays work_pickaxe (the
-        // mocap mining stroke, walk.pick_at), and pictured through one stroke, timed from the game's own count to its next
+        // mocap mining stroke, with work_pickaxe_idle, the pick held ready, between strokes), and pictured through one stroke, timed from the game's own count to its next
         // strike (ticksToPickHit, which WalkFigures.PickPhase plays the stroke by), the point meant to go in on the strike.
         private static IEnumerator MineTest()
         {
@@ -1823,7 +1826,7 @@ namespace M3AT
             Thing rock = Spawn(ThingMaker.MakeThing(granite), middle + IntVec3.North);
             map.designationManager.AddDesignation(new Designation(rock, DesignationDefOf.Mine));
             Pawn miner = NewPawn(middle, null);
-            miner.skills.GetSkill(SkillDefOf.Mining).Level = 5;   // (a strike about every 2.6 s, near the stroke's own length)
+            miner.skills.GetSkill(SkillDefOf.Mining).Level = 2;   // (a strike about every 6 s: the 2.9 s stroke, then the pick held ready)
             HoldOthersAway(miner);
             Job job = JobMaker.MakeJob(JobDefOf.Mine, rock, 20000, true);
             job.playerForced = true;
@@ -1893,7 +1896,7 @@ namespace M3AT
             miner.jobs.EndCurrentJob(JobCondition.InterruptForced);
             lookDistance = LookDistance;
             lookHeight = LookHeight;
-            Note("Look: the pick resting low beside the right foot, swung back behind, then over the right shoulder into the rock's face ahead at about head height, the point going in on `hit`, then brought back round and let down to rest; facing the rock at the blow; both hands round the handle, the right above the left; the pick clear of the head.");
+            Note("Look: the pick held ready over the right shoulder (shifting a little, not frozen) between strokes, wound up, swung down fast into the rock's face ahead, the point going in on `hit` (the strike's sound and flash), then brought back up to the ready hold; the ready hold and the stroke blending without a jump; facing the rock at the blow; both hands round the handle; the pick clear of the head.");
         }
 
         // The other tool strokes from Maru's tracker takes (walk.TOOL_TAKES): a colonist felling a grown oak in the next
@@ -2222,6 +2225,48 @@ namespace M3AT
             lookHeight = heightWas;
             Check("talk variants: played", played >= 2, played + " variants");
             Note("Look: each the same pawn and camera; compare the hands, the trunk and the head.");
+        }
+
+        // The free hands kept out of holstered weapons (HandsClear.cs): a pawn in a duster with an autopistol (on the hip)
+        // and a knife and grenades in its inventory, standing at ease, close on its hips from each side and the front. Run
+        // with M3AT_HANDCLEAR=1 to have the hands kept clear (off by default).
+        private static IEnumerator HandHolsterTest()
+        {
+            ClearPatch();
+            Pawn pawn = NewPawn(middle, "Gun_Autopistol");
+            Hold(pawn);
+            ThingDef duster = ThingDef.Named("Apparel_Duster");
+            pawn.apparel.Wear((Apparel)ThingMaker.MakeThing(duster, GenStuff.DefaultStuffFor(duster)), false);
+            pawn.inventory.innerContainer.TryAdd(ThingMaker.MakeThing(ThingDef.Named("MeleeWeapon_Knife"), ThingDefOf.Steel));
+            pawn.inventory.innerContainer.TryAdd(ThingMaker.MakeThing(ThingDef.Named("Weapon_GrenadeFrag")));
+            lookAt = pawn.DrawPos;
+            yield return Ticks(60, "handholster", pawn);
+            yield return WaitReal(1f);
+            float most = 0f;
+            try
+            {
+                lookPitch = 15f;
+                lookDistance = 2.2f;
+                lookHeight = 0.45f;
+                foreach (float yaw in new[] { 0f, 90f, 180f, 270f })
+                {
+                    lookYaw = yaw;
+                    for (int i = 0; i < 3; i++)
+                    {
+                        yield return Ticks(40, "handholster", pawn);
+                        most = Mathf.Max(most, Field<Vector3>(pawn, "clearR").magnitude, Field<Vector3>(pawn, "clearL").magnitude);
+                    }
+                    yield return Shot("hips_" + (int)yaw);
+                }
+            }
+            finally
+            {
+                lookPitch = LookPitch;
+                lookDistance = LookDistance;
+                lookHeight = LookHeight;
+            }
+            Note("handholster: a wrist moved out of a holstered weapon by up to " + most.ToString("F3") + " model units");
+            Note("Look: hips_*: neither hand through the pistol on the hip or the knife or grenades; the hands hanging naturally just clear of them.");
         }
 
         private static IEnumerator DrunkTest()
@@ -3362,6 +3407,172 @@ namespace M3AT
             lookHeight = LookHeight;
             lookPitch = LookPitch;
             Note("Look: nothing under a garment showing through it: no shirt through the jacket or duster, no trousers through the duster, no skin on the back.");
+        }
+
+        // Looking into a sleeve's cuff: a drafted rifleman in trousers, a shirt and a parka close up from the front and
+        // above, where the parka's right cuff swings off the wrist (hide_edges.py), with the clothes' occlusion on and off.
+        private static IEnumerator SleeveTest()
+        {
+            Rand.PushState(20261119);
+            Pawn pawn;
+            try
+            {
+                pawn = NewPawn(middle, "Gun_AssaultRifle");
+            }
+            finally
+            {
+                Rand.PopState();
+            }
+            bool outlines = SettingsMod.Settings.outlines;
+            bool occlusion = SettingsMod.Settings.clothesOcclusion;
+            lookDistance = 1.3f;
+            lookHeight = 0.65f;
+            // A short-sleeved shirt under the parka (the skin fills its cuff, hide_edges.py's opens) and a long-sleeved one
+            // (the shirt's cuff does, UnderOf's OverOpens).
+            foreach (string shirt in new[] { "Apparel_BasicShirt", "Apparel_CollarShirt" })
+            {
+                pawn.apparel.DestroyAll();
+                foreach (string name in new[] { "Apparel_Pants", shirt, "Apparel_Parka" })
+                {
+                    ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail(name);
+                    pawn.apparel.Wear((Apparel)ThingMaker.MakeThing(def, GenStuff.DefaultStuffFor(def)), false);
+                }
+                pawn.drafter.Drafted = true;
+                pawn.Rotation = Rot4.South;
+                lookPitch = 25f;
+                Look(pawn, 0f);
+                yield return WaitReal(2f);
+                yield return Ticks(60, "sleeve", pawn);
+                string outfit = shirt.Substring("Apparel_".Length).ToLowerInvariant();
+                foreach (string run in new[] { "default", "noocclusion" })
+                {
+                    SettingsMod.Settings.outlines = true;
+                    SettingsMod.Settings.clothesOcclusion = run == "default";
+                    foreach (float pitch in new[] { 25f, 50f })
+                    {
+                        lookPitch = pitch;
+                        Look(pawn, 0f);
+                        yield return Ticks(3, "sleeve", pawn);
+                        yield return Shot(outfit + "_" + run + "_p" + Mathf.RoundToInt(pitch));
+                    }
+                }
+            }
+            SettingsMod.Settings.outlines = outlines;
+            SettingsMod.Settings.clothesOcclusion = occlusion;
+            lookDistance = LookDistance;
+            lookHeight = LookHeight;
+            lookPitch = LookPitch;
+            Note("Look: into the right cuff: the wrist (or the collared shirt's cuff) fills it, no dark hole into the hand; no skin through the parka.");
+        }
+
+        // UnderWhere's underwear and Kiiro's (Kiiro_Race) light clothes on the new garments (briefs, bandeau, crop top,
+        // shorts, short shorts, Models/garments): a woman and a man in each set, alone and under a shirt and trousers,
+        // from the front, the side and the back. Wants UnderWhere active; Kiiro's sets are passed over without it. Each
+        // apparel is checked for the garment it should get, "own <garment>" or "stand-in <garment>+<garment>"
+        // (WalkFigures.AutoStandIns).
+        private static IEnumerator UnderwearTest()
+        {
+            string[][] sets =
+            {
+                new[] { "UnderWhere_Panties", "own Underwear", "UnderWhere_Bra", "stand-in CropTop" },
+                new[] { "UnderWhere_Boxers", "own Shorts", "UnderWhere_Tanktop", "own CropTop" },
+                new[] { "UnderWhere_Loincloth", "stand-in Underwear", "UnderWhere_Chestwrap", "own Chestwrap" },
+                new[] { "UnderWhere_LongJohns", "own LongJohns" },
+                new[] { "UnderWhere_Panties", null, "UnderWhere_Bra", null, "Apparel_BasicShirt", null, "Apparel_Pants", null },
+                new[] { "UnderWhere_LongJohns", null, "Apparel_BasicShirt", null, "Apparel_Pants", null },
+                new[] { "Kiiro_Underwear_Normal", "stand-in CropTop+Underwear" },
+                new[] { "Kiiro_SimpleUnderwear", "stand-in Chestwrap+Underwear" },
+                new[] { "Kiiro_Stocking_Black", "stand-in CropTop+Underwear+Pants" },
+                new[] { "Kiiro_Pantynose_White", "stand-in CropTop+Pants" },
+                new[] { "Kiiro_HotPant", "stand-in ShortShorts", "Kiiro_RunningShirt", "stand-in CropTop" },
+                new[] { "Kiiro_Shorts", null, "Kiiro_TShirtShort", "stand-in CropTop" },
+                new[] { "Kiiro_ShortDressII", "stand-in ShortShorts", "Kiiro_TShirt", "stand-in BasicShirt" },
+                new[] { "Kiiro_Underwear_Normal", null, "Kiiro_HotPant", null, "Kiiro_TShirt", null },
+            };
+            if (DefDatabase<ThingDef>.GetNamedSilentFail("UnderWhere_Panties") == null)
+            {
+                Check("UnderWhere active", false, "no UnderWhere_Panties def: activate UnderWhere (Malistaticy.UnderWhere) to run this");
+                yield break;
+            }
+            Rand.PushState(20261119);
+            Pawn woman, man;
+            try
+            {
+                woman = NewPawn(middle, null);
+                man = NewPawn(middle + IntVec3.East * 2, null);
+            }
+            finally
+            {
+                Rand.PopState();
+            }
+            woman.gender = Gender.Female;
+            woman.story.bodyType = BodyTypeDefOf.Female;
+            man.gender = Gender.Male;
+            man.story.bodyType = BodyTypeDefOf.Male;
+            Pawn[] pawns = { woman, man };
+            lookDistance = 4f;
+            lookHeight = 0.6f;
+            lookPitch = 10f;
+            for (int k = 0; k < sets.Length; k++)
+            {
+                if (DefDatabase<ThingDef>.GetNamedSilentFail(sets[k][0]) == null)
+                {
+                    Note("set" + k + ": no " + sets[k][0] + " (its mod isn't active), passed over");
+                    continue;
+                }
+                foreach (Pawn pawn in pawns)
+                {
+                    pawn.apparel.DestroyAll();
+                    for (int i = 0; i + 1 < sets[k].Length; i += 2)
+                    {
+                        string name = sets[k][i];
+                        ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail(name);
+                        if (def == null)
+                        {
+                            continue;
+                        }
+                        // (Wear, not the game's checks: UnderWhere gives the panties and bra to women only, Kiiro its
+                        // clothes to its own race)
+                        pawn.apparel.Wear((Apparel)ThingMaker.MakeThing(def, GenStuff.DefaultStuffFor(def)), false);
+                        if (pawn == woman && sets[k][i + 1] != null)
+                        {
+                            string got = WalkFigures.AutoStandIns(def);
+                            Check(name + ": " + sets[k][i + 1], SameGarments(got, sets[k][i + 1]), got);
+                        }
+                    }
+                    Hold(pawn);
+                }
+                foreach (float yaw in new[] { 0f, 90f, 180f })
+                {
+                    lookAt = Centre(pawns);
+                    lookYaw = yaw;
+                    yield return Ticks(5, "underwear", woman);
+                    yield return Shot("set" + k + "_" + Mathf.RoundToInt(yaw));
+                }
+            }
+            lookDistance = LookDistance;
+            lookHeight = LookHeight;
+            lookPitch = LookPitch;
+            lookYaw = 0f;
+            Note("Look: each set drawn alone (sets 0-3, 6-12); under the shirt and trousers (sets 4, 5) and under Kiiro's hotpants and T-shirt (set 13) none of the underwear showing through, the long johns' waffle knit, placket and ribbed cuffs at the wrists and ankles.");
+        }
+
+        // The same garments in any order: a stand-in pair or set is listed by score, or a stands_for set by the export's order.
+        private static bool SameGarments(string got, string want)
+        {
+            if (got == null || want == null)
+            {
+                return got == want;
+            }
+            int a = got.IndexOf(' '), b = want.IndexOf(' ');
+            if (a < 0 || b < 0 || got.Substring(0, a) != want.Substring(0, b))
+            {
+                return got == want;
+            }
+            List<string> x = new List<string>(got.Substring(a + 1).Split('+')), y = new List<string>(want.Substring(b + 1).Split('+'));
+            x.Sort(StringComparer.Ordinal);
+            y.Sort(StringComparer.Ordinal);
+            return string.Join("+", x) == string.Join("+", y);
         }
 
         private static IEnumerator ProstheticsTest()
@@ -7735,6 +7946,8 @@ namespace M3AT
         // The last grip slide DrawWeapon gave this pawn's weapon (GripSlide, in cells of the art's own axes, before the
         // figure's size), and the grips found in its art and the kind's.
         internal static readonly Dictionary<int, Vector2> AutoGripSlide = new Dictionary<int, Vector2>();
+        // The other hand's fist on the drawn slab's sprite (x, y as uv; z model units off its face), DrawWeapon's.
+        internal static readonly Dictionary<int, Vector3> AutoOffFist = new Dictionary<int, Vector3>();
 
         private static string AutoGripOf(Pawn pawn, ThingWithComps w)
         {
@@ -7754,6 +7967,17 @@ namespace M3AT
             if (AutoSlabFist.TryGetValue(pawn.thingIDNumber, out rec))
             {
                 text += ", fist on the sprite at (" + rec.uv.x.ToString("F3") + ", " + rec.uv.y.ToString("F3") + ")";
+            }
+            Vector3 off;
+            if (AutoOffFist.TryGetValue(pawn.thingIDNumber, out off))
+            {
+                text += ", other fist on the sprite at (" + off.x.ToString("F3") + ", " + off.y.ToString("F3") + "), " + off.z.ToString("F3") + " off its face (slab units)";
+            }
+            Vector2 vMain, vOff;
+            if (VirtualGrips(pawn, out vMain, out vOff))
+            {
+                text += "; the grip tool's drafted-stance fists at (" + vMain.x.ToString("F3") + ", " + vMain.y.ToString("F3") + ") and ("
+                    + vOff.x.ToString("F3") + ", " + vOff.y.ToString("F3") + ")";
             }
             return text;
         }

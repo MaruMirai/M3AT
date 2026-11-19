@@ -62,8 +62,8 @@ namespace M3AT
         private static ThingCategoryDef armourCategory, helmetCategory;
         private static bool categoriesLooked;
 
-        // True if the apparel stays on in bed with NoEquipment: worn on the skin or the middle layer (shirts, trousers,
-        // tribalwear, a vacsuit) and not armour (the game's ApparelArmor or ArmorHeadgear categories, so power armour and
+        // True if the apparel stays on in bed with NoEquipment: worn on the skin or the middle layer, or a mod's counting as one (shirts, trousers,
+        // tribalwear, a vacsuit) or under the skin layer (underwear, SkinnedFigure.UnderSkin) and not armour (the game's ApparelArmor or ArmorHeadgear categories, so power armour and
         // flak too). Headgear, coats on the shell layer alone, belts, packs, webbing and shields come off.
         private static bool KeptOnInBed(ThingDef def)
         {
@@ -74,7 +74,7 @@ namespace M3AT
                 helmetCategory = DefDatabase<ThingCategoryDef>.GetNamedSilentFail("ArmorHeadgear");
             }
             List<ApparelLayerDef> layers = def.apparel != null ? def.apparel.layers : null;
-            if (layers == null || !(layers.Contains(ApparelLayerDefOf.OnSkin) || layers.Contains(ApparelLayerDefOf.Middle)))
+            if (layers == null || !layers.Exists(l => SkinnedFigure.BodyLayerOf(l) == "OnSkin" || SkinnedFigure.BodyLayerOf(l) == "Middle" || SkinnedFigure.UnderSkin(l)))
             {
                 return false;
             }

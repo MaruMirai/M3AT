@@ -256,12 +256,14 @@ namespace M3AT
         private const float DazeEase = 2f;   // how fast a pawn slumps when stunned or comes round, per real second
         // Mining: the game strikes the rock (its sound and flash, EffecterDefOf.Mine) when JobDriver_Mine's ticksToPickHit
         // runs out, every round(100 / MiningSpeed) ticks, so work_pickaxe is played from that count (PickPhase) rather
-        // than the clock, the blow landing on that tick. PickHit is where in the stroke the point goes in (walk.PICK_HIT:
-        // lifted from rest beside the foot and swung over into the rock), PickBounce how far the stroke runs on after it
-        // (the pick brought back round and let down to rest again, the end of the stroke, where it waits).
+        // than the clock, the blow landing on that tick: one stroke from the pick held ready over the shoulder, swung
+        // into the rock and brought back up to it, the blow at the export's pick_hit share (PickHit on an older one), at
+        // its own pace (at most PickSlowest slower) or squeezed for a miner striking more often; between strokes,
+        // work_pickaxe_idle (the pick held ready) loops for as long as the miner waits, crossfaded with the stroke over
+        // PickIdleBlend ticks at either end of it.
         private const float PickHit = 0.5f;
-        private const float PickBounce = 0.5f;
-        private const float PickSlowest = 1f;   // a stroke is played at most this much slower than the clip's own length: at its own pace, a slower miner resting the pick for longer between strokes
+        private const float PickSlowest = 1f;
+        private const float PickIdleBlend = 20f;   // (the take's long idle holds the pick a little further back than the stroke's ends)
         // Beating out a fire: the game beats once each time its beat verb's 1.1 s cool-down ends (Verb_BeatFire), so
         // work_stomp and work_pat are played from those beats (BeatPhase) rather than the clock, a blow landing on the tick
         // the game beats. Where in each clip a blow lands, and how many blows a loop (walk.STOMP_HIT, walk.PAT_HIT and
@@ -485,6 +487,9 @@ namespace M3AT
             public string stance;   // the drafted clip for the weapon it holds (DraftedClip); null: the export has none
             public float armsOut;   // this draw: how much of the stance's hold is laid on, its hands pushed out past armour by (ArmsOut)
             public bool handHeld;   // the game shows its weapon in its hands (StepDraw)
+            public List<HolsterSeen> holstered = new List<HolsterSeen>();   // the weapons drawn holstered last draw (HandsClear)
+            public GarmentMask holsterMask;   // and the garments worn then
+            public Vector3 clearR, clearL;   // model units each wrist is moved out of a holstered weapon, eased (HandsClear)
             public float drawAt = -1f;   // 0 .. 1 through the draw clip, going up to draw and down to holster; less than 0: none
             public string drawClip;   // the draw clip it plays or last played (DrawClipOf)
             public int drawWeapon;   // the weapon it draws (thingIDNumber)
@@ -1369,6 +1374,7 @@ namespace M3AT
                 FaceLayers.PatchEyes(harmony);
                 FaceLayers.PatchBlush(harmony);
                 RomanceOnTheRim.PatchShareReading(harmony);
+                PatchGripTool(harmony);
                 Api.AddWeaponModelRule(WeaponRule);
                 Api.AddGroundModelRule(GroundRule);
                 try
@@ -1650,6 +1656,55 @@ namespace M3AT
             Map map = pawn.Map;
             Building b = map != null && pawn.Position.InBounds(map) ? pawn.Position.GetEdifice(map) : null;
             return b != null && b.def.building != null && b.def.building.isSittable ? b : null;
+        }
+
+        // Sliding forward on a seat (SeatSlideOf): the chibi's thighs are short, so sat in the middle of IsoRim's dining
+        // chair its knees were at the seat's front edge and the calves hung down through it. It is drawn slid forward until
+        // the back of its calves, within SeatSlab under the seat, is CalfClear past the seat's front edge (SeatFrontOf), at
+        // most SeatSlideMost. Clips that already draw it moved on the seat (eating at a table, playing an instrument) take
+        // the larger of the two, not both.
+        private const float SeatSlab = 0.1f;   // cells under the seat's top that the calves must clear (the dining chair's seat and rail are 0.08 thick)
+        private const float CalfClear = 0.015f;   // cells
+        private const float SeatSlideMost = 0.2f;   // cells
+        private const float SeatFrontDefault = 0.28f;   // cells from the middle to the front edge, for a seat IsoRim draws no model of
+        private static readonly Dictionary<ThingDef, float> seatFronts = new Dictionary<ThingDef, float>();
+
+        // How far a seat's front edge is from its middle, cells: the nearer of its model's reach along x and along z (its
+        // depth: an armchair's arms and a couch's length are along the other), so for any quarter turn. Dining chair
+        // and stool 0.28, armchair 0.38, throne 0.43. Cached per def.
+        private static float SeatFrontOf(Thing seat)
+        {
+            if (seat == null)
+            {
+                return SeatFrontDefault;
+            }
+            float front;
+            if (seatFronts.TryGetValue(seat.def, out front))
+            {
+                return front;
+            }
+            front = SeatFrontDefault;
+            ThingModelInfo info;
+            Vector3[] soup = Api.ReadThingModel(seat, ThingModelUse.Ground, out info) ? WeaponFit.SoupOf(info.Model) : null;
+            if (soup != null)
+            {
+                float x = 0f, z = 0f;
+                for (int i = 0; i < soup.Length; i++)
+                {
+                    x = Mathf.Max(x, Mathf.Abs(soup[i].x));
+                    z = Mathf.Max(z, Mathf.Abs(soup[i].z));
+                }
+                float scale = info.Scale > 0f ? info.Scale : 1f;
+                front = Mathf.Min(x, z) * scale;
+            }
+            seatFronts[seat.def] = front;
+            return front;
+        }
+
+        // How far forward to slide a figure sat on this seat, cells (see SeatFrontOf); calfBack from SkinnedFigure.SeatOf.
+        private static float SeatSlideOf(Thing seat, float calfBack, float size)
+        {
+            return calfBack < float.MaxValue ? Mathf.Clamp(SeatFrontOf(seat) + CalfClear - calfBack * size, 0f, SeatSlideMost) : 0f;
         }
 
         // How far the game's own sitting shift has got (0 .. 1): it slides the sprite up the screen onto the seat.
@@ -5360,25 +5415,58 @@ namespace M3AT
             return s < BendHold ? 1f : Mathf.SmoothStep(0f, 1f, (1f - s) / (1f - BendHold));
         }
 
-        // Where the pickaxe stroke is for a pawn mining, 0 .. 1 round it, timed so the point goes into the rock (PickHit) on
-        // the tick the game strikes it: from JobDriver_Mine's own count down to the next strike (ticksToPickHit), so it
-        // keeps time with the strike's sound and flash and with the miner's speed. The stroke takes its own length (up to
-        // PickSlowest of it), so the swing looks the same at any skill and a slower miner only rests the pick by its foot
-        // longer until it is time to swing again; a miner striking more often than that has it squeezed into the time. A pawn ticked less than every tick (the game's tick intervals) counts
-        // down in jumps, so the count is carried on by the game clock from when it was last seen to change. Any other job,
-        // or mining not yet begun (the count is set below -100 until the first tick at the rock), keeps the clock.
-        private static float PickPhase(Pawn pawn, Ease e, string clip)
+        // Where the pickaxe stroke is for a pawn mining, 0 .. 1 through it, timed so the point goes into the rock (the
+        // pick_hit share) on the tick the game strikes it: from JobDriver_Mine's own count down to the next strike
+        // (ticksToPickHit), so it keeps time with the strike's sound and flash and with the miner's speed. The stroke takes
+        // its own length (up to PickSlowest of it), so the swing looks the same at any skill; a slower miner holds the
+        // pick ready (work_pickaxe_idle) until it is time to swing again, and one striking more often has the stroke
+        // squeezed into the time. stroke is how much of the stroke to show against the idle: 1 through it, eased over
+        // PickIdleBlend ticks at its ends, 0 between strokes (always 1 on an export without the idle). A pawn ticked less
+        // than every tick counts down in jumps, so the count is carried on by the game clock (PickCount). Any other job,
+        // or mining not yet begun, keeps the clock.
+        private static float PickPhase(Pawn pawn, Ease e, string clip, out float stroke)
         {
-            JobDriver_Mine mine = pawn.jobs != null ? pawn.jobs.curDriver as JobDriver_Mine : null;
+            stroke = 1f;
             float seconds = skin.SecondsOf(clip);
-            if (mine == null || seconds <= 0f)
+            float until;
+            if (seconds <= 0f || !PickCount(pawn, e, out until))
             {
                 return LoopPhase(pawn, clip);
+            }
+            float hit = skin.PickHitShare > 0f && skin.PickHitShare < 1f ? skin.PickHitShare : PickHit;
+            float since = Mathf.Max(0f, e.pickPeriod - until);
+            float length = Mathf.Min(e.pickPeriod, seconds * 60f * PickSlowest);   // ticks the whole stroke takes
+            float into = until <= hit * length ? hit * length - until   // winding up and swinging down
+                       : since < (1f - hit) * length ? hit * length + since   // back up to the ready hold after the strike
+                       : -1f;   // waiting for the next
+            bool idles = skin.Has("work_pickaxe_idle") && e.pickPeriod - length > 2f * PickIdleBlend;
+            if (into < 0f)
+            {
+                stroke = idles ? 0f : 1f;
+                return 0f;
+            }
+            if (idles)
+            {
+                stroke = Mathf.SmoothStep(0f, 1f, Mathf.Min(into, length - into) / PickIdleBlend);
+            }
+            return into / length;
+        }
+
+        // JobDriver_Mine's count to the next strike for a pawn mining, as until (ticks, carried on by the game clock between
+        // readings), keeping e.pickPeriod (the ticks between strikes) up to date. False for any other job, or mining not
+        // yet begun (the count is set below -100 until the first tick at the rock).
+        private static bool PickCount(Pawn pawn, Ease e, out float until)
+        {
+            until = 0f;
+            JobDriver_Mine mine = pawn.jobs != null ? pawn.jobs.curDriver as JobDriver_Mine : null;
+            if (mine == null)
+            {
+                return false;
             }
             int left = pickHitIn(mine);
             if (left < -100)
             {
-                return LoopPhase(pawn, clip);
+                return false;
             }
             int now = Find.TickManager.TicksGame;
             int job = mine.job != null ? mine.job.loadID : -1;
@@ -5397,18 +5485,8 @@ namespace M3AT
                 e.pickSeen = left;
                 e.pickSeenTick = now;
             }
-            float until = Mathf.Max(0f, e.pickSeen - (now - e.pickSeenTick));
-            float since = Mathf.Max(0f, e.pickPeriod - until);
-            float stroke = Mathf.Min(e.pickPeriod, seconds * 60f * PickSlowest);   // ticks the whole stroke takes
-            if (until <= PickHit * stroke)
-            {
-                return PickHit - until / stroke;   // winding up and bringing it down
-            }
-            if (since < PickBounce * stroke)
-            {
-                return PickHit + since / stroke;   // back from the rock to rest after the last strike
-            }
-            return 0f;   // resting (the stroke's start) until it is time to swing
+            until = Mathf.Max(0f, e.pickSeen - (now - e.pickSeenTick));
+            return e.pickPeriod > 0;
         }
 
         // Where a fire-beating clip (work_stomp, work_pat) is for a pawn beating a fire, 0 .. 1 round it, timed so a blow
@@ -5708,9 +5786,9 @@ namespace M3AT
             for (int i = 0; shoes && all != null && i < all.Count; i++)
             {
                 List<BodyPartGroupDef> groups = all[i].def.apparel == null ? null : all[i].def.apparel.bodyPartGroups;
-                if (groups == null)
+                if (groups == null || SkinnedFigure.IsUnderwear(all[i].def.apparel))
                 {
-                    continue;
+                    continue;   // (underwear: a bra and panties aren't dressed for shoes)
                 }
                 if (legs == null && groups.Contains(BodyPartGroupDefOf.Legs))
                 {
@@ -6095,7 +6173,23 @@ namespace M3AT
         // turned in the stance aims it); the sprite's top (a gun's sights) kept up, and the game's
         // equippedAngleOffset (a sword or spear's tilt in its sprite) turned out first, as SpriteSolids.DrawHeld does.
         // Aiming, IsoRim takes the end of the barrel as drawn for where the shots start (Api.ReportMuzzle).
-        private static void DrawWeapon(Pawn pawn, string stance, bool aiming, SkinnedFigure.Posed fig, Vector3 at, float yaw, float size, GarmentMask mask, Ease drawing)
+        // Where the weapon in the hands is, before it comes out of or goes into its holster (DrawWeapon's placing, which the
+        // off hand's reach to it shares, GripOffHand): model units, the whole move in, as JointOf gives. Null when it isn't
+        // held (no art, bare hands, no hand bones).
+        private sealed class WeaponPlaced
+        {
+            public ThingWithComps weapon;
+            public SkinnedFigure.Hold hold;
+            public bool left;           // held in the left hand
+            public Vector3 hand;        // the hold's place, the slide not yet taken off it
+            public Vector3 closed;      // where the holding hand closes
+            public Vector3 a, top;      // along the weapon and its top, unit
+            public Vector2 slide;       // GripSlide's, along the art's own axes
+            public Vector3 fist;        // AUTOTEST's: the fist before the hold's at
+            public Matrix4x4 handTurn;  // AUTOTEST's: the holding hand's bone (zero: the hold isn't on the hand)
+        }
+
+        private static WeaponPlaced PlaceWeapon(Pawn pawn, string stance, SkinnedFigure.Posed fig, float size, Ease drawing)
         {
             ThingWithComps weapon = HeldWeapon(pawn);
             Graphic g = weapon.Graphic;
@@ -6134,7 +6228,7 @@ namespace M3AT
             if (mat == null || kind == "unarmed" || !skin.JointOf(fig, "hand.R", out wristR) || !skin.JointOf(fig, "forearm.R", out elbowR)
                 || !skin.JointOf(fig, "hand.L", out wristL) || !skin.JointOf(fig, "forearm.L", out elbowL))
             {
-                return;
+                return null;
             }
             bool left = hold.hand == "L";
             Vector3 wrist = left ? wristL : wristR, elbow = left ? elbowL : elbowR;
@@ -6142,18 +6236,14 @@ namespace M3AT
             Matrix4x4 turn;
             Vector3 grip, a, top;
             Vector3 closed = hand;   // where the hand closes, before the hold's at moves the slab off it
-#if AUTOTEST
             Vector3 fist = hand;   // the fist itself, before the hold's at and the weapon shift move the slab off it
             Matrix4x4 handTurn = Matrix4x4.zero;   // the holding hand's bone, for the hold's at (zero: the hold isn't on the hand)
-#endif
             if (hold.line == "hand" && skin.BoneOf(fig, left ? "hand.L" : "hand.R", out turn) && skin.GripOf(hold.hand, out grip))
             {
                 hand = wrist + turn.MultiplyVector(grip).normalized * (skin.HandGrip >= 0f ? skin.HandGrip : HandGrip);
                 closed = hand;
-#if AUTOTEST
                 fist = hand;
                 handTurn = turn;
-#endif
                 hand += turn.MultiplyVector(hold.at);
                 Vector3 rest = (hold.aim.normalized + Vector3.down * hold.drop).normalized;
                 a = turn.MultiplyVector(rest).normalized;
@@ -6178,6 +6268,18 @@ namespace M3AT
                 a = (along.normalized + Vector3.down * hold.drop).normalized;
                 top = TopOf(a, hold.roll);
             }
+            // Turned in the fist as the player set it (GripTool): about the fist, in the plane of the art, + tipping the
+            // art's right end toward its top (a gun's muzzle up). Before the slide, which then goes along the turned art.
+            Vector3 own;
+            if (GripOverrideOf(weapon.def, out own) && own.z != 0f)
+            {
+                Vector3 tx, ty;
+                SpriteAxes(a, top, weapon.def.equippedAngleOffset, out tx, out ty);
+                Quaternion tilt = Quaternion.AngleAxis(own.z, Vector3.Cross(tx, ty));
+                a = tilt * a;
+                top = tilt * top;
+                hand = closed + tilt * (hand - closed);
+            }
             // Another mod's weapon held by its kind's hold: slid along its own art so the grip found there is in the fist
             // (GripSlide), in the art's own axes, so it goes with the weapon however it is laid down below.
             Vector2 slide = GripSlide(weapon, holdName, slab, closed, hand, a, top, hold.behind, size);
@@ -6198,6 +6300,25 @@ namespace M3AT
             // its turn. Model space: the figure's right is +x, its front +z.
             Vector3 shift = skin.WeaponShift;
             hand += Quaternion.AngleAxis(fig.twist, Vector3.up) * (Vector3.up * shift.y + (left ? Vector3.left : Vector3.right) * shift.x + Vector3.forward * shift.z);
+            return new WeaponPlaced { weapon = weapon, hold = hold, left = left, hand = hand, closed = closed, a = a, top = top, slide = slide, fist = fist, handTurn = handTurn };
+        }
+
+        private static void DrawWeapon(Pawn pawn, string stance, bool aiming, SkinnedFigure.Posed fig, Vector3 at, float yaw, float size, GarmentMask mask, Ease drawing)
+        {
+            WeaponPlaced placed = PlaceWeapon(pawn, stance, fig, size, drawing);
+            if (placed == null)
+            {
+                return;
+            }
+            ThingWithComps weapon = placed.weapon;
+            SkinnedFigure.Hold hold = placed.hold;
+            bool left = placed.left, slab = AsSlab(weapon);
+            Vector3 hand = placed.hand, a = placed.a, top = placed.top;
+            Vector2 slide = placed.slide;
+#if AUTOTEST
+            Vector3 fist = placed.fist;
+            Matrix4x4 handTurn = placed.handTurn;
+#endif
             float behind = hold.behind;
             // Coming out of its holster or going back: on its way from the slot to the hand, which closes the gap to whatever
             // the clip couldn't reach or wasn't made for (this weapon's own length, a coat, a backpack).
@@ -6220,6 +6341,16 @@ namespace M3AT
                 SpriteAxes(a, top, weapon.def.equippedAngleOffset, out sx, out sy);
                 hand -= (sx * slide.x + sy * slide.y) * drawn;   // none in the holster, all of it in the hand
             }
+            // The grip tool's marks: both fists on the art as drawn, once the weapon is all the way in the hands.
+            if (gripTool != null && gripTool.pawn == pawn && drawn >= 1f)
+            {
+                Vector3 offFist;
+                GripSeen = FistOnArt(weapon, placed.closed, placed.hand, a, top, behind, size, slide);
+                OffSeen = FistOf(fig, left ? "R" : "L", out offFist)
+                    ? FistOnArt(weapon, offFist, placed.hand, a, top, behind, size, slide) : new Vector2(-1f, -1f);
+                gripSeenFrame = Time.frameCount;
+            }
+
             Vector3 tip;
             Matrix4x4 world = DrawSlab(weapon, ScaleOf(weapon), hand, a, top, behind, at, yaw, size, out tip);
 #if AUTOTEST
@@ -6227,6 +6358,14 @@ namespace M3AT
             {
                 NoteSlabFist(pawn, world, Matrix4x4.Translate(at) * Matrix4x4.Rotate(Quaternion.AngleAxis(yaw, Vector3.up))
                     * Matrix4x4.Scale(new Vector3(size, size, size)), fist, handTurn, hold.at);
+            }
+            Vector3 offAt;
+            AutoOffFist.Remove(pawn.thingIDNumber);
+            if (drawn >= 1f && world != Matrix4x4.zero && FistOf(fig, left ? "R" : "L", out offAt))
+            {
+                Vector3 l = world.inverse.MultiplyPoint3x4((Matrix4x4.Translate(at) * Matrix4x4.Rotate(Quaternion.AngleAxis(yaw, Vector3.up))
+                    * Matrix4x4.Scale(new Vector3(size, size, size))).MultiplyPoint3x4(offAt));
+                AutoOffFist[pawn.thingIDNumber] = new Vector3(l.x + 0.5f, l.y + 0.5f, l.z);   // on the drawn slab, z off its face
             }
 #endif
             Ease ease = null;
@@ -6355,6 +6494,22 @@ namespace M3AT
         // sprites still put it in the hands; tip is then its barrel's end (true cells), else NoTip. Returns where the
         // slab went (true cells), zero if it has no sprite. onFigure: drawn with the figure being drawn, the model sharing its
         // outline (SkinnedFigure.DrawJoined).
+        // The weapon's picture placed as DrawSlab places it (model units, the figure's size not in): x along the picture's
+        // width and y up it, each as long as it is drawn, z out of its face a cell long, about its middle.
+        internal static Matrix4x4 SlabMatrix(Thing weapon, Graphic g, float scale, Vector3 hand, Vector3 a, Vector3 top, float behind, float size)
+        {
+            float o = weapon.def.equippedAngleOffset * Mathf.Deg2Rad, c = Mathf.Cos(o), sn = Mathf.Sin(o);
+            // The figure's size moves the hands but not the weapon: it is as big (and as thick) in every pawn's hands as in
+            // a grown one's, so a child holds a whole rifle. Its axes are divided back out of the size the matrix below
+            // scales everything by, so its scale is a share of the size the game draws it at on the floor and its
+            // thickness is IsoRim's slab's own.
+            float unsize = 1f / size;
+            Vector2 draw = g.drawSize * scale * unsize;
+            Vector3 x = (a * c - top * sn) * draw.x, y = (a * sn + top * c) * draw.y;
+            Vector3 middle = hand + a * (behind * Mathf.Max(draw.x, draw.y));
+            return new Matrix4x4(x, y, Vector3.Cross(x, y).normalized * unsize, new Vector4(middle.x, middle.y, middle.z, 1f));
+        }
+
         private static Matrix4x4 DrawSlab(Thing weapon, float scale, Vector3 hand, Vector3 a, Vector3 top, float behind,
             Vector3 at, float yaw, float size, out Vector3 tip, bool onFigure = true)
         {
@@ -6365,16 +6520,7 @@ namespace M3AT
             {
                 return Matrix4x4.zero;
             }
-            float o = weapon.def.equippedAngleOffset * Mathf.Deg2Rad, c = Mathf.Cos(o), sn = Mathf.Sin(o);
-            // The figure's size moves the hands but not the weapon: it is as big (and as thick) in every pawn's hands as in
-            // a grown one's, so a child holds a whole rifle. Its axes are divided back out of the size the matrix below
-            // scales everything by, so its scale is a share of the size the game draws it at on the floor and its
-            // thickness is IsoRim's slab's own.
-            float unsize = 1f / size;
-            Vector2 draw = g.drawSize * scale * unsize;
-            Vector3 x = (a * c - top * sn) * draw.x, y = (a * sn + top * c) * draw.y;
-            Vector3 middle = hand + a * (behind * Mathf.Max(draw.x, draw.y));
-            Matrix4x4 slab = new Matrix4x4(x, y, Vector3.Cross(x, y).normalized * unsize, new Vector4(middle.x, middle.y, middle.z, 1f));
+            Matrix4x4 slab = SlabMatrix(weapon, g, scale, hand, a, top, behind, size);
             Matrix4x4 world = Matrix4x4.Translate(at) * Matrix4x4.Rotate(Quaternion.AngleAxis(yaw, Vector3.up))
                 * Matrix4x4.Scale(new Vector3(size, size, size)) * slab;   // true cells
             if (DrawModel(weapon, mat, g.drawSize, scale, world, onFigure, out tip))
@@ -8063,12 +8209,18 @@ namespace M3AT
                     skin.Add(fig, "hunker", LoopPhase(pawn, "hunker"), (1f - moving) * (1f - drafted) * (1f - sat) * hunker * up);
                     if (work > 0f)
                     {
+                        float pickStroke = 1f;   // mining: the stroke against the pick held ready between strikes (PickPhase)
                         float workPhase = IsDressKind(ease.workKind) ? DressPhase(pawn, workClip)
-                            : workClip == "work_pickaxe" ? PickPhase(pawn, ease, workClip)
+                            : workClip == "work_pickaxe" ? PickPhase(pawn, ease, workClip, out pickStroke)
                             : ease.workKind == "stomp" ? BeatPhase(pawn, ease, workClip, StompHit, 1)
                             : ease.workKind == "pat" ? BeatPhase(pawn, ease, workClip, PatHit, PatHits)
                             : LoopPhase(pawn, workClip);
-                        skin.Add(fig, workClip, workPhase, (1f - moving) * (1f - drafted) * work * (1f - stir) * up);
+                        float working = (1f - moving) * (1f - drafted) * work * (1f - stir) * up;
+                        skin.Add(fig, workClip, workPhase, working * pickStroke);
+                        if (pickStroke < 1f)
+                        {
+                            skin.Add(fig, "work_pickaxe_idle", LoopPhase(pawn, "work_pickaxe_idle"), working * (1f - pickStroke));
+                        }
                         if (stir > 0f)
                         {
                             skin.Add(fig, ease.stirClip, ease.stirAt, (1f - moving) * (1f - drafted) * work * stir * up);
@@ -8354,6 +8506,8 @@ namespace M3AT
                         }
                         GripCarried(pawn, ease, fig, whole, size);
                         StrokePet(pawn, ease, fig, whole, size);
+                        GripOffHand(pawn, ease, fig, whole, size);
+                        HandsClear(ease, fig, whole, size);
                     }
                     skin.Finish(fig);
                 }
@@ -8374,6 +8528,7 @@ namespace M3AT
                     floor -= Mathf.Min(ease.depth, FloatSink * Mathf.Max(0f, bodyTop - lowest) * size);
                 }
                 float y = Lift * size;
+                float seatSlide = 0f;   // cells forward on the seat, so the calves clear its front edge (SeatSlideOf)
                 Vector3 underGlass = Vector3.zero;   // cells, the move keeping a figure on a couch under its glass (UnderGlass)
                 if (lying && ease.doll != null)
                 {
@@ -8406,7 +8561,10 @@ namespace M3AT
                 }
                 else if (sat > 0f)
                 {
-                    y = Mathf.Max(Mathf.Lerp(y, seatHeight - skin.SeatOf(fig) * size, sat), -lowest * size);   // feet not through the floor
+                    float calfBack;
+                    float seatAt = skin.SeatOf(fig, SeatSlab / size, out calfBack);
+                    y = Mathf.Max(Mathf.Lerp(y, seatHeight - seatAt * size, sat), -lowest * size);   // feet not through the floor
+                    seatSlide = SeatSlideOf(SeatUnder(pawn), calfBack, size) * sat;
                 }
                 else if (seated)
                 {
@@ -8473,7 +8631,10 @@ namespace M3AT
                         IntVec3 to = table - pawn.Position;
                         ease.eatWay = new Vector3(to.x, 0f, to.z);
                     }
-                    at += ease.eatWay * (EatCloser * Mathf.SmoothStep(0f, 1f, ease.eat));
+                    // (Slid forward on the seat as it eases in, and then the larger of that and EatCloser, not both.)
+                    float eating = Mathf.SmoothStep(0f, 1f, ease.eat);
+                    at += Quaternion.Euler(0f, yaw, 0f) * Vector3.forward * (seatSlide * (1f - eating))
+                        + ease.eatWay * (Mathf.Max(EatCloser, seatSlide) * eating);
                 }
                 else if (ease.eatClip == "kiss" && ease.eat > 0f)
                 {
@@ -8493,7 +8654,8 @@ namespace M3AT
                 else if (seated && ease.share > 0f && ease.shareWay.sqrMagnitude > 1e-4f)
                 {
                     // At a shared reading: drawn toward the one beside it (its turn on the seat is above).
-                    at += ease.shareWay.normalized * (ShareCloser * Mathf.SmoothStep(0f, 1f, ease.share));
+                    at += ease.shareWay.normalized * (ShareCloser * Mathf.SmoothStep(0f, 1f, ease.share))
+                        + Quaternion.Euler(0f, yaw, 0f) * Vector3.forward * seatSlide;   // toward the side, and forward on the seat
                 }
                 else if (ease.listen > 0f || ListeningTo(pawn) != null)
                 {
@@ -8514,8 +8676,11 @@ namespace M3AT
                 }
                 else if (ease.workKind != null && InstrumentCloser.TryGetValue(ease.workKind, out float closer))
                 {
-                    // Playing an instrument: drawn stepped up to it in the same way (seated, scooted forward on the seat).
-                    at += Quaternion.Euler(0f, ease.workFace, 0f) * Vector3.forward * (closer * ease.shownWork);
+                    // Playing an instrument: drawn stepped up to it in the same way (seated, scooted forward on the seat: the
+                    // larger of that and seatSlide, as the hands are posed for the instrument at its closer).
+                    float played = ease.shownWork;
+                    at += Quaternion.Euler(0f, ease.workFace, 0f) * Vector3.forward * (Mathf.Max(closer, seatSlide) * played)
+                        + Quaternion.Euler(0f, yaw, 0f) * Vector3.forward * (seatSlide * (1f - played));
                 }
                 else if (ease.workBeside.HasValue && ease.shownWork > 0f)
                 {
@@ -8530,6 +8695,12 @@ namespace M3AT
                     // Walking up to kneel by them, stopped short of the body (ApproachBeside), or letting go of that.
                     at.x += ease.besideHold.x;
                     at.z += ease.besideHold.z;
+                }
+                else if (seatSlide > 0f)
+                {
+                    // Sat on anything else (the plain sit, seated work at a bench, reading, praying): slid forward on the
+                    // seat so the calves clear its front edge.
+                    at += Quaternion.Euler(0f, yaw, 0f) * Vector3.forward * seatSlide;
                 }
                 ease.drawnAt = at;
                 if (!lying && !bedding && !seated && flight < 0f && swim <= 0f && lift <= 0f && duck <= 0f)
@@ -8674,7 +8845,12 @@ namespace M3AT
                 if (!lying && !crawling && swim <= 0f)
                 {
                     DrawHolstered(pawn, inHands, mask, fig, at, yaw, size);
+                    SeenHolstered(ease, mask);
                     DrawWornGear(pawn, mask, fig, at, yaw, size, HipShare(ease));
+                }
+                else
+                {
+                    ease.holstered.Clear();
                 }
             }
             catch (Exception e)

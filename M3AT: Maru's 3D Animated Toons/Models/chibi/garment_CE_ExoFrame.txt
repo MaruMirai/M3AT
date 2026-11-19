@@ -5,7 +5,8 @@ defs CE_Apparel_ExoFrame
 # texture: its image (t lines, a place on it per vertex); tint: whether the apparel's colour tints it.
 texture garment_CE_ExoFrame.png
 # hide k ...: body triangles (skin.txt's f lines, from 0) left out while it is worn.
-hide 35 94 508 587 588 596 630 631 773 786
+# opens k ...: body triangles it covers at rest that a pose brings out from under its edge (hide_edges.py), drawn though it is worn.
+opens 35 94 508 587 588 596 630 631 773 786
 v -0.00000 0.61371 -0.08641
 v -0.00000 0.51522 -0.10425
 v 0.05791 0.52701 -0.10251

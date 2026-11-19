@@ -7,7 +7,8 @@ texture garment_Collar.png
 hide_hair no
 hide_face no
 # hide k ...: body triangles (skin.txt's f lines, from 0) left out while it is worn.
-hide 1 242 335 368 616 707
+# opens k ...: body triangles it covers at rest that a pose brings out from under its edge (hide_edges.py), drawn though it is worn.
+opens 1 242 335 368 616 707
 v -0.00000 0.82150 0.03600
 v -0.01298 0.82255 0.03497
 v -0.02590 0.82543 0.03139

@@ -104,7 +104,8 @@ namespace M3AT
                 {
                     if (worn[g] == a)
                     {
-                        drawn.Add(skin.PieceName(g) + (skin.GarmentOf(a.def) == g ? "" : " (stand-in)"));
+                        drawn.Add(skin.PieceName(g) + (skin.GarmentOf(a.def) == g ? ""
+                            : SettingsMod.Settings != null && SettingsMod.Settings.clothingChoices.ContainsKey(a.def.defName) ? " (player's choice)" : " (stand-in)"));
                     }
                 }
                 string layers = a.def.apparel?.layers == null ? "" : string.Join("/", a.def.apparel.layers.Select(l => l.defName));

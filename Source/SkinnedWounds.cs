@@ -110,7 +110,7 @@ namespace M3AT
             }
             for (int g = 1; anyOnClothes && g < pieces.Length && g <= MaxHiding; g++)
             {
-                if ((mask & (GarmentBit(g))) != 0 && worn[g] != null && worn[g].def.apparel.layers.Contains(ApparelLayerDefOf.OnSkin))
+                if ((mask & (GarmentBit(g))) != 0 && worn[g] != null && OnTheSkin(worn[g].def.apparel))
                 {
                     carriers.Add(g);
                     hidden[g] = GarmentHidden(g, OverOf(g, mask, worn));

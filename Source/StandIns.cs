@@ -37,7 +37,7 @@ namespace M3AT
 
         private const float StandInLeast = 0.35f;   // the least score drawn: below it the apparel is left undrawn
         private const float PairCost = 0.03f;       // taken off two garments drawn together, so one as good wins
-        private const float OtherLayerStep = 0.6f;  // the score's share one body layer apart (OnSkin, Middle, Shell); squared two apart
+        private const float OtherLayerStep = 0.6f;  // the score's share one body layer apart (Underwear, OnSkin, Middle, Shell); squared two apart
         private const float OtherHeadLayer = 0.7f;  // and between two head layers (Overhead, CE's StrappedHead, EyeCover)
         private const float NotArmour = 0.75f;      // one armour and the other not
         private const float NotVacsuit = 0.3f;      // a vacsuit's garment for apparel that isn't one
@@ -50,6 +50,7 @@ namespace M3AT
         private const float NameWords = 0.15f;      // added for all the garment's name words in the apparel's name or label
         private const float GenericBonus = 0.03f;   // added for the plain garments (Generic), so they win ties
         private const float ChildOnlyShare = 0.7f;  // a garment for children's apparel only (the kid romper) on anything
+        private const float NarrowShare = 0.7f;     // a Narrow garment on apparel with none of its name words
 
         // How much each body part group counts in the overlap. FullHead is its parts (FullHead, UpperHead, Eyes, Mouth).
         private static readonly Dictionary<string, float> GroupWeight = new Dictionary<string, float>
@@ -62,7 +63,11 @@ namespace M3AT
             { "Teeth", "Mouth" }, { "LeftShoulder", "Shoulders" }, { "RightShoulder", "Shoulders" }, { "LeftHand", "Hands" },
             { "RightHand", "Hands" }, { "MiddleFingers", "Hands" },
         };
-        private static readonly string[] BodyLayers = { "OnSkin", "Middle", "Shell" };
+        // The body layers in order. A mod's layer is taken as the one it counts as (SkinnedFigure.BodyLayerOf): any
+        // underwear layer (UnderWhere's Underwear and UnderwearTop, Kiiro's Kiiro_Underwear) as "Underwear", so every
+        // underwear mod's apparel takes the underwear garments, and Kiiro's trousers layer, under the skin layer, as OnSkin.
+        private const string UnderLayer = SkinnedFigure.UnderwearLayer;
+        private static readonly string[] BodyLayers = { UnderLayer, "OnSkin", "Middle", "Shell" };
         private static readonly string[] HeadLayers = { "Overhead", "OnHead", "StrappedHead", "EyeCover" };
 
         // Garments too much their own thing to be drawn for anything else, unless its name says it is one (a mod's cape,
@@ -77,8 +82,26 @@ namespace M3AT
             "ArmorHelmetCataphractPrestige", "ArmorHelmetReconPrestige", "ArmorMarineHelmetPrestige",
             "ArmorHelmetMechCommander", "ArmorHelmetMechlordHelmet", "RobeRoyal", "ShirtRuffle", "Shadecone", "Tailcap",
             "TribalHeaddress", "PsychicFoilHelmet", "EltexSkullcap", "Headwrap", "WarVeil", "HatTop", "HatLadies",
-            "CE_SimpleNightVision", "CE_AdvancedNightVision",
+            "CE_SimpleNightVision", "CE_AdvancedNightVision", "Scarf",
         };
+        // Other words that name the same thing as a NoStandIn garment's name word, and phrases that don't though they hold
+        // it (a headscarf is worn over the hair, not round the neck).
+        private static readonly Dictionary<string, string[]> NameAlike = new Dictionary<string, string[]>
+        {
+            { "scarf", new[] { "neckerchief", "kerchief", "muffler", "shemagh", "keffiyeh", "snood" } },
+            { "short", new[] { "hotpant", "hot pant" } },   // hotpants are the short shorts, not the shorts
+            { "crop", new[] { "tank top", "tanktop", "halter", "tube top" } },
+        };
+        private static readonly Dictionary<string, string[]> NameNot = new Dictionary<string, string[]>
+        {
+            { "scarf", new[] { "headscarf", "head scarf" } },
+            { "pants", new[] { "hotpant", "underpant" } },   // hotpants are shorts, underpants underwear
+        };
+        // A NoStandIn garment named by the apparel (all its name words) is the thing itself, whatever the groups say (a mod's
+        // airwire headset over the eyes alone, a scarf pulled up over the chin given FullHead): its coverage is taken as at
+        // least NamedCover, and it is ahead of any other by NamedBonus, though it must still share a layer.
+        private const float NamedCover = 0.5f;
+        private const float NamedBonus = 1f;
 
         // Garments over the face, which stand in only for apparel named as one (MaskWords): mods often give a plain hat
         // FullHead, or a cap UpperHead and Eyes, which the gas mask (FullHead, Overhead, not armour) matched exactly.
@@ -95,11 +118,32 @@ namespace M3AT
             "PowerArmor", "Parka", "GasMask", "ClothMask",
         };
 
+        // Garments that are a narrower kind of a plain one (a crop top of a shirt, shorts of trousers): drawn for apparel
+        // whose name says so (a tank top, hotpants, a short skirt), but behind the plain one on coverage alone, as they
+        // were only 0.03 behind it on a plain sweater or jeans.
+        private static readonly HashSet<string> Narrow = new HashSet<string> { "CropTop", "Shorts", "ShortShorts" };
+
         // Name words too common to tell garments apart.
         private static readonly HashSet<string> CommonWords = new HashSet<string> { "hat", "helmet", "armor", "armour", "apparel", "kid" };
 
-        // The garments drawn for this apparel, which has none of its own, best first; empty for none. Cached per def.
+        // The garments drawn for this apparel, which has none of its own, best first; empty for none: the player's choice
+        // in the clothing tool if any (ClothingTool.cs, WalkFigures.ChosenStandIns), else the best match, cached per def.
         public int[] StandInsFor(ThingDef def)
+        {
+            if (def == null || def.apparel == null)
+            {
+                return NoStandIns;
+            }
+            int[] chosen;
+            if (WalkFigures.ChosenStandIns(this, def, out chosen))
+            {
+                return chosen;
+            }
+            return AutoStandInsFor(def);
+        }
+
+        // The garments the scoring picks for this apparel, whatever the player chose. Cached per def.
+        public int[] AutoStandInsFor(ThingDef def)
         {
             if (def == null || def.apparel == null)
             {
@@ -114,6 +158,47 @@ namespace M3AT
             return found;
         }
 
+        // The garments the player may pick for apparel in the clothing tool: every one that can stand in (StandInProfiles),
+        // those kept for apparel named as them too, as the player picks it by eye.
+        public List<int> ChoosableGarments()
+        {
+            List<Profile> all = StandInProfiles();
+            List<int> found = new List<int>(all.Count);
+            for (int i = 0; i < all.Count; i++)
+            {
+                found.Add(all[i].piece);
+            }
+            return found;
+        }
+
+        // A garment by its name (its file's, garment_<name>.txt), or -1.
+        public int GarmentNamed(string name)
+        {
+            for (int g = 1; name != null && g < pieces.Length; g++)
+            {
+                if (pieces[g].name == name)
+                {
+                    return g;
+                }
+            }
+            return -1;
+        }
+
+        // A garment as the player knows it: the label of the first apparel it is drawn for that the game has, else its name.
+        public string GarmentLabel(int g)
+        {
+            Piece piece = pieces[g];
+            for (int i = 0; piece.defs != null && i < piece.defs.Length; i++)
+            {
+                ThingDef d = DefDatabase<ThingDef>.GetNamedSilentFail(piece.defs[i]);
+                if (d != null && d.apparel != null)
+                {
+                    return d.LabelCap;
+                }
+            }
+            return GenText.SplitCamelCase(piece.name ?? "?");
+        }
+
         // The best garment for it, or -1.
         public int StandInFor(ThingDef def)
         {
@@ -126,6 +211,11 @@ namespace M3AT
             if (NeverStoodIn(def))
             {
                 return NoStandIns;
+            }
+            int[] named = StandsFor(def);
+            if (named.Length > 0)
+            {
+                return named;
             }
             Profile a = ProfileOf(def, 0);
             a.mask = IsMaskNamed(a.text);
@@ -143,7 +233,10 @@ namespace M3AT
             List<Profile> all = StandInProfiles();
             for (int i = 0; i < all.Count; i++)
             {
-                if ((!all[i].namedOnly || NameShare(a.text, all[i].tokens) >= 1f) && (!all[i].mask || a.mask))
+                // A garment over the skull (not a mask, which FullHead only says is, nor one the apparel is named as) only
+                // for apparel over it: a scarf over the mouth or neck scored just enough for the power armour helmet.
+                bool skull = !all[i].mask && !all[i].namedOnly && all[i].groups.Contains("UpperHead") && !a.groups.Contains("UpperHead");
+                if ((!all[i].namedOnly || NameShare(a.text, all[i].tokens) >= 1f) && (!all[i].mask || a.mask) && !skull)
                 {
                     pool.Add(all[i]);
                 }
@@ -185,13 +278,18 @@ namespace M3AT
         {
             float layer = LayerShare(a.layers, g.layers);
             float covered = Coverage(a.groups, g.groups, null);
+            bool named = g.namedOnly && NameShare(a.text, g.tokens) >= 1f;
+            if (named)
+            {
+                covered = Math.Max(covered, NamedCover);
+            }
             if (layer <= 0f || covered <= 0f)
             {
                 return 0f;
             }
             float times, plus;
             Factors(a, g, out times, out plus);
-            return covered * layer * times + plus;
+            return covered * layer * times + plus + (named ? NamedBonus : 0f);
         }
 
         // Two garments drawn together for a: their joined coverage at the farther layer, their kinds averaged, less PairCost.
@@ -258,6 +356,11 @@ namespace M3AT
             {
                 times *= ChildOnlyShare;
             }
+            float named = NameShare(a.text, g.tokens);
+            if (Narrow.Contains(g.name) && named <= 0f)
+            {
+                times *= NarrowShare;
+            }
             if (g.vacsuit && a.vacsuit)
             {
                 plus += BothVacsuit;
@@ -274,7 +377,7 @@ namespace M3AT
             {
                 plus += SameStuff;
             }
-            plus += NameWords * NameShare(a.text, g.tokens);
+            plus += NameWords * named;
             if (Generic.Contains(g.name))
             {
                 plus += GenericBonus;
@@ -330,7 +433,22 @@ namespace M3AT
             int found = 0;
             for (int i = 0; i < tokens.Length; i++)
             {
-                if (text.Contains(tokens[i]))
+                string t = text;
+                string[] not;
+                if (NameNot.TryGetValue(tokens[i], out not))
+                {
+                    for (int k = 0; k < not.Length; k++)
+                    {
+                        t = t.Replace(not[k], " ");
+                    }
+                }
+                string[] alike;
+                bool hit = t.Contains(tokens[i]);
+                if (!hit && NameAlike.TryGetValue(tokens[i], out alike))
+                {
+                    hit = Array.Exists(alike, w => t.Contains(w));
+                }
+                if (hit)
                 {
                     found++;
                 }
@@ -395,7 +513,11 @@ namespace M3AT
             Profile p = new Profile { piece = piece, name = def.defName, tech = def.techLevel };
             for (int i = 0; ap.layers != null && i < ap.layers.Count; i++)
             {
-                p.layers.Add(ap.layers[i].defName);
+                string layer = BodyLayerOf(ap.layers[i]);
+                if (!p.layers.Contains(layer))
+                {
+                    p.layers.Add(layer);
+                }
             }
             for (int i = 0; ap.bodyPartGroups != null && i < ap.bodyPartGroups.Count; i++)
             {
@@ -433,6 +555,21 @@ namespace M3AT
             groups.Add(group);
         }
 
+        // The garments whose stands_for lines name this apparel, in the export's order: a set the scoring can't tell
+        // apart (Kiiro's bra and briefs from its bandeau and briefs) named by hand. Empty for none.
+        private int[] StandsFor(ThingDef def)
+        {
+            List<int> found = null;
+            for (int g = 1; g < pieces.Length; g++)
+            {
+                if (pieces[g].standsFor != null && Array.IndexOf(pieces[g].standsFor, def.defName) >= 0)
+                {
+                    (found ?? (found = new List<int>())).Add(g);
+                }
+            }
+            return found != null ? found.ToArray() : NoStandIns;
+        }
+
         // Every garment that can stand in: by the first of its defs the game has, else by its own layer and groups lines.
         // Not a held one (a shield), the shoes, the baby romper nor the fur; those in NoStandIn only by name (namedOnly).
         private List<Profile> StandInProfiles()
@@ -459,15 +596,29 @@ namespace M3AT
                     }
                 }
                 Profile p;
+                string[] lineLayers = string.IsNullOrEmpty(piece.layer) ? new string[0]
+                    : piece.layer.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);   // may name several (a scarf is worn on any)
                 if (def != null)
                 {
                     p = ProfileOf(def, g);
-                    p.tokens = NameTokens(def.defName);
+                    // Its layer and groups lines add to the def's: the crop top is UnderWhere's tank top and a top worn
+                    // on the skin over the shoulders too.
+                    for (int i = 0; i < lineLayers.Length; i++)
+                    {
+                        if (!p.layers.Contains(lineLayers[i]))
+                        {
+                            p.layers.Add(lineLayers[i]);
+                        }
+                    }
+                    for (int i = 0; piece.groups != null && i < piece.groups.Length; i++)
+                    {
+                        AddGroup(p.groups, piece.groups[i]);
+                    }
                 }
-                else if (!string.IsNullOrEmpty(piece.layer) && piece.groups != null)
+                else if (lineLayers.Length > 0 && piece.groups != null)
                 {
-                    p = new Profile { piece = g, name = piece.name, tech = TechLevel.Undefined, tokens = NameTokens(piece.name ?? "") };
-                    p.layers.Add(piece.layer);
+                    p = new Profile { piece = g, tech = TechLevel.Undefined };
+                    p.layers.AddRange(lineLayers);
                     for (int i = 0; i < piece.groups.Length; i++)
                     {
                         AddGroup(p.groups, piece.groups[i]);
@@ -477,6 +628,21 @@ namespace M3AT
                 {
                     continue;
                 }
+                // Its kind (tech level, stuff, armour) from the apparel its like line names, if the game has it, over its
+                // def's: the shorts aren't behind the trousers on those alone, and the crop top isn't an Animal-tech
+                // undergarment because UnderWhere's tank top is.
+                ThingDef like = piece.like != null ? DefDatabase<ThingDef>.GetNamedSilentFail(piece.like) : null;
+                if (like != null && like.apparel != null)
+                {
+                    Profile kind = ProfileOf(like, g);
+                    p.tech = kind.tech;
+                    p.stuff = kind.stuff;
+                    p.armour = kind.armour;
+                    p.noble = kind.noble;
+                }
+                // Its name words are its own name's, not those of whichever def describes it (UnderWhere_Tanktop for
+                // the crop top).
+                p.tokens = NameTokens(piece.name ?? "");
                 p.name = piece.name;   // the garment's own name, which Generic goes by
                 p.namedOnly = NoStandIn.Contains(piece.name ?? "");
                 p.mask = Masks.Contains(piece.name ?? "");

@@ -64,3 +64,5 @@ anim_scripts/grip_detect/out/
 anim_scripts/mocap/.venv/
 autotest-latest
 autotest-videos/
+workshop_i18n/out/
+workshop_i18n/uploaded_english.txt

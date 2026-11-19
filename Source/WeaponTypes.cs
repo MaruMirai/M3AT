@@ -193,9 +193,22 @@ namespace M3AT
         // the fist's place on the kind's sprite, from that sprite's grip, put on this one's grip. fist, hand, a and top:
         // the fist and the hold's place and line as DrawWeapon has them (before the slab is laid down or holstered); size:
         // the figure's. Zero when it doesn't apply or the grip isn't clear in either sprite.
+        // A grip the player set (GripTool) wins over everything, for any weapon: the slide that puts the fist on that place
+        // of the art.
         private static Vector2 GripSlide(Thing weapon, string holdName, bool slab, Vector3 fist, Vector3 hand, Vector3 a, Vector3 top, float behind, float size)
         {
             ThingDef def = weapon.def;
+            Vector3 set;
+            if (GripOverrideOf(def, out set) && set.x >= 0f)
+            {
+                Vector2 drawn;
+                if (!ArtDrawSize(weapon, size, out drawn))
+                {
+                    return Vector2.zero;
+                }
+                Vector2 now = FistOnSprite(fist, hand, a, top, behind, def.equippedAngleOffset, drawn);
+                return Vector2.Scale(new Vector2(set.x - 0.5f, set.y - 0.5f), drawn) - now;
+            }
             if (!AutoGrips || Thrown(def) || HoldOf(WeaponName(def), slab) != null)
             {
                 return Vector2.zero;
@@ -229,6 +242,26 @@ namespace M3AT
             Vector2 there = FistOnSprite(fist, hand, a, top, behind, refDef.equippedAngleOffset, refDraw);
             Vector2 want = Vector2.Scale(grip - new Vector2(0.5f, 0.5f), draw) + there - Vector2.Scale(refGrip - new Vector2(0.5f, 0.5f), refDraw);
             return want - here;
+        }
+
+        // The weapon's art as DrawSlab sizes its slab, in the figure's units (the figure's size taken out); false without art.
+        private static bool ArtDrawSize(Thing weapon, float size, out Vector2 draw)
+        {
+            Graphic g = weapon.Graphic;
+            draw = g != null && size > 0f ? g.drawSize * ScaleOf(weapon) / size : Vector2.zero;
+            return draw.x > 0f && draw.y > 0f;
+        }
+
+        // Where the fist is on the weapon's art (0..1, y up), the slide made: for the grip tool's marker (GripSeen).
+        private static Vector2 FistOnArt(Thing weapon, Vector3 fist, Vector3 hand, Vector3 a, Vector3 top, float behind, float size, Vector2 slide)
+        {
+            Vector2 draw;
+            if (!ArtDrawSize(weapon, size, out draw))
+            {
+                return new Vector2(-1f, -1f);
+            }
+            Vector2 at = FistOnSprite(fist, hand, a, top, behind, weapon.def.equippedAngleOffset, draw) + slide;
+            return new Vector2(at.x / draw.x + 0.5f, at.y / draw.y + 0.5f);
         }
 
         // The fist from the slab's middle along a sprite's own axes (the slab's x and y, unit), as DrawSlab places a sprite

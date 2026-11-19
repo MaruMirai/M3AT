@@ -59,6 +59,16 @@ namespace M3AT
         public bool armourHidesTail = true;   // body armour (a garment with hide_clothes, not a vacsuit) leaves the gene tail off (WalkFigures.ArmourHidesTail)
         public EarHiding earHiding = EarHiding.Helmets;   // which headgear leaves the gene ears off (WalkFigures.EarHiding)
         public BeardMode beardMode = BeardMode.Flat;   // how beards are drawn (WalkFigures.Beards, FlatBeards)
+        public bool gripToolButton = true;   // the M3AT tools' toggle among the play settings, bottom right of the map (GripTool.cs)
+        public bool gripTool = false;        // that toggle: Adjust grip and Adjust clothing buttons on pawns (GripTool.cs, ClothingTool.cs)
+        // The player's own choice of garments for apparel with none of its own, by apparel defName (ClothingTool.cs,
+        // WalkFigures.ChosenStandIns): the garments' names joined by commas, "" for none drawn.
+        public Dictionary<string, string> clothingChoices = new Dictionary<string, string>();
+        // The player's own grips, by weapon defName (GripTool.cs, WalkFigures.GripOverrideOf): x and y the fist's place on
+        // the weapon's art (0..1, y up; x below 0 for the grip left as it was), z degrees the weapon is turned in the fist.
+        public Dictionary<string, Vector3> gripOverrides = new Dictionary<string, Vector3>();
+        // Where the other hand holds a weapon on its art (0..1, y up), by weapon defName (GripTool.cs, GripOffHand).
+        public Dictionary<string, Vector2> offHandGrips = new Dictionary<string, Vector2>();
         public bool autoGrips = true;   // another mod's weapon held by its grip as found in its art (WalkFigures.AutoGrips, GripFinder)
         public bool retexturedWeaponModels = true;   // the game's own weapons keep IsoRim's model though another mod redraws their art (WalkFigures.RetexturedWeaponModels)
         public bool vatClothes = false;    // a pawn in a growth vat or biosculpter pod drawn in its clothes (WalkFigures.VatClothes); off: without them
@@ -185,6 +195,23 @@ namespace M3AT
             Scribe_Values.Look(ref freecamCutaway, "freecamCutaway", false);
             Scribe_Values.Look(ref slabScale, "slabScale", DefaultSlabScale);
             Scribe_Collections.Look(ref weaponScales, "weaponGroundScales", LookMode.Value, LookMode.Value);
+            Scribe_Values.Look(ref gripToolButton, "gripToolButton", true);
+            Scribe_Values.Look(ref gripTool, "gripTool", false);
+            Scribe_Collections.Look(ref gripOverrides, "gripOverrides", LookMode.Value, LookMode.Value);
+            if (gripOverrides == null)
+            {
+                gripOverrides = new Dictionary<string, Vector3>();
+            }
+            Scribe_Collections.Look(ref offHandGrips, "offHandGrips", LookMode.Value, LookMode.Value);
+            if (offHandGrips == null)
+            {
+                offHandGrips = new Dictionary<string, Vector2>();
+            }
+            Scribe_Collections.Look(ref clothingChoices, "clothingChoices", LookMode.Value, LookMode.Value);
+            if (clothingChoices == null)
+            {
+                clothingChoices = new Dictionary<string, string>();
+            }
             if (weaponScales == null)
             {
                 weaponScales = new Dictionary<string, float>();
@@ -315,7 +342,9 @@ namespace M3AT
             System.Reflection.BindingFlags fields = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.DeclaredOnly;
             foreach (System.Reflection.FieldInfo field in typeof(Settings).GetFields(fields))
             {
-                if (field.IsInitOnly || field.Name == nameof(Settings.freecamOn) || field.Name == nameof(Settings.freecam3D))
+                if (field.IsInitOnly || field.Name == nameof(Settings.freecamOn) || field.Name == nameof(Settings.freecam3D)
+                    || field.Name == nameof(Settings.gripOverrides) || field.Name == nameof(Settings.offHandGrips)
+                    || field.Name == nameof(Settings.clothingChoices))   // the player's own work, not an option: cleared by its own button
                 {
                     continue;
                 }
@@ -576,6 +605,28 @@ namespace M3AT
                 "M3AT_HitFlashTip".Translate());
             list.CheckboxLabeled("M3AT_AutoGrips".Translate(), ref Settings.autoGrips,
                 "M3AT_AutoGripsTip".Translate());
+            list.CheckboxLabeled("M3AT_GripToolButton".Translate(), ref Settings.gripToolButton,
+                "M3AT_GripToolButtonTip".Translate());
+            list.CheckboxLabeled("M3AT_GripTool".Translate(), ref Settings.gripTool,
+                "M3AT_GripToolTip".Translate());
+            int adjusted = Settings.gripOverrides.Keys.Union(Settings.offHandGrips.Keys).Count();
+            if (adjusted > 0 && list.ButtonText("M3AT_GripClearAll".Translate(adjusted)))
+            {
+                Find.WindowStack.Add(Dialog_MessageBox.CreateConfirmation("M3AT_GripClearAllConfirm".Translate(adjusted), () =>
+                {
+                    Settings.gripOverrides.Clear();
+                    Settings.offHandGrips.Clear();
+                }, true));
+            }
+            int clothed = Settings.clothingChoices.Count;
+            if (clothed > 0 && list.ButtonText("M3AT_ClothesClearAll".Translate(clothed)))
+            {
+                Find.WindowStack.Add(Dialog_MessageBox.CreateConfirmation("M3AT_ClothesClearAllConfirm".Translate(clothed), () =>
+                {
+                    Settings.clothingChoices.Clear();
+                    WalkFigures.ClothingChoicesChanged();
+                }, true));
+            }
             list.CheckboxLabeled("M3AT_RetexturedWeaponModels".Translate(), ref Settings.retexturedWeaponModels,
                 "M3AT_RetexturedWeaponModelsTip".Translate());
         }

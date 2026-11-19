@@ -199,4 +199,49 @@ Before you start, point the camera at your colonists the way you usually play an
   <M3AT_FieldOfViewTip>How wide the camera sees, in degrees from the top of the screen to the bottom (default {0}).</M3AT_FieldOfViewTip>
   <M3AT_FreecamOn>Freecam on: {0} to leave.</M3AT_FreecamOn>
   <M3AT_FreecamOff>Freecam off.</M3AT_FreecamOff>
+  <M3AT_GripToolButton>M3AT tools button</M3AT_GripToolButton>
+  <M3AT_GripToolButtonTip>Puts a toggle for the M3AT tools (weapon grip and clothing) among the small buttons at the bottom right of the map, beside the beauty and roof toggles.</M3AT_GripToolButtonTip>
+  <M3AT_GripTool>M3AT tool buttons on pawns</M3AT_GripTool>
+  <M3AT_GripToolTip>Gives a colonist holding a weapon an "Adjust grip" button, to set where the hand holds that weapon and how it is angled, and anyone wearing clothes from another mod an "Adjust clothing" button, to pick which of M3AT's clothes they are drawn as. The same as the toggle at the bottom right of the map.</M3AT_GripToolTip>
+  <M3AT_GripClearAll>Clear adjusted grips ({0})</M3AT_GripClearAll>
+  <M3AT_GripClearAllConfirm>Forget the grips you set on {0} weapons? They go back to their usual hold.</M3AT_GripClearAllConfirm>
+  <M3AT_ToolsToggleTip>M3AT tools: show "Adjust grip" on colonists holding a weapon, and "Adjust clothing" on anyone wearing clothes from another mod.</M3AT_ToolsToggleTip>
+  <M3AT_ClothesAdjust>Adjust clothing</M3AT_ClothesAdjust>
+  <M3AT_ClothesAdjustDesc>Clothes from other mods are drawn as the closest of M3AT's own. Pick a different one, or none, for any of them. Kept for that piece of clothing on everyone, in every game.</M3AT_ClothesAdjustDesc>
+  <M3AT_ClothesWindowTitle>Clothing look</M3AT_ClothesWindowTitle>
+  <M3AT_ClothesNoPawn>Select someone wearing clothes from another mod.</M3AT_ClothesNoPawn>
+  <M3AT_ClothesAuto>Drawn as: {0}</M3AT_ClothesAuto>
+  <M3AT_ClothesAutoNone>Not drawn: nothing close enough</M3AT_ClothesAutoNone>
+  <M3AT_ClothesChosen>Your choice: {0}</M3AT_ClothesChosen>
+  <M3AT_ClothesChosenNone>Your choice: not drawn</M3AT_ClothesChosenNone>
+  <M3AT_ClothesChoose>Change</M3AT_ClothesChoose>
+  <M3AT_ClothesAdd>Add another</M3AT_ClothesAdd>
+  <M3AT_ClothesReset>Automatic</M3AT_ClothesReset>
+  <M3AT_ClothesMenuAuto>Automatic ({0})</M3AT_ClothesMenuAuto>
+  <M3AT_ClothesNotDrawn>not drawn</M3AT_ClothesNotDrawn>
+  <M3AT_ClothesMenuNone>Don't draw it</M3AT_ClothesMenuNone>
+  <M3AT_ClothesHelp>Changes show at once, on everyone wearing that piece of clothing, in every game. "Add another" draws two together, such as a shirt and trousers for a one-piece suit. Clear them all in the mod options.</M3AT_ClothesHelp>
+  <M3AT_ClothesClearAll>Clear clothing choices ({0})</M3AT_ClothesClearAll>
+  <M3AT_ClothesClearAllConfirm>Forget the clothing choices you made for {0} pieces of clothing? They go back to being matched automatically.</M3AT_ClothesClearAllConfirm>
+  <M3AT_GripAdjust>Adjust grip</M3AT_GripAdjust>
+  <M3AT_GripAdjustDesc>Set where the hand holds this weapon and how it is angled. Kept for every weapon of this kind, in every game.</M3AT_GripAdjustDesc>
+  <M3AT_GripWindowTitle>Weapon grip</M3AT_GripWindowTitle>
+  <M3AT_GripNoWeapon>Select a colonist holding a weapon.</M3AT_GripNoWeapon>
+  <M3AT_GripSeen>Where the hand is now.</M3AT_GripSeen>
+  <M3AT_GripNotSeen>The hands can't be shown for this weapon.</M3AT_GripNotSeen>
+  <M3AT_GripStateOwn>The grip you set.</M3AT_GripStateOwn>
+  <M3AT_GripStateAuto>Usual grip. Click or drag on the weapon to set your own.</M3AT_GripStateAuto>
+  <M3AT_GripTurn>Angle in the hand: {0}°</M3AT_GripTurn>
+  <M3AT_GripAuto>Reset grip</M3AT_GripAuto>
+  <M3AT_GripResetTurn>Reset angle</M3AT_GripResetTurn>
+  <M3AT_GripHelp>Changes show at once on the colonist (drafted, so it holds the weapon). They are kept for every weapon of this kind in every game, and can be cleared in the mod options. A positive angle tips the weapon's front up. The other hand reaches as far as the arm allows, and lets go while it is busy (reloading, a shield, a blow).</M3AT_GripHelp>
+  <M3AT_GripMainHand>Main hand</M3AT_GripMainHand>
+  <M3AT_GripOffHand>Other hand</M3AT_GripOffHand>
+  <M3AT_GripOffOwn>Where you set the other hand.</M3AT_GripOffOwn>
+  <M3AT_GripOffAuto>Other hand: where its stance puts it. Pick "Other hand" and click to set it.</M3AT_GripOffAuto>
+  <M3AT_GripOffSeen>Where the other hand is now.</M3AT_GripOffSeen>
+  <M3AT_GripOffUsual>Reset other hand</M3AT_GripOffUsual>
+  <M3AT_GripRestoreDefault>Restore default for this weapon</M3AT_GripRestoreDefault>
+  <M3AT_GripSeenStance>Where the hand goes when drafted.</M3AT_GripSeenStance>
+  <M3AT_GripOffSeenStance>Where the other hand goes when drafted.</M3AT_GripOffSeenStance>
 </LanguageData>

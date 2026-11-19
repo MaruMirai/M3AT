@@ -199,4 +199,49 @@
   <M3AT_FieldOfViewTip>镜头的视野宽度，以屏幕上沿到下沿的角度计（默认 {0}）。</M3AT_FieldOfViewTip>
   <M3AT_FreecamOn>自由镜头已开启：按 {0} 退出。</M3AT_FreecamOn>
   <M3AT_FreecamOff>自由镜头已关闭。</M3AT_FreecamOff>
+  <M3AT_GripToolButton>M3AT 工具按钮</M3AT_GripToolButton>
+  <M3AT_GripToolButtonTip>在地图右下角的小按钮中（美观度、屋顶等开关旁边）加入 M3AT 工具（武器握把与服装）的开关。</M3AT_GripToolButtonTip>
+  <M3AT_GripTool>在小人上显示 M3AT 工具按钮</M3AT_GripTool>
+  <M3AT_GripToolTip>为持有武器的殖民者加上"调整握把"按钮，可设置手握住该武器的位置和角度；为穿着其他模组服装的小人加上"调整服装"按钮，可选择用 M3AT 的哪件服装来显示。与地图右下角的开关相同。</M3AT_GripToolTip>
+  <M3AT_GripClearAll>清除已调整的握把（{0}）</M3AT_GripClearAll>
+  <M3AT_GripClearAllConfirm>忘记你为 {0} 种武器设置的握把？它们将恢复通常握法。</M3AT_GripClearAllConfirm>
+  <M3AT_ToolsToggleTip>M3AT 工具：在持有武器的殖民者上显示"调整握把"，在穿着其他模组服装的小人上显示"调整服装"。</M3AT_ToolsToggleTip>
+  <M3AT_ClothesAdjust>调整服装</M3AT_ClothesAdjust>
+  <M3AT_ClothesAdjustDesc>其他模组的服装会显示为 M3AT 中最接近的服装。可以为任意一件改选其他服装，或不显示。对所有穿着这件服装的人、所有存档都有效。</M3AT_ClothesAdjustDesc>
+  <M3AT_ClothesWindowTitle>服装外观</M3AT_ClothesWindowTitle>
+  <M3AT_ClothesNoPawn>请选择一名穿着其他模组服装的小人。</M3AT_ClothesNoPawn>
+  <M3AT_ClothesAuto>显示为：{0}</M3AT_ClothesAuto>
+  <M3AT_ClothesAutoNone>不显示：没有足够接近的服装</M3AT_ClothesAutoNone>
+  <M3AT_ClothesChosen>你的选择：{0}</M3AT_ClothesChosen>
+  <M3AT_ClothesChosenNone>你的选择：不显示</M3AT_ClothesChosenNone>
+  <M3AT_ClothesChoose>更改</M3AT_ClothesChoose>
+  <M3AT_ClothesAdd>再加一件</M3AT_ClothesAdd>
+  <M3AT_ClothesReset>自动</M3AT_ClothesReset>
+  <M3AT_ClothesMenuAuto>自动（{0}）</M3AT_ClothesMenuAuto>
+  <M3AT_ClothesNotDrawn>不显示</M3AT_ClothesNotDrawn>
+  <M3AT_ClothesMenuNone>不显示</M3AT_ClothesMenuNone>
+  <M3AT_ClothesHelp>更改会立即显示在所有穿着这件服装的人身上，对所有存档都有效。"再加一件"可同时显示两件，例如用衬衫和裤子表现连体服。可在模组设置中全部清除。</M3AT_ClothesHelp>
+  <M3AT_ClothesClearAll>清除服装选择（{0}）</M3AT_ClothesClearAll>
+  <M3AT_ClothesClearAllConfirm>忘记你为 {0} 件服装做的选择？它们将恢复自动匹配。</M3AT_ClothesClearAllConfirm>
+  <M3AT_GripAdjust>调整握把</M3AT_GripAdjust>
+  <M3AT_GripAdjustDesc>设置手握住这把武器的位置和角度。对所有同种武器、所有存档都有效。</M3AT_GripAdjustDesc>
+  <M3AT_GripWindowTitle>武器握把</M3AT_GripWindowTitle>
+  <M3AT_GripNoWeapon>请选择一名持有武器的殖民者。</M3AT_GripNoWeapon>
+  <M3AT_GripSeen>手当前的位置。</M3AT_GripSeen>
+  <M3AT_GripNotSeen>无法显示这把武器的手部位置。</M3AT_GripNotSeen>
+  <M3AT_GripStateOwn>你设置的握把。</M3AT_GripStateOwn>
+  <M3AT_GripStateAuto>通常握法。在武器上点击或拖动即可自行设置。</M3AT_GripStateAuto>
+  <M3AT_GripTurn>在手中的角度：{0}°</M3AT_GripTurn>
+  <M3AT_GripAuto>重置握把</M3AT_GripAuto>
+  <M3AT_GripResetTurn>重置角度</M3AT_GripResetTurn>
+  <M3AT_GripHelp>更改会立即显示在殖民者身上（需征召，使其手持武器）。设置对所有同种武器、所有存档都有效，可在模组设置中清除。正角度使武器前端上抬。另一只手会尽量伸到设定位置，忙于其他动作（装弹、举盾、攻击）时会松开。</M3AT_GripHelp>
+  <M3AT_GripMainHand>主手</M3AT_GripMainHand>
+  <M3AT_GripOffHand>另一只手</M3AT_GripOffHand>
+  <M3AT_GripOffOwn>你为另一只手设置的位置。</M3AT_GripOffOwn>
+  <M3AT_GripOffAuto>另一只手：按姿势默认的位置。选择"另一只手"后点击即可设置。</M3AT_GripOffAuto>
+  <M3AT_GripOffSeen>另一只手当前的位置。</M3AT_GripOffSeen>
+  <M3AT_GripOffUsual>重置另一只手</M3AT_GripOffUsual>
+  <M3AT_GripRestoreDefault>将此武器恢复默认</M3AT_GripRestoreDefault>
+  <M3AT_GripSeenStance>征召时手的位置。</M3AT_GripSeenStance>
+  <M3AT_GripOffSeenStance>征召时另一只手的位置。</M3AT_GripOffSeenStance>
 </LanguageData>

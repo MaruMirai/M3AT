@@ -21,8 +21,8 @@ namespace M3AT
     {
         private static readonly string[] LetOutLayers = { "Webbing" };
         // Apparel let out though on no let-out layer: the slave collar, made close round the bare neck, over a shirt's collar
-        // or armour's neck ring.
-        private static readonly string[] LetOutDefs = { "Apparel_Collar" };
+        // or armour's neck ring; the scarf (no apparel of the game's: drawn for other mods'), over a coat's or armour's.
+        private static readonly string[] LetOutDefs = { "Apparel_Collar", "Apparel_Scarf" };
         private const float LetOutClear = 0.006f;   // cells over what is under it (about the webbing's own offset off a shirt)
         private const float LetOutBack = 0.05f;     // cells: a surface this far under a place along its line still counts
         private const float LetOutFar = 0.2f;       // cells: and this far over it (armour stands up to about 0.11 off the skin)
@@ -54,12 +54,39 @@ namespace M3AT
                             break;
                         }
                     }
+                    if (pieceApparel[i] == null && !string.IsNullOrEmpty(pieces[i].layer))
+                    {
+                        pieceApparel[i] = FromLines(pieces[i]);
+                    }
                     ApparelProperties ap = pieceApparel[i];
                     letsOut[i] = ap != null && (ap.layers != null && ap.layers.Exists(l => System.Array.IndexOf(LetOutLayers, l.defName) >= 0)
                         || System.Array.Exists(pieces[i].defs, d => System.Array.IndexOf(LetOutDefs, d) >= 0));
                 }
             }
             return pieceApparel[g];
+        }
+
+        // A garment with no apparel of the game's (the scarf, stood in for other mods'), as its layer and groups lines say.
+        private static ApparelProperties FromLines(Piece piece)
+        {
+            ApparelProperties ap = new ApparelProperties { layers = new List<ApparelLayerDef>(), bodyPartGroups = new List<BodyPartGroupDef>() };
+            foreach (string name in piece.layer.Split(new[] { ' ' }, System.StringSplitOptions.RemoveEmptyEntries))
+            {
+                ApparelLayerDef layer = DefDatabase<ApparelLayerDef>.GetNamedSilentFail(name);
+                if (layer != null)
+                {
+                    ap.layers.Add(layer);
+                }
+            }
+            for (int i = 0; piece.groups != null && i < piece.groups.Length; i++)
+            {
+                BodyPartGroupDef group = DefDatabase<BodyPartGroupDef>.GetNamedSilentFail(piece.groups[i]);
+                if (group != null)
+                {
+                    ap.bodyPartGroups.Add(group);
+                }
+            }
+            return ap.layers.Count > 0 ? ap : null;
         }
 
         private bool LetsOut(int g)

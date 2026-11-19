@@ -112,6 +112,10 @@ calibrate = (float(calibrate[0]), float(calibrate[1])) if calibrate else None
 hands = option('--hands', 2)
 hands = (float(hands[0]), float(hands[1])) if hands else None
 swap = option('--swap', 0) is not None
+# --forward-tool (with --tool and --calibrate): forward from the head tracker to the tool held up in front while
+# calibrating, across the ground, rather than from the hips tracker to the chest's (for a take with the hips tracker
+# worn at the front, under the chest).
+forward_tool = option('--forward-tool', 0) is not None
 path = args[0]
 span = (float(args[1]), float(args[2])) if len(args) >= 3 else None
 header, devices = read(path)
@@ -148,7 +152,18 @@ print('IMPORT rest pose %.2f .. %.2f s' % (times[rest_a], times[rest_b]))
 rest = slice(rest_a, rest_b)
 trackers = {s: d[1][rest].mean(0) for s, d in devices.items() if kinds[s] == 'tracker'}
 wands = {s: d[1][rest].mean(0) for s, d in devices.items() if kinds[s] == 'wand'}
-parts, problems = assign(trackers, wands, None if tool else {s: devices[s][2][rest_b - 1] for s in wands})
+tool_forward = None
+if tool and forward_tool:
+    if not calibrate:
+        sys.exit('IMPORT --forward-tool needs --calibrate')
+    held = (times >= calibrate[0]) & (times <= calibrate[1])
+    top = max(trackers, key=lambda s: trackers[s][1])     # the head tracker, the highest
+    tool_forward = sum(devices[s][1][held & devices[s][3]].mean(0) for s in wands) / len(wands) \
+        - devices[top][1][held & devices[top][3]].mean(0)
+    tool_forward[1] = 0.0
+    tool_forward /= np.linalg.norm(tool_forward)
+    print('IMPORT forward from the head to the tool held up while calibrating')
+parts, problems = assign(trackers, wands, None if tool else {s: devices[s][2][rest_b - 1] for s in wands}, tool_forward)
 if problems:
     sys.exit('IMPORT ' + '; '.join(problems))
 knees = 'knee_L' in parts.values()     # knee trackers, no elbow trackers
@@ -215,7 +230,7 @@ def runs(ok):
 for part in P:
     for a, b in runs(OK[part]):
         before, after = a - 1, b + 1
-        anchor = next((x for x in ANCHOR[part] if all(OK[x][max(before, 0):after + 1 if after < N else N])), None)
+        anchor = next((x for x in ANCHOR[part] if x in OK and all(OK[x][max(before, 0):after + 1 if after < N else N])), None)
         for i in range(a, b + 1):
             u = (i - before) / (after - before) if before >= 0 and after < N else (0.0 if before >= 0 else 1.0)
             ends = [k for k in (before, after) if 0 <= k < N]
@@ -241,9 +256,12 @@ for part in P:
 # between the feet at rest
 
 if tool:
-    fw = P['chest'][rest].mean(0) - P['hips'][rest].mean(0)     # the hips tracker is at the back of the belt
-    fw[1] = 0.0
-    fw /= np.linalg.norm(fw)
+    if tool_forward is not None:
+        fw = tool_forward.copy()     # (--forward-tool)
+    else:
+        fw = P['chest'][rest].mean(0) - P['hips'][rest].mean(0)     # the hips tracker is at the back of the belt
+        fw[1] = 0.0
+        fw /= np.linalg.norm(fw)
 else:
     fw = facing({}, {}, {'L': Q['hand_L'][rest_b - 1], 'R': Q['hand_R'][rest_b - 1]})   # the way the wands point
 up = np.array([0.0, 1.0, 0.0])
