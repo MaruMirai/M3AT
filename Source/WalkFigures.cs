@@ -83,7 +83,7 @@ namespace M3AT
     [StaticConstructorOnStartup]
     public static partial class WalkFigures
     {
-        private const string Tag = "[M3AT] ";
+        internal const string Tag = "[M3AT] ";
         internal const string Folder = "Models/chibi";
         private const float ScaleUp = 1.2f;   // on top of IsoRim's size for the life stage: the baked figure is 1.25 cells tall, which looks tiny beside furniture
         private const bool ColonistsOnly = false;   // true: everyone else keeps IsoRim's figure, to compare side by side
@@ -456,6 +456,16 @@ namespace M3AT
         private static FaceLayers.Patch idleFace;
         private static FaceLayers.Patch[][] cycleFaces;   // the face patch of each frame of cycles; null without them
         private static SkinnedFigure skin;   // null: the baked frames are drawn
+
+        internal static SkinnedFigure Skin   // for ExpansionApi: the skinned chibi once loaded, else null
+        {
+            get { return ready ? skin : null; }
+        }
+
+        internal static float SizeForApi(Pawn pawn)
+        {
+            return SizeOf(pawn);
+        }
         private static string[] clipNames;   // the clips in anim.txt for the walk, then run1 .. runN
         private static readonly Dictionary<int, Ease> eases = new Dictionary<int, Ease>();
         private static readonly List<int> stale = new List<int>();
@@ -1515,6 +1525,7 @@ namespace M3AT
                         Log.Message(Tag + "the chibi is skinned at runtime (" + Folder + "/skin.txt, anim.txt), garments: "
                             + (garments.Length > 0 ? garments : "none") + ".");
                         ready = true;
+                        ExpansionApi.Loaded(skin);
                         LoadTrail.Note("chibi loaded, skinned" + LoadTrail.MemoryNow());
                         return ready;
                     }
@@ -6894,6 +6905,56 @@ namespace M3AT
             return true;
         }
 
+        private static readonly PoseRequest apiPose = new PoseRequest();
+        private static SleepWear? apiDress;   // the clothes a poser asked for, while its figure is drawn (SleepWearOf)
+
+        // A figure another mod poses (ExpansionApi): its clips blended, moved by its whole-body matrix, at its place and
+        // yaw, let down onto its floor if it gives one, and dressed as it asks.
+        private static bool DrawPosedByApi(FigureDrawContext ctx, PoseRequest pose, float size)
+        {
+            Pawn pawn = ctx.Pawn;
+            if (!ctx.ForOtherMod && !SkinnedFigure.MaybeOnScreen(pose.at, size))
+            {
+                return true;
+            }
+            try
+            {
+                SkinnedFigure.Shape shape = ShapeFor(pawn);
+                SkinnedFigure.Posed fig = skin.For(pawn.thingIDNumber, shape);
+                skin.Begin(fig);
+                CutLimbs(pawn, fig);
+                for (int i = 0; i < pose.layers; i++)
+                {
+                    skin.Add(fig, pose.clips[i], pose.phases[i], pose.weights[i]);
+                }
+                skin.End(fig, pose.whole);
+                Vector3 at = pose.at;
+                if (pose.restOn.HasValue)
+                {
+                    float lowest, bodyTop;
+                    skin.Extent(fig, out lowest, out bodyTop);
+                    at.y = pose.restOn.Value - lowest * size;
+                }
+                apiDress = pose.dress;
+                try
+                {
+                    DrawDressed(pawn, fig, at, pose.yaw, size);
+                }
+                finally
+                {
+                    apiDress = null;
+                }
+            }
+            catch (Exception e)
+            {
+                Log.Error(Tag + "drawing a chibi posed by another mod failed, IsoRim's figures are kept: " + e);
+                skin = null;
+                ready = false;
+                return false;
+            }
+            return true;
+        }
+
         // A corpse hung in a gibbet cage, where IsoRim's placing puts it (the cage's middle, a yaw of its own, the cage floor):
         // slumped where it stands (walk.caged_pose: the knees buckled, the back curled, the head hung, the arms down), leant
         // as IsoRim leans its own figure there, its feet on the cage floor. No taller than
@@ -7491,6 +7552,18 @@ namespace M3AT
                 return DrawCaged(ctx, placed, size);
             }
             SawAim(pawn, placed);
+            // Posed by another mod (ExpansionApi): its clips at its place, none of the rules below.
+            if (ExpansionApi.Any)
+            {
+                apiPose.placedAt = placed.Position;
+                apiPose.placedYaw = placed.Yaw;
+                apiPose.situation = placed.Situation;
+                apiPose.size = size;
+                if (ExpansionApi.Ask(pawn, apiPose))
+                {
+                    return DrawPosedByApi(ctx, apiPose, size);
+                }
+            }
             // Off screen: nothing posed or drawn, and IsoRim told it was, so it draws nothing either. What eases over time
             // waits meanwhile, and the one-off events (a fall, getting up) go by frames in a row, so one missed off screen is
             // not played late. Another mod's draw (a portrait, a measure) is always made.

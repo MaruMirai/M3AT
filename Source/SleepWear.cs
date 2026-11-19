@@ -21,6 +21,10 @@ namespace M3AT
         // hospital bed, so a patient too), else Dressed, which leaves its clothes as they are.
         private static SleepWear SleepWearOf(Pawn pawn)
         {
+            if (apiDress.HasValue)
+            {
+                return apiDress.Value;   // a poser's choice (ExpansionApi), in or out of bed
+            }
             SleepWear wear = SleepWearSetting;
             if (wear == SleepWear.Dressed || pawn.Dead || !pawn.Spawned || !pawn.InBed())
             {
