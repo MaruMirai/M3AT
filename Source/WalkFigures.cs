@@ -263,6 +263,7 @@ namespace M3AT
         // PickIdleBlend ticks at either end of it.
         private const float PickHit = 0.5f;
         private const float PickSlowest = 1f;
+        private const int PickRateMost = 60;   // ticks: a longer gap between the pawn's interval runs is taken as a pause, not its rate
         private const float PickIdleBlend = 20f;   // (the take's long idle holds the pick a little further back than the stroke's ends)
         // Beating out a fire: the game beats once each time its beat verb's 1.1 s cool-down ends (Verb_BeatFire), so
         // work_stomp and work_pat are played from those beats (BeatPhase) rather than the clock, a blow landing on the tick
@@ -479,6 +480,7 @@ namespace M3AT
         private static readonly AccessTools.FieldRef<PawnFlyer, int> flyingTicks = AccessTools.FieldRefAccess<PawnFlyer, int>("ticksFlying");
         private static readonly AccessTools.FieldRef<PawnFlyer, int> flightTicks = AccessTools.FieldRefAccess<PawnFlyer, int>("ticksFlightTime");
         private static readonly AccessTools.FieldRef<JobDriver_Mine, int> pickHitIn = AccessTools.FieldRefAccess<JobDriver_Mine, int>("ticksToPickHit");
+        private static readonly AccessTools.FieldRef<Thing, int> tickDeltaOf = AccessTools.FieldRefAccess<Thing, int>("tickDelta");
 
         private class Ease
         {
@@ -680,8 +682,10 @@ namespace M3AT
             public int dollFrame = -1;   // the frame it was last stepped in
             public int workRoll;   // picks the work stroke's variant, new each time it sets to work
             public int pickSeen = int.MinValue;   // JobDriver_Mine's ticksToPickHit as last read (PickPhase)
-            public int pickSeenTick;   // the game tick it was read at
-            public int pickPeriod;   // the ticks between the last strike and the next, as the game reset it
+            public int pickStrike = int.MinValue / 2;   // the game tick of its last strike (long ago before one is seen)
+            public int pickPeriod;   // the ticks from the last strike to the next
+            public int pickRan;   // the tick its interval work last ran, as last read
+            public int pickRate = 15;   // the ticks between those runs, as last measured
             public int pickJob = -1;   // the mining job those are for (its loadID)
             public int beatTick = int.MinValue;   // the tick the pawn last beat a fire (its beat verb's cool-down began; BeatPhase)
             public int beatPeriod;   // the ticks between its last two beats; 0 before a second
@@ -5452,9 +5456,14 @@ namespace M3AT
             return into / length;
         }
 
-        // JobDriver_Mine's count to the next strike for a pawn mining, as until (ticks, carried on by the game clock between
-        // readings), keeping e.pickPeriod (the ticks between strikes) up to date. False for any other job, or mining not
-        // yet begun (the count is set below -100 until the first tick at the rock).
+        // JobDriver_Mine's count to the next strike for a pawn mining, as until (ticks from now to the tick the game will
+        // strike), keeping e.pickPeriod (the ticks from the last strike to the next) up to date. The game counts down only
+        // when it runs the pawn's interval work, every few ticks (Thing.DoTick's rate by how far the camera is; 30 seen in
+        // the autotest), taking off all the ticks since at once, and strikes on the first run at which the count is 0 or
+        // less. Counting the reading down by the clock reached 0 up to a whole interval before that and held the pick still
+        // in the rock until it came, so the strike is put on the run that will find the count gone: runs come every
+        // e.pickRate ticks, as measured between the last two (until then the rate DoTick would take). False for any other
+        // job, or mining not yet begun (the count is set below -100 until the first tick at the rock).
         private static bool PickCount(Pawn pawn, Ease e, out float until)
         {
             until = 0f;
@@ -5469,23 +5478,32 @@ namespace M3AT
                 return false;
             }
             int now = Find.TickManager.TicksGame;
+            int ran = now - tickDeltaOf(pawn);   // the tick the interval work last ran (and counted down)
             int job = mine.job != null ? mine.job.loadID : -1;
             if (job != e.pickJob)
             {
                 e.pickJob = job;
-                e.pickPeriod = 0;
-                e.pickSeen = int.MinValue;
+                e.pickSeen = left;
+                e.pickStrike = int.MinValue / 2;   // none seen: as if long ago, so it winds up from the ready hold
+                e.pickRan = ran;
+                e.pickRate = Mathf.Clamp(pawn.UpdateRateTicks, 1, 15);
             }
-            if (left != e.pickSeen)
+            if (ran != e.pickRan)
             {
-                if (left > e.pickSeen || e.pickPeriod <= 0)
+                if (ran > e.pickRan && ran - e.pickRan <= PickRateMost)
                 {
-                    e.pickPeriod = Mathf.Max(left, 1);   // just reset after a strike (or first seen): the time to the next
+                    e.pickRate = ran - e.pickRan;
+                }
+                e.pickRan = ran;
+                if (left > e.pickSeen)
+                {
+                    e.pickStrike = ran;   // the count was set again: the game struck on that run
                 }
                 e.pickSeen = left;
-                e.pickSeenTick = now;
             }
-            until = Mathf.Max(0f, e.pickSeen - (now - e.pickSeenTick));
+            int runs = Mathf.Max(1, (left + e.pickRate - 1) / e.pickRate);   // runs from the last one to the strike
+            until = Mathf.Max(0, ran + runs * e.pickRate - now);
+            e.pickPeriod = (int)Mathf.Min(until + (now - e.pickStrike), 1000000f);
             return e.pickPeriod > 0;
         }
 

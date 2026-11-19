@@ -8005,6 +8005,21 @@ namespace M3AT
                 + ", lying clip " + LieClip(pawn, pawn.Dead, pawn.InBed(), false) + ", ragdoll " + (e.doll != null) + ", fall " + (e.fallClip ?? "none") + " " + e.fallen.ToString("F2");
         }
 
+        // Mining: where the stroke is (PickPhase), how much of it shows against the ready hold, the game's own count to the
+        // strike and the ticks since the pawn's interval work last ran, so a hold at the blow shows as the phase standing.
+        private static string PickProbe(Pawn pawn, Ease e)
+        {
+            JobDriver_Mine mine = pawn.jobs != null ? pawn.jobs.curDriver as JobDriver_Mine : null;
+            if (mine == null || !skin.Has("work_pickaxe"))
+            {
+                return "";
+            }
+            float stroke;
+            float phase = PickPhase(pawn, e, "work_pickaxe", out stroke);
+            return " pick=" + phase.ToString("F3") + " pickStroke=" + stroke.ToString("F2") + " pickLeft=" + pickHitIn(mine)
+                + " pickSince=" + tickDeltaOf(pawn) + " pickPeriod=" + e.pickPeriod;
+        }
+
         internal static string AutoProbe(Pawn pawn)
         {
             Ease e;
@@ -8015,7 +8030,7 @@ namespace M3AT
             return "job=" + (pawn.CurJobDef != null ? pawn.CurJobDef.defName : "none") + " posture=" + pawn.GetPosture()
                 + " flash=" + HitFlash.Of(pawn, false).ToString("F2")
                 + " duck=" + e.duck.ToString("F2") + " duckLoop=" + (e.duckLoop ?? "-") + " work=" + e.work.ToString("F2")
-                + " workKind=" + (e.workKind ?? "-") + " beats=" + e.beatCount + " beatPeriod=" + e.beatPeriod
+                + " workKind=" + (e.workKind ?? "-") + PickProbe(pawn, e) + " beats=" + e.beatCount + " beatPeriod=" + e.beatPeriod
                 + " toss=" + e.toss.ToString("F2") + " tossAt=" + e.tossAt.ToString("F2") + " fallen=" + e.fallen.ToString("F2")
                 + " carry=" + e.carry.ToString("F2") + " carryClip=" + (e.carryClip ?? "-") + " play=" + e.play.ToString("F2")
                 + " drafted=" + e.drafted.ToString("F2") + " stance=" + (e.stance ?? "-") + " handHeld=" + e.handHeld + " drawAt=" + e.drawAt.ToString("F2")
