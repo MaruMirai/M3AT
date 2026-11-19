@@ -20,6 +20,9 @@ M3AT: Maru's 3D Animated Toons/Models/chibi/hair/
 # Vanilla weapon sprites extracted for posing in the preview; the game's art, not ours.
 weapon_sprites/
 
+# Motion capture takes (record_mocap.sh): raw recordings, kept locally only.
+animDLs/mocap/
+
 # Python bytecode
 __pycache__/
 meshyAPIkey
@@ -58,3 +61,4 @@ discord/__pycache__/
 # Workshop description drafts
 workshop_description*.txt
 anim_scripts/grip_detect/out/
+anim_scripts/mocap/.venv/
