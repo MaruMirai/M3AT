@@ -1348,6 +1348,58 @@ def stopped_clip(clip):
 
 CHOP_CLIP = stopped_clip(clip_file('chop'))
 GATHER_CLIP = clip_file('gather')
+# Tool strokes from Maru's own tracker takes (take_at; TOOL_TAKES by WORK kind), each with the wands taped along the front
+# of a T-shaped stick held in both hands, each just above a hand (the right nearer the head), held upright with the head's
+# point straight forward from 2 to 4 s to calibrate, imported with
+#   import_take.py -- <take> <from> <to> --as <name> --tool --calibrate 2.0 4.0 --hands 0.17 0.19 [--loop shortest longest]
+# (the hands measured from a photo of the rig: each fist 0.17 and 0.19 m down the handle from its wand, the head 0.43 m
+# above the upper wand). The body is the clip's; the hands close round the chibi's own tool laid along the recorded
+# handle with its head's point (a blade's edge) the way the recorded one faces, the right fist where the performer's was
+# from the shoulder in arm lengths, 'grip' model units up the model's handle from its end (where the performer's right
+# hand was on the stick, by share of its length), the left at 'other', slid along the handle toward a shoulder out of
+# TOOL_REACH, each elbow toward its tracker (the poles smoothed over TOOL_POLE_SMOOTH frames), each hand's hold the one
+# found for the stroke (take_holds: the thumb toward the head, the wrist kept on its shoulder's side, TOOL_SIDE_COST;
+# 'holds' and 'edge' to set them by hand), which places the tool's own tool line (take_held). The whole figure is turned
+# 'face' degrees (+ to the left; None: so the head's point is straight ahead at the 'blow'; 'trunk': back by as far as the
+# trunk is turned then, which overturned the axe's level chop, its trunk twisted 74 degrees into the blow) and, with 'lands', moved along
+# the way it faces so the head's point lands that many cells ahead of the pawn's middle at the blow. The stroke
+# (take_stroke, TOOL_CLIPS) is the raw clip played 'pace' times as fast; with 'hit' it is laid so the blow is that share
+# of the way round, from rest to rest (the game strikes then, WalkFigures.PickHit).
+# Each entry: 'clip' (the json), 'blow' (seconds into the take of the blow), 'hit', 'pace', 'grip', 'other', 'head'
+# (model units up the handle to the head) and 'blade' (model units out from the handle to each end of the head that may
+# be the point: both ends of a pick, the edge alone of an axe, both edges of a spade), 'face', 'lands', 'holds', 'edge'.
+# - pickaxe: take_07.csv 13.1 .. 17.1 s, resting low beside the right foot, swung back, over the shoulder into an
+#   imagined rock face at about head height (the head stops dead at 15.12 s), brought back round and down to rest. IsoRim's
+#   rock narrows upward, so at head height its face is about 0.75 cells ahead.
+# - axe: woodchop_02.csv 11.30 .. 13.83 s, a loop from a hold at the top of the backswing round to the next (--loop 2.3
+#   2.9 in 8 .. 14 s, calibrated on 3 .. 4 s, where the upright pose had settled), swung level into a trunk at about
+#   waist height (the blade stops dead at 11.98 s); a tree stands in the next cell, its trunk about 0.85 cells ahead.
+#   Its tool is this mod's own felling axe (make_axe.py, tool_felling_axe), the hands spaced as on the stick.
+# - dig: plant_01.csv 12.93 .. 15.93 s (named dig and plant in the takes), a loop from one stroke into the ground to the
+#   next (--loop 2.7 3.3 in 8 .. 16 s): driven in at 15.6 s, levered, lifted, let down and paused; the game sows the cell
+#   beside the pawn, so it is driven in 0.6 cells ahead (as recorded it dug by the feet, 0.3 ahead). Maru mimed a spade:
+#   its tool is this mod's own (make_spade.py, tool_spade), the blade centred where the stick's head was. Held head-down,
+#   the right hand at the top by the T grip and the left nearer the blade: imported with --swap (--hands 0.19 0.17). The wands were 0.29 m apart on it rather than 0.26, so the hands' places on the stick are a guess.
+TOOL_TAKES = {
+    'pickaxe': dict(clip='pick', blow=15.12, hit=0.5, pace=1.6, grip=0.15, other=-0.035, head=0.53, blade=(0.25, -0.25),
+                    face='trunk', lands=0.75),
+    'axe': dict(clip='chop_take', blow=11.98, pace=1.3, grip=0.151, other=-0.034, head=0.481, blade=(0.11,), face=None,
+                lands=0.85),
+    'dig': dict(clip='dig', blow=15.6, pace=1.3, grip=-0.034, other=0.151, head=0.637, blade=(0.065, -0.065), face=None,
+                lands=0.6),
+}
+TOOL_CLIPS = {}     # take_stroke's by kind, made at the end of this file, as it poses the raw clips
+# The chibi's arms are short for its head: a fist further than TOOL_REACH leg lengths from its shoulder has the whole
+# tool slid along toward it (keeping its way), a few times over, so both hands close round it.
+TOOL_REACH = 0.6
+TOOL_HOLD_SAMPLES = 16   # points round the stroke a hold is tried at (take_holds)
+TOOL_POLE_SMOOTH = 2.0   # frames of the stroke the elbow poles are smoothed over (take_stroke)
+# Each hand's hold is searched with its thumb toward the tool's head (as both of the performer's are), and with its
+# wrist kept on the handle's side toward its own shoulder (TOOL_SIDE_COST a step of the share it is off it): searched for
+# the straightest wrists alone, both hands came out round the far side of the handle and upside down.
+TOOL_THUMB = 1
+TOOL_SIDE_COST = 4000.0
+TOOL_RAW = {kind: clip_file(take['clip']) for kind, take in TOOL_TAKES.items()}
 WORK_MOCAPS = {'axe': CHOP_CLIP} if CHOP_CLIP is not None else {}
 WORK_MOCAP = None
 WORK_MOCAP_TOOL = True
@@ -1365,19 +1417,23 @@ try:
 except FileNotFoundError:
     RUB_CLIP = None
 
-# Talking (talk_at: board games, giving a speech, and now and then at a party): talk_clip.json beside this file
-# (import_pluck.py --as talk Stand_Talking_Angry 26 149: the first six seconds or so of Meshy's angry talk, from after
-# it lifts its arms out of the rest pose, to where it closes best). From the waist up only (TALK_UPPER), as the rub is,
+# Talking (talk_at: board games, giving a speech, and now and then at a party): Maru's own tracker takes, each from the
+# arms down at rest through some talking with the hands and back down, so they loop and follow on from each other
+# (import_take.py -- animDLs/mocap/2026-11-18/talk_NN.csv <from> <to> --as talk_NN: talk_01 3.85 .. 9.10 s, talk_02
+# 3.90 .. 10.15, talk_03 3.85 .. 9.60): talk_01 is talk itself (the other two were taken out, their files kept), and
+# Meshy's angry talk (talk_clip.json, import_pluck.py --as talk Stand_Talking_Angry 26 149, from after it lifts its arms
+# out of rest to where it closes best) talk~2 (VARIANTS), with TALK_LEVEL (its neck and head put right, talk_at). The game picks one per
+# bout, or one after another (WalkFigures.TalkVariant, TalkLoop). From the waist up only (TALK_UPPER), as the rub is,
 # so the game can lay it over the idle, the sit or the walk (WalkFigures.TalkOf).
 TALK_UPPER = {'spine.001': 1.0}   # in place of UPPER: from the waist up
 TALK_NECK = ('spine.004', 'spine.005')   # the neck's bones, bent on the chest as the standing pose bends them (talk_at)
 TALK_NOD = 0.6   # share of the clip's nodding (about its mean, which is bowed) kept on the levelled head
-try:
-    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'talk_clip.json')) as _f:
-        TALK_CLIP = json.load(_f)
-    TALK_SECONDS = TALK_CLIP['frames'] / TALK_CLIP['fps']
-except FileNotFoundError:
-    TALK_CLIP = None
+TALK_HEAD = 0.5   # Maru's takes (not TALK_LEVEL): share of the neck's and head's own turns about their mean over the clip kept (talk_at)
+MESHY_TALK_CLIP = clip_file('talk')
+TALK_TAKES = [c for c in (clip_file('talk_01'),) if c is not None]   # (talk_02 and talk_03 are kept beside it, not played)
+TALK_CLIP = TALK_TAKES[0] if TALK_TAKES else MESHY_TALK_CLIP
+TALK_LEVEL = TALK_CLIP is MESHY_TALK_CLIP   # the neck and head put right (talk_at): Meshy's clip only
+TALK_SECONDS = TALK_CLIP['frames'] / TALK_CLIP['fps'] if TALK_CLIP is not None else None
 
 # Reloading (reload_at: Combat Extended's ReloadWeapon job): reload_clip.json beside this file (import_pluck.py --as
 # reload Standing_Reload 0 78: Meshy's standing reload, the rifle kept shouldered in the right hand while the left goes
@@ -1549,6 +1605,14 @@ SOW_SPREAD = 30.0    # degrees each knee is swung out about its hip-to-ankle lin
                      # down between the thighs rather than into them
 SOW_RAISE = 6.0      # degrees the trunk is straightened back from the waist, out of the thighs (raise_trunk)
 BENDSOW_CLIP = clip_file('bendsow')
+# Planting (plant_at, work_plant: sowing, planting seeds and replanting): plant_clip.json beside this file, Maru's own
+# tracker take (`anim_scripts/mocap/import_take.py -- animDLs/mocap/2026-11-18/take_03.csv 6.6 12.4 --as plant --loop
+# 1.5 4`: 9.90 .. 11.43 s), knelt on both knees with the back fairly straight, the left hand on the ground and the right
+# working the soil in front of the knees. Set on the floor as the kneels are; the hands reach the ground as they are
+# (the fingertips 0.01 .. 0.07 leg lengths over it). An earlier take knelt lower and bent further over, and from there the
+# chibi's arms, short for its body, stopped well over the ground.
+PLANT_CLIP = clip_file('plant')
+PLANT_SECONDS = PLANT_CLIP['frames'] / PLANT_CLIP['fps'] if PLANT_CLIP is not None else None
 BENCH_CLIP = clip_file('bench')
 BENCH_RAISE = 4.0    # degrees the bench work's trunk is stood up from the waist (raise_trunk), the hands kept: the clip
                      # stoops the chibi's big head right down onto what lies on the bench (a stove's pot, the food); more
@@ -2684,6 +2748,8 @@ VARIANTS = {
     # Harvesting by hand, crouched and picking (the mocap gather), with no scythe.
     'work_scythe': [dict(WORK_MOCAP=GATHER_CLIP, WORK_MOCAP_TOOL=False)] if GATHER_CLIP is not None else [],
     # Eating at a table with a knife and fork, bowed to the plate (the second mocap clip).
+    'talk': [dict(TALK_CLIP=c, TALK_SECONDS=c['frames'] / c['fps'], TALK_LEVEL=c is MESHY_TALK_CLIP)
+             for c in TALK_TAKES[1:] + ([MESHY_TALK_CLIP] if TALK_TAKES and MESHY_TALK_CLIP is not None else [])],
     'eat_sit': [dict(EAT_SIT_CLIP=EAT_SIT2_CLIP, EAT_SIT_SECONDS=EAT_SIT2_CLIP['frames'] / EAT_SIT2_CLIP['fps'],
                      EAT_REACH=False, EAT_LEVEL=(0.0, EAT_LEVEL[1]))] if EAT_SIT2_CLIP is not None else [],
     # Sowing stood and bent down from the hips to the ground and up again (the second mocap clip).
@@ -2764,7 +2830,7 @@ GRIP_DEVIATE = (-10.0, 15.0)   # the same for the hand tipped toward the thumb (
 FIST = (85.0, 95.0, 40.0, 30.0)
 WORK = {
     # Felling a tree: swung from over the right shoulder into the trunk in front, both hands at the end of the handle.
-    'axe': dict(tool='tool_axe', ticks=70, motion='chop', scale=0.8, grip=0.1, other=0.0,
+    'axe': dict(tool='tool_felling_axe', ticks=70, motion='chop', scale=0.8, grip=0.1, other=0.0,
                 body=dict(NARROW=0.35, STAGGER=0.2),
                 struck=dict(fist=(-0.04, -0.42, 0.3), pitch=95.0, yaw=8.0, roll=0.0, lean=15.0, twist=5.0, drop=0.08),
                 raised=dict(fist=(-0.3, -0.18, 0.55), pitch=-30.0, yaw=35.0, roll=0.0, lean=0.0, twist=-30.0, drop=0.02)),
@@ -2825,8 +2891,9 @@ WORK = {
                                          twist=0.0, L=(0.15, -0.72, -0.03)),
                              raised=dict(fist=(-0.1, -0.559, 0.026), pitch=0.0, yaw=0.0, roll=0.0, lean=26.0,
                                          twist=-5.0, L=(0.15, -0.72, -0.02))),
-    # Sowing: the blade raised in front and dug into the ground ahead, the left hand further up the handle.
-    'hoe': dict(tool='tool_hoe', ticks=78, motion='chop', scale=0.8, grip=0.05, other=0.12,
+    # Digging with the spade, for sowing and clearing pollution: played from Maru's tracker take (TOOL_TAKES' dig); these
+    # posed keys (the old hoe's) are only a stand-in should its clip be missing.
+    'dig': dict(tool='tool_spade', ticks=78, motion='chop', scale=0.8, grip=0.05, other=0.12,
                 body=dict(NARROW=0.4, STAGGER=0.15),
                 struck=dict(fist=(-0.1, -0.4, 0.15), pitch=135.0, yaw=0.0, roll=180.0, lean=15.0, twist=0.0, drop=0.08),
                 raised=dict(fist=(-0.2, -0.32, 0.4), pitch=60.0, yaw=0.0, roll=180.0, lean=5.0, twist=-5.0, drop=0.04)),
@@ -3826,8 +3893,14 @@ def talk_at(t):
     legs, as rub_at is. The clip hunches the chest forward but holds the neck upright and bows the head, so the neck
     stood behind the chest and the face looked at the floor: the neck's two bones are bent on the chest as the standing
     pose bends them, and the head is put level as the standing pose holds it, with TALK_NOD of the clip's own nodding
-    about its mean kept. Returns the pose and the worst overreach."""
+    about its mean kept (TALK_LEVEL: Maru's tracker takes carry the head as it moved, and are taken as they are).
+    Returns the pose and the worst overreach."""
     B = stand_pose()
+    if not TALK_LEVEL:
+        X = upper_from(dict(B), mocap_at(TALK_CLIP, t, Quaternion()))
+        if TALK_HEAD < 1.0:
+            calm_head(X, talk_head_means(B), TALK_HEAD)
+        return X, 0.0
     key = (TALK_CLIP['source'], TALK_CLIP['action'], TALK_CLIP['first'], TALK_CLIP['last'])
     if key not in talk_nods:
         n = TALK_CLIP['frames']
@@ -3842,6 +3915,44 @@ def talk_at(t):
     want = pitch_of(B, HEAD) + nod * TALK_NOD
     turn_branch(X, HEAD, about(X[HEAD] @ head[HEAD], (1, 0, 0), want - pitch_of(X, HEAD)))
     return X, 0.0
+
+talk_heads = {}   # the clip's mean neck and head turns on their parents, by its source frames, once worked out
+
+def own_turn(X, b):
+    """Bone b's turn on its parent in pose X (rest space), as a quaternion."""
+    return (X[bones[b].parent.name].inverted() @ X[b]).to_quaternion()
+
+def talk_head_means(B):
+    """TALK_CLIP's mean turn of each neck bone and the head on its parent, over the clip (the take as it is)."""
+    key = (TALK_CLIP['source'], TALK_CLIP['action'], TALK_CLIP['first'], TALK_CLIP['last'])
+    if key not in talk_heads:
+        n = TALK_CLIP['frames']
+        sums = {b: [0.0, 0.0, 0.0, 0.0] for b in TALK_NECK + (HEAD,)}
+        for f in range(n):
+            X = upper_from(dict(B), mocap_at(TALK_CLIP, f / n, Quaternion()))
+            for b, sum_ in sums.items():
+                q = own_turn(X, b)
+                sign = 1.0 if q.w * sum_[0] + q.x * sum_[1] + q.y * sum_[2] + q.z * sum_[3] >= 0.0 else -1.0   # (a turn and its negative are one turn)
+                for i, v in enumerate((q.w, q.x, q.y, q.z)):
+                    sum_[i] += sign * v
+        # (summed as plain numbers: in Blender 5.2 a 4-long Vector's normalized() made into a Quaternion came out wrong)
+        talk_heads[key] = {b: Quaternion(v).normalized() for b, v in sums.items()}
+    return talk_heads[key]
+
+def calm_head(X, means, share):
+    """The neck's bones and the head kept share of their own turns away from means (talk_head_means), parent first, each
+    about its own joint with everything under it."""
+    for b in TALK_NECK + (HEAD,):
+        parent = X[bones[b].parent.name]
+        own = parent.inverted() @ X[b]
+        q = own.to_quaternion()
+        if q.dot(means[b]) < 0.0:
+            q.negate()   # (the short way round: slerp doesn't choose it)
+        want = means[b].slerp(q, share)
+        pivot = head[b]
+        # (the joint left where the take has it on the parent, only the turn about it calmed)
+        local = T(own @ pivot) @ want.to_matrix().to_4x4() @ T(-pivot)
+        turn_branch(X, b, parent @ local @ X[b].inverted())
 
 def reload_at(t):
     """Reloading at t (0 .. 1 through it; see RELOAD_CLIP): the clip from the waist up on the standing pose's hips and
@@ -4096,6 +4207,11 @@ def sow_at(t):
         clamp = max(clamp, arm_to(side, sign, wrist, X, pole=pole, turn=[math.degrees(a) for a in turn]))
         X.update((name, X[hn] @ rel) for name, rel in fingers.items())
     return X, clamp
+
+def plant_at(t):
+    """Knelt on both knees planting at t (0 .. 1 round the loop; see PLANT_CLIP), set on the floor as the kneels are.
+    Returns the pose and the worst overreach."""
+    return kneel_at(PLANT_CLIP, t), 0.0
 
 def bench_at(t):
     """Stood at a bench working at t (0 .. 1 round the loop; see BENCH_CLIP), the trunk stood up BENCH_RAISE and the head
@@ -6462,12 +6578,12 @@ def tool_matrix(kind, k):
     origin = head[HIPS] + k['fist'] * LEG - d * w['grip'] * size
     return T(origin) @ R @ Matrix.Scale(size, 4)
 
-def grip_handle(side, sign, fist, d, edge, wrap, X, lift=None, swing=0.0, palm=0.0):
+def grip_handle(side, sign, fist, d, edge, wrap, X, lift=None, swing=0.0, palm=0.0, pole=None):
     """Places one arm by IK so its fist closes round a handle at fist (armature space) running along d (toward the tool's
     head, which the thumb points at), the fingers pointing the way edge does turned wrap degrees about the handle, the
     handle palm leg lengths out of the palm, the elbow lifted as arm_to's lift, or swung swing degrees about the line
-    from the shoulder to the wrist (out from the body when the hand is in front, a fixed way round so it eases evenly).
-    Returns how far the wrist was out of reach."""
+    from the shoulder to the wrist (out from the body when the hand is in front, a fixed way round so it eases evenly),
+    or toward pole (arm_to's, in the chest's frame). Returns how far the wrist was out of reach."""
     hn = 'hand.' + side
     d0 = (tail[hn] - head[hn]).normalized()
     n0 = Vector((sign * HAND_PALM[0], HAND_PALM[1], HAND_PALM[2]))
@@ -6481,7 +6597,6 @@ def grip_handle(side, sign, fist, d, edge, wrap, X, lift=None, swing=0.0, palm=0
     chest = X[CHEST_BONE].to_quaternion().to_matrix()
     turn = (chest.inverted() @ R).to_euler('XYZ')
     wrist = fist - f * WORK_GRIP * LEG - (R @ n0) * palm * LEG
-    pole = None
     if swing:
         line = (wrist - X['shoulder.' + side] @ head['upper_arm.' + side]).normalized()
         pole = chest.inverted() @ Matrix.Rotation(math.radians(swing * sign), 3, line) @ chest @ Vector((sign * ELBOW_OUT, 0.25, -1.0))
@@ -6629,9 +6744,222 @@ def work_at(t, kind):
     clip = work_mocap(kind)
     if clip is CHOP_CLIP and clip is not None:
         return chop_at(t), 0.0
+    if clip is not None and TOOL_CLIPS.get(kind) is clip:
+        return take_at(kind, t)
     if clip is not None:
         return kneel_at(clip, t), 0.0
     return tool_stroke_at(t, kind)
+
+def take_tool(clip, t):
+    """A tool clip's recorded tool at t (0 .. 1 round it): its right fist, handle way, point way and elbow poles, in the
+    chest's rest frame, eased between frames."""
+    entries = clip['tool']
+    n = len(entries)
+    i = int(t * n) % n
+    j, u = (i + 1) % n, t * n - math.floor(t * n)
+    return {k: Vector(entries[i][k]).lerp(Vector(entries[j][k]), u) for k in entries[i]}
+
+def pick_yaw(M):
+    """The way a bone's matrix faces about the upright, degrees, + to the figure's left."""
+    v = M.to_3x3().normalized() @ FWD
+    return math.degrees(math.atan2(v.x, -v.y))
+
+def take_size(kind):
+    """Armature units per model unit of a WORK kind's tool."""
+    return WORK[kind]['scale'] * LEG / MODEL_LEG
+
+def take_point(kind, fist, way, edge, edge_sign=None):
+    """A tool's foremost point (armature space): the end of its head the take's 'blade' gives furthest ahead."""
+    take = TOOL_TAKES[kind]
+    size = take_size(kind)
+    sign = edge_sign if edge_sign is not None else (take.get('edge') or 1)
+    at = fist + way * (take['head'] - take['grip']) * size
+    return min((at + edge * sign * b * size for b in take['blade']), key=lambda q: q.y)
+
+def pick_cells(p):
+    """A place (armature space) as cells ahead of the pawn's middle, to its left and up, at the standard grown size."""
+    cells = MODEL_LEG * GAME_SCALE / LEG
+    return (head[HIPS].y - p.y) * cells, (p.x - head[HIPS].x) * cells, p.z * cells
+
+def take_base(clip, t, M=None):
+    """A tool clip's body at t, moved by M (armature space) if given, and the recorded tool on it: (pose, right fist,
+    handle way, point way, elbow poles by side in the chest's frame)."""
+    X = kneel_at(clip, t)
+    if M is not None:
+        X = moved_all(M, X)
+    e = take_tool(clip, t)
+    chest = X[CHEST_BONE]
+    C3 = chest.to_3x3().normalized()
+    way = (C3 @ e['way']).normalized()
+    edge = C3 @ e['edge']
+    return X, chest @ e['fist'], way, (edge - edge.dot(way) * way).normalized(), {s: e['pole_' + s] for s in 'LR'}
+
+def take_raw_blow(kind):
+    """Where the blow ('blow' seconds into the take) is in a kind's raw clip, 0 .. 1."""
+    raw = TOOL_RAW[kind]
+    return min(max((TOOL_TAKES[kind]['blow'] * raw['fps'] - raw['first']) / raw['frames'], 0.0), 1.0)
+
+take_placed = {}   # take_place's answers, by the numbers they go by
+
+def take_place(kind):
+    """How the whole figure is moved for a kind's stroke (armature space): turned 'face' degrees about the pawn's middle
+    (None: so the head's point is straight ahead at the blow; 'trunk': back by the trunk's turn at the blow), then, with 'lands', along the way it faces so the point lands that many
+    cells ahead at the blow."""
+    take = TOOL_TAKES[kind]
+    key = (kind, take['face'], take['lands'], take['blow'], take['grip'], TOOL_RAW[kind]['action'], TOOL_RAW[kind]['first'])
+    if key not in take_placed:
+        raw, blow = TOOL_RAW[kind], take_raw_blow(kind)
+        X = kneel_at(raw, blow)
+        face = take['face']
+        if face == 'trunk':
+            face = -(pick_yaw(X[HIPS]) + pick_yaw(X[CHEST_BONE])) / 2
+        elif face is None:
+            _, fist, way, edge, _ = take_base(raw, blow)
+            ahead, left, _ = pick_cells(take_point(kind, fist, way, edge))
+            face = -math.degrees(math.atan2(left, ahead))
+        M = about(Vector((head[HIPS].x, head[HIPS].y, 0.0)), (0, 0, 1), face)
+        moved = 0.0
+        if take['lands'] is not None:
+            _, fist, way, edge, _ = take_base(raw, blow, M)
+            moved = take['lands'] - pick_cells(take_point(kind, fist, way, edge))[0]
+            M = T(FWD * moved * LEG / (MODEL_LEG * GAME_SCALE)) @ M
+        take_placed[key] = (M, face, moved)
+    return take_placed[key][0]
+
+def take_targets(kind, t, clip=None):
+    """A kind's stroke at t (TOOL_CLIPS by default), placed by take_place, and where the tool is for the hands: (pose, right
+    fist, handle way toward the head, point way, elbow poles by side in the chest's frame, each fist's place along the
+    handle from the right one's)."""
+    X, fist, way, edge, poles = take_base(clip or TOOL_CLIPS[kind], t, take_place(kind))
+    take = TOOL_TAKES[kind]
+    shoulders = {s: X['shoulder.' + s] @ head['upper_arm.' + s] for s in 'LR'}
+    along = {'R': 0.0, 'L': (take['other'] - take['grip']) * take_size(kind)}
+    for _ in range(4):
+        for side in 'LR':
+            at = fist + way * along[side]
+            far = (at - shoulders[side]).length - TOOL_REACH * LEG
+            if far > 0:
+                fist += (shoulders[side] - at).normalized() * far
+    return X, fist, way, edge, poles, along
+
+def take_stroke(kind):
+    """A kind's stroke made from its raw clip: played 'pace' times as fast as recorded, and with 'hit' laid so the blow
+    comes that share of the way round, from rest to rest."""
+    take, raw = TOOL_TAKES[kind], TOOL_RAW[kind]
+    n = max(2, int(round(raw['frames'] / take['pace'])))
+    blow, hit = take_raw_blow(kind), take.get('hit')
+    frames = []
+    for k in range(n):
+        u = k / n
+        if hit is not None:
+            r = blow * u / hit if u < hit else blow + (1 - blow) * (u - hit) / (1 - hit)
+        else:
+            r = u
+        f = r * raw['frames']
+        i = int(math.floor(f)) % raw['frames']
+        j, v = (i + 1) % raw['frames'], f - math.floor(f)
+        frames.append((clip_frame(raw, f), {k: list(Vector(raw['tool'][i][k]).lerp(Vector(raw['tool'][j][k]), v))
+                                            for k in raw['tool'][i]}))
+    tool = [f[1] for f in frames]
+    # The elbow poles smoothed round the loop (TOOL_POLE_SMOOTH frames, a Gaussian's spread), so the elbows don't jump.
+    reach = int(math.ceil(3 * TOOL_POLE_SMOOTH))
+    for side in 'LR':
+        key = 'pole_' + side
+        ways = [Vector(e[key]) for e in tool]
+        for f, e in enumerate(tool):
+            e[key] = list(sum((ways[(f + d) % n] * math.exp(-0.5 * (d / TOOL_POLE_SMOOTH) ** 2)
+                               for d in range(-reach, reach + 1)), Vector()).normalized())
+    out = dict(raw, action='mocap %s stroke %s %.2f' % (kind, hit, take['pace']), frames=n,
+               turns={b: [f[0][0][b] for f in frames] for b in raw['turns']}, hips=[f[0][1] for f in frames], tool=tool)
+    if hit is not None:
+        out['hit'] = hit * n
+    return out
+
+def take_grip(X, side, target, hold, edge_sign):
+    """Closes one hand round the tool of take_targets' target, held as hold ((wrap, thumb), as work_grip's) with the
+    point the recorded one's way times edge_sign. Returns how far the wrist was out of reach."""
+    _, fist, way, edge, poles, along = target
+    wrap, thumb = hold
+    sign = -1 if side == 'R' else 1
+    clamp = grip_handle(side, sign, fist + way * along[side], way * thumb, edge * edge_sign, wrap, X, palm=WORK_PALM,
+                        pole=poles[side])
+    close_hand(X, side, sign)
+    return clamp
+
+take_hold_cache = {}
+
+def take_holds(kind):
+    """Each hand's hold on a kind's tool and the point's sign, one for the whole stroke: those that keep the wrists
+    straightest and the hands least twisted over TOOL_HOLD_SAMPLES points round it, as work_holds' costs, the thumb toward
+    the head and the wrist on its shoulder's side; a double-ended tool (two 'blade's) may take either end for the point,
+    a bladed one only its edge. Returns ({side: (wrap, thumb)}, edge sign)."""
+    take = TOOL_TAKES[kind]
+    if take.get('holds') is not None:
+        return {s: tuple(h) for s, h in take['holds'].items()}, take.get('edge') or 1
+    key = (kind, TOOL_CLIPS[kind]['action'], repr(take), TOOL_REACH, TOOL_THUMB, TOOL_SIDE_COST, GRIP_WRAP_STEP,
+           GRIP_FREE, GRIP_FLEX, GRIP_DEVIATE, WORK_GRIP, WORK_PALM, TOOL_HOLD_SAMPLES)
+    if key not in take_hold_cache:
+        targets = [take_targets(kind, k / TOOL_HOLD_SAMPLES) for k in range(TOOL_HOLD_SAMPLES)]
+        best = None
+        for edge_sign in ((1, -1) if len(take['blade']) > 1 else (take.get('edge') or 1,)):
+            holds, total = {}, 0.0
+            for side in 'LR':
+                sign = -1 if side == 'R' else 1
+                def cost(hold):
+                    c = 0.0
+                    for target in targets:
+                        Y = dict(target[0])
+                        over = take_grip(Y, side, target, hold, edge_sign)
+                        flex, deviate = wrist_bend(Y, side, sign)
+                        _, fist, way, _, _, along = target
+                        at = fist + way * along[side]
+                        off, to = Y['hand.' + side] @ head['hand.' + side] - at, Y['shoulder.' + side] @ head['upper_arm.' + side] - at
+                        off, to = off - off.dot(way) * way, to - to.dot(way) * way
+                        wrong = max(0.0, -off.normalized().dot(to.normalized())) if off.length > 1e-6 and to.length > 1e-6 else 0.0
+                        c += (max(0.0, abs(arm_twist[side]) - GRIP_FREE) ** 2 + 1e4 * over / LEG + TOOL_SIDE_COST * wrong
+                              + max(0.0, abs(flex - GRIP_FLEX[0]) - GRIP_FLEX[1]) ** 2
+                              + max(0.0, abs(deviate - GRIP_DEVIATE[0]) - GRIP_DEVIATE[1]) ** 2)
+                    return c
+                thumbs = (TOOL_THUMB,) if TOOL_THUMB else (1, -1)
+                tried = [(i * GRIP_WRAP_STEP - 180.0, thumb) for thumb in thumbs for i in range(int(360 / GRIP_WRAP_STEP))]
+                costs = {h: cost(h) for h in tried}
+                holds[side] = min(costs, key=costs.get)
+                total += costs[holds[side]]
+            if best is None or total < best[0]:
+                best = (total, holds, edge_sign)
+        take_hold_cache[key] = (best[1], best[2])
+    return take_hold_cache[key]
+
+def take_at(kind, t):
+    """A kind's stroke at t (0 .. 1 round it; see TOOL_TAKES): the clip's body set on the floor and placed (take_place),
+    the hands round the tool where the recorded one is. Returns the pose and the worst overreach."""
+    target = take_targets(kind, t)
+    X = target[0]
+    holds, edge_sign = take_holds(kind)
+    clamp = 0.0
+    for side in 'RL':
+        clamp = max(clamp, take_grip(X, side, target, holds[side], edge_sign))
+    return X, clamp
+
+def take_matrix(kind, t):
+    """Where a kind's tool model is at t of take_at (armature space), as tool_matrix places a tool: the handle along the
+    model's z from its grip in the right fist, the head's point (a blade's edge) toward its -y."""
+    X, fist, way, edge, _, _ = take_targets(kind, t)
+    _, edge_sign = take_holds(kind)
+    size = take_size(kind)
+    y = -edge * edge_sign
+    R = Matrix((y.cross(way), y, way)).transposed().to_4x4()
+    return T(fist - way * TOOL_TAKES[kind]['grip'] * size) @ R @ Matrix.Scale(size, 4)
+
+def take_held(kind):
+    """A kind's tool in the right hand's rest frame as take_at holds it (its tool line): the same at every frame, as the
+    hand's hold on it is."""
+    X, _ = take_at(kind, 0.0)
+    return X['hand.R'].inverted() @ take_matrix(kind, 0.0)
+
+def pick_at(t):
+    """Mining at t (take_at's pickaxe)."""
+    return take_at('pickaxe', t)
 
 chop_wrist = []   # the wrist's turn at the hit, in the hand's rest frame, once worked out (chop_at)
 chop_balls = {}   # where each foot's ball is planted for the chop, by side, once worked out (chop_ball)
@@ -7384,6 +7712,12 @@ def fcurves_of(action):
                 for bag in strip.channelbags:
                     out.extend(bag.fcurves)
         return out
+
+# The tool strokes from tracker takes, made once every pose they need is defined (see TOOL_TAKES).
+for _kind, _raw in TOOL_RAW.items():
+    if _raw is not None and 'tool' in _raw:
+        TOOL_CLIPS[_kind] = take_stroke(_kind)
+        WORK_MOCAPS[_kind] = TOOL_CLIPS[_kind]
 
 if __name__ == '__main__':   # run by Blender; imported (export_frames.py) it only defines the poses
     act, worst = bake()

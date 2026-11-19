@@ -256,12 +256,12 @@ namespace M3AT
         private const float DazeEase = 2f;   // how fast a pawn slumps when stunned or comes round, per real second
         // Mining: the game strikes the rock (its sound and flash, EffecterDefOf.Mine) when JobDriver_Mine's ticksToPickHit
         // runs out, every round(100 / MiningSpeed) ticks, so work_pickaxe is played from that count (PickPhase) rather
-        // than the clock, the blow landing on that tick. PickHit is where in the stroke the point goes in (walk.work_stroke's
-        // chop: the blow ends at 0.7), PickBounce how far the small bounce off the rock after it runs (to the end of the
-        // stroke, where the pick rests in the rock again).
-        private const float PickHit = 0.7f;
-        private const float PickBounce = 0.3f;
-        private const float PickSlowest = 1.25f;   // a stroke is played at most this much slower than the clip's own length; a slower miner rests the pick in the rock between strokes
+        // than the clock, the blow landing on that tick. PickHit is where in the stroke the point goes in (walk.PICK_HIT:
+        // lifted from rest beside the foot and swung over into the rock), PickBounce how far the stroke runs on after it
+        // (the pick brought back round and let down to rest again, the end of the stroke, where it waits).
+        private const float PickHit = 0.5f;
+        private const float PickBounce = 0.5f;
+        private const float PickSlowest = 1f;   // a stroke is played at most this much slower than the clip's own length: at its own pace, a slower miner resting the pick for longer between strokes
         // Beating out a fire: the game beats once each time its beat verb's 1.1 s cool-down ends (Verb_BeatFire), so
         // work_stomp and work_pat are played from those beats (BeatPhase) rather than the clock, a blow landing on the tick
         // the game beats. Where in each clip a blow lands, and how many blows a loop (walk.STOMP_HIT, walk.PAT_HIT and
@@ -557,6 +557,9 @@ namespace M3AT
             public string stirClip;   // the stirring clip for the work it does (work_stir, work_stir_crouch); null when not cooking
             public float burn;   // 0 .. 1: patting at the flames on itself (Burning)
             public float chatAt = -1f;
+            public string talkClip;   // the talk variant the continuous talk is playing (TalkLoop), and the tick it began
+            public int talkFrom = -1;
+            public string talkPrev;   // the variant before it, blended out from its last frame over TalkJoin; null: none
             public Pawn chatWith;   // whom the bout of talking under way is to (ListenerOf); null: no one in particular
             public float? chatFace;   // which way they are (degrees clockwise from north), kept if they leave
             public int chatLooked = -99999;   // the game tick it last looked for someone to talk to
@@ -688,6 +691,7 @@ namespace M3AT
         {
             public int start = -1;   // the game tick the bout under way began; -1: none
             public int next = -1;   // the game tick from which the next may begin; -1: not picked yet
+            public string clip;   // the clip (or variant) the bout under way plays, or the next one will (talk's)
         }
 
         // Where a carried person is drawn this frame, set by its carrier before the game draws it (Carried.Draw).
@@ -3774,8 +3778,15 @@ namespace M3AT
         // Talking the whole time: playing a board game (chess, poker, the game of Ur) with someone else at the same board,
         // giving a speech (a throne room's, or a ritual's speaker), or visiting someone sick in bed (VisitSickPawn, stood or
         // sat by them; the game turns the visitor to face them), once there and not on its way.
+        internal static int TalkTestPawn = -1;   // the autotest's: this pawn talks on (TalkOf) ..
+        internal static string TalkTestClip;     // .. playing only this variant, from its start (TalkVariant, TalkLoop)
+
         private static bool TalkOf(Pawn pawn)
         {
+            if (pawn.thingIDNumber == TalkTestPawn && TalkTestClip != null)
+            {
+                return true;
+            }
             JobDef job = pawn.CurJobDef;
             if (job == null || (pawn.pather != null && pawn.pather.Moving))
             {
@@ -3922,7 +3933,11 @@ namespace M3AT
             }
             bool wanted = free && (party || with != null);
             int started = e.chat.start;
-            float at = BoutOf(pawn, e.chat, "talk", wanted, ChatRestFrom, ChatRestTo);
+            if (e.chat.start < 0)
+            {
+                e.chat.clip = TalkVariant(pawn, e.chat.next);   // (each bout one of talk's variants, picked as it is due)
+            }
+            float at = BoutOf(pawn, e.chat, e.chat.clip, wanted, ChatRestFrom, ChatRestTo);
             if (at >= 0f && e.chat.start != started)
             {
                 e.chatWith = with;   // a new bout
@@ -4587,10 +4602,10 @@ namespace M3AT
                         kind = "hammer";
                         break;
                     case "Sow":
-                        kind = PlaceWork(pawn, a, "hoe", false);   // (knelt at the ground, as for cutting plants)
-                        break;
                     case "ClearPollution":
-                        kind = PlaceWork(pawn, a, "hoe", false);
+                        // Stood digging with the spade (Maru's own tracker take, walk.TOOL_TAKES' dig), at a hydroponics
+                        // basin or the like stood at it as at a bench; knelt at the ground on an export without it.
+                        kind = PlaceWork(pawn, a, "crouch", false, "dig");
                         break;
                     case "Clean":
                     case "ClearSnow":
@@ -4598,7 +4613,7 @@ namespace M3AT
                         break;
                     case "PlantSeed":
                     case "Replant":
-                        kind = PlaceWork(pawn, a, "pluck", false);   // (knelt at the ground, bare hands, on an older export)
+                        kind = PlaceWork(pawn, a, "pluck", false, "plant");   // (knelt at the ground, bare hands, on an older export)
                         break;
                     case "Forage":
                     case "ExtractTree":
@@ -4973,8 +4988,8 @@ namespace M3AT
         }
 
         // Work done with the hands at a place rather than with a tool, by where it is (the export's mocap work): stood at a
-        // bench (bench) or sat at it (bench_sit), knelt at the ground (crouch, or ground in its place: sow, crouched
-        // hunched over, falling back to crouch on an export without it) or sat there with no bench (chair: a crafting
+        // bench (bench) or sat at it (bench_sit), knelt at the ground (crouch, or ground in its place: plant, knelt on
+        // both knees planting, or sow, crouched hunched over, falling back to crouch on an export without it) or sat there with no bench (chair: a crafting
         // spot with a chair on it). seats: whether the game sits a pawn for this work, on a seat at the work's spot.
         // fallback is the kind on an older export without these clips.
         private static string PlaceWork(Pawn pawn, LocalTargetInfo at, string fallback, bool seats, string ground = "crouch")
@@ -5347,9 +5362,9 @@ namespace M3AT
 
         // Where the pickaxe stroke is for a pawn mining, 0 .. 1 round it, timed so the point goes into the rock (PickHit) on
         // the tick the game strikes it: from JobDriver_Mine's own count down to the next strike (ticksToPickHit), so it
-        // keeps time with the strike's sound and flash and with the miner's speed. The stroke takes as long as the time
-        // between strikes, up to PickSlowest of the clip's own length: a slow miner swings at that pace and rests the pick in
-        // the rock until it is time to swing again. A pawn ticked less than every tick (the game's tick intervals) counts
+        // keeps time with the strike's sound and flash and with the miner's speed. The stroke takes its own length (up to
+        // PickSlowest of it), so the swing looks the same at any skill and a slower miner only rests the pick by its foot
+        // longer until it is time to swing again; a miner striking more often than that has it squeezed into the time. A pawn ticked less than every tick (the game's tick intervals) counts
         // down in jumps, so the count is carried on by the game clock from when it was last seen to change. Any other job,
         // or mining not yet begun (the count is set below -100 until the first tick at the rock), keeps the clock.
         private static float PickPhase(Pawn pawn, Ease e, string clip)
@@ -5391,9 +5406,9 @@ namespace M3AT
             }
             if (since < PickBounce * stroke)
             {
-                return PickHit + since / stroke;   // the bounce off the rock after the last strike
+                return PickHit + since / stroke;   // back from the rock to rest after the last strike
             }
-            return 0f;   // resting in the rock until it is time to wind up
+            return 0f;   // resting (the stroke's start) until it is time to swing
         }
 
         // Where a fire-beating clip (work_stomp, work_pat) is for a pawn beating a fire, 0 .. 1 round it, timed so a blow
@@ -5436,6 +5451,56 @@ namespace M3AT
             }
             float t = Find.TickManager.TicksGame / 60f + (pawn.thingIDNumber % 997) * 1.618f;
             return Mathf.Repeat(t / seconds, 1f);
+        }
+
+        // One of talk's variants (Maru's take and Meshy's talk, walk.py's talk and its VARIANTS), by the pawn and n.
+        private static string TalkVariant(Pawn pawn, int n)
+        {
+            if (pawn.thingIDNumber == TalkTestPawn && TalkTestClip != null)
+            {
+                return TalkTestClip;
+            }
+            return skin.Variant("talk", Gen.HashCombineInt(pawn.thingIDNumber, n));
+        }
+
+        // Game ticks over which one talk variant hands over to the next (TalkLoop): Maru's take starts and ends with the
+        // hands down, Meshy's (talk~2) with them raised.
+        private const int TalkJoin = 18;
+
+        // The talk variant a pawn talking on and on (a board game, a speech) is playing, and how far through it (at): each
+        // starts and ends with the hands down, so another is picked each time one ends, the last one's end blended out
+        // under it over TalkJoin (prev, and the new one's share of the two, join; null and 1 once done).
+        private static string TalkLoop(Pawn pawn, Ease e, out float at, out string prev, out float join)
+        {
+            int now = Find.TickManager.TicksGame;
+            int length = e.talkClip != null ? Mathf.Max(1, Mathf.RoundToInt(skin.SecondsOf(e.talkClip) * 60f)) : 1;
+            if (e.talkClip == null || e.talkFrom > now || now - e.talkFrom >= 2 * length)
+            {
+                e.talkClip = TalkVariant(pawn, now);   // (begun afresh, part way through so pawns don't all start together)
+                length = Mathf.Max(1, Mathf.RoundToInt(skin.SecondsOf(e.talkClip) * 60f));
+                e.talkFrom = pawn.thingIDNumber == TalkTestPawn ? now : now - (pawn.thingIDNumber * 37) % length;
+                e.talkPrev = null;
+            }
+            else if (now - e.talkFrom >= length)
+            {
+                e.talkFrom += length;
+                e.talkPrev = e.talkClip;
+                e.talkClip = TalkVariant(pawn, e.talkFrom);
+                length = Mathf.Max(1, Mathf.RoundToInt(skin.SecondsOf(e.talkClip) * 60f));
+            }
+            at = Mathf.Clamp01((now - e.talkFrom) / (float)length);
+            int into = now - e.talkFrom;
+            if (e.talkPrev != null && e.talkPrev != e.talkClip && into < TalkJoin)
+            {
+                prev = e.talkPrev;
+                join = Mathf.SmoothStep(0f, 1f, into / (float)TalkJoin);
+            }
+            else
+            {
+                prev = null;
+                join = 1f;
+            }
+            return e.talkClip;
         }
 
         // Forgets pawns not drawn for a while.
@@ -8158,7 +8223,16 @@ namespace M3AT
                     if (skin.Has("talk") && (ease.talk > 0f || chat > 0f))
                     {
                         bool bout = chat > ease.talk;
-                        skin.Over(fig, "talk", bout ? ease.chatAt : LoopPhase(pawn, "talk"), Mathf.Max(ease.talk, chat) * idleHands);
+                        float talkAt = 0f, join = 1f;
+                        string prev = null;
+                        string talkClip = bout ? ease.chat.clip ?? "talk" : TalkLoop(pawn, ease, out talkAt, out prev, out join);
+                        float talkWeight = Mathf.Max(ease.talk, chat) * idleHands;
+                        if (prev != null)
+                        {
+                            int last = Mathf.Max(1, skin.FramesOf(prev));
+                            skin.Over(fig, prev, (last - 1) / (float)last, talkWeight * (1f - join));   // its last frame (Sample wraps on to the first), blended out
+                        }
+                        skin.Over(fig, talkClip, bout ? ease.chatAt : talkAt, talkWeight * join);
                     }
                     if (skin.Has("rub") && ease.rubAt >= 0f)
                     {

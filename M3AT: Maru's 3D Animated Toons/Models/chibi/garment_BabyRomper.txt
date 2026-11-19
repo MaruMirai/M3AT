@@ -3,7 +3,7 @@
 # its own worn on that layer and covering one of those body part groups.
 defs Apparel_BabyRomper
 # texture: its image (t lines, a place on it per vertex); tint: whether the apparel's colour tints it.
-texture garment_KidRomper.png
+texture garment_BabyRomper.png
 # baby_romper: worn by a baby a few hours old with nothing over its trunk or legs.
 baby_romper yes
 colour 0.950 0.880 0.640

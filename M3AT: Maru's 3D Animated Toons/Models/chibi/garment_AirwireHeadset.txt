@@ -3,7 +3,7 @@
 # its own worn on that layer and covering one of those body part groups.
 defs Apparel_AirwireHeadset
 # texture: its image (t lines, a place on it per vertex); tint: whether the apparel's colour tints it.
-texture garment_Gunlink.png
+texture garment_AirwireHeadset.png
 hide_hair no
 hide_face no
 # hide k ...: body triangles (skin.txt's f lines, from 0) left out while it is worn.

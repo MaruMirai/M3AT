@@ -1527,7 +1527,7 @@ if getattr(walk, 'RUB_CLIP', None) is not None:
     masks['rub'] = upper_mask('LR', walk.RUB_UPPER)
 # Talking: the same, over the idle, the sit or the walk.
 if getattr(walk, 'TALK_CLIP', None) is not None:
-    pose_worst = max(pose_worst, export_loop('talk', walk.talk_at, walk.TALK_CLIP['frames'], walk.TALK_SECONDS))
+    pose_worst = max(pose_worst, export_loop('talk', walk.talk_at, lambda: walk.TALK_CLIP['frames'], lambda: walk.TALK_SECONDS))
     masks['talk'] = upper_mask('LR', walk.TALK_UPPER)
 # Teaching a lesson at a school desk: the same, over the idle or the sit (the game turns the head to the pupil).
 if hasattr(walk, 'teach_at'):
@@ -1602,10 +1602,11 @@ if getattr(walk, 'RESEARCH_CLIP', None) is not None:
     if hasattr(walk, 'research_floor_at') and getattr(walk, 'MEDITATE_CLIP', None) is not None:
         pose_worst = max(pose_worst, export_loop('work_research_floor', walk.research_floor_at, walk.RESEARCH_CLIP['frames'],
                                                  walk.RESEARCH_SECONDS))
-# Generic work by where it is done: knelt at the ground (crouched hunched over for sowing) and stood at a bench, the
-# whole figure in place of the idle; sat at a bench and sat with no bench, from the waist up over the sit, as
-# researching is.
-for name in ('crouch', 'sow', 'bench', 'bench_sit', 'chair'):
+# Generic work by where it is done: knelt at the ground (plant, knelt on both knees planting, from Maru's own tracker
+# take; sow, crouched hunched over, and its bent-over variant are left out for now, as no job plays them) and stood at
+# a bench, the whole figure in place of the idle; sat at a bench and sat with no bench, from the waist up over the sit,
+# as researching is.
+for name in ('crouch', 'plant', 'bench', 'bench_sit', 'chair'):
     clip = getattr(walk, name.upper() + '_CLIP', None)
     if clip is not None:
         # Read at each variant, which may play another mocap clip (sow's bent-over one).
@@ -1729,9 +1730,16 @@ for kind, w in walk.WORK.items():
     if w['tool'] is None:
         continue
     held = []
-    for f in range(WORK_FRAMES):
-        X, _ = walk.tool_stroke_at(f / WORK_FRAMES, kind)
-        held.append(X['hand.R'].inverted() @ walk.tool_matrix(kind, walk.work_key(w, walk.work_stroke(f / WORK_FRAMES, w))))
+    take = getattr(walk, 'TOOL_CLIPS', {}).get(kind)
+    if take is not None and walk.work_mocap(kind) is take:
+        # A stroke from a tracker take holds its tool its own way (walk.take_holds), so its tool line is its own.
+        for f in range(0, take['frames'], 4):
+            X, _ = walk.take_at(kind, f / take['frames'])
+            held.append(X['hand.R'].inverted() @ walk.take_matrix(kind, f / take['frames']))
+    else:
+        for f in range(WORK_FRAMES):
+            X, _ = walk.tool_stroke_at(f / WORK_FRAMES, kind)
+            held.append(X['hand.R'].inverted() @ walk.tool_matrix(kind, walk.work_key(w, walk.work_stroke(f / WORK_FRAMES, w))))
     tool_drift = max(tool_drift, max((m.translation - held[0].translation).length for m in held) * rig.matrix_world.to_scale().x * scale)
     # From the tool's own model space (cells, as IsoRim loads it) to the rest pose's, in the game's axes.
     game = Matrix.Scale(scale, 4) @ GAME @ rig.matrix_world @ held[0] @ GAME.inverted()
@@ -1962,7 +1970,7 @@ if getattr(walk, 'VOMIT_CLIP', None) is not None:
           % (walk.VOMIT_CLIP['frames'], walk.VOMIT_SECONDS, walk.VOMIT_CLIP['source'], walk.VOMIT_CLIP['first'],
              walk.VOMIT_CLIP['last'], walk.VOMIT_HEAVE[0], walk.VOMIT_HEAVE[1]))
 print('JUMP %d frames over the flight; land over %.1f s' % (walk.JUMP_FRAMES, walk.LAND_SECONDS))
-for name in ('sleep', 'downed', 'downed_side', 'knockdown', 'die', 'electrocuted', 'shot_fall', 'falling_down', 'chop', 'gather', 'inspect', 'crouch', 'sow', 'bendsow',
+for name in ('sleep', 'downed', 'downed_side', 'knockdown', 'die', 'electrocuted', 'shot_fall', 'falling_down', 'chop', 'gather', 'inspect', 'crouch', 'sow', 'bendsow', 'plant',
              'bench', 'bench_sit', 'chair'):
     clip = walk.clip_file(name)
     if clip is not None:

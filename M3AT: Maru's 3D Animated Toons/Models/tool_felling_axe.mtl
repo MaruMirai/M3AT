@@ -1,0 +1,7 @@
+# M3AT felling axe colours (anim_scripts/make_axe.py); fixed (no stuff)
+
+newmtl axe_wood
+Kd 0.580 0.400 0.240
+
+newmtl axe_steel
+Kd 0.550 0.570 0.600
