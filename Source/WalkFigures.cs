@@ -923,6 +923,18 @@ namespace M3AT
             Graphic g = weapon.graphicData != null ? weapon.graphicData.Graphic : null;
             Material mat = g != null ? g.MatSingle : null;
             mat = mat != null ? FitArt(weapon, mat) : null;
+            length = ArtLengthOf(mat, g != null ? g.drawSize : Vector2.one, weapon.equippedAngleOffset);
+            if (length > 0f)
+            {
+                artLengths[weapon] = length;
+            }
+            return length;
+        }
+
+        // How long a picture's art is drawn along a weapon's barrel (cells): its solid pixels over the picture laid at drawSize,
+        // along the way the weapon's equippedAngleOffset turns the barrel. 0 for no picture.
+        private static float ArtLengthOf(Material mat, Vector2 drawSize, float angleOffset)
+        {
             if (mat == null || mat.mainTexture == null)
             {
                 return 0f;
@@ -933,7 +945,7 @@ namespace M3AT
             {
                 return 0f;
             }
-            Vector3 d3 = Quaternion.AngleAxis(-weapon.equippedAngleOffset, Vector3.up) * Vector3.right;
+            Vector3 d3 = Quaternion.AngleAxis(-angleOffset, Vector3.up) * Vector3.right;
             Vector2 way = new Vector2(d3.x, d3.z).normalized;
             float least = float.MaxValue, most = float.MinValue;
             for (int j = 0; j < n; j++)
@@ -942,15 +954,13 @@ namespace M3AT
                 {
                     if (px[j * n + i].a > 128)
                     {
-                        float along = (i + 0.5f) / n * g.drawSize.x * way.x + (j + 0.5f) / n * g.drawSize.y * way.y;
+                        float along = (i + 0.5f) / n * drawSize.x * way.x + (j + 0.5f) / n * drawSize.y * way.y;
                         least = Mathf.Min(least, along);
                         most = Mathf.Max(most, along);
                     }
                 }
             }
-            length = most > least ? most - least : 0f;
-            artLengths[weapon] = length;
-            return length;
+            return most > least ? most - least : 0f;
         }
 
         // A weapon that is itself thrown: the vanilla verb's throw log (as IsoRim marks one), or Combat

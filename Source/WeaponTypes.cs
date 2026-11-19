@@ -141,13 +141,22 @@ namespace M3AT
 
         // How big a weapon is drawn, held or holstered, a share of its sprite's drawn size (DrawSlab): its type's size
         // against the weapon on the floor, in the mod options, else the export's, over this weapon's own GroundRatio
-        // (for a weapon with an IsoRim model its size on the floor is smaller than its sprite's); else WeaponScale.
+        // (for a weapon with an IsoRim model its size on the floor is smaller than its sprite's); else WeaponScale. A
+        // weapon drawn as its sprite's slab is then made SlabScale of that, to stand as long as a model would.
         // The figure may not be loaded yet (a weapon still in flight from a saved game, drawn before any pawn is), or
         // ever (the baked frames), so then anim.txt's type_scale lines stand in for its sizes.
         private static float ScaleOf(Thing weapon)
         {
             float scale = TypeSize(TypeOf(weapon.def));
-            return scale < 0f ? (skin != null && skin.WeaponScale >= 0f ? skin.WeaponScale : WeaponScale) : scale / GroundRatio(weapon);
+            scale = scale < 0f ? (skin != null && skin.WeaponScale >= 0f ? skin.WeaponScale : WeaponScale) : scale / GroundRatio(weapon);
+            return Thrown(weapon.def) || !AsSlab(weapon) ? scale : scale * SlabScale;
+        }
+
+        // A sprite slab's share of its type's size (the mod options' slabScale): see Settings.slabScale. Not a thrown
+        // weapon's, as its model is drawn at its size on the ground already and its slab is the small heap sprite.
+        public static float SlabScale
+        {
+            get { return SettingsMod.Settings != null ? SettingsMod.Settings.slabScale : Settings.DefaultSlabScale; }
         }
 
         // A type's size against the weapon on the floor: the mod options', else the export's; -1 for neither.

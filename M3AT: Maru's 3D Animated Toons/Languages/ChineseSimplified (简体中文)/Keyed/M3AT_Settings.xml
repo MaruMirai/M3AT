@@ -101,6 +101,8 @@
   <M3AT_RetexturedWeaponModelsTip>即使其他模组（如 Combat Extended 或材质包）给游戏原版武器换了新贴图或移除了其模型，仍显示 IsoRim 的 3D 模型。模型会与新贴图对齐，但保持自己的形状，因此重绘差异很大的武器可能对不上。其他模组的武器交给 IsoRim 处理。关闭：由 IsoRim 决定，重绘贴图的武器显示为贴图。需要开启 IsoRim 的"武器使用 3D 模型"设置。对地上的武器，关闭此窗口后生效。</M3AT_RetexturedWeaponModelsTip>
   <M3AT_WeaponSizes>武器尺寸</M3AT_WeaponSizes>
   <M3AT_WeaponSizeTip>此类武器在小人手中或身上的大小，相对于同一武器放在地上时（默认 {0}）。100% 即 IsoRim 在地上绘制它的大小。</M3AT_WeaponSizeTip>
+  <M3AT_SlabScale>按贴图绘制的武器</M3AT_SlabScale>
+  <M3AT_SlabScaleTip>没有 3D 模型的武器（多数其他模组的武器，或关闭 IsoRim 武器模型时的所有武器）会以从贴图切出的扁平板绘制，比 3D 模型显得更长。此项将其缩小以与模型相称（默认 {0}）。</M3AT_SlabScaleTip>
   <M3AT_ResetWeaponSizes>重置武器尺寸</M3AT_ResetWeaponSizes>
   <M3AT_Performance>性能</M3AT_Performance>
   <M3AT_GpuSkinning>在显卡上计算动画</M3AT_GpuSkinning>

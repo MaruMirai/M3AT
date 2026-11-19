@@ -686,6 +686,7 @@ namespace M3AT
                 case "bows": return BowTest(null);
                 case "weaponkinds": return WeaponKindsTest();
                 case "retextured": return RetexturedTest();
+                case "slabsizes": return SlabSizesTest();
                 case "standins": return StandInsTest();
                 case "tendbed": return TendBedTest();
                 case "feed": return FeedTest(null);
@@ -717,6 +718,12 @@ namespace M3AT
             if (name.StartsWith("weapons_"))
             {
                 return BowRun(WeaponsNamed(name.Substring("weapons_".Length).Split('+')), false);
+            }
+            // slabweapons_<names>: the same with IsoRim's weapon models off, every weapon its sprite's slab, at the
+            // slabScale option (M3AT_SLAB_SCALE sets it for the run), to compare with the models' pictures.
+            if (name.StartsWith("slabweapons_"))
+            {
+                return WithSlabScale(WithoutWeaponModels(BowRun(WeaponsNamed(name.Substring("slabweapons_".Length).Split('+')), false)));
             }
             if (name.StartsWith("bows_"))
             {
@@ -5310,6 +5317,29 @@ namespace M3AT
             return found;
         }
 
+        // Runs a scenario with the slabScale option at M3AT_SLAB_SCALE if that is set (put back after; never written to disk).
+        private static IEnumerator WithSlabScale(IEnumerator inner)
+        {
+            float was = SettingsMod.Settings.slabScale, set;
+            string env = Environment.GetEnvironmentVariable("M3AT_SLAB_SCALE");
+            if (env != null && float.TryParse(env, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out set))
+            {
+                SettingsMod.Settings.slabScale = set;
+            }
+            Note("Sprite slabs at " + SettingsMod.Settings.slabScale.ToString("F2") + " of their type's size.");
+            try
+            {
+                while (inner.MoveNext())
+                {
+                    yield return inner.Current;
+                }
+            }
+            finally
+            {
+                SettingsMod.Settings.slabScale = was;
+            }
+        }
+
         // Runs a scenario with IsoRim's weapon models off (its setting, put back after; never written to disk).
         private static IEnumerator WithoutWeaponModels(IEnumerator inner)
         {
@@ -5601,6 +5631,76 @@ namespace M3AT
             Check("official weapons found", official > 0, official.ToString());
             Check("every weapon bound by its own name has its model with the option on, and the option off never adds one",
                 wrong.Count == 0, string.Join("; ", wrong));
+        }
+
+        // slabsizes: no pawn. Every weapon of the game's own with an IsoRim model, not thrown: how long its model is drawn held
+        // against how long its sprite's slab would be at the same type size, to set the slab's own scale (slabScale). The
+        // held size is the type's over the weapon's GroundRatio for a model and over 1 for a slab, so a slab is drawn as
+        // long as its art while the model is fitted to the art and then shrunk by the ratio. Each weapon's "match" is the
+        // slab scale that would draw its slab as long as its model: its model's length over the ratio, over its art's,
+        // for the art drawn now (another mod's, Combat Extended's, where it supplies one) and the game's own.
+        private static IEnumerator SlabSizesTest()
+        {
+            yield return WaitReal(1f);
+            Dictionary<string, List<float>> nowByType = new Dictionary<string, List<float>>(), ownByType = new Dictionary<string, List<float>>();
+            List<float> allNow = new List<float>(), allOwn = new List<float>(), allNowOther = new List<float>();
+            foreach (ThingDef def in DefDatabase<ThingDef>.AllDefsListForReading)
+            {
+                if (!def.IsWeapon || def.equipmentType != EquipmentType.Primary || def.graphicData == null || def.destroyOnDrop
+                    || def.modContentPack == null || !def.modContentPack.IsOfficialMod || !def.IsWithinCategory(ThingCategoryDefOf.Weapons)
+                    || WalkFigures.AutoThrown(def))
+                {
+                    continue;
+                }
+                Thing thing = ThingMaker.MakeThing(def, def.MadeFromStuff ? GenStuff.DefaultStuffFor(def) : null);
+                float ratio, model, now, own;
+                string type;
+                if (!WalkFigures.AutoSlabMeasure(thing, out ratio, out model, out now, out own, out type))
+                {
+                    continue;
+                }
+                float matchNow = now > 0f ? model / ratio / now : 0f, matchOwn = own > 0f ? model / ratio / own : 0f;
+                Note(def.defName + " (" + type + "): model " + model.ToString("F2") + " cells fitted, ground ratio " + ratio.ToString("F2")
+                    + ", art now " + now.ToString("F2") + ", game's art " + own.ToString("F2") + "; slab scale to match: "
+                    + matchNow.ToString("F2") + " (art now), " + matchOwn.ToString("F2") + " (game's art)");
+                if (matchNow > 0f)
+                {
+                    allNow.Add(matchNow);
+                    if (!nowByType.ContainsKey(type)) nowByType[type] = new List<float>();
+                    nowByType[type].Add(matchNow);
+                    if (Mathf.Abs(now - own) > 0.01f)
+                    {
+                        allNowOther.Add(matchNow);
+                    }
+                }
+                if (matchOwn > 0f)
+                {
+                    allOwn.Add(matchOwn);
+                    if (!ownByType.ContainsKey(type)) ownByType[type] = new List<float>();
+                    ownByType[type].Add(matchOwn);
+                }
+            }
+            Note("All: slab scale to match, art now " + Spread(allNow) + "; game's art " + Spread(allOwn)
+                + "; only those whose art another mod changed " + Spread(allNowOther));
+            foreach (KeyValuePair<string, List<float>> t in nowByType)
+            {
+                Note("  " + t.Key + ": art now " + Spread(t.Value) + "; game's art " + Spread(ownByType.ContainsKey(t.Key) ? ownByType[t.Key] : new List<float>()));
+            }
+            Check("weapons with models measured", allNow.Count > 0, allNow.Count.ToString());
+        }
+
+        // A list's median and quartiles, as "median 0.73 (0.70 .. 0.76, n 20)".
+        private static string Spread(List<float> v)
+        {
+            if (v.Count == 0)
+            {
+                return "none";
+            }
+            List<float> s = new List<float>(v);
+            s.Sort();
+            Func<float, float> at = q => s[Mathf.Clamp(Mathf.RoundToInt(q * (s.Count - 1)), 0, s.Count - 1)];
+            return "median " + at(0.5f).ToString("F2") + " (" + at(0.25f).ToString("F2") + " .. " + at(0.75f).ToString("F2")
+                + ", n " + s.Count + ")";
         }
 
         private static IEnumerator WeaponKindsTest()
@@ -7014,6 +7114,39 @@ namespace M3AT
         internal static bool AutoShowsModel(Thing weapon)
         {
             return ShowsModel(weapon);
+        }
+
+        // For slabsizes: a weapon's GroundRatio, its model's length as fitted to its sprite (cells, at a scale of 1), its art's
+        // length as drawn now and the game's own art's (cells), and its type. False with no model to fit.
+        internal static bool AutoSlabMeasure(Thing weapon, out float ratio, out float model, out float now, out float own, out string type)
+        {
+            ratio = model = now = own = 0f;
+            type = TypeOf(weapon.def);
+            IsoRim.ThingModelInfo info;
+            WeaponFit.Hold h;
+            if (!HeldModel(weapon, out info, out h))
+            {
+                return false;
+            }
+            Vector3[] soup = WeaponFit.SoupOf(info.Model);
+            if (soup == null || soup.Length == 0)
+            {
+                return false;
+            }
+            Graphic g = weapon.Graphic;
+            Matrix4x4 drawn = Matrix4x4.Scale(new Vector3(g.drawSize.x, g.drawSize.y, 1f)) * h.slab;
+            float least = float.MaxValue, most = float.MinValue;
+            for (int i = 0; i < soup.Length; i++)
+            {
+                least = Mathf.Min(least, soup[i].x);
+                most = Mathf.Max(most, soup[i].x);
+            }
+            model = (most - least) * ((Vector3)drawn.GetColumn(0)).magnitude;
+            ratio = GroundRatio(weapon);
+            Material mat = g.MatSingleFor(weapon);
+            now = ArtLengthOf(mat, g.drawSize, weapon.def.equippedAngleOffset);
+            own = ArtLengthOf(FitArt(weapon.def, mat), g.drawSize, weapon.def.equippedAngleOffset);
+            return true;
         }
 
         internal static bool AutoThrown(ThingDef def)

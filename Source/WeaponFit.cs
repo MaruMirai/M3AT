@@ -47,7 +47,7 @@ namespace M3AT
 
         // The model's faces as a triangle soup (three corners a face, model space): the solid ones of IsoRim's ready meshes of
         // it (Api.ModelParts), whose corners are the model's own. Read once per model; null for one with none.
-        private static Vector3[] SoupOf(ModelHandle m)
+        internal static Vector3[] SoupOf(ModelHandle m)
         {
             Vector3[] soup;
             if (soups.TryGetValue(m, out soup))

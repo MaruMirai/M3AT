@@ -99,6 +99,13 @@ namespace M3AT
         // (WalkFigures.ScaleOf, over each weapon's WalkFigures.GroundRatio); a type not in it keeps the export's. Saved
         // under a new name, as the old one was a share of the sprite.
         public Dictionary<string, float> weaponScales = new Dictionary<string, float>();
+        // A weapon drawn as its sprite's slab rather than IsoRim's model (another mod's weapon with no model, or models off),
+        // a share of the size the type's slider gives it (WalkFigures.ScaleOf). The slab is as long as the sprite, but
+        // IsoRim lays its models on the ground at about 0.7 of their sprite (WalkFigures.GroundRatio), so at the same type
+        // size a slab came out about 1.4 times as long as a model: the game's guns' models match their slabs at 0.59 ..
+        // 0.74 (median 0.71; 0.66 on Combat Extended's art), by the autotest's slabsizes.
+        public float slabScale = DefaultSlabScale;
+        public const float DefaultSlabScale = 0.7f;
 
         public override void ExposeData()
         {
@@ -176,6 +183,7 @@ namespace M3AT
             Scribe_Values.Look(ref freecamScrollSpeed, "freecamScrollSpeed", DefaultFreecamScrollSpeed);
             Scribe_Values.Look(ref freecamFov, "freecamFov", DefaultFreecamFov);
             Scribe_Values.Look(ref freecamCutaway, "freecamCutaway", false);
+            Scribe_Values.Look(ref slabScale, "slabScale", DefaultSlabScale);
             Scribe_Collections.Look(ref weaponScales, "weaponGroundScales", LookMode.Value, LookMode.Value);
             if (weaponScales == null)
             {
@@ -195,6 +203,7 @@ namespace M3AT
         private const float SizeLeast = 0.5f, SizeMost = 1.5f;
         private const float WeaponStep = 0.05f;   // the weapon size sliders' steps
         private const float WeaponLeast = 0.25f, WeaponMost = 2f;   // against the ground
+        private const float SlabLeast = 0.3f, SlabMost = 1.2f;   // a sprite slab's share of its type's size
         private const float HairDetailStep = 0.05f, HairDetailLeast = 0.05f;   // up to all of it
         private const float FlingPowerStep = 0.25f, FlingPowerLeast = 0.25f, FlingPowerMost = 5f;   // of the standard distance
         private const float SubOptionIndent = 24f;   // how far in, px, the options a checkbox shows are set
@@ -598,9 +607,13 @@ namespace M3AT
                         Settings.weaponScales.Remove(type.Key);
                     }
                 }
+                Settings.slabScale = Mathf.Round(Slider(list, "M3AT_SlabScale".Translate(), Settings.slabScale.ToStringPercent(),
+                    Settings.slabScale, SlabLeast, SlabMost, "M3AT_SlabScaleTip".Translate(Settings.DefaultSlabScale.ToStringPercent()))
+                    / WeaponStep) * WeaponStep;
                 if (list.ButtonText("M3AT_ResetWeaponSizes".Translate()))
                 {
                     Settings.weaponScales.Clear();
+                    Settings.slabScale = Settings.DefaultSlabScale;
                 }
             }
         }
