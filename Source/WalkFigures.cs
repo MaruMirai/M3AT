@@ -284,8 +284,12 @@ namespace M3AT
         private const float KneelLow = 0.3f;   // cells, at size 1: how high a joint of the kneel may be and still be on the ground
         private const float KneelClear = 0.14f;   // cells, at size 1: how near one of its joints may come to one of theirs
         private const float ChestInset = 0.1f;   // cells, at size 1: how far out from their chest's middle its hands go (on its near side)
+        private const float HoldLetGo = 2f;   // cells per real second: how fast besideHold goes back to none once it is not walking up to them or kneeling there
+        private const float CameAcross = 0.3f;   // by a patient in a bed on the ground (a sleeping spot): how far across their body the way it came in must point for it to kneel on that side (of 1)
         private const float VisitBack = 0.4f;    // cells, at size 1: how much further out a visitor sat beside them puts its hands (on its knees), as it sits back to talk rather than reaching to tend
         private const int KneelWays = 24;   // the ways round the chest it looks at
+        private static readonly float[] KneelOut = { 0f, 0.1f, 0.2f, 0.3f };   // cells, at size 1: how much further out a visitor (KneelBeside's back) may sit, to keep off limbs reaching out that way; a doctor's hands must reach the body
+        private const float KneelOutCost = 1.5f;   // of kneeling a cell further out
         private const float KneelOverlap = 100f;   // the cost of a joint (cells into the clearance, squared)
         private const float KneelSquare = 0.3f;   // of kneeling along the body rather than square to it
         private const float KneelKeep = 0.4f;   // of turning right round from the way it kneels already
@@ -659,6 +663,7 @@ namespace M3AT
             public Vector3 walkedFrom;   // where it was last drawn (true cells), for cameWay
             public Vector3? cameWay;   // the way it last walked (flat, a unit): someone it tends on the ground is tended from that side
             public Vector3? workBeside;   // working on someone lying on the ground: where it is drawn, kneeling beside them (true cells)
+            public Vector3 besideHold;   // walking up to kneel by them: how far it is drawn back from where it is (true cells, flat), so it stops short of the body (ApproachBeside)
             public int flashShot = -1;   // the LastShotTick of the last shot it flashed for (MuzzleFlash)
             public float flashAt = -99f;   // and when that flash began (real seconds)
             public bool dollSaved;   // it is at rest, and kept with the map (RagdollRests)
@@ -2299,6 +2304,22 @@ namespace M3AT
                 else
                 {
                     e.work = recent ? Mathf.MoveTowards(e.work, 0f, WorkEase * Time.deltaTime) : 0f;
+                }
+                // Walking up to kneel by someone lying: drawn no further along the way it walks than where it will kneel,
+                // kept so while it kneels there, then let go of.
+                Vector3? approach = skin != null && workKind == null ? ApproachBeside(pawn) : null;
+                if (approach.HasValue && e.cameWay.HasValue)
+                {
+                    Vector3 real = pawn.DrawPos;
+                    real.y = 0f;
+                    Vector3 to = approach.Value;
+                    to.y = 0f;
+                    float past = Vector3.Dot(real - to, e.cameWay.Value);
+                    e.besideHold = past > 0f ? -e.cameWay.Value * past : Vector3.zero;
+                }
+                else if (workKind == null || !workBeside.HasValue)
+                {
+                    e.besideHold = recent ? Vector3.MoveTowards(e.besideHold, Vector3.zero, HoldLetGo * Time.deltaTime) : Vector3.zero;
                 }
                 // Cooking: stirring the pot now and then in place of the bench or ground work, once at it.
                 e.stirClip = skin != null && workKind != null ? StirOf(pawn, workKind) : null;
@@ -4418,7 +4439,7 @@ namespace M3AT
         // Trial only: feeding a patient played with the taming clips (FeedPatient in WorkOf).
         internal static readonly bool FeedAsTame = Environment.GetEnvironmentVariable("M3AT_FEED_TAME") == "1";
 
-        private static string WorkOf(Pawn pawn, out float face, out Vector3? beside, bool coming = false)
+        private static string WorkOf(Pawn pawn, out float face, out Vector3? beside, bool coming = false, bool approaching = false)
         {
             beside = null;
             face = 0f;
@@ -4434,7 +4455,7 @@ namespace M3AT
             string play = job != null ? PlaysByBaby(pawn) : null;
             bool music = job != null && pawn.jobs != null && (pawn.jobs.curDriver is JobDriver_PlayMusicalInstrument || PlaysForLover(pawn));
             bool chalk = Floordrawing(pawn);
-            if (job == null || job.def == null || (!vomit && !meditate && play == null && !music && !chalk && !WorkAnimations) || (!coming && pawn.pather != null && pawn.pather.Moving))
+            if (job == null || job.def == null || (!vomit && !meditate && play == null && !music && !chalk && !WorkAnimations) || (!coming && !approaching && pawn.pather != null && pawn.pather.Moving))
             {
                 return null;
             }
@@ -4733,6 +4754,18 @@ namespace M3AT
                     // (off a bed or sleeping spot, from the side it came: drawn as if it knelt in the cell it came in from,
                     // though the game has often walked it on into the patient's own)
                     Vector3? came = on.CurrentBed() == null && mine != null ? mine.cameWay : null;
+                    if (on.CurrentBed() != null && mine != null && mine.cameWay.HasValue && lying != null)
+                    {
+                        // (in a bed on the ground, a sleeping spot or bedroll: on the side of the body it came in from, the way
+                        // it came taken across the body, as the game often walks it on over them to the far side; coming in
+                        // from the head or foot end, as before, by where it is)
+                        Vector3 across = mine.cameWay.Value - lying.lyingAlong * Vector3.Dot(mine.cameWay.Value, lying.lyingAlong);
+                        across.y = 0f;
+                        if (across.magnitude >= CameAcross)
+                        {
+                            came = across.normalized;
+                        }
+                    }
                     // Tended (or fed, or anything else done for them but stripping) downed on the ground: laid on their back
                     // to be seen to, as on a sleeping spot (OnBack), rather than curled on their side, where the doctor knelt
                     // over their head and shoulders. Its knees are then kept off the body as it lies once it has turned.
@@ -4839,12 +4872,27 @@ namespace M3AT
             return true;
         }
 
+        // Walking up to kneel by someone lying on the ground (to tend, feed or visit them): where it will be drawn kneeling
+        // (KneelBeside), worked out on the way, or null. The game often walks it on over the body to a cell on the far side
+        // or onto their own, so it is drawn stopped short of that place (besideHold) rather than walking through them and
+        // sliding back as it sets to work.
+        private static Vector3? ApproachBeside(Pawn pawn)
+        {
+            if (pawn.pather == null || !pawn.pather.Moving)
+            {
+                return null;
+            }
+            float face;
+            Vector3? beside;
+            return WorkOf(pawn, out face, out beside, false, true) != null ? beside : null;
+        }
+
         // Where a pawn working on someone lying on the ground is drawn (true cells, flat) and the way it faces: kneeling
         // with its hands (the clip's, first frame) on the near side of their chest, out from it on whichever way round
         // (KneelWays of them) leaves its knees and feet (the clip's joints below KneelLow) clearest of the body as drawn,
         // their arms and legs included, as a body lying on its side or limp has them well off its line. Given came (the
         // way it walked up), only ways within KneelCameSpread of the side it came from, the nearest that side liked
-        // best; then square to the body, then the way it kneels already (so it doesn't hop about as the body breathes),
+        // best (with back, further out by one of KneelOut if limbs reach out that way, at KneelOutCost); then square to the body, then the way it kneels already (so it doesn't hop about as the body breathes),
         // and without came, the side of the body it is on. back (cells at size 1) puts the hands that much further out, for
         // a clip whose hands don't reach for the body (a visitor sat with them on its knees, VisitBack).
         private static Vector3 KneelBeside(Pawn pawn, string clip, Ease lying, Ease mine, int whom, Vector3? came, out float face, float back = 0f, float bodyInset = -1f)
@@ -4870,46 +4918,49 @@ namespace M3AT
                     continue;   // (only round about the side it came from)
                 }
                 Quaternion turned = Quaternion.AngleAxis((-way).AngleFlat(), Vector3.up);
-                Vector3 at = chest + way * inset - turned * hands;
-                at.y = 0f;
-                float cost = 0f;
-                for (int k = 0; k < KneelBones.Length; k++)
+                for (int o = 0; o < (back > 0f ? KneelOut.Length : 1); o++)   // (only a visitor, whose hands are on its own knees)
                 {
-                    Vector3 joint = skin.HeadOf(clip, KneelBones[k]);
-                    if (joint.y > KneelLow)
+                    Vector3 at = chest + way * (inset + KneelOut[o] * lying.lyingSize) - turned * hands;
+                    at.y = 0f;
+                    float cost = KneelOut[o] * KneelOutCost;
+                    for (int k = 0; k < KneelBones.Length; k++)
                     {
-                        continue;
-                    }
-                    Vector3 w = at + turned * (joint * size);
-                    for (int j = 0; j < lying.lyingJoints.Length; j++)
-                    {
-                        Vector3 q = lying.lyingJoints[j] - w;
-                        q.y = 0f;
-                        float into = clear - q.magnitude;
-                        if (into > 0f)
+                        Vector3 joint = skin.HeadOf(clip, KneelBones[k]);
+                        if (joint.y > KneelLow)
                         {
-                            cost += into * into * KneelOverlap;
+                            continue;
+                        }
+                        Vector3 w = at + turned * (joint * size);
+                        for (int j = 0; j < lying.lyingJoints.Length; j++)
+                        {
+                            Vector3 q = lying.lyingJoints[j] - w;
+                            q.y = 0f;
+                            float into = clear - q.magnitude;
+                            if (into > 0f)
+                            {
+                                cost += into * into * KneelOverlap;
+                            }
                         }
                     }
-                }
-                cost += Mathf.Abs(Vector3.Dot(way, along)) * KneelSquare;
-                if (kept.HasValue)
-                {
-                    cost += Vector3.Angle(way, kept.Value) / 180f * KneelKeep;
-                }
-                if (came.HasValue)
-                {
-                    cost += offCame / 180f * KneelCame;
-                }
-                else if (from.sqrMagnitude > 0.0025f)
-                {
-                    cost += Vector3.Angle(way, from) / 180f * KneelNear;
-                }
-                if (cost < best)
-                {
-                    best = cost;
-                    bestWay = way;
-                    bestAt = at;
+                    cost += Mathf.Abs(Vector3.Dot(way, along)) * KneelSquare;
+                    if (kept.HasValue)
+                    {
+                        cost += Vector3.Angle(way, kept.Value) / 180f * KneelKeep;
+                    }
+                    if (came.HasValue)
+                    {
+                        cost += offCame / 180f * KneelCame;
+                    }
+                    else if (from.sqrMagnitude > 0.0025f)
+                    {
+                        cost += Vector3.Angle(way, from) / 180f * KneelNear;
+                    }
+                    if (cost < best)
+                    {
+                        best = cost;
+                        bestWay = way;
+                        bestAt = at;
+                    }
                 }
             }
             if (mine != null)
@@ -8395,10 +8446,16 @@ namespace M3AT
                 else if (ease.workBeside.HasValue && ease.shownWork > 0f)
                 {
                     // Working on someone lying on the ground: drawn kneeling beside them, its hands on their chest, as the
-                    // game often stands it on their own cell, over their middle.
+                    // game often stands it on their own cell, over their middle; from where it was held walking up.
                     Vector3 beside = ease.workBeside.Value;
-                    at.x = Mathf.Lerp(at.x, beside.x, ease.shownWork);
-                    at.z = Mathf.Lerp(at.z, beside.z, ease.shownWork);
+                    at.x = Mathf.Lerp(at.x + ease.besideHold.x, beside.x, ease.shownWork);
+                    at.z = Mathf.Lerp(at.z + ease.besideHold.z, beside.z, ease.shownWork);
+                }
+                else if (ease.besideHold.sqrMagnitude > 1e-6f)
+                {
+                    // Walking up to kneel by them, stopped short of the body (ApproachBeside), or letting go of that.
+                    at.x += ease.besideHold.x;
+                    at.z += ease.besideHold.z;
                 }
                 ease.drawnAt = at;
                 if (!lying && !bedding && !seated && flight < 0f && swim <= 0f && lift <= 0f && duck <= 0f)
