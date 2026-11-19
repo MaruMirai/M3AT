@@ -64,6 +64,23 @@ namespace M3AT
         private static IntVec3 middle;
         private static Map map;
         private static Process recorder;
+        // Rendered videos (the default video mode; -m3atTestScreen records the screen instead): the game stepped a tick at a
+        // time with exactly a tick of frame time (Time.maximumDeltaTime, which caps Time.deltaTime, at 1/60 s), so the game
+        // ticks once and whatever runs on frame time (eases, ragdolls, a draw from the holster) moves a tick's worth, then
+        // frozen (paused, the cap at 0) while IsoRim's scene image of it comes back, whose pixels go to ffmpeg. Smooth
+        // whatever the frame rate, at the cost of running slower than the game would.
+        private static bool screen;
+        private static int ticksPerFrame = 2;   // game ticks a video frame (2: 30 frames a second)
+        private static string renderFile;   // the video being rendered, ffmpeg started on its first picture
+        private static Process renderer;
+        private static int renderWidth, renderHeight, renderFrames;
+        private static readonly Stopwatch renderTickTime = new Stopwatch(), renderWaitTime = new Stopwatch(), renderWriteTime = new Stopwatch();
+        private static int renderWaitFrames;
+        private static float maxDeltaWas = -1f;   // Time.maximumDeltaTime as the game had it, put back after a render
+        private const float TickSeconds = 1f / 60f;
+        private const int RenderWidth = 1600, RenderHeight = 900;   // a rendered video's size (CaptureView)
+        private static string recordPending;   // the scenario whose recording starts on its first game tick (StartRecording)
+        private static List<Pawn> heldAway = new List<Pawn>();   // the map's colonists HoldOthersAway sent off, let go after
 
         static AutoTest()
         {
@@ -74,6 +91,8 @@ namespace M3AT
             }
             wanted = new List<string>(which == "all" ? All : which.Split(','));
             video = GenCommandLine.CommandLineArgPassed("m3atTestVideo");
+            screen = GenCommandLine.CommandLineArgPassed("m3atTestScreen");
+            ticksPerFrame = Math.Min(6, Math.Max(1, IntArg("m3atTestTicksPerFrame", 2)));
             quit = GenCommandLine.CommandLineArgPassed("m3atTestQuit");
             string dir;
             if (!GenCommandLine.TryGetCommandLineArg("m3atTestOut", out dir) || string.IsNullOrEmpty(dir))
@@ -658,6 +677,7 @@ namespace M3AT
                 case "drugs": return DrugsTest();
                 case "visit": return VisitTest();
                 case "talk": return TalkTest();
+                case "talkvariants": return TalkVariantsTest();
                 case "chat": return ChatTest();
                 case "music": return MusicTest();
                 case "rolljoint": return RollJointTest();
@@ -668,6 +688,8 @@ namespace M3AT
                 case "cook": return CookTest();
                 case "teach": return TeachTest();
                 case "floordraw": return FloordrawTest();
+                case "mine": return MineTest();
+                case "tools": return ToolsTest();
                 case "tail": return TailTest();
                 case "romance": return RomanceTest(null);
                 case "readroom": return ReadRoomTest();
@@ -1786,6 +1808,198 @@ namespace M3AT
             Note("Look: the child knelt on its cell edge facing the drawing, the left palm propped on the floor, the chalk upright in its right fist, the tip on the floor scribbling loops and sweeping side to side, lifted once a loop; the head bowed to it.");
         }
 
+        // A colonist mining a block of granite in the next cell north (JobDriver_Mine), checking it plays work_pickaxe (the
+        // mocap mining stroke, walk.pick_at), and pictured through one stroke, timed from the game's own count to its next
+        // strike (ticksToPickHit, which WalkFigures.PickPhase plays the stroke by), the point meant to go in on the strike.
+        private static IEnumerator MineTest()
+        {
+            ThingDef granite = DefDatabase<ThingDef>.GetNamedSilentFail("Granite");
+            if (granite == null)
+            {
+                Check("mine", false, "no Granite def");
+                yield break;
+            }
+            ClearPatch();
+            Thing rock = Spawn(ThingMaker.MakeThing(granite), middle + IntVec3.North);
+            map.designationManager.AddDesignation(new Designation(rock, DesignationDefOf.Mine));
+            Pawn miner = NewPawn(middle, null);
+            miner.skills.GetSkill(SkillDefOf.Mining).Level = 5;   // (a strike about every 2.6 s, near the stroke's own length)
+            HoldOthersAway(miner);
+            Job job = JobMaker.MakeJob(JobDefOf.Mine, rock, 20000, true);
+            job.playerForced = true;
+            miner.jobs.StartJob(job, JobCondition.InterruptForced);
+            Look(miner, 270f);
+            lookDistance = 4f;
+            lookHeight = 0.5f;
+            Func<int> until = () => miner.jobs.curDriver is JobDriver_Mine d ? Traverse.Create(d).Field("ticksToPickHit").GetValue<int>() : -1;
+            string kind = null;
+            float shown = 0f;
+            for (int i = 0; i < 20; i++)
+            {
+                yield return Ticks(10, "mine", miner);
+                string k = Field<string>(miner, "workKind");
+                if (k != null && Field<float>(miner, "work") > 0.5f)
+                {
+                    kind = k;
+                }
+                shown = Mathf.Max(shown, Field<float>(miner, "work"));
+            }
+            Check("mining with the pick", kind == "pickaxe" && miner.CurJobDef == JobDefOf.Mine,
+                  "work kind " + (kind ?? "none") + ", work " + shown.ToString("F2") + ", job " + (miner.CurJobDef != null ? miner.CurJobDef.defName : "none"));
+            // Up to a strike (the count runs out and starts again), then one whole stroke in eighths.
+            int last = until(), period = 0;
+            for (int i = 0; i < 1200 && period == 0; i++)
+            {
+                yield return Ticks(1, "mine", miner);
+                int now = until();
+                if (now > last)
+                {
+                    period = now + 1;
+                }
+                last = now;
+            }
+            Check("the game strikes the rock", period > 0, "ticksToPickHit " + last);
+            if (period > 0)
+            {
+                Note("strikes every " + period + " ticks; pictures at eighths of the stroke after one, `hit` on the strike");
+                int step = Mathf.Max(1, period / 8);
+                for (int at = step; at <= period; at += step)
+                {
+                    yield return Ticks(step, "mine", miner);
+                    yield return Shot(until() > period - step ? "hit" : "t" + at);
+                }
+                // And on the very tick of the next strike, where the point should be in the rock's face.
+                last = until();
+                for (int i = 0; i < period + 5; i++)
+                {
+                    yield return Ticks(1, "mine", miner);
+                    int now = until();
+                    if (now > last)
+                    {
+                        yield return Shot("strike");
+                        break;
+                    }
+                    last = now;
+                    if (now == 2)
+                    {
+                        yield return Shot("strike_less2");
+                    }
+                }
+            }
+            if (video)
+            {
+                yield return Ticks(600, "mine", miner);   // (more strokes to watch)
+            }
+            miner.jobs.EndCurrentJob(JobCondition.InterruptForced);
+            lookDistance = LookDistance;
+            lookHeight = LookHeight;
+            Note("Look: the pick resting low beside the right foot, swung back behind, then over the right shoulder into the rock's face ahead at about head height, the point going in on `hit`, then brought back round and let down to rest; facing the rock at the blow; both hands round the handle, the right above the left; the pick clear of the head.");
+        }
+
+        // The other tool strokes from Maru's tracker takes (walk.TOOL_TAKES): a colonist felling a grown oak in the next
+        // cell (CutPlant: the axe) and one sowing potatoes in a growing zone (Sow: the spade's dig), each checked for its work
+        // kind and pictured through a few strokes.
+        private static IEnumerator ToolsTest()
+        {
+            ThingDef oak = DefDatabase<ThingDef>.GetNamedSilentFail("Plant_TreeOak");
+            ThingDef potato = DefDatabase<ThingDef>.GetNamedSilentFail("Plant_Potato");
+            if (oak == null || potato == null)
+            {
+                Check("tools", false, "no Plant_TreeOak or Plant_Potato");
+                yield break;
+            }
+            ClearPatch();
+            Plant tree = (Plant)Spawn(ThingMaker.MakeThing(oak), middle + IntVec3.North);
+            tree.Growth = 1f;
+            Pawn feller = NewPawn(middle, null);
+            HoldOthersAway(feller);
+            Job chop = JobMaker.MakeJob(JobDefOf.CutPlant, tree);
+            chop.playerForced = true;
+            feller.jobs.StartJob(chop, JobCondition.InterruptForced);
+            Look(feller, 270f);
+            lookDistance = 4f;
+            lookHeight = 0.5f;
+            string kind = null;
+            int steps = video ? 50 : 12;   // (in a video about 8 s of chopping to watch)
+            for (int i = 0; i < steps; i++)
+            {
+                yield return Ticks(10, "chop", feller);
+                string k = Field<string>(feller, "workKind");
+                if (k != null && Field<float>(feller, "work") > 0.5f)
+                {
+                    kind = k;
+                }
+                if (i >= 6)
+                {
+                    yield return Shot("chop_" + i);
+                }
+            }
+            Check("felling with the axe", kind == "axe", "work kind " + (kind ?? "none") + ", job " + (feller.CurJobDef != null ? feller.CurJobDef.defName : "none"));
+            feller.jobs.EndCurrentJob(JobCondition.InterruptForced);
+            feller.DeSpawn();
+            if (!tree.Destroyed)
+            {
+                tree.Destroy();
+            }
+
+            ClearPatch();
+            IntVec3 cell = middle + IntVec3.North;
+            // A row of five cells, so a video can watch it sow one after another (each takes the game a couple of seconds).
+            List<IntVec3> row = new List<IntVec3>();
+            for (int dx = -2; dx <= 2; dx++)
+            {
+                row.Add(cell + new IntVec3(dx, 0, 0));
+            }
+            Zone_Growing zone = new Zone_Growing(map.zoneManager);
+            map.zoneManager.RegisterZone(zone);
+            foreach (IntVec3 c in row)
+            {
+                floors.Add(new KeyValuePair<IntVec3, TerrainDef>(c, c.GetTerrain(map)));
+                map.terrainGrid.SetTerrain(c, TerrainDefOf.Soil);
+                zone.AddCell(c);
+            }
+            zone.SetPlantDefToGrow(potato);
+            Pawn sower = NewPawn(middle, null);
+            HoldOthersAway(sower);
+            sower.skills.GetSkill(SkillDefOf.Plants).Level = 10;
+            Job sow = JobMaker.MakeJob(JobDefOf.Sow, cell);
+            sow.plantDefToSow = potato;
+            sow.playerForced = true;
+            sower.jobs.StartJob(sow, JobCondition.InterruptForced);
+            Look(sower, 270f);
+            kind = null;
+            for (int i = 0; i < steps; i++)
+            {
+                if (sower.CurJobDef != JobDefOf.Sow)
+                {
+                    IntVec3 next = row.Find(c => c.GetPlant(map) == null);
+                    if (next.IsValid && next != IntVec3.Zero)
+                    {
+                        Job again = JobMaker.MakeJob(JobDefOf.Sow, next);
+                        again.plantDefToSow = potato;
+                        again.playerForced = true;
+                        sower.jobs.StartJob(again, JobCondition.InterruptForced);
+                    }
+                }
+                yield return Ticks(10, "sow", sower);
+                string k = Field<string>(sower, "workKind");
+                if (k != null && Field<float>(sower, "work") > 0.5f)
+                {
+                    kind = k;
+                }
+                if (i >= 6)
+                {
+                    yield return Shot("sow_" + i);
+                }
+            }
+            Check("sowing with the spade", kind == "dig", "work kind " + (kind ?? "none") + ", job " + (sower.CurJobDef != null ? sower.CurJobDef.defName : "none"));
+            sower.jobs.EndCurrentJob(JobCondition.InterruptForced);
+            zone.Delete();
+            lookDistance = LookDistance;
+            lookHeight = LookHeight;
+            Note("Look: the axe swung over the right shoulder and level into the trunk ahead at about waist height; the spade driven into the ground ahead, levered, lifted out in front and let down again, the right hand at its top; both hands round each handle, the right above, the thumbs toward the head.");
+        }
+
         // A child with each cat tail gene knelt stooped over its chalk drawing (the pluck kneel, bent forward from the hips),
         // seen from behind and the side, to see the tail stays on the skin over the tailbone (CatTail.cs, OnSkin).
         private static IEnumerator TailTest()
@@ -1964,6 +2178,52 @@ namespace M3AT
 
         // Drunk: a pawn given AlcoholHigh as hammered swaying standing, then weaving as it walks off (DrunkOf, Ease.drunk,
         // Ease.weave).
+        // Each talk variant (talk, talk~2, ...) played on the same pawn stood in the same place under the same camera, one
+        // video each (talkvariants_1.mp4 ...), to compare them: eased in from standing, played through twice from its start,
+        // eased out (WalkFigures.TalkTestPawn/TalkTestClip in place of a job that talks).
+        private static IEnumerator TalkVariantsTest()
+        {
+            ClearPatch();
+            Pawn pawn = NewPawn(middle, null);
+            Hold(pawn);
+            HoldOthersAway(pawn);
+            pawn.Rotation = Rot4.South;
+            Look(pawn, 25f);
+            lookAt = pawn.DrawPos;
+            // (close, the whole figure in the frame, a little above its middle, looking down a little)
+            float pitchWas = lookPitch, distanceWas = lookDistance, heightWas = lookHeight;
+            lookPitch = 20f;
+            lookDistance = 3.2f;
+            lookHeight = 0.6f;
+            yield return WaitReal(3f);
+            int played = 0;
+            for (int n = 1; n <= 9; n++)
+            {
+                string clip = n == 1 ? "talk" : "talk~" + n;
+                if (!WalkFigures.AutoHas(clip))
+                {
+                    break;
+                }
+                float seconds = WalkFigures.AutoClipSeconds(clip);
+                StopRenderer();
+                StartRecording("talkvariants_" + n);
+                WalkFigures.TalkTestPawn = pawn.thingIDNumber;
+                WalkFigures.TalkTestClip = clip;
+                WalkFigures.AutoTalkAfresh(pawn);
+                yield return Ticks(Mathf.RoundToInt(seconds * 2f * 60f), "talk_" + clip, pawn);
+                WalkFigures.TalkTestClip = null;
+                yield return Ticks(60, "talk_" + clip + "_after", pawn);
+                Note("talkvariants_" + n + ".mp4: " + clip + ", " + seconds.ToString("F2") + " s a loop, played twice");
+                played++;
+            }
+            WalkFigures.TalkTestPawn = -1;
+            lookPitch = pitchWas;
+            lookDistance = distanceWas;
+            lookHeight = heightWas;
+            Check("talk variants: played", played >= 2, played + " variants");
+            Note("Look: each the same pawn and camera; compare the hands, the trunk and the head.");
+        }
+
         private static IEnumerator DrunkTest()
         {
             ClearPatch();
@@ -4543,6 +4803,17 @@ namespace M3AT
                 {
                     patient.needs.joy.CurLevel = 0f;
                 }
+                // (a tended cut on a leg: the game keeps a pawn with a tended, healing injury on medical rest, so it lies on
+                // awake once rested, as a visited patient does, rather than getting up out of bed; tended, so no doctor
+                // comes for it)
+                BodyPartRecord leg = patient.RaceProps.body.AllParts.FirstOrDefault(r => r.def == BodyPartDefOf.Leg);
+                if (leg != null)
+                {
+                    Hediff_Injury cut = (Hediff_Injury)HediffMaker.MakeHediff(DefDatabase<HediffDef>.GetNamed("Cut"), patient, leg);
+                    cut.Severity = 2f;
+                    patient.health.AddHediff(cut);
+                    cut.Tended(1f, 1f);
+                }
                 patient.jobs.Notify_TuckedIntoBed(bed);
                 Look(patient, 0f);
                 yield return WaitReal(3f);
@@ -4552,6 +4823,8 @@ namespace M3AT
                 float standOff = 0f;   // cells: the furthest the talking visitor stood from the bed's edge
                 HashSet<string> standCells = new HashSet<string>();
                 float nearest = float.MaxValue;   // cells from where the sat visitor is drawn to the patient's nearest joint
+                int patientUp = 0;   // ticks the patient was on its feet (out of bed)
+                List<Vector3> drawnPlaces = new List<Vector3>();   // where the visitor was drawn each tick, after it came within reach
                 for (int i = 0; i < 36; i++)
                 {
                     if (patient.needs.rest != null)
@@ -4571,7 +4844,18 @@ namespace M3AT
                     }
                     Vector3? drawnAt = Field<Vector3?>(visitor, "workBeside");
                     lookAt = drawnAt ?? visitor.DrawPos;
-                    yield return Ticks(15, "visit_" + where, visitor);
+                    for (int t = 0; t < 15; t++)
+                    {
+                        yield return Ticks(1, "visit_" + where, visitor);
+                        if (patient.GetPosture() == PawnPosture.Standing)
+                        {
+                            patientUp++;
+                        }
+                        if (visitor.CurJobDef == JobDefOf.VisitSickPawn && (visitor.DrawPos - patient.DrawPos).MagnitudeHorizontal() < 2.5f)
+                        {
+                            drawnPlaces.Add(Field<Vector3>(visitor, "drawnAt"));
+                        }
+                    }
                     if (visitor.CurJobDef == JobDefOf.VisitSickPawn && (visitor.pather == null || !visitor.pather.Moving))
                     {
                         visited = true;
@@ -4613,11 +4897,36 @@ namespace M3AT
                         yield return Shot(where + "_t" + (i + 1) * 15);
                     }
                 }
+                Check(where + ": the patient stays in bed", patientUp == 0, patientUp + " ticks on its feet");
                 Check(where + ": visiting", visited, "job " + (visitor.CurJobDef != null ? visitor.CurJobDef.defName : "none") + ", patient in bed " + patient.InBed() + ", awake " + patient.Awake());
                 if (where == "spot")
                 {
                     Check("spot: work_visit", kind == "visit" && work > 0.9f, "work kind " + (kind ?? "none") + ", weight " + work.ToString("F2"));
-                    Check("spot: sat beside, off the patient", placed && nearest > 0.45f && nearest < 1f, placed ? "hips " + nearest.ToString("F2") + " cells from the patient's nearest joint" : "not placed beside (KneelBeside)");
+                    Check("spot: sat beside, off the patient", placed && nearest > 0.35f && nearest < 1f,   // (0.35: sat by the head, the nearest joint, to talk)
+                         placed ? "hips " + nearest.ToString("F2") + " cells from the patient's nearest joint" : "not placed beside (KneelBeside)");
+                    // (never drawn past the patient's middle to the far side from where it sits: walked over them and slid back)
+                    Vector3? sat = Field<Vector3?>(visitor, "workBeside");
+                    Vector3[] body = Field<Vector3[]>(patient, "lyingJoints");
+                    if (sat.HasValue && body != null && body.Length > 0)
+                    {
+                        Vector3 bodyMiddle = Vector3.zero;
+                        foreach (Vector3 j in body)
+                        {
+                            bodyMiddle += j;
+                        }
+                        bodyMiddle /= body.Length;
+                        Vector3 side = sat.Value - bodyMiddle;
+                        side.y = 0f;
+                        side.Normalize();
+                        float far = 0f;
+                        foreach (Vector3 d in drawnPlaces)
+                        {
+                            Vector3 o = d - bodyMiddle;
+                            o.y = 0f;
+                            far = Mathf.Max(far, -Vector3.Dot(o, side));
+                        }
+                        Check("spot: never drawn across the patient", far < 0.15f, "at most " + far.ToString("F2") + " cells past their middle on the far side, over " + drawnPlaces.Count + " ticks");
+                    }
                 }
                 else
                 {
@@ -6568,6 +6877,24 @@ namespace M3AT
             return pawn;
         }
 
+        // The map's other colonists sent well off the test patch and kept waiting there, so they don't walk through a
+        // video; let go when the scenario ends (StopRecording).
+        private static void HoldOthersAway(params Pawn[] keep)
+        {
+            foreach (Pawn p in new List<Pawn>(map.mapPawns.FreeColonistsSpawned))
+            {
+                if (Array.IndexOf(keep, p) >= 0 || spawned.Contains(p))
+                {
+                    continue;
+                }
+                IntVec3 away = CellFinder.RandomClosewalkCellNear(middle + new IntVec3(Clear + 12, 0, 12), map, 4);
+                p.Position = away;
+                p.Notify_Teleported();
+                Hold(p);
+                heldAway.Add(p);
+            }
+        }
+
         // Kept standing where it is, doing nothing, until another job is given.
         private static void Hold(Pawn pawn)
         {
@@ -6650,10 +6977,15 @@ namespace M3AT
         // Game ticks moved on: one a frame while paused (stills), or at normal speed (video). Each tick probed.
         private static IEnumerator Ticks(int ticks, string what, Pawn pawn)
         {
+            yield return RecordNow();
             int until = Find.TickManager.TicksGame + ticks;
             while (Find.TickManager.TicksGame < until)
             {
-                if (video)
+                if (Rendering)
+                {
+                    yield return RenderTick();
+                }
+                else if (video)
                 {
                     Find.TickManager.CurTimeSpeed = TimeSpeed.Normal;
                 }
@@ -6669,7 +7001,13 @@ namespace M3AT
                 }
                 if (pawn != null && pawn.Spawned)
                 {
-                    lookAt = Vector3.Lerp(lookAt, pawn.DrawPos, 0.1f);
+                    lookAt = Vector3.Lerp(lookAt, DrawnAt(pawn), 0.1f);
+                }
+                if (Rendering)
+                {
+                    Probe(what, pawn);
+                    yield return RenderFrameDue();
+                    continue;
                 }
                 yield return null;
                 Probe(what, pawn);
@@ -6681,6 +7019,21 @@ namespace M3AT
         // real seconds are up, then paused again.
         private static IEnumerator Unpaused(Pawn pawn, Func<bool> done, float seconds)
         {
+            yield return RecordNow();
+            if (Rendering)
+            {
+                // (rendered: the same game time, a tick at a time, as frame time then moves with the ticks)
+                int left = Mathf.RoundToInt(seconds * 60f);
+                yield return RenderTick();
+                while (left-- > 0 && !done())
+                {
+                    Probe("unpaused", pawn);
+                    yield return RenderFrameDue();
+                    yield return RenderTick();
+                }
+                Pause();
+                yield break;
+            }
             float until = Time.realtimeSinceStartup + seconds;
             Find.TickManager.CurTimeSpeed = TimeSpeed.Normal;
             yield return null;
@@ -6696,6 +7049,168 @@ namespace M3AT
         private static void Pause()
         {
             Find.TickManager.CurTimeSpeed = TimeSpeed.Paused;
+            if (maxDeltaWas >= 0f)
+            {
+                Time.maximumDeltaTime = maxDeltaWas;   // (frame time as the game has it, outside a render's steps)
+            }
+        }
+
+        // ---- rendered video ----
+
+        private static bool Rendering
+        {
+            get { return video && !screen && renderFile != null; }
+        }
+
+        // One game tick with exactly a tick of frame time: this frame (begun with the time frozen) held a tick long, so the
+        // next one's Time.deltaTime is at least a tick, capped at it, and the game ticks once at normal speed; then frozen
+        // again at the start of the frame after, before the game ticks or draws. The test runs from BeforeViewUpdate,
+        // early in a frame, before the game's tick and draw. (RealTime.deltaTime is read before that, so the pawn tweener
+        // lags a frame: each pawn is put where the game has it, as the stills mode does.)
+        private static IEnumerator RenderTick()
+        {
+            if (maxDeltaWas < 0f)
+            {
+                maxDeltaWas = Time.maximumDeltaTime;
+            }
+            Time.maximumDeltaTime = 0f;
+            Find.TickManager.CurTimeSpeed = TimeSpeed.Paused;
+            int before = Find.TickManager.TicksGame;
+            renderTickTime.Start();
+            System.Threading.Thread.Sleep(18);
+            yield return null;
+            Time.maximumDeltaTime = TickSeconds;
+            Find.TickManager.CurTimeSpeed = TimeSpeed.Normal;
+            yield return null;
+            Time.maximumDeltaTime = 0f;
+            Find.TickManager.CurTimeSpeed = TimeSpeed.Paused;
+            if (Find.TickManager.TicksGame == before)
+            {
+                Find.TickManager.DoSingleTick();   // (never seen; then only the frame time is off)
+            }
+            foreach (Pawn p in map.mapPawns.AllPawnsSpawned)
+            {
+                p.Drawer?.tweener?.ResetTweenedPosToRoot();
+            }
+            renderTickTime.Stop();
+        }
+
+        // A video frame once every ticksPerFrame ticks: IsoRim's scene image of the view, the time frozen until it comes.
+        private static IEnumerator RenderFrameDue()
+        {
+            if (Find.TickManager.TicksGame % ticksPerFrame != 0)
+            {
+                yield break;
+            }
+            Texture2D got = null;
+            imageDone = false;
+            renderWaitTime.Start();
+            // (a photo from the scenario's camera pose, drawn offscreen at the video's size, back a frame later (Api 76),
+            // else the screen's picture, back about five frames later at the screen's size)
+            IsoRim.ViewPose? pose = Pose();
+            bool asked = pose.HasValue && IsoRim.Api.Version >= 76 && IsoRim.Api.CaptureView(map, pose.Value,
+                new IsoRim.CaptureViewOptions { Width = RenderWidth, Height = RenderHeight }, tex =>
+                {
+                    got = tex;
+                    imageDone = true;
+                });
+            if (!asked)
+            {
+                asked = IsoRim.Api.RequestSceneImage(tex =>
+                {
+                    got = tex;
+                    imageDone = true;
+                }, new IsoRim.SceneImageOptions { IncludeOverlays = false });
+            }
+            for (int i = 0; asked && i < 240 && !imageDone; i++)
+            {
+                renderWaitFrames++;
+                yield return null;
+            }
+            renderWaitTime.Stop();
+            if (got == null)
+            {
+                yield break;
+            }
+            renderWriteTime.Start();
+            try
+            {
+                byte[] pixels = got.GetRawTextureData();
+                if (renderer == null)
+                {
+                    StartRenderer(got.width, got.height);
+                }
+                if (renderer != null && got.width == renderWidth && got.height == renderHeight && pixels.Length == renderWidth * renderHeight * 4)
+                {
+                    renderer.StandardInput.BaseStream.Write(pixels, 0, pixels.Length);
+                    renderFrames++;
+                }
+            }
+            catch (Exception e)
+            {
+                Log.Warning(Tag + "rendering a frame: " + e.Message);
+                StopRenderer();
+            }
+            renderWriteTime.Stop();
+            UnityEngine.Object.Destroy(got);
+        }
+
+        private static void StartRenderer(int width, int height)
+        {
+            renderWidth = width;
+            renderHeight = height;
+            renderFrames = 0;
+            string fps = (60f / ticksPerFrame).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+            ProcessStartInfo start = new ProcessStartInfo("ffmpeg")
+            {
+                UseShellExecute = false,
+                RedirectStandardInput = true,
+            };
+            foreach (string a in new[] { "-loglevel", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgba", "-s", width + "x" + height,
+                "-r", fps, "-i", "-", "-vf", width > RenderWidth ? "vflip,scale=" + RenderWidth + ":-2" : "vflip", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+                "-pix_fmt", "yuv420p", renderFile })
+            {
+                start.ArgumentList.Add(a);
+            }
+            try
+            {
+                renderer = Process.Start(start);
+            }
+            catch (Exception e)
+            {
+                Log.Warning(Tag + "could not start ffmpeg: " + e.Message);
+                renderer = null;
+                renderFile = null;
+            }
+        }
+
+        private static void StopRenderer()
+        {
+            if (renderer != null)
+            {
+                try
+                {
+                    renderer.StandardInput.Close();
+                    renderer.WaitForExit(120000);
+                }
+                catch (Exception e)
+                {
+                    Log.Warning(Tag + "finishing the video: " + e.Message);
+                }
+                Log.Message(Tag + "rendered " + renderFrames + " frames into " + Path.GetFileName(renderFile) + ": ticks "
+                    + renderTickTime.Elapsed.TotalSeconds.ToString("F1") + " s, waiting for pictures " + renderWaitTime.Elapsed.TotalSeconds.ToString("F1")
+                    + " s (" + renderWaitFrames + " frames), reading and encoding " + renderWriteTime.Elapsed.TotalSeconds.ToString("F1") + " s");
+                renderTickTime.Reset();
+                renderWaitTime.Reset();
+                renderWriteTime.Reset();
+                renderWaitFrames = 0;
+            }
+            renderer = null;
+            renderFile = null;
+            if (maxDeltaWas >= 0f)
+            {
+                Time.maximumDeltaTime = maxDeltaWas;
+            }
         }
 
         private static IEnumerator WaitReal(float seconds)
@@ -6718,6 +7233,24 @@ namespace M3AT
             probe.WriteLine(Find.TickManager.TicksGame + " " + what + " " + pawn.LabelShort + " " + WalkFigures.AutoProbe(pawn));
         }
 
+        // Where the pawn is drawn (Ease.drawnAt: after the moves for work, kneeling beside a patient and the like), else
+        // where the game has it: the camera follows that, as following the game's cell it swung away from a visitor drawn
+        // sat beside a patient and was set back each time the scenario aimed it.
+        private static Vector3 DrawnAt(Pawn pawn)
+        {
+            Vector3 game = pawn.DrawPos;
+            object v = WalkFigures.AutoField(pawn, "drawnAt");
+            if (v is Vector3 drawn && drawn != Vector3.zero)
+            {
+                Vector3 flat = new Vector3(drawn.x - game.x, 0f, drawn.z - game.z);
+                if (flat.sqrMagnitude < 4f)
+                {
+                    return new Vector3(drawn.x, game.y, drawn.z);
+                }
+            }
+            return game;
+        }
+
         private static T Field<T>(Pawn pawn, string name)
         {
             object v = WalkFigures.AutoField(pawn, name);
@@ -6737,13 +7270,36 @@ namespace M3AT
 
         // ---- video ----
 
+        // Video mode: the recording waits for the scenario's first game tick (Ticks, Unpaused), by when it has set its
+        // camera, so a video doesn't open on the view as it was before (the map's edge, looking out).
         private static void StartRecording(string name)
         {
-            if (!video)
+            recordPending = video ? name : null;
+        }
+
+        // The pending recording begun, a couple of frames after the camera was posed.
+        private static IEnumerator RecordNow()
+        {
+            if (recordPending == null)
             {
+                yield break;
+            }
+            string name = recordPending;
+            recordPending = null;
+            yield return null;
+            yield return null;
+            BeginRecording(name);
+        }
+
+        private static void BeginRecording(string name)
+        {
+            string file = Path.Combine(outDir, name + ".mp4");
+            if (!screen)
+            {
+                renderFile = file;   // (ffmpeg started on the first picture, when its size is known)
+                report.AppendLine("- video `" + Path.GetFileName(file) + "` (rendered, " + (60 / ticksPerFrame) + " frames a second of game time)");
                 return;
             }
-            string file = Path.Combine(outDir, name + ".mp4");
             string cmd = "id=$(xdotool search --name '^RimWorld by Ludeon Studios$' | head -1); "
                 + "exec ffmpeg -loglevel error -y -f x11grab -framerate 30 -window_id $id -i :0 -t 300 "
                 + "-vf 'scale=trunc(iw/4)*2:-2' -c:v libx264 -preset veryfast -crf 26 -pix_fmt yuv420p '" + file + "'";
@@ -6768,6 +7324,16 @@ namespace M3AT
 
         private static void StopRecording()
         {
+            recordPending = null;
+            foreach (Pawn p in heldAway)
+            {
+                if (p.Spawned && p.jobs != null)
+                {
+                    p.jobs.EndCurrentJob(JobCondition.InterruptForced);
+                }
+            }
+            heldAway.Clear();
+            StopRenderer();
             if (recorder == null)
             {
                 return;
@@ -7319,6 +7885,27 @@ namespace M3AT
         internal static bool AutoWeaponShows(Pawn pawn)
         {
             return WeaponShows(pawn);
+        }
+
+        // The autotest's talk variants: the pawn's talk started afresh, with the variant now set (TalkTestClip).
+        internal static void AutoTalkAfresh(Pawn pawn)
+        {
+            Ease e;
+            if (eases.TryGetValue(pawn.thingIDNumber, out e))
+            {
+                e.talkClip = null;
+                e.talkPrev = null;
+            }
+        }
+
+        internal static float AutoClipSeconds(string clip)
+        {
+            return skin != null ? skin.SecondsOf(clip) : 0f;
+        }
+
+        internal static bool AutoHas(string clip)
+        {
+            return skin != null && skin.Has(clip);
         }
 
         internal static object AutoField(Pawn pawn, string name)

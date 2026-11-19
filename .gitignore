@@ -62,3 +62,5 @@ discord/__pycache__/
 workshop_description*.txt
 anim_scripts/grip_detect/out/
 anim_scripts/mocap/.venv/
+autotest-latest
+autotest-videos/
