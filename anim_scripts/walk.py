@@ -229,7 +229,7 @@ UPPER = {'spine.001': 0.5, 'spine.002': 1.0}
 # sprite's middle the fist is, a share of its length. 'roll': turned about the line (degrees), the sprite's top kept up
 # at 0. Its size is its type's (WEAPON_TYPES, TYPE_SCALE: weapon_scale). Not used by any pose here; preview.py draws it.
 WEAPON_SCALE = 0.9   # a share of the weapon's drawn size on the floor (the chibi's arms are short), for a type without one
-GAME_SCALE = 1.2     # WalkFigures.ScaleUp: cells per model unit for a grown pawn, which a weapon's size is not scaled by
+GAME_SCALE = 1.08    # cells per model unit for a grown pawn of the standard size, which a weapon's size is not scaled by; written to anim.txt's game_scale line, which the game reads as WalkFigures.ScaleUp, so changing the standard size is this and an export
 HAND_GRIP = 0.03     # model units from the wrist along the forearm to where the hand closes
 # The weapon moved as a whole once its fist and line are found, along the figure's own directions (model units), so it
 # keeps its turn: up, out to the side of the hand holding it, and forward.

@@ -20,7 +20,11 @@
 //     red or bruise blue is left and a scar shows on any skin.
 //   7 a wound on the eye (FaceLayers.DrawEyeWounds), drawn on the face patch under the lids: the sheet's square at _WoundAt,
 //     a _Color alpha under 1 making it a scar as in mode 6, cut to the eye's shape (the alpha of _MaskTex: the white, or
-//     for a prosthetic eye Facial Animation's iris, moved with it by the shift).
+//     for a prosthetic eye Facial Animation's iris, moved with it by the shift). With _Recolour (a prosthetic eye or a
+//     clouded one on a measured iris, FaceLayers.DrawEyeWounds) the cell is not art but a recolouring
+//     (make_prosthetic_decals.py's RAMPS): the iris's own art, blurred by the cell's settings, looked up by its brightness
+//     in the cell's ramp, plus the cell's ring by the distance from the iris's middle, so it keeps that eye style's
+//     drawing.
 // _Smooth 1 (set per draw for the runtime-skinned chibi, FaceLayers.Patch.smooth): shaded by the patch's own normals,
 // rounded to _ShadeBands levels, as MarusSmooth.frag.glsl shades the body under it.
 // _EyeCut (set per draw): halves of the face left out, so a missing eye's eyeball and open lid go and Facial Animation's
@@ -52,6 +56,7 @@ layout(set = 2, binding = 0) uniform MaterialUniforms
     float _ShadeBands; // @default = 0.0  as MarusSmooth.frag.glsl
     float _EyeCut;    // @default = 0.0   set per draw (FaceLayers.EyeCut): 1 leaves out the texture's left half, 2 its right
     float _IsoFlash;   // @default = 0.0   per draw (FaceLayers.Flash): how red a hit figure is now, as MarusSmooth.frag.glsl; not on wounds (modes 6, 7)
+    float _Recolour;   // @default = 0.0   mode 7: 1 redraws the iris under it (_MaskTex) in its cell's colours rather than drawing the cell's art
 } uMaterial;
 
 layout(set = 2, binding = 1) uniform sampler2D _MainTex;
@@ -66,7 +71,8 @@ layout(std430, set = 2, binding = 6) readonly buffer _MarusBones
 };
 
 // Facial Animation's offset of this layer now (FaceLayers.ShiftOf, FaceGaze.cs): face texture places it is moved by, in the
-// first slot's xy (the stacked shader's layout, two layers a vec4). Set on every block these draws are given; none: none.
+// first slot's xy (the stacked shader's layout, two layers a vec4), and the player's tuning in the second (FaceTuning.cs).
+// Set on every block these draws are given; none: none.
 layout(std430, set = 2, binding = 7) readonly buffer _MarusFaceShift
 {
     vec4 faceShift[];
@@ -147,6 +153,20 @@ vec3 ToEye(vec3 p)
     return uMaterial._IsoView.xyz;
 }
 
+// Mode 7's recolouring cells (make_prosthetic_decals.py's RAMPS; keep in step): the iris's radius over the art's cell,
+// FaceGaze.cs's IrisArtShare, and the blur in iris radii at a settings red of 1.
+const float IrisArtShare = 34.0 / 128.0;
+const float BlurMost = 0.5;
+const float OwnIris = 2.5;   // iris radii from its middle that a recolouring reaches
+
+// A place on one of a cell's strips: across (0 .. 1, inset), up its height (0 .. 1 from its bottom), on the sheet as
+// the engine turns it.
+vec2 Strip(vec4 cell, float across, float up)
+{
+    vec2 at = cell.xy + vec2(mix(0.02, 0.98, clamp(across, 0.0, 1.0)), up) * cell.zw;
+    return vec2(at.x, 1.0 - at.y);
+}
+
 void main()
 {
     // Derivatives first, in uniform control flow (before any discard).
@@ -162,15 +182,19 @@ void main()
     bool smoothed = uMaterial._Smooth > 0.5 && snLen > 1e-6;
     float smoothShade = Banded(ModelShade(smoothed ? sn / snLen : n, uMaterial._IsoSun.xyz), uMaterial._ShadeBands);
 
-    // A missing eye: Facial Animation's face is split down the middle, one eye to each half (vUv.x 0.5).
+    // The player's tuning of the layer's mod (FaceLayers.TuneOf, FaceTuning.cs), in the second slot: its texture places
+    // scaled by 1 + x and moved by yz, all zero (the wounds, ridges and flat beard, SetNoShift) leaving them as they are.
+    vec2 tuned = faceShift.length() > 1 ? vUv * (1.0 + faceShift[1].x) + faceShift[1].yz : vUv;
+
+    // A missing eye: Facial Animation's face is split down the middle, one eye to each half (0.5 across).
     int cut = int(uMaterial._EyeCut + 0.5);
-    if (((cut & 1) != 0 && vUv.x < 0.5) || ((cut & 2) != 0 && vUv.x >= 0.5))
+    if (((cut & 1) != 0 && tuned.x < 0.5) || ((cut & 2) != 0 && tuned.x >= 0.5))
         discard;
 
     // Where the layer is read: moved by Facial Animation's offset (where its eyes look, its brows and mouth shift).
-    vec2 place = faceShift.length() > 0 ? vUv - faceShift[0].xy : vUv;
+    vec2 place = faceShift.length() > 0 ? tuned - faceShift[0].xy : tuned;
     if (faceShift.length() > 0)
-        place.x += SpreadAt(vUv.x, faceShift[0].z);
+        place.x += SpreadAt(tuned.x, faceShift[0].z);
     vec2 uv = place * uMaterial._MainTex_ST.zw + uMaterial._MainTex_ST.xy;
     vec4 t = texture(_MainTex, uv);
     vec4 tint = uMaterial._Color * vColor;
@@ -210,18 +234,52 @@ void main()
     {
         vec2 from = place - uMaterial._WoundAt.xy;   // a prosthetic eye's iris moves with the iris's shift
         vec2 local = vec2(dot(from, uMaterial._WoundAt.zw), dot(from, vec2(-uMaterial._WoundAt.w, uMaterial._WoundAt.z))) + 0.5;
-        if (local.x < 0.0 || local.x > 1.0 || local.y < 0.0 || local.y > 1.0)
-            discard;
-        // The engine turns a texture upside down against a place worked out here (a mesh's UVs are turned with it), so the
-        // square's place on the sheet is turned back; without it the eye took the sheet's top row, a stab wound.
-        vec2 at = uMaterial._WoundCell.xy + local * uMaterial._WoundCell.zw;
-        vec4 sprite = texture(_MainTex, vec2(at.x, 1.0 - at.y));
         // The eye's shape read where the face layers read their art (uv, by _MainTex_ST, through which the engine turns its
         // textures the right way up), not at vUv, which read the masks upside down and clear.
-        float onEye = smoothstep(0.3, 0.7, max(texture(_MaskTex, uv).a, texture(_MaskTwo, uv).a));
-        c = sprite * tint;
-        if (tint.a < 0.99)
-            c.rgb = ScarColour(sprite.rgb, tint.rgb);
+        vec4 shape = texture(_MaskTex, uv);
+        float onEye = smoothstep(0.3, 0.7, max(shape.a, texture(_MaskTwo, uv).a));
+        if (uMaterial._Recolour > 0.5)
+        {
+            // The cell's strips, read at their middles (a sixth, a half and five sixths up), at the top mip, as they are
+            // thin; across inset a little, so the next cell doesn't bleed in. The engine turns the sheet as for the art.
+            // Only round its own iris: Facial Animation's iris texture holds both eyes' (each eye's layer takes its half by
+            // its mask), so cut to its alpha alone this would cover the other eye too. They are some 4.7 radii apart, and an
+            // iris's soft edge reaches about 1.5.
+            float radii = length(local - 0.5) / IrisArtShare;
+            if (radii > OwnIris)
+                discard;
+            vec4 cell = uMaterial._WoundCell;
+            float blur = textureLod(_MainTex, Strip(cell, 0.5, 5.0 / 6.0), 0.0).r * BlurMost;
+            // The iris's radius in face texture places: _WoundAt.z is IrisArtShare over it (FaceLayers.DrawEyeWounds).
+            float radius = IrisArtShare / max(uMaterial._WoundAt.z, 1e-4);
+            vec2 reach = blur * radius * uMaterial._MainTex_ST.zw;
+            vec4 iris = shape;
+            if (blur > 0.0)
+            {
+                iris += texture(_MaskTex, uv + vec2(reach.x, 0.0)) + texture(_MaskTex, uv - vec2(reach.x, 0.0))
+                    + texture(_MaskTex, uv + vec2(0.0, reach.y)) + texture(_MaskTex, uv - vec2(0.0, reach.y))
+                    + texture(_MaskTex, uv + reach * 0.7) + texture(_MaskTex, uv - reach * 0.7)
+                    + texture(_MaskTex, uv + vec2(reach.x, -reach.y) * 0.7) + texture(_MaskTex, uv + vec2(-reach.x, reach.y) * 0.7);
+                iris /= 9.0;
+            }
+            // Brightness of the art alone, not darkened by its own soft edge (the art's colours are not premultiplied).
+            float bright = clamp(dot(iris.rgb, vec3(1.0 / 3.0)), 0.0, 1.0);
+            vec4 ramp = textureLod(_MainTex, Strip(cell, bright, 1.0 / 6.0), 0.0);
+            vec4 ring = textureLod(_MainTex, Strip(cell, radii * 0.5, 0.5), 0.0);
+            c = vec4(ramp.rgb + ring.rgb * ring.a, ramp.a) * tint;
+        }
+        else
+        {
+            if (local.x < 0.0 || local.x > 1.0 || local.y < 0.0 || local.y > 1.0)
+                discard;
+            // The engine turns a texture upside down against a place worked out here (a mesh's UVs are turned with it), so
+            // the square's place on the sheet is turned back; without it the eye took the sheet's top row, a stab wound.
+            vec2 at = uMaterial._WoundCell.xy + local * uMaterial._WoundCell.zw;
+            vec4 sprite = texture(_MainTex, vec2(at.x, 1.0 - at.y));
+            c = sprite * tint;
+            if (tint.a < 0.99)
+                c.rgb = ScarColour(sprite.rgb, tint.rgb);
+        }
         c.a *= onEye;
     }
     else if (mode == 4)

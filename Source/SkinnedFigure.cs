@@ -117,6 +117,22 @@ namespace M3AT
             public Matrix4x4 heldAt;    // and that line: from its rest place on the back to its rest place in the left fist
             public Matrix4x4? heldGrip; // and its held_grip line: from there to its rest place on hand.L as shield_draw takes it by its edge
             public Color? colour;       // a garment's own colour, in place of the apparel's (the shoes); null: the apparel's
+            // Another mod's garment (ModGarments.cs): the lines that say how it is fitted to the body in the game.
+            public string modRoot;      // the folder it was read from (its texture is found there); null: this mod's own
+            public string modName;      // and the mod's name, for messages
+            public string baseName;     // its base line: this mod's garment whose mesh it takes (a retexture)
+            public string bodyStamp;    // its body line: the skin.txt hash it was exported against; its w, hide and key lines count only on that body
+            public bool weightsGiven;   // it had w lines
+            public string[] weightBones;   // its bones line: the bone each w line's number means, by name (own weights kept across a new body)
+            public bool ownWeights;     // its own_weights line: its w lines are kept (by its bones line) though fitted for another body
+            public string boneName;     // its bone line: it rides that bone whole (a hat on spine.006)
+            public bool hard, rigid;    // its hard line (moved by its bones as a key moves the joints, not reshaped) and rigid (moved whole)
+            public int hardLine = -1;   // its hard line as given: 1 yes, 0 no, -1 none (then hard if it rides one bone)
+            public string[] ownKeys;    // its own_keys line: its key lines kept for these keys, the rest fitted from the body
+            public int hidesWanted = -1;   // its hides line: 0 it hides no skin, 1 worked out; -1 not said (worked out unless it hides already)
+            public string[] hideBones;  // its hide_bones line: body triangles with HideGroupWeight of every corner on bones starting with these are hidden
+            public string[] genes;      // its genes line: a gene part, drawn while the pawn has one of these genes active, not for apparel
+            public int colourFrom;      // a gene part's colour_from line: 0 the skin's, 1 the hair's, 2 its own (its colour line or texture)
             public int[] hides;       // a garment's: the body triangles (numbered as skin.txt's) under it, left out while it is worn
             public int[] opens;       // a garment's: the body triangles it covers at rest that a pose brings out from under its edge
                                       // (its opens lines, anim_scripts/hide_edges.py), drawn though it is worn; UnderOf keeps a
@@ -363,6 +379,7 @@ namespace M3AT
             public float look;    // degrees the head is turned about the vertical on the chest (Look)
             public float nod;     // degrees the head is tipped down (+) or up (-) on top of the clips (Look), about the figure's sideways
             public float lean;    // degrees the trunk is leant sideways over the hips, + to the figure's left (Lean)
+            public float stoop;   // degrees the upper back is bent forward, the head kept up (Stoop)
             public GarmentMask wornMask;       // the garments it has on this draw (Wearing)
             public bool gearPack;      // and whether an equipment pack is drawn on its back
             public float packScale = 1f;   // the size an equipment pack is drawn at, of this figure's: as big on every pawn
@@ -843,6 +860,7 @@ namespace M3AT
                 {
                     TurnRound(s.faceTris);
                 }
+                s.AddModGarments(all, animPath);   // other mods' garments and gene parts, fitted to the body here (ModGarments.cs)
                 s.pieces = all.ToArray();
                 if (all.Count - 1 > MaxHiding)
                 {
@@ -1037,6 +1055,46 @@ namespace M3AT
                     case "like":
                         piece.like = p.Length > 1 ? p[1] : null;
                         break;
+                    case "base":
+                        piece.baseName = p.Length > 1 ? p[1] : null;
+                        break;
+                    case "body":
+                        piece.bodyStamp = p.Length > 1 ? p[1] : null;
+                        break;
+                    case "bones":
+                        piece.weightBones = new string[p.Length - 1];
+                        Array.Copy(p, 1, piece.weightBones, 0, p.Length - 1);
+                        break;
+                    case "own_weights":
+                        piece.ownWeights = p[1] == "yes";
+                        break;
+                    case "bone":
+                        piece.boneName = p.Length > 1 ? p[1] : null;
+                        break;
+                    case "hard":
+                        piece.hardLine = p[1] == "yes" ? 1 : 0;
+                        break;
+                    case "rigid":
+                        piece.rigid = p[1] == "yes";
+                        break;
+                    case "own_keys":
+                        piece.ownKeys = new string[p.Length - 1];
+                        Array.Copy(p, 1, piece.ownKeys, 0, p.Length - 1);
+                        break;
+                    case "hides":
+                        piece.hidesWanted = p[1] == "no" ? 0 : 1;
+                        break;
+                    case "hide_bones":
+                        piece.hideBones = new string[p.Length - 1];
+                        Array.Copy(p, 1, piece.hideBones, 0, p.Length - 1);
+                        break;
+                    case "genes":
+                        piece.genes = new string[p.Length - 1];
+                        Array.Copy(p, 1, piece.genes, 0, p.Length - 1);
+                        break;
+                    case "colour_from":
+                        piece.colourFrom = p[1] == "hair" ? 1 : p[1] == "own" ? 2 : 0;
+                        break;
                     case "stands_for":
                         piece.standsFor = new string[p.Length - 1];
                         Array.Copy(p, 1, piece.standsFor, 0, p.Length - 1);
@@ -1128,6 +1186,7 @@ namespace M3AT
                         break;
                 }
             }
+            piece.weightsGiven = first.Count > 0;
             if (first.Count == 0 && !isBody)
             {
                 // No weights (hair): the whole piece rides the head bone.
@@ -1881,6 +1940,7 @@ namespace M3AT
             p.look = 0f;
             p.nod = 0f;
             p.lean = 0f;
+            p.stoop = 0f;
             p.standOn = -1;
             p.balance = 0f;
             p.crouch = 0f;
@@ -1995,6 +2055,16 @@ namespace M3AT
         {
             p.lean = degrees;
         }
+
+        // Bends the upper back forward (degrees) over the hips, spread up the spine as the twist is (TwistBones), the arms,
+        // head and what they hold going with it, and tips the head back up StoopHeadUp of that down the neck, so it still
+        // looks ahead: an old pawn's stoop (WalkFigures.StoopOf).
+        public void Stoop(Posed p, float degrees)
+        {
+            p.stoop = degrees;
+        }
+
+        private const float StoopHeadUp = 0.8f;   // of the stoop the head is tipped back up, so the face doesn't go down with the back
 
         // Turns the head about the vertical (degrees, as the figure's yaw) on top of whatever the clips and the twist do,
         // spread down the neck (LookBones): a look aside at someone without turning the body, as a teacher looks round
@@ -2401,7 +2471,7 @@ namespace M3AT
             {
                 Bend(p, p.recline);
             }
-            Place(p, whole, p.head[root] / p.total + p.shape.boneMove[root], p.twist, p.look, p.lean, p.nod);
+            Place(p, whole, p.head[root] / p.total + p.shape.boneMove[root], p.twist, p.look, p.lean, p.nod, p.stoop);
             if (p.standOn >= 0)
             {
                 OverFoot(p, whole);
@@ -2714,8 +2784,10 @@ namespace M3AT
 
         // Puts the turns (each on top of its parent's) together down the chain from the root's head at root (model units,
         // before whole), and works out each bone's matrix.
-        private void Place(Posed p, Matrix4x4 whole, Vector3 root, float twist, float look = 0f, float lean = 0f, float nod = 0f)
+        private void Place(Posed p, Matrix4x4 whole, Vector3 root, float twist, float look = 0f, float lean = 0f, float nod = 0f, float stoop = 0f)
         {
+            nod -= stoop * StoopHeadUp;
+            Vector3 stoopAcross = Quaternion.AngleAxis(twist, Vector3.up) * Vector3.right;   // the trunk's sideways, as the twist leaves it
             Vector3[] shapedHead = p.shape.boneHead;
             for (int i = 0; i < boneOrder.Length; i++)
             {
@@ -2739,6 +2811,11 @@ namespace M3AT
                     // Its share of the lean, about the way the figure faces (model space's +z): a turn about it by +
                     // degrees takes up toward -x, the figure's left.
                     p.turn[b] = Quaternion.AngleAxis(lean * twistShare[b], Vector3.forward) * p.turn[b];
+                }
+                if (stoop != 0f && twistShare[b] > 0f)
+                {
+                    // Its share of the stoop, about the trunk's sideways: + takes the way it faces down, as the nod's does.
+                    p.turn[b] = Quaternion.AngleAxis(stoop * twistShare[b], stoopAcross) * p.turn[b];
                 }
                 if (nod != 0f && lookShare[b] > 0f)
                 {
@@ -3194,9 +3271,9 @@ namespace M3AT
             }
         }
 
-        // The most garments HideUnder can tell apart (bits of an Int128, GarmentMask.cs, the body's left out, and the sign's, so a mask is never
+        // The most garments HideUnder can tell apart (bits of a 256-bit GarmentMask, GarmentMask.cs, the body's left out, and the sign's, so a mask is never
         // below 0).
-        public const int MaxHiding = 126;
+        public const int MaxHiding = 254;
 
         // Leaves out of the body the triangles under the garments in mask (bit g: garment g is worn), so skin can't show
         // through where the two don't bend quite alike (the inside of a bent knee), and out of its outline also the head

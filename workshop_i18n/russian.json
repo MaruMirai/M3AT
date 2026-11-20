@@ -1,7 +1,7 @@
 {
  "[h1]M3AT: Maru's 3D Animated Toons[/h1]": "[h1]M3AT: Maru's 3D Animated Toons[/h1]",
  "[i]Animated 3D pawns for [url=https://steamcommunity.com/sharedfiles/filedetails/?id=3819577715]IsoRim Waylith[/url].[/i]": "[i]Анимированные 3D-пешки для [url=https://steamcommunity.com/sharedfiles/filedetails/?id=3819577715]IsoRim Waylith[/url].[/i]",
- "Screenshots use [url=https://steamcommunity.com/sharedfiles/filedetails/?id=3271240549]Facial Animation - Retexture[/url], [url=https://steamcommunity.com/sharedfiles/filedetails/?id=3824503834]IsoRimZ[/url] and [url=https://steamcommunity.com/sharedfiles/filedetails/?id=2890901044]Combat Extended[/url], see suggestions.": "",
+ "Screenshots use Facial Animation - Retexture, IsoRimZ and Combat Extended (see suggestions).": "На скриншотах: Facial Animation - Retexture, IsoRimZ и Combat Extended (см. рекомендации).",
  "Early WIP and just launched, so expect scuff; letting me know about any issues is appreciated!": "Ранняя версия, возможны шероховатости — сообщайте о проблемах!",
  "[h2]Main Features[/h2]": "[h2]Возможности[/h2]",
  "[*][b]Around 200 Animations[/b] covering most of the game": "[*][b]Около 200 анимаций[/b] почти на всё в игре",
@@ -54,6 +54,8 @@
  "[*][b]Mod races and geneparts[/b]: The weakest area currently, could display unpredictably. Will usually require an IsoRim Patch and Facial Animation patch.": "[*][b]Расы и гены из модов[/b]: слабое место; обычно нужны патчи для IsoRim и Facial Animation",
  "Races with some built in support:": "Расы со встроенной поддержкой:",
  "[*][b]Kiiro[/b]: Faces and hair patched (Requires Kiiro Race Facial Animation and IsoRim Waylith - Kiiro Pack)": "[*][b]Kiiro[/b]: лица и волосы (нужны Kiiro Race Facial Animation и IsoRim Waylith - Kiiro Pack)",
+ "[h2]Save game safe[/h2]": "[h2]Безопасно для сохранений[/h2]",
+ "M3AT can be added and removed anytime - it's mostly visual and its few saved components are dropped harmlessly.": "M3AT можно добавить и убрать когда угодно: мод в основном визуальный, а его немногие сохранённые данные безвредно отбрасываются.",
  "[h2]Links[/h2]": "[h2]Ссылки[/h2]",
  "[*]discord(.)gg/7t5Aav2f2e Discord: Issues and reports, support, suggestions, and general discussion": "[*]discord(.)gg/7t5Aav2f2e Discord: проблемы, помощь, идеи",
  "[*]github(.)com/MaruMirai/M3AT GitHub: Contribute or raise issues, M3AT is open source": "[*]github(.)com/MaruMirai/M3AT GitHub: открытый исходный код",

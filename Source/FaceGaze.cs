@@ -33,8 +33,11 @@ namespace M3AT
         // Then each stacked layer's spread (RaceEyeSpread), a float each, four a vec4, from slot ShiftSlots (MarusFaceStack's
         // SpreadOf); a single layer's is its own slot's z.
         private const int SpreadSlots = 2;
-        private static readonly Vector4[] shifts = new Vector4[ShiftSlots + SpreadSlots];
-        private static readonly Vector4[] noShifts = new Vector4[ShiftSlots + SpreadSlots];
+        // Then each stacked layer's tuning by the player (FaceTuning.cs, TuneOf), a vec4 each from slot ShiftSlots +
+        // SpreadSlots (MarusFaceStack's TuneOf); a single layer's is its second slot. All zero: as drawn untuned.
+        private const int TuneSlots = 8;
+        private static readonly Vector4[] shifts = new Vector4[ShiftSlots + SpreadSlots + TuneSlots];
+        private static readonly Vector4[] noShifts = new Vector4[ShiftSlots + SpreadSlots + TuneSlots];
 
 #if AUTOTEST
         // A shift added to every eye layer, in Facial Animation's offset units (cells on the 2D head, x right, z up), to
@@ -45,14 +48,15 @@ namespace M3AT
         // A layer's shift on the face texture for its draw (one layer: the first slot), or none. Set on every block these
         // shaders are given, as the engine binds a storage slot a block leaves unset to the first one it does set (the
         // bones), which would read as a shift.
-        private static void SetShift(MaterialPropertyBlock block, Vector2 shift, float spread = 0f)
+        private static void SetShift(MaterialPropertyBlock block, Vector2 shift, float spread = 0f, Vector3 tune = default(Vector3))
         {
             if (block == null)
             {
                 return;
             }
             shifts[0] = new Vector4(shift.x, shift.y, spread, 0f);
-            for (int i = 1; i < shifts.Length; i++)
+            shifts[1] = new Vector4(tune.x, tune.y, tune.z, 0f);   // MarusFace.frag.glsl reads it there
+            for (int i = 2; i < shifts.Length; i++)
             {
                 shifts[i] = Vector4.zero;
             }
@@ -77,6 +81,8 @@ namespace M3AT
             for (int i = 0; i < count && i < 2 * ShiftSlots; i++)
             {
                 shifts[ShiftSlots + i / 4][i % 4] = stack[from + i].spread;
+                Vector3 t = stack[from + i].tune;
+                shifts[ShiftSlots + SpreadSlots + i] = new Vector4(t.x, t.y, t.z, 0f);
                 Vector2 s = stack[from + i].shift;
                 if ((i & 1) == 0)
                 {
@@ -381,7 +387,7 @@ namespace M3AT
                 iris.why = px == null ? "unreadable" : px.Length + " px";
                 if (px != null && px.Length >= read * read)
                 {
-                    double sum = 0, su = 0, sv = 0, suu = 0, svv = 0;
+                    double sum = 0, su = 0, sv = 0, suu = 0, svv = 0, sl = 0;
                     for (int r = 0; r < read; r++)
                     {
                         for (int c = left ? 0 : read / 2; c < (left ? read / 2 : read); c++)
@@ -393,13 +399,14 @@ namespace M3AT
                             }
                             double u = (c + 0.5) / read, v = (r + 0.5) / read;
                             sum += a;
+                            sl += a * (px[r * read + c].r + px[r * read + c].g + px[r * read + c].b) / 765.0;
                             su += a * u;
                             sv += a * v;
                             suu += a * u * u;
                             svv += a * v * v;
                         }
                     }
-                    iris.why += ", alpha " + sum.ToString("F0");
+                    iris.why += ", alpha " + sum.ToString("F0") + (sum > 0 ? ", brightness " + (sl / sum).ToString("F2") : "");
                     if (sum > 8)
                     {
                         double mu = su / sum, mv = sv / sum;

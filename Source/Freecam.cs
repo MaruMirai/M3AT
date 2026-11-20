@@ -49,6 +49,8 @@ namespace M3AT
         private const float BoostTimes = 2f;   // the boost key's multiple of the flying speed (and the wheel's climb)
         private const float ScrollEase = 12f;   // how fast the eye takes up the wheel's climb, per second (exponential)
         private const float Crosshair = 6f, CrosshairThick = 2f;   // the cross at the middle of the screen, UI px
+        private const float LastDot = 8f;   // the dot where the freed cursor will appear, UI px across
+        private static Texture2D dotTexture;
         // A jump to something (a colonist double-clicked on the bar, a letter, an alert): the eye put where it looks at
         // it along its own yaw and pitch from as far as it was from what it looked at, kept within JumpNearest and
         // JumpFarthest (close enough to see the pawn well), the pitch at least JumpLeastPitch (so it doesn't end up
@@ -87,9 +89,7 @@ namespace M3AT
         private static Vector3 glideFrom, glideTo;
         private static float glideTime, glideLength;   // real seconds
 
-        private static bool pointerMode;   // the pointer is left free until a right click that opens no menu of orders
-        private static bool rightPending;   // a right click on the map in pointer mode with something selected: did it open a menu?
-        private static int rightUpFrame = -1;   // the frame its button was first seen up
+        private static bool pointerMode;   // the pointer is left free until the pointer key or button (right clicks are the game's alone)
         private static bool leftPending;   // a left click on the map in pointer mode, with freecamClickOffLooks: did it select anything?
         private static int leftUpFrame = -1;
         private static readonly List<Window> keptOpen = new List<Window>();   // main tabs kept open through a left click on the map
@@ -104,7 +104,7 @@ namespace M3AT
         // Where the pointer was when looking began, so going into pointer mode puts it back there rather than in the
         // middle: the game's own reading (screen pixels, y up) and the engine window's raw cursor (whatever its own
         // units), kept as they were read so neither's convention has to be known. Freed for a window that wants the
-        // pointer (a menu opened under the cross, a dialog), it still goes to the middle.
+        // pointer (a menu opened under the cross, a dialog), it goes back there too, a menu moved along with it.
         private static Vector2 lookedFrom;
         private static object lookedFromWindow;
         private static bool haveLookedFrom;
@@ -348,7 +348,6 @@ namespace M3AT
                 posed = Posing.Push();
             }
             pointerMode = false;
-            rightPending = false;
             leftPending = false;
             SyncWalls();
             seenGame = Current.Game;
@@ -671,35 +670,10 @@ namespace M3AT
             if (buttonPressed || !typing && PointerKey != null && PointerKey.JustPressed)
             {
                 pointerMode = !pointerMode;
-                rightPending = false;
                 leftPending = false;
                 if (!pointerMode)
                 {
                     CloseTab();
-                }
-            }
-            // A right click in pointer mode that gave an order is looked at the frame after its button is up (a held
-            // right button may be dragging out a group's places, and a menu it opened has had its OnGUI): with no menu
-            // of orders up, back to looking.
-            if (rightPending)
-            {
-                if (Input.GetMouseButton(1))
-                {
-                    rightUpFrame = -1;
-                }
-                else if (rightUpFrame < 0)
-                {
-                    rightUpFrame = Time.frameCount;
-                }
-                else if (Time.frameCount > rightUpFrame)
-                {
-                    rightPending = false;
-                    rightUpFrame = -1;
-                    if (!MenuOpen())
-                    {
-                        pointerMode = false;
-                        CloseTab();
-                    }
                 }
             }
             // A left click in pointer mode with freecamClickOffLooks, the same way once the game has selected on its
@@ -722,7 +696,6 @@ namespace M3AT
                         && (Find.DesignatorManager == null || Find.DesignatorManager.SelectedDesignator == null))
                     {
                         pointerMode = false;
-                        rightPending = false;
                         CloseTab();
                     }
                 }
@@ -822,22 +795,6 @@ namespace M3AT
         }
 
         // Whether any selected pawn is drafted (the player's own, as only theirs can be).
-        private static bool DraftedSelected()
-        {
-            if (Find.Selector == null)
-            {
-                return false;
-            }
-            foreach (object o in Find.Selector.SelectedObjectsListForReading)
-            {
-                if (o is Pawn p && p.Drafted)
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
-
         private static bool MenuOpen()
         {
             if (Find.WindowStack == null)
@@ -855,11 +812,10 @@ namespace M3AT
         }
 
         // Before the game's windows take a mouse press off them (on the map). A click with a menu of orders up is left
-        // to the game (it closes the menu). In pointer mode a left click is kept from closing a main tab (which would use
-        // it up) and goes on to the map (with freecamClickOffLooks, one that leaves nothing selected goes back to looking), and a right click (unless it
-        // closes a menu of orders or drops a designator) goes back to looking: at once with nothing selected (used up,
-        // so the game doesn't open the architect again, and closing it), or once it is seen to open no menu.
-        // Looking, a right click with nothing selected goes into pointer mode, and the game opens the architect.
+        // to the game (it closes the menu). A left click in pointer mode, or with a main tab up (the architect), is kept
+        // from closing the tab (which would use it up) and goes on to the map (in pointer mode with freecamClickOffLooks,
+        // one that leaves nothing selected goes back to looking). A right click is the game's alone and never changes
+        // pointer mode: the architect it opens or closes frees the pointer while it is up, as any menu does.
         public static bool WindowEventsPrefix()
         {
             keptOpen.Clear();
@@ -884,45 +840,20 @@ namespace M3AT
                 skyPress = e.button == 0 && InSky(looking ? new Vector2(Screen.width * 0.5f, Screen.height * 0.5f)
                     : new Vector2(Input.mousePosition.x, Input.mousePosition.y));
                 skyFrom = UI.MousePositionOnUIInverted;
-                bool nothingSelected = Find.Selector == null || Find.Selector.NumSelected == 0;
-                if (!pointerMode)
+                if (e.button != 0)
                 {
-                    if (e.button == 1 && nothingSelected && !WindowWantsPointer())
-                    {
-                        pointerMode = true;
-                    }
                     return true;
                 }
-                if (e.button == 0)
+                if (pointerMode || TabOpen())
                 {
                     KeepTabsOpen();
+                }
+                if (pointerMode)
+                {
                     leftPending = Options.freecamClickOffLooks
                         && (Find.DesignatorManager == null || Find.DesignatorManager.SelectedDesignator == null);
                     leftUpFrame = -1;
-                    return true;
                 }
-                if (Find.DesignatorManager != null && Find.DesignatorManager.SelectedDesignator != null)
-                {
-                    return true;
-                }
-                if (nothingSelected)
-                {
-                    pointerMode = false;
-                    rightPending = false;
-                    CloseTab();
-                    e.Use();
-                    return false;
-                }
-                // An order: kept from closing the architect, so the game gives it (the tab is closed going back to looking).
-                // One given to drafted colonists stays in pointer mode, as a fight is directed by one order after another.
-                KeepTabsOpen();
-                if (DraftedSelected())
-                {
-                    rightPending = false;
-                    return true;
-                }
-                rightPending = true;
-                rightUpFrame = -1;
             }
             catch (Exception ex)
             {
@@ -985,9 +916,15 @@ namespace M3AT
             }
         }
 
+        // Whether a main tab other than the inspect pane is up (the architect, a work or research tab).
+        private static bool TabOpen()
+        {
+            return Find.MainTabsRoot != null && Find.MainTabsRoot.OpenTab != null && Find.MainTabsRoot.OpenTab != MainButtonDefOf.Inspect;
+        }
+
         private static void CloseTab()
         {
-            if (Find.MainTabsRoot != null && Find.MainTabsRoot.OpenTab != null && Find.MainTabsRoot.OpenTab != MainButtonDefOf.Inspect)
+            if (TabOpen())
             {
                 Find.MainTabsRoot.EscapeCurrentTab(false);
             }
@@ -1060,32 +997,40 @@ namespace M3AT
                 Cursor.lockState = CursorLockMode.None;
                 Cursor.visible = true;
                 centreFrames = CentreFrames;
-                // Back where it was when looking began on going into pointer mode or leaving the freecam; to the
-                // middle when something on screen wants it there (a menu under the cross) or the game lost focus.
-                freedBack = Options.freecamPointerBack && haveLookedFrom && (pointerMode || !on) && Application.isFocused && !WindowWantsPointerBesidesTab();
+                // Back where it was when looking began, however it was freed (pointer mode, leaving the freecam, a menu
+                // of orders, a dialog, a main tab); to the middle only with the option off or the game unfocused. A menu
+                // of orders opened under the cross goes with it, so the pointer comes back onto it.
+                freedBack = Options.freecamPointerBack && haveLookedFrom && Application.isFocused;
+                if (freedBack)
+                {
+                    MoveMenusBack();
+                }
             }
         }
 
-        // A window that wants the pointer other than a main tab: the architect a right click opens going into pointer
-        // mode is at the screen's bottom, so the pointer may as well go back where it was for it.
-        private static bool WindowWantsPointerBesidesTab()
+        // Each menu of orders open (not a pinned one) moved by as far as the pointer goes from the middle of the
+        // screen, where it was opened under the cross, to lookedFrom, kept on screen: the game closes a menu the pointer
+        // is left far from (FloatMenu.UpdateBaseColor). lookedFrom is in screen pixels, y up; windows in UI units, y down.
+        private static void MoveMenusBack()
         {
             if (Find.WindowStack == null)
             {
-                return false;
+                return;
             }
+            float scale = Prefs.UIScale;
+            Vector2 to = new Vector2(lookedFrom.x / scale, (Screen.height - lookedFrom.y) / scale);
+            Vector2 shift = to - new Vector2(Screen.width * 0.5f / scale, Screen.height * 0.5f / scale);
             foreach (Window w in Find.WindowStack.Windows)
             {
-                if (w == pinned || w is MainTabWindow)
+                if (!(w is FloatMenu) || w == pinned)
                 {
                     continue;
                 }
-                if (w is FloatMenu || w.absorbInputAroundWindow || w.forcePause || w.preventCameraMotion)
-                {
-                    return true;
-                }
+                Rect r = w.windowRect;
+                r.x = Mathf.Clamp(r.x + shift.x, 0f, Mathf.Max(0f, UI.screenWidth - r.width));
+                r.y = Mathf.Clamp(r.y + shift.y, 0f, Mathf.Max(0f, UI.screenHeight - r.height));
+                w.windowRect = r;
             }
-            return false;
         }
 
         // The pointer's place as looking begins, before it is first warped to the middle.
@@ -1514,6 +1459,51 @@ namespace M3AT
                 return;
             }
             DrawCross(UI.screenWidth * 0.5f, UI.screenHeight * 0.5f);
+            DrawLookedFrom();
+        }
+
+        // A dot where the cursor will appear when it is freed, with the cursor set to come back to its last position
+        // (freecamPointerBack). lookedFrom is in screen pixels, y up; the interface in UI px, y down.
+        private static void DrawLookedFrom()
+        {
+            if (!Options.freecamPointerBack || !Options.freecamPointerDot || !haveLookedFrom)
+            {
+                return;
+            }
+            float scale = Prefs.UIScale;
+            float x = lookedFrom.x / scale, y = (Screen.height - lookedFrom.y) / scale;
+            GUI.DrawTexture(new Rect(x - LastDot * 0.5f, y - LastDot * 0.5f, LastDot, LastDot), DotTexture());
+        }
+
+        // A round white dot with a dark rim and soft edges, made once.
+        private static Texture2D DotTexture()
+        {
+            if (dotTexture != null)
+            {
+                return dotTexture;
+            }
+            const int n = 32;
+            Color32[] px = new Color32[n * n];
+            float mid = (n - 1) * 0.5f, outer = n * 0.5f - 1f, inner = outer * 0.6f;
+            for (int r = 0; r < n; r++)
+            {
+                for (int c = 0; c < n; c++)
+                {
+                    float d = Mathf.Sqrt((c - mid) * (c - mid) + (r - mid) * (r - mid));
+                    float a = Mathf.Clamp01(outer - d + 0.5f);
+                    float white = Mathf.Clamp01(inner - d + 0.5f);
+                    byte g = (byte)Mathf.RoundToInt(255f * white);
+                    px[r * n + c] = new Color32(g, g, g, (byte)Mathf.RoundToInt(255f * a * (0.6f + 0.3f * white)));
+                }
+            }
+            Texture2D t = new Texture2D(n, n, TextureFormat.RGBA32, false);
+            t.name = "Marus_FreecamDot";
+            t.filterMode = FilterMode.Bilinear;
+            t.wrapMode = TextureWrapMode.Clamp;
+            t.SetPixels32(px);
+            t.Apply(false, true);
+            dotTexture = t;
+            return t;
         }
 
         // Over the pinned menu: its contents are drawn in a group at its window's corner (a float menu has no margin).

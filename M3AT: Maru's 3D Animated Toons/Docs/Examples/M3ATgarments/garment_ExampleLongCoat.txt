@@ -1,0 +1,4 @@
+# An example retexture (Docs/Apparel.md, Approach 1): M3AT's duster drawn for a mod's own coat, with the duster's
+# own image. Put a garment_ExampleLongCoat.png beside it and a "texture garment_ExampleLongCoat.png" line to repaint it.
+base Duster
+defs MyMod_Apparel_LongCoat

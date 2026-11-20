@@ -98,6 +98,16 @@ float SpreadOf(int layer)
     return faceShift[4 + layer / 4][layer % 4];
 }
 
+// Then each layer's tuning by the player (FaceLayers.TuneOf, FaceTuning.cs) from faceShift[6], a vec4 each: its texture
+// places scaled by 1 + x and moved by yz; all zero, as they are.
+vec2 TuneOf(int layer, vec2 place)
+{
+    if (faceShift.length() <= 6 + layer)
+        return place;
+    vec4 t = faceShift[6 + layer];
+    return place * (1.0 + t.x) + t.yz;
+}
+
 // Another race's eyes set as far apart as a human's (FaceGaze.RaceEyeSpread): the layer's left half read further right
 // and its right half further left by spread (texture widths), so its art moves out, the move easing to none over
 // SpreadEase either side of the middle so the strip between the eyes is stretched rather than shown twice.
@@ -177,7 +187,7 @@ bool LayerColour(sampler2D tex, vec4 texST, sampler2D mask, vec4 maskST, vec4 co
     int mode = packed % 8;
     int cut = (packed / 8) % 4;
     bool mouth = packed >= 32;
-    vec2 place = mouth ? vUv * uMaterial._MouthMap.xy + uMaterial._MouthMap.zw : vUv;
+    vec2 place = TuneOf(layer, mouth ? vUv * uMaterial._MouthMap.xy + uMaterial._MouthMap.zw : vUv);
     if (((cut & 1) != 0 && place.x < 0.5) || ((cut & 2) != 0 && place.x >= 0.5))
         return false;
     float across = place.x;

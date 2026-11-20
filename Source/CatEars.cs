@@ -984,7 +984,7 @@ namespace M3AT
                     goneR |= side == "R";
                 }
             }
-            Color tint = file == SkinnedFigure.PigEarFile ? skinColour : pawn.story.HairColor;
+            Color tint = file == SkinnedFigure.PigEarFile ? skinColour : WalkFigures.HairColourOf(pawn);
             skin.DrawEars(fig, file, fig.earState, goneL, goneR, at, yaw, size, tint, skinColour);
         }
     }

@@ -66,3 +66,5 @@ autotest-latest
 autotest-videos/
 workshop_i18n/out/
 workshop_i18n/uploaded_english.txt
+autotest-runs/
+autotest-by-scenario/

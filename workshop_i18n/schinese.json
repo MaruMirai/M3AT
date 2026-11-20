@@ -1,7 +1,7 @@
 {
  "[h1]M3AT: Maru's 3D Animated Toons[/h1]": "[h1]M3AT: Maru's 3D Animated Toons[/h1]",
  "[i]Animated 3D pawns for [url=https://steamcommunity.com/sharedfiles/filedetails/?id=3819577715]IsoRim Waylith[/url].[/i]": "[i]为 [url=https://steamcommunity.com/sharedfiles/filedetails/?id=3819577715]IsoRim Waylith[/url] 带来会动的 3D 小人。[/i]",
- "Screenshots use [url=https://steamcommunity.com/sharedfiles/filedetails/?id=3271240549]Facial Animation - Retexture[/url], [url=https://steamcommunity.com/sharedfiles/filedetails/?id=3824503834]IsoRimZ[/url] and [url=https://steamcommunity.com/sharedfiles/filedetails/?id=2890901044]Combat Extended[/url], see suggestions.": "截图中使用了 [url=https://steamcommunity.com/sharedfiles/filedetails/?id=3271240549]Facial Animation - Retexture[/url]、[url=https://steamcommunity.com/sharedfiles/filedetails/?id=3824503834]IsoRimZ[/url] 和 [url=https://steamcommunity.com/sharedfiles/filedetails/?id=2890901044]Combat Extended[/url]，详见下方的搭配推荐。",
+ "Screenshots use Facial Animation - Retexture, IsoRimZ and Combat Extended (see suggestions).": "截图中使用了 Facial Animation - Retexture、IsoRimZ 和 Combat Extended（见推荐）。",
  "Early WIP and just launched, so expect scuff; letting me know about any issues is appreciated!": "目前是刚发布的早期开发版本，难免有些粗糙；欢迎反馈任何问题！",
  "[h2]Main Features[/h2]": "[h2]主要功能[/h2]",
  "[*][b]Around 200 Animations[/b] covering most of the game": "[*][b]约 200 个动画[/b]，覆盖游戏中的绝大部分行为",
@@ -54,6 +54,8 @@
  "[*][b]Mod races and geneparts[/b]: The weakest area currently, could display unpredictably. Will usually require an IsoRim Patch and Facial Animation patch.": "[*][b]模组种族与基因部件[/b]：目前最薄弱的部分，显示效果可能难以预料。通常需要一个 IsoRim 补丁和一个 Facial Animation 补丁。",
  "Races with some built in support:": "已有部分内置支持的种族：",
  "[*][b]Kiiro[/b]: Faces and hair patched (Requires Kiiro Race Facial Animation and IsoRim Waylith - Kiiro Pack)": "[*][b]Kiiro[/b]：已适配面部与头发（需要 Kiiro Race Facial Animation 和 IsoRim Waylith - Kiiro Pack）",
+ "[h2]Save game safe[/h2]": "[h2]存档安全[/h2]",
+ "M3AT can be added and removed anytime - it's mostly visual and its few saved components are dropped harmlessly.": "M3AT 可随时添加或移除——它主要是视觉模组，少量保存的数据会被无害地丢弃。",
  "[h2]Links[/h2]": "[h2]链接[/h2]",
  "[*]discord(.)gg/7t5Aav2f2e Discord: Issues and reports, support, suggestions, and general discussion": "[*]discord(.)gg/7t5Aav2f2e Discord：问题反馈、技术支持、建议与日常讨论",
  "[*]github(.)com/MaruMirai/M3AT GitHub: Contribute or raise issues, M3AT is open source": "[*]github(.)com/MaruMirai/M3AT GitHub：M3AT 是开源的，欢迎贡献代码或提交问题",

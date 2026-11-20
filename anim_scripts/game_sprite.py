@@ -81,6 +81,30 @@ def image(dds):
     blocks = join(dds[148:], n)
     return Image.frombytes('RGBA', (w, h), blocks[:((w + 3) // 4) * ((h + 3) // 4) * 16], 'bcn', 7)
 
+def entries(zip_path):
+    """Each .dds.split's texture path (without the extension and any .psd) in the zip, to its ZipInfo."""
+    out = {}
+    with open(zip_path, 'rb') as f:
+        for i in zipfile.ZipFile(f).infolist():
+            if i.filename.endswith('.dds.split'):
+                name = i.filename[:-len('.dds.split')]
+                out[name[:-4] if name.endswith('.psd') else name] = i
+    return out
+
+
+def read(zip_path, info):
+    """The image of one entry (from entries) as a PIL image, or None."""
+    with open(zip_path, 'rb') as f:
+        f.seek(info.header_offset)
+        head = f.read(30)
+        name_len, extra_len = struct.unpack('<HH', head[26:30])
+        f.seek(info.header_offset + 30 + name_len + extra_len)
+        data = f.read(info.compress_size)
+    if info.compress_type == 93:
+        data = subprocess.run(['zstd', '-d', '-c'], input=data, capture_output=True, check=True).stdout
+    return image(data)
+
+
 def main():
     zip_path, part, out = sys.argv[1], sys.argv[2], sys.argv[3]
     os.makedirs(out, exist_ok=True)

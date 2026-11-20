@@ -85,7 +85,7 @@ namespace M3AT
     {
         internal const string Tag = "[M3AT] ";
         internal const string Folder = "Models/chibi";
-        private const float ScaleUp = 1.2f;   // on top of IsoRim's size for the life stage: the baked figure is 1.25 cells tall, which looks tiny beside furniture
+        // (ScaleUp, on top of IsoRim's size for the life stage, is the export's: WeaponTypes.cs, from anim.txt's game_scale line.)
         private const bool ColonistsOnly = false;   // true: everyone else keeps IsoRim's figure, to compare side by side
         private const float WalkingGait = 0.5f;   // the placing's gait (0 still .. 1 walking) from which the walk shows
         private const float RunFrom = 1.5f;   // cells per game second: the run starts to blend in (a colonist ambles at ~1.5,
@@ -258,11 +258,13 @@ namespace M3AT
         // runs out, every round(100 / MiningSpeed) ticks, so work_pickaxe is played from that count (PickPhase) rather
         // than the clock, the blow landing on that tick: one stroke from the pick held ready over the shoulder, swung
         // into the rock and brought back up to it, the blow at the export's pick_hit share (PickHit on an older one), at
-        // its own pace (at most PickSlowest slower) or squeezed for a miner striking more often; between strokes,
-        // work_pickaxe_idle (the pick held ready) loops for as long as the miner waits, crossfaded with the stroke over
-        // PickIdleBlend ticks at either end of it.
+        // the wind-up and the lift back as recorded and the downswing (from the top of the backswing, PickDownFrom, to the
+        // blow) in at most PickDownSlowest of its recorded time, as played as recorded it looked sluggish; or all of it
+        // squeezed alike for a miner striking more often; between strokes, work_pickaxe_idle (the pick held ready) loops
+        // for as long as the miner waits, crossfaded with the stroke over PickIdleBlend ticks at either end of it.
         private const float PickHit = 0.5f;
-        private const float PickSlowest = 1f;
+        private const float PickDownFrom = 0.34f;   // of the stroke: the top of the backswing, frame 35 of pick3's 102 (the handle swung furthest back)
+        private const float PickDownSlowest = 0.6f;   // of the recorded downswing's time (0.6 s, played in about 0.36)
         private const int PickRateMost = 60;   // ticks: a longer gap between the pawn's interval runs is taken as a pause, not its rate
         private const float PickIdleBlend = 20f;   // (the take's long idle holds the pick a little further back than the stroke's ends)
         // Beating out a fire: the game beats once each time its beat verb's 1.1 s cool-down ends (Verb_BeatFire), so
@@ -1757,19 +1759,24 @@ namespace M3AT
             float grown = GrownAge(pawn);
             if (grown > 0f)
             {
-                return Mathf.Lerp(BirthSize, 1f, Growth.Evaluate(Mathf.Clamp01(pawn.ageTracker.AgeBiologicalYearsFloat / grown))) * ScaleUp * PawnSize * GenderSize(pawn) * HeightSize(pawn);
+                return Mathf.Lerp(BirthSize, 1f, Growth.Evaluate(Mathf.Clamp01(pawn.ageTracker.AgeBiologicalYearsFloat / grown))) * ScaleUp * PawnSize * GenderSize(pawn) * HeightSize(pawn) * AgeSize(pawn);
             }
             float factor = pawn.ageTracker != null && pawn.ageTracker.CurLifeStage != null ? pawn.ageTracker.CurLifeStage.bodySizeFactor : 1f;
             float size = Api.FigureSizeFor(factor);
-            return size * ScaleUp * PawnSize * GenderSize(pawn) * HeightSize(pawn);
+            return size * ScaleUp * PawnSize * GenderSize(pawn) * HeightSize(pawn) * AgeSize(pawn);
         }
 
         private const float MostGrownAge = 10000f;   // years: a life stage starting later than this is not one a pawn ages into (GrownAge)
 
-        // Of the standard size: the mod options' size for every pawn, on top of ScaleUp.
+        // Of the standard size: the mod options' pawn height (cells, an absolute height, so a player's choice stands
+        // whatever the export's standard is), over the standard's; 1 left at the default.
         private static float PawnSize
         {
-            get { return SettingsMod.Settings != null ? SettingsMod.Settings.pawnSize : 1f; }
+            get
+            {
+                float height = SettingsMod.Settings != null ? SettingsMod.Settings.pawnHeight : -1f;
+                return height > 0f ? height / StandardHeight : 1f;
+            }
         }
 
         // Of the standard size: GenderGap, if the mod's options have it on, split between the genders, a male that half of it bigger and a
@@ -3934,7 +3941,8 @@ namespace M3AT
         }
 
         // Whether someone else is playing the same game at the same board (its job's target A) as the pawn: a pawn
-        // playing alone sits quiet. Looked for round the board, within PlayerReach cells, where its seats are.
+        // playing alone sits quiet. Looked for round the board, within PlayerReach cells, where its seats are (the game's
+        // JoyGiver_InteractBuildingSitAdjacent puts the board in target A and the seat cell beside it in B).
         private static bool PlaysWithOthers(Pawn pawn, JobDef job)
         {
             Thing board = pawn.CurJob.targetA.Thing;
@@ -3953,7 +3961,9 @@ namespace M3AT
                 for (int i = 0; i < things.Count; i++)
                 {
                     Pawn other = things[i] as Pawn;
-                    if (other != null && other != pawn && other.CurJobDef == job && other.CurJob.targetA.Thing == board)
+                    // (sat down at it, not still on its way over, as the game gives the job before the walk there)
+                    if (other != null && other != pawn && other.CurJobDef == job && other.CurJob.targetA.Thing == board
+                        && (other.pather == null || !other.pather.Moving))
                     {
                         return true;
                     }
@@ -5422,7 +5432,8 @@ namespace M3AT
         // Where the pickaxe stroke is for a pawn mining, 0 .. 1 through it, timed so the point goes into the rock (the
         // pick_hit share) on the tick the game strikes it: from JobDriver_Mine's own count down to the next strike
         // (ticksToPickHit), so it keeps time with the strike's sound and flash and with the miner's speed. The stroke takes
-        // its own length (up to PickSlowest of it), so the swing looks the same at any skill; a slower miner holds the
+        // its own length but for the downswing, which takes at most PickDownSlowest of its own, so the swing looks brisk
+        // and the same at any skill below that; a slower miner holds the
         // pick ready (work_pickaxe_idle) until it is time to swing again, and one striking more often has the stroke
         // squeezed into the time. stroke is how much of the stroke to show against the idle: 1 through it, eased over
         // PickIdleBlend ticks at its ends, 0 between strokes (always 1 on an export without the idle). A pawn ticked less
@@ -5439,9 +5450,24 @@ namespace M3AT
             }
             float hit = skin.PickHitShare > 0f && skin.PickHitShare < 1f ? skin.PickHitShare : PickHit;
             float since = Mathf.Max(0f, e.pickPeriod - until);
-            float length = Mathf.Min(e.pickPeriod, seconds * 60f * PickSlowest);   // ticks the whole stroke takes
-            float into = until <= hit * length ? hit * length - until   // winding up and swinging down
-                       : since < (1f - hit) * length ? hit * length + since   // back up to the ready hold after the strike
+            // Ticks of the wind-up, the downswing and the lift back after the blow, all squeezed alike into a shorter period.
+            float from = Mathf.Min(PickDownFrom, 0.9f * hit);
+            float ticks = seconds * 60f;
+            float wind = from * ticks;
+            float down = (hit - from) * ticks * PickDownSlowest;
+            float back = (1f - hit) * ticks;
+            float length = wind + down + back;
+            if (length > e.pickPeriod)
+            {
+                float squeeze = e.pickPeriod / length;
+                wind *= squeeze;
+                down *= squeeze;
+                back *= squeeze;
+                length = e.pickPeriod;
+            }
+            float swing = wind + down;
+            float into = until <= swing ? swing - until   // winding up and swinging down
+                       : since < back ? swing + since   // back up to the ready hold after the strike
                        : -1f;   // waiting for the next
             bool idles = skin.Has("work_pickaxe_idle") && e.pickPeriod - length > 2f * PickIdleBlend;
             if (into < 0f)
@@ -5453,7 +5479,9 @@ namespace M3AT
             {
                 stroke = Mathf.SmoothStep(0f, 1f, Mathf.Min(into, length - into) / PickIdleBlend);
             }
-            return into / length;
+            return into <= wind ? from * into / Mathf.Max(wind, 1e-3f)
+                 : into <= swing ? from + (hit - from) * (into - wind) / Mathf.Max(down, 1e-3f)
+                 : hit + (1f - hit) * (into - swing) / Mathf.Max(back, 1e-3f);
         }
 
         // JobDriver_Mine's count to the next strike for a pawn mining, as until (ticks from now to the tick the game will
@@ -6651,7 +6679,10 @@ namespace M3AT
             bool headless = pawn.health != null && !pawn.health.hediffSet.HasHead;
             HairDef hair = skin.HidesHair(mask) || headless || Baby(pawn) ? null : HairBuilder.HairOf(pawn);   // with a race's hair add-ons (AddonHair.cs)
             skin.HairUnderHats(fig, hair, mask);
-            skin.HideUnder(fig, mask, hair);
+            Color hairColour = HairColourOf(pawn);   // greyed with age (GreyingHair.cs)
+            // Other mods' gene parts (ModGarments.cs) hide the skin under them as a garment does.
+            GarmentMask geneParts = skin.GenePartsOf(pawn);
+            skin.HideUnder(fig, mask | geneParts, hair);
             string earFile = headless ? null : EarFileOf(pawn);
             skin.HideGarments(fig, mask, wornBuffer, wornVersion);
             int fur = FurOf(pawn);
@@ -6662,7 +6693,7 @@ namespace M3AT
             }
             else
             {
-                skin.DrawBody(fig, hair, at, yaw, size, skinColour, pawn.story.HairColor, fur > 0);   // furred without a coat: the hair's strand grain all over (StrandGrain.cs)
+                skin.DrawBody(fig, hair, at, yaw, size, skinColour, hairColour, fur > 0);   // furred without a coat: the hair's strand grain all over (StrandGrain.cs)
             }
             if (fur > 0)
             {
@@ -6670,12 +6701,26 @@ namespace M3AT
                 skin.HideFur(fig, fur, mask, hair);
                 skin.Draw(fig, fur, at, yaw, size, skinColour, true);
             }
+            foreach (int part in skin.GenePartsIn(geneParts))
+            {
+                // Under whatever is worn, in the skin's colour, the hair's or its own (its colour_from line).
+                skin.HideGenePart(fig, part, mask);
+                int from = skin.GeneColourFrom(part);
+                Color tint = from == 1 ? hairColour : from == 2 ? (skin.ColourOf(part) ?? Color.white) : skinColour;
+                skin.Draw(fig, part, at, yaw, size, tint, from == 0);
+            }
             DrawGarments(pawn, wornBuffer, fig, at, yaw, size);
-            skin.DrawHair(fig, hair, mask, at, yaw, size, pawn.story.HairColor, skinColour);
+            skin.DrawHair(fig, hair, mask, at, yaw, size, hairColour, skinColour);
             string ridgeDesign = headless ? null : RidgesOf(pawn);
             if (ridgeDesign != null && !skin.HidesFace(mask, wornBuffer))
             {
                 skin.DrawRidges(fig, ridgeDesign, at, yaw, size, skinColour);
+            }
+            // Old age's wrinkles, drawn as the ridges are (Aging.cs), under the flat beard.
+            string wrinkles = headless ? null : WrinklesOf(pawn);
+            if (wrinkles != null && !skin.HidesFace(mask, wornBuffer))
+            {
+                skin.DrawRidges(fig, wrinkles, at, yaw, size, skinColour);
             }
             // The Nose_Pig key's nostrils, drawn as the ridges are: over the lid cover, and clear of the mouth (generationAssets/pigSnout).
             if (!headless && HasGeneKey(pawn, NosePig) && !skin.HidesFace(mask, wornBuffer))
@@ -6688,12 +6733,12 @@ namespace M3AT
                 // Drawn on the face patch with the face's layers, so a mask that leaves the face off leaves it off too.
                 if (!skin.HidesFace(mask, wornBuffer))
                 {
-                    skin.DrawFlatBeard(fig, beard, at, yaw, size, pawn.story.HairColor);
+                    skin.DrawFlatBeard(fig, beard, at, yaw, size, hairColour);
                 }
             }
             else if (beard != null)
             {
-                skin.DrawBeard(fig, beard, at, yaw, size, pawn.story.HairColor);
+                skin.DrawBeard(fig, beard, at, yaw, size, hairColour);
             }
             if (earFile != null)
             {
@@ -8018,6 +8063,11 @@ namespace M3AT
                 skin.Twist(fig, twist);
                 skin.Look(fig, ease.look);
                 skin.Nod(fig, nodded);
+                // Old age, a bad back or frailty: the upper back bent forward on its feet or seated (Aging.cs), less in a
+                // drafted stance and less again aiming, as the trunk's bend takes the arms and weapon down with it.
+                float stooped = !lying && !crawling && flight < 0f && swim <= 0f && duck <= 0f && rise <= 0f
+                    ? StoopOf(pawn) * Mathf.Lerp(1f, StoopDrafted, ease.drafted) * Mathf.Lerp(1f, StoopAiming, ease.aim) * (seated ? StoopSeated : 1f) : 0f;
+                skin.Stoop(fig, stooped);
                 if (seated && ease.share > 0f && ease.shareWay.sqrMagnitude > 1e-4f)
                 {
                     // At a shared reading: leant toward the other (on the figure's right if it lies to +x as the figure faces).
@@ -8278,7 +8328,9 @@ namespace M3AT
                     skin.Add(fig, "sit", LoopPhase(pawn, "sit"), sat * land);
                     skin.Add(fig, skin.Variant("bend", ease.bentRoll), 0f, bend * (1f - onTheMove) * land);
                     skin.Add(fig, skin.Variant("land", ease.landedRoll), 0f, crouch * land);
-                    skin.Crouch(fig, cover * (1f - bend * (1f - onTheMove)) * land);
+                    // Behind cover, or an old pawn's knees giving a little standing still (Aging.cs).
+                    float aged = sat <= 0f ? AgeKnees * stooped / StoopMost * (1f - moving) : 0f;
+                    skin.Crouch(fig, Mathf.Max(cover, aged) * (1f - bend * (1f - onTheMove)) * land);
                     float stroke = swim > 0f ? StrokeOf(ease, moving) : moving;
                     skin.Add(fig, "swim", cycle, stroke * swim);
                     skin.Add(fig, "tread", LoopPhase(pawn, "tread"), (1f - stroke) * swim);

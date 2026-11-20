@@ -42,7 +42,7 @@ namespace M3AT
     internal sealed partial class HairBuilder
     {
         private const string Tag = "[M3AT] ";
-        public const int Version = 40;   // raise when the build changes, so cached hair is made again
+        public const int Version = 41;   // raise when the build changes, so cached hair is made again
         public const int BeardVersion = 6;   // and cached beards
         internal static bool Tapered = true;    // the hull's flanks narrowing behind the head's middle (Hull; M3AT_NO_TAPER off)
         internal static bool ForeOn = true;     // the side sprites having no say over what the front one carried out (Textured; M3AT_NO_FORE off)
@@ -61,6 +61,7 @@ namespace M3AT
         private bool[] curtain;   // the sheets' voxels, grown by one (null: none)
         internal static bool IslandsOn = true;  // small loose pieces dropped (WithoutIslands; M3AT_NO_ISLANDS off)
         private const float IslandShare = 0.02f;   // least share of the kept hair's area a piece joined to nothing else must have
+        internal static float EyeMatch = 1f;   // share of the way the sprites' eye row is pinned to the chibi's eye line (HeightOf): with one scale top to chin, fringes ended well above the eyes, as the chibi's eyes are lower on its head than Facial Animation's on the sprite head (harness: M3AT_EYE_MATCH)
         internal static bool FringeOn = true;   // the fringe carried forward to the head's front (Hull; M3AT_NO_FRINGE off)
         internal static int FringeGap = 16;     // pixels short of the head's front from which hair over the face is left as the side sprite has it
         internal static float FringeTurn = 0.08f;   // share of the head's depth or width its surface may be in from its outermost in a row for hair to be carried to it there
@@ -838,7 +839,12 @@ namespace M3AT
         {
             if (!beard)
             {
-                return top - (Y - hy0) * sy;
+                if (EyeMatch <= 0f || Y >= hy1)
+                {
+                    return top - (Y - hy0) * sy;
+                }
+                float pin = EyePin();
+                return Y <= EyeRow ? top - (Y - hy0) * (top - pin) / (EyeRow - hy0) : pin - (Y - EyeRow) * (pin - chin) / (hy1 - EyeRow);
             }
             if (Y <= EyeRow)
             {
@@ -851,11 +857,23 @@ namespace M3AT
             return Y <= hy1 ? mouth - (Y - MouthRow) * (mouth - chin) / (hy1 - MouthRow) : chin - (Y - hy1) * sy;
         }
 
+        // Where the sprites' eye line (EyeRow) goes on the chibi: the one scale's place, moved EyeMatch of the way to
+        // the chibi's own eye line (eyes), the head above and below it each stretched to fit.
+        private float EyePin()
+        {
+            return Mathf.Lerp(top - (EyeRow - hy0) * sy, eyes, EyeMatch);
+        }
+
         private float RowOf(float y)
         {
             if (!beard)
             {
-                return hy0 + (top - y) / sy;
+                if (EyeMatch <= 0f || y <= chin)
+                {
+                    return hy0 + (top - y) / sy;
+                }
+                float pin = EyePin();
+                return y >= pin ? hy0 + (top - y) * (EyeRow - hy0) / (top - pin) : EyeRow + (pin - y) * (hy1 - EyeRow) / (pin - chin);
             }
             if (y >= eyes)
             {

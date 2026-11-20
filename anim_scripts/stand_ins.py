@@ -60,7 +60,8 @@ NO_STAND_IN = {
     'TribalHeaddress', 'PsychicFoilHelmet', 'EltexSkullcap', 'Headwrap', 'WarVeil', 'HatTop', 'HatLadies',
     'CE_SimpleNightVision', 'CE_AdvancedNightVision', 'Scarf'}
 # Other words naming the same thing as a NO_STAND_IN garment's name word, and phrases holding it that don't (StandIns.cs).
-NAME_ALIKE = {'scarf': ('neckerchief', 'kerchief', 'muffler', 'shemagh', 'keffiyeh', 'snood'),
+NAME_ALIKE = {'frame': ('exoskelet', 'exosuit'),   # CE's exoframe is any exoskeleton (StandIns.cs)
+              'scarf': ('neckerchief', 'kerchief', 'muffler', 'shemagh', 'keffiyeh', 'snood'),
               'short': ('hotpant', 'hot pant'),   # hotpants are the short shorts, not the shorts
               'crop': ('tank top', 'tanktop', 'halter', 'tube top')}
 NAME_NOT = {'scarf': ('headscarf', 'head scarf'), 'pants': ('hotpant', 'underpant')}
@@ -73,6 +74,70 @@ GENERIC = {'BasicShirt', 'Pants', 'Jacket', 'Duster', 'FlakVest', 'SimpleHelmet'
 MASKS = {'GasMask', 'ClothMask', 'WarMask', 'VisageMask', 'WarVeil', 'CultistMask', 'CeremonialCultistMask'}
 MASK_WORDS = ('mask', 'respirator', 'balaclava', 'veil')
 COMMON_WORDS = {'hat', 'helmet', 'armor', 'armour', 'apparel', 'kid'}
+
+
+# Open-fronted garments stand in only for apparel whose front sprite is open down the middle (Source/OpenFronts.cs):
+# the clear gap up from its hem at least OPEN_FRONT_LEAST of its height.
+OPEN_FRONTS = {'Duster', 'LabCoat'}
+OPEN_FRONT_LEAST = 0.45
+OPEN_SIZE = 128
+OPEN_HALF_WIDTH = 1
+OPEN_BODIES = ['Male', 'Female', 'Thin', 'Hulk', 'Fat']
+TEXTURES = []   # (texture path without extension, lower case) -> where it is: a file, or (zip, info); filled by main
+OPEN_SHARES = {}
+
+
+def texture_index(folders):
+    """Every texture the game could load, by its path under Textures (lower case, no extension): each mod folder's
+    Textures, then the game's Assets.zip files; the first found wins, as mods load after the game and override it."""
+    sys.path.insert(0, os.path.dirname(__file__))
+    import game_sprite
+    index = {}
+    for folder in reversed(folders):   # (later mods override earlier ones)
+        t = os.path.join(folder, 'Textures')
+        for f in glob.glob(os.path.join(t, '**', '*.png'), recursive=True):
+            index.setdefault(os.path.relpath(f, t)[:-4].replace(os.sep, '/').lower(), f)
+    root = os.path.dirname(GAME)
+    for z in [os.path.join(root, 'Assets.zip')] + sorted(glob.glob(os.path.join(GAME, '*', 'Assets.zip'))):
+        if os.path.exists(z):
+            for name, info in game_sprite.entries(z).items():
+                key = name.split('Textures/', 1)[-1].lower()
+                index.setdefault(key, (z, info))
+    return index
+
+
+def open_front_share(d):
+    """How far up from its hem the clear gap down the middle of the apparel's south sprite reaches, as a share of its
+    height (rows with art either side counted); -1 without a sprite (OpenFronts.cs's OpenFrontShare)."""
+    if d['name'] in OPEN_SHARES:
+        return OPEN_SHARES[d['name']]
+    import numpy as np
+    from PIL import Image
+    sys.path.insert(0, os.path.dirname(__file__))
+    import game_sprite
+    share, path = -1, d.get('worn')
+    where = None
+    for suffix in ['_' + b + '_south' for b in OPEN_BODIES] + ['_south']:
+        where = path and TEXTURES[0].get((path + suffix).lower()) if TEXTURES else None
+        if where:
+            break
+    if where:
+        im = Image.open(where) if isinstance(where, str) else game_sprite.read(*where)
+        if im is not None:
+            a = np.array(im.convert('RGBA').resize((OPEN_SIZE, OPEN_SIZE)))[::-1, :, 3] > 128   # rows bottom first
+            rows = np.where(a.any(1))[0]
+            share = 0
+            if len(rows):
+                low, high, mid, w = rows[0], rows[-1], OPEN_SIZE // 2, OPEN_HALF_WIDTH
+                n = 0
+                for j in range(low, high + 1):
+                    if a[j, mid - w:mid + w + 1].any():
+                        break
+                    if a[j, :mid - w].any() and a[j, mid + w + 1:].any():
+                        n += 1
+                share = n / (high - low + 1)
+    OPEN_SHARES[d['name']] = share
+    return share
 
 
 def mod_folders(mod, version='1.7'):
@@ -148,7 +213,8 @@ def read_defs(folders):
         out[name] = dict(name=name, label=get(d, 'label') or '', layers=get(d, 'apparel/layers') or [],
                          groups=get(d, 'apparel/bodyPartGroups') or [], cats=get(d, 'thingCategories') or [],
                          tags=get(d, 'apparel/tags') or [], tech=get(d, 'techLevel'), stuff=get(d, 'stuffCategories') or [],
-                         stage=get(d, 'apparel/developmentalStageFilter') or 'Child, Adult', comps=get(d, 'comps') or [])
+                         stage=get(d, 'apparel/developmentalStageFilter') or 'Child, Adult', comps=get(d, 'comps') or [],
+                         worn=get(d, 'apparel/wornGraphicPath'))
     return out
 
 
@@ -175,7 +241,7 @@ def under(layer):
 
 
 def profile(d):
-    return dict(mask=any(w in (d['name'] + ' ' + d['label']).lower() for w in MASK_WORDS),
+    return dict(def_=d, mask=any(w in (d['name'] + ' ' + d['label']).lower() for w in MASK_WORDS),
                 name=d['name'], layers=list(dict.fromkeys(under(x) for x in d['layers'])), groups=groups_of(d['groups']),
                 armour=any('armor' in c.lower() for c in d['cats']), noble=any('noble' in c.lower() for c in d['cats']),
                 vacsuit='Vacsuit' in d['tags'] or 'vacsuit' in d['name'].lower(), child='Adult' not in d['stage'],
@@ -244,9 +310,11 @@ def name_share(a, g):
 def usable(a, g):
     """A garment of NO_STAND_IN stands in only for apparel with all its name words, one of MASKS only for a mask, and one
     over the skull (not a mask, which FullHead only says is, nor one the apparel is named as) only for apparel over it: a
-    scarf over the mouth or neck scored just enough for the power armour helmet."""
+    scarf over the mouth or neck scored just enough for the power armour helmet. An open-fronted garment only for apparel
+    drawn open down the front (OPEN_FRONTS)."""
     return (not g['named_only'] or name_share(a, g) == 1) and (g['garment'] not in MASKS or a['mask']) \
-        and ('UpperHead' not in g['groups'] or 'UpperHead' in a['groups'] or g['garment'] in MASKS or g['named_only'])
+        and ('UpperHead' not in g['groups'] or 'UpperHead' in a['groups'] or g['garment'] in MASKS or g['named_only']) \
+        and (g['garment'] not in OPEN_FRONTS or open_front_share(a['def_']) >= OPEN_FRONT_LEAST)
 
 
 def as_hat(a):
@@ -308,8 +376,9 @@ def stand_ins(a, garments, skip=None):
 def main():
     args = [x for x in sys.argv[1:] if not x.startswith('--')]
     loo = '--loo' in sys.argv
-    defs = read_defs(args or glob.glob(os.path.join(GAME, '*', 'Defs'))
-                     + [f for m in sorted(glob.glob(os.path.join(WORKSHOP, '*'))) for f in mod_folders(m)])
+    mods = [f for m in sorted(glob.glob(os.path.join(WORKSHOP, '*'))) for f in mod_folders(m)]
+    defs = read_defs(args or glob.glob(os.path.join(GAME, '*', 'Defs')) + mods)
+    TEXTURES.append(texture_index(mods))
     garments, own, named = [], {}, {}
     for f in sorted(glob.glob(os.path.join(CHIBI, 'garment_*.txt'))):
         name = os.path.basename(f)[len('garment_'):-4]
@@ -349,7 +418,7 @@ def main():
             print(f'{name:45} own {own[name]}')
             continue
         a = as_hat(profile(d))
-        found = [] if never(d) else named.get(name) or stand_ins(a, garments, own.get(name))
+        found = named.get(name) or ([] if never(d) else stand_ins(a, garments, own.get(name)))
         top = sorted(((score(a, a['groups'], g), g['garment']) for g in garments if g['garment'] != own.get(name) and usable(a, g)), reverse=True)[:3]
         print(f"{'LOO ' if name in own else ''}{name:45} {'+'.join(found) or '-':28} " + '  '.join(f'{n}:{s:.2f}' for s, n in top))
 

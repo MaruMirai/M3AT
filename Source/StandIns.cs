@@ -91,6 +91,9 @@ namespace M3AT
             { "scarf", new[] { "neckerchief", "kerchief", "muffler", "shemagh", "keffiyeh", "snood" } },
             { "short", new[] { "hotpant", "hot pant" } },   // hotpants are the short shorts, not the shorts
             { "crop", new[] { "tank top", "tanktop", "halter", "tube top" } },
+            // CE's exoframe (name words exo and frame) is any exoskeleton or exosuit: Passive Exoskeletons' and The Dead
+            // Man's Switch's, which scored as power armour or flak by their coverage.
+            { "frame", new[] { "exoskelet", "exosuit" } },
         };
         private static readonly Dictionary<string, string[]> NameNot = new Dictionary<string, string[]>
         {
@@ -208,14 +211,16 @@ namespace M3AT
 
         private int[] WorkOutStandIns(ThingDef def)
         {
-            if (NeverStoodIn(def))
-            {
-                return NoStandIns;
-            }
+            // A garment's stands_for line names the apparel outright, so it wins even over NeverStoodIn: Vanilla Weapons
+            // Expanded - Heavy Weapons' exoskeleton frame is worn on the Belt layer, drawn as a pack.
             int[] named = StandsFor(def);
             if (named.Length > 0)
             {
                 return named;
+            }
+            if (NeverStoodIn(def))
+            {
+                return NoStandIns;
             }
             Profile a = ProfileOf(def, 0);
             a.mask = IsMaskNamed(a.text);
@@ -236,7 +241,8 @@ namespace M3AT
                 // A garment over the skull (not a mask, which FullHead only says is, nor one the apparel is named as) only
                 // for apparel over it: a scarf over the mouth or neck scored just enough for the power armour helmet.
                 bool skull = !all[i].mask && !all[i].namedOnly && all[i].groups.Contains("UpperHead") && !a.groups.Contains("UpperHead");
-                if ((!all[i].namedOnly || NameShare(a.text, all[i].tokens) >= 1f) && (!all[i].mask || a.mask) && !skull)
+                // An open-fronted garment only for apparel drawn open down the front (OpenFronts.cs).
+                if ((!all[i].namedOnly || NameShare(a.text, all[i].tokens) >= 1f) && (!all[i].mask || a.mask) && !skull && FrontFits(all[i], def))
                 {
                     pool.Add(all[i]);
                 }
@@ -557,7 +563,7 @@ namespace M3AT
 
         // The garments whose stands_for lines name this apparel, in the export's order: a set the scoring can't tell
         // apart (Kiiro's bra and briefs from its bandeau and briefs) named by hand. Empty for none.
-        private int[] StandsFor(ThingDef def)
+        internal int[] StandsFor(ThingDef def)
         {
             List<int> found = null;
             for (int g = 1; g < pieces.Length; g++)
@@ -582,7 +588,7 @@ namespace M3AT
             for (int g = 1; g < pieces.Length; g++)
             {
                 Piece piece = pieces[g];
-                if (piece.held || piece.withLegwear || piece.forBaby)
+                if (piece.held || piece.withLegwear || piece.forBaby || piece.genes != null)
                 {
                     continue;
                 }

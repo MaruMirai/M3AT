@@ -241,6 +241,8 @@ STANDS_FOR = {
     'Chestwrap': ('Kiiro_SimpleUnderwear',),
     'Underwear': ('Kiiro_Underwear_Normal', 'Kiiro_SimpleUnderwear', 'Kiiro_Stocking_Black', 'Kiiro_Stocking_White'),
     'Pants': ('Kiiro_Stocking_Black', 'Kiiro_Stocking_White', 'Kiiro_Pantynose_Black', 'Kiiro_Pantynose_White'),
+    # Vanilla Weapons Expanded - Heavy Weapons' exoskeleton frame, on the Belt layer, which is never otherwise stood in for.
+    'CE_ExoFrame': ('VWE_Apparel_Exoframe',),
 }
 for _name, _defs in STANDS_FOR.items():
     GARMENT_PROPS.setdefault(_name, {})['stands_for'] = ' '.join(_defs)
@@ -1391,6 +1393,10 @@ def write_anim(path, clips):
             f.write('# draw_timing at: walk.DRAW_AT, where a draw clip\'s hand closes on the handle. draw_slide clip share: the share\n')
             f.write('# of the clip the game swings the weapon to the hand over, ending there (walk.DRAW_SIZES).\n')
             f.write('draw_timing %.4f\n' % walk.DRAW_AT)
+            f.write('# game_scale scale height: walk.GAME_SCALE, cells per model unit for a grown pawn of the standard size (the\n')
+            f.write('# size the clips aimed at things in the world were made for), and FIGURE_HEIGHT, the idle\'s height in model\n')
+            f.write('# units, so the standard pawn stands scale times height cells tall (WalkFigures.ScaleUp, StandardHeight).\n')
+            f.write('game_scale %.4f %.4f\n' % (walk.GAME_SCALE, FIGURE_HEIGHT))
             pick = getattr(walk, 'TOOL_CLIPS', {}).get('pickaxe')
             if pick is not None and 'hit' in pick:
                 f.write('# pick_hit share: where the blow falls in work_pickaxe, 0 .. 1 through it (walk.TOOL_TAKES\' pickaxe), which the\n')

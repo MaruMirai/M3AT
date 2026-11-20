@@ -90,9 +90,29 @@ for _ in $(seq 1 1800); do
     fi
     sleep 1
 done
+# Raw frames the game wrote because ffmpeg can't run inside Steam's container (name.mp4.<w>x<h>@<fps>.rgba): encoded here.
+done_dir=$(grep -a "\[AutoTest\] done: " "$log" | tail -1 | sed 's/^.*\[AutoTest\] done: //; s#/report.md$##')
+if [ -n "$done_dir" ]; then
+    for raw in "$done_dir"/*.rgba; do
+        [ -e "$raw" ] || continue
+        base="${raw%.rgba}"; mp4="${base%.*}"; spec="${base##*.mp4.}"
+        ffmpeg -loglevel error -y -f rawvideo -pix_fmt rgba -s "${spec%@*}" -r "${spec#*@}" -i "$raw" -vf vflip -c:v libx264 -preset veryfast -crf 23 -pix_fmt yuv420p "$mp4" && rm -f "$raw"
+    done
+fi
 grep -a "\[AutoTest\]" "$log" | sed 's/^.*\[AutoTest\] //'
 # The newest run's folder linked at the repository's root as autotest-latest (git-ignored), so its videos and pictures
 # can be opened from links to files in the workspace; only for a run in the default folder, as a run with --out (another
 # session's, into its own scratch folder) re-pointed it away from the run being looked at.
 done_dir=$(grep -a "\[AutoTest\] done: " "$log" | tail -1 | sed 's/^.*\[AutoTest\] done: //; s#/report.md$##')
 [ -z "$out" ] && [ -n "$done_dir" ] && [ -d "$done_dir" ] && ln -sfn "$done_dir" autotest-latest || true
+# autotest-latest is re-pointed by every run, so a clip being looked at went with the next one. Every run is also linked
+# under autotest-runs/<date-time>, and each scenario it ran under autotest-by-scenario/<scenario> (its newest run), so a
+# run of other scenarios leaves those alone.
+if [ -z "$out" ] && [ -n "$done_dir" ] && [ -d "$done_dir" ]; then
+    mkdir -p autotest-runs autotest-by-scenario
+    ln -sfn "$done_dir" "autotest-runs/$(basename "$done_dir")"
+    if [ "$which" != all ]; then
+        IFS=',' read -ra ran <<< "$which"
+        for s in "${ran[@]}"; do ln -sfn "$done_dir" "autotest-by-scenario/$s"; done
+    fi
+fi

@@ -40,10 +40,17 @@ namespace M3AT
         public const float DefaultHeightSpread = 0.02f, DefaultBodySpread = 0.3f;   // the variety sliders' defaults
         public const float DefaultHairDetail = 0.3f;
         public const float DefaultGazeStrength = 1f;   // how far the eyes look about, of Facial Animation's own   // the share of its triangles a hairstyle keeps
-        public float pawnSize = 1f;   // every pawn's size, of the standard (WalkFigures.PawnSize, in SizeOf)
+        // How tall a grown pawn is drawn, cells, before gender and height variety; -1 (the default, not saved) the export's
+        // standard (WalkFigures.StandardHeight). Absolute, so a height chosen stays when the standard changes
+        // (WalkFigures.PawnSize, in SizeOf).
+        public float pawnHeight = -1f;
+        public const float HeightLeast = 1f, HeightMost = 1.7f;   // cells, the slider's range
+        private const float OldStandardHeight = 1.5f;   // cells: a grown pawn of the standard size when the option was a share of it
         public float headShrink = DefaultShrink;   // 0 .. 1 of the Shrinkhead key: a smaller, less chibi head (skinned figure only)
         public bool genderSizes = true;   // grown males are drawn bigger than grown females, by WalkFigures.GenderGap (WalkFigures.GenderSize)
         public float heightSpread = DefaultHeightSpread;   // the standard deviation of pawns' own heights about their gender's, of the standard size (WalkFigures.HeightSize)
+        public bool agingLooks = true;   // old pawns drawn wrinkled, stooped and a little shorter, with cataracts clouding the eye (Aging.cs, WalkFigures.AgingLooks)
+        public bool greyingHair = true;   // hair drawn greying with age, a dye or other new colour starting it again (GreyingHair.cs, WalkFigures.GreyingHair)
         public bool variedBodies = true;    // each pawn's build spread about its body type's by the Thin, Fat and Hulk keys (WalkFigures.VariedBuild)
         public float bodySpread = DefaultBodySpread;   // and the standard deviation of that spread, in key amounts
         public float bodyShapeStrength = 1f;   // how strongly the Thin, Fat and Hulk keys are applied, 0 .. BodyShapeMost of each (WalkFigures.BodyShapeStrength)
@@ -69,6 +76,11 @@ namespace M3AT
         public Dictionary<string, Vector3> gripOverrides = new Dictionary<string, Vector3>();
         // Where the other hand holds a weapon on its art (0..1, y up), by weapon defName (GripTool.cs, GripOffHand).
         public Dictionary<string, Vector2> offHandGrips = new Dictionary<string, Vector2>();
+        // The player's tuning of each face mod's art on the chibi's face (FaceTuning.cs, FaceLayers.TuneOf), by the mod's
+        // packageId: x and y the move (face texture widths, + right and up), z the size (1 as it is); the whole face's, and
+        // the mouth's on top of it.
+        public Dictionary<string, Vector3> faceTunes = new Dictionary<string, Vector3>();
+        public Dictionary<string, Vector3> mouthTunes = new Dictionary<string, Vector3>();
         public bool autoGrips = true;   // another mod's weapon held by its grip as found in its art (WalkFigures.AutoGrips, GripFinder)
         public bool retexturedWeaponModels = true;   // the game's own weapons keep IsoRim's model though another mod redraws their art (WalkFigures.RetexturedWeaponModels)
         public bool vatClothes = false;    // a pawn in a growth vat or biosculpter pod drawn in its clothes (WalkFigures.VatClothes); off: without them
@@ -94,7 +106,8 @@ namespace M3AT
         public bool freecamOn = false;   // the freecam is wanted: kept through 2D, other maps and restarts (Freecam.Wanted)
         public bool freecam3D = false;   // the 3D view was on with it, so a loaded game starts in 3D (Freecam.Resume)
         public bool freecamClickOffLooks = false;   // in pointer mode, a left click on nothing goes back to looking
-        public bool freecamPointerBack = true;   // the pointer freed for pointer mode goes back where it was when looking began
+        public bool freecamPointerDot = true;   // a dot where the freed cursor will appear, while looking with freecamPointerBack
+        public bool freecamPointerBack = true;   // the freed pointer (pointer mode, a menu, a dialog) goes back where it was when looking began
         public bool freecamMenuFreesPointer = true;   // a menu of orders opened while looking frees the pointer, rather than being pinned in the view
         public int freecamButton = 2;   // the mouse button that toggles pointer mode (2 middle, 3 and 4 the side buttons, -1 none)
         public float freecamSensitivity = DefaultFreecamSensitivity;
@@ -120,10 +133,23 @@ namespace M3AT
         public override void ExposeData()
         {
             base.ExposeData();
-            Scribe_Values.Look(ref pawnSize, "pawnSize", 1f);
+            Scribe_Values.Look(ref pawnHeight, "pawnHeight", -1f);
+            if (Scribe.mode == LoadSaveMode.LoadingVars && pawnHeight <= 0f)
+            {
+                // Saved before the option was a height: it was a share of a standard pawn 1.5 cells tall, so keep the
+                // height it gave (saved only if moved off 100%), within today's range.
+                float share = -1f;
+                Scribe_Values.Look(ref share, "pawnSize", -1f);
+                if (share > 0f)
+                {
+                    pawnHeight = Mathf.Clamp(share * OldStandardHeight, HeightLeast, HeightMost);
+                }
+            }
             Scribe_Values.Look(ref headShrink, "headShrink", DefaultShrink);
             Scribe_Values.Look(ref genderSizes, "genderSizes", true);
             Scribe_Values.Look(ref heightSpread, "heightSpread", DefaultHeightSpread);
+            Scribe_Values.Look(ref agingLooks, "agingLooks", true);
+            Scribe_Values.Look(ref greyingHair, "greyingHair", true);
             Scribe_Values.Look(ref variedBodies, "variedBodies", true);
             Scribe_Values.Look(ref bodySpread, "bodySpread", DefaultBodySpread);
             Scribe_Values.Look(ref bodyShapeStrength, "bodyShapeStrength", 1f);
@@ -177,13 +203,15 @@ namespace M3AT
             Scribe_Values.Look(ref silhouetteOutlines, "silhouetteOutlines", true);
             Scribe_Values.Look(ref clothesOcclusion, "clothesOcclusion", true);
             Scribe_Values.Look(ref fewerPoses, "fewerPoses", false);
-            Scribe_Values.Look(ref gpuSkinning, "gpuSkinning", true);
+            // Saved under a new key since the option moved to Advanced, so anyone who had turned it off has it back on once.
+            Scribe_Values.Look(ref gpuSkinning, "gpuSkinningOn", true);
             Scribe_Values.Look(ref firstPersonEye, "firstPersonEye", true);
             Scribe_Values.Look(ref hairDetail, "hairDetail", DefaultHairDetail);
             Scribe_Values.Look(ref freecamOn, "freecamOn", false);
             Scribe_Values.Look(ref freecam3D, "freecam3D", false);
             Scribe_Values.Look(ref freecamClickOffLooks, "freecamClickOffLooks", false);
             Scribe_Values.Look(ref freecamPointerBack, "freecamPointerBack", true);
+            Scribe_Values.Look(ref freecamPointerDot, "freecamPointerDot", true);
             Scribe_Values.Look(ref freecamMenuFreesPointer, "freecamMenuFreesPointer", true);
             Scribe_Values.Look(ref freecamButton, "freecamButton", 2);
             Scribe_Values.Look(ref freecamSensitivity, "freecamSensitivity", DefaultFreecamSensitivity);
@@ -207,6 +235,16 @@ namespace M3AT
             {
                 offHandGrips = new Dictionary<string, Vector2>();
             }
+            Scribe_Collections.Look(ref faceTunes, "faceTunes", LookMode.Value, LookMode.Value);
+            if (faceTunes == null)
+            {
+                faceTunes = new Dictionary<string, Vector3>();
+            }
+            Scribe_Collections.Look(ref mouthTunes, "mouthTunes", LookMode.Value, LookMode.Value);
+            if (mouthTunes == null)
+            {
+                mouthTunes = new Dictionary<string, Vector3>();
+            }
             Scribe_Collections.Look(ref clothingChoices, "clothingChoices", LookMode.Value, LookMode.Value);
             if (clothingChoices == null)
             {
@@ -226,8 +264,7 @@ namespace M3AT
         // The slider moves in these steps, as every amount it passes through makes and keeps another shape per body type.
         private const float ShrinkStep = 0.05f;
         private const float BodyShapeStep = 0.05f;   // the body shape strength slider's step, as each amount makes its own shapes
-        private const float SizeStep = 0.05f;   // the pawn size slider's steps
-        private const float SizeLeast = 0.5f, SizeMost = 1.5f;
+        private const float HeightStep = 0.05f;   // cells, the pawn height slider's steps
         private const float WeaponStep = 0.05f;   // the weapon size sliders' steps
         private const float WeaponLeast = 0.25f, WeaponMost = 2f;   // against the ground
         private const float SlabLeast = 0.3f, SlabMost = 1.2f;   // a sprite slab's share of its type's size
@@ -281,43 +318,47 @@ namespace M3AT
             weaponModelsBaked = Settings.retexturedWeaponModels;
         }
 
-        // The options' sections, in the order they are read: down the first column, then the second, then the third. Where
-        // the columns break is worked out from how tall each section came out (Columns), so they come out even whatever the
-        // window's width or the wrapping of the text.
+        // The options' sections, in the order they are read: down the first column, then the second. Two columns rather
+        // than three, so the long labels and sliders have room. The freecam always heads the second column and the
+        // weapon sizes always end it (Pinned); the sections between flow from the bottom of the first column to under
+        // the freecam, and where they break is worked out from how tall each section came out (Columns), so the
+        // columns come out even whatever the window's width or the wrapping of the text.
         private static readonly System.Action<Listing_Standard>[] Sections =
         {
-            PawnsSection, ClothesSection, InjuriesSection, DrawingSection, CombatSection, WeaponSizesSection,
-            PerformanceSection, ProblemsSection, FreecamSection,
+            PawnsSection, ClothesSection, InjuriesSection, DrawingSection, CombatSection,
+            PerformanceSection, ProblemsSection, AdvancedSection,
         };
-        private const int ColumnCount = 3;
+        private static readonly System.Action<Listing_Standard> PinnedTop = FreecamSection;
+        private static readonly System.Action<Listing_Standard> PinnedBottom = WeaponSizesSection;
+        private const int ColumnCount = 2;
         private const float SectionGap = 12f;   // px between two sections in a column, as the listing's own Gap
 
-        // Each section's height, px, as last drawn, and the section each column after the first starts at.
-        private static readonly float[] sectionHeights = new float[Sections.Length];
-        private static int[] columnStarts;
+        // Each section's height, px, as last drawn (the flowing ones, then the pinned top and bottom), and the flowing
+        // section the second column carries on from.
+        private static readonly float[] sectionHeights = new float[Sections.Length + 2];
+        private static int columnBreak = -1;
         // The columns are worked out again only as the window opens (or its width changes), not while it is open, so a
         // section doesn't jump to another column under the pointer when a checkbox shows or hides the options under it.
         private static bool relayout = true;
         private static float laidOutWidth = -1f;
         private static bool measured;   // every section has been drawn once, so sectionHeights holds them all
 
-        // The breaks (the sections kept in order) that make the tallest column shortest. Every pair of breaks is tried:
-        // there are only a few dozen.
-        private static int[] Columns()
+        // The break (the sections kept in order) that makes the taller column shortest. Every break is tried, the
+        // second column counted with its pinned sections.
+        private static int Columns()
         {
             int n = Sections.Length;
-            int[] best = null;
+            int best = n;
             float bestTallest = float.MaxValue;
-            for (int a = 1; a < n - 1; a++)
+            float pinned = sectionHeights[n] + sectionHeights[n + 1] + SectionGap;
+            for (int a = 1; a <= n; a++)
             {
-                for (int b = a + 1; b < n; b++)
+                float right = pinned + (a < n ? ColumnHeight(a, n) + 2f * SectionGap : 0f);
+                float tallest = Mathf.Max(ColumnHeight(0, a), right);
+                if (tallest < bestTallest - 0.5f)
                 {
-                    float tallest = Mathf.Max(ColumnHeight(0, a), Mathf.Max(ColumnHeight(a, b), ColumnHeight(b, n)));
-                    if (tallest < bestTallest - 0.5f)
-                    {
-                        bestTallest = tallest;
-                        best = new[] { a, b };
-                    }
+                    bestTallest = tallest;
+                    best = a;
                 }
             }
             return best;
@@ -344,7 +385,8 @@ namespace M3AT
             {
                 if (field.IsInitOnly || field.Name == nameof(Settings.freecamOn) || field.Name == nameof(Settings.freecam3D)
                     || field.Name == nameof(Settings.gripOverrides) || field.Name == nameof(Settings.offHandGrips)
-                    || field.Name == nameof(Settings.clothingChoices))   // the player's own work, not an option: cleared by its own button
+                    || field.Name == nameof(Settings.clothingChoices)
+                    || field.Name == nameof(Settings.faceTunes) || field.Name == nameof(Settings.mouthTunes))   // the player's own work, not an option: cleared by its own button
                 {
                     continue;
                 }
@@ -430,6 +472,16 @@ namespace M3AT
             return def == null ? "?" : def.MainKey == KeyCode.None ? "M3AT_Unbound".Translate() : def.MainKeyLabel;
         }
 
+        private static string PointerPlaceName(bool back)
+        {
+            return back ? "M3AT_FreecamPointerLast".Translate() : "M3AT_FreecamPointerCross".Translate();
+        }
+
+        private static string MenuSelectName(bool pointer)
+        {
+            return pointer ? "M3AT_FreecamMenuPointer".Translate() : "M3AT_FreecamMenuCrosshair".Translate();
+        }
+
         private static string ButtonName(int button)
         {
             return button == 2 ? "M3AT_MiddleButton".Translate() : button == 3 ? "M3AT_MouseButton4".Translate() : button == 4 ? "M3AT_MouseButton5".Translate() : "M3AT_NoButton".Translate();
@@ -455,8 +507,13 @@ namespace M3AT
         private static void PawnsSection(Listing_Standard list)
         {
             Header(list, "M3AT_Pawns".Translate());
-            Settings.pawnSize = Mathf.Round(Slider(list, "M3AT_PawnSize".Translate(), Settings.pawnSize.ToStringPercent(), Settings.pawnSize, SizeLeast, SizeMost,
-                "M3AT_PawnSizeTip".Translate()) / SizeStep) * SizeStep;
+            // An absolute height, shown with its share of the export's standard; back at the standard it is the default
+            // again, so it follows the standard if that changes.
+            float standard = WalkFigures.StandardHeight;
+            float height = Settings.pawnHeight > 0f ? Settings.pawnHeight : standard;
+            height = Mathf.Round(Slider(list, "M3AT_PawnSize".Translate(), "M3AT_PawnHeightValue".Translate(height.ToString("0.00"), (height / standard).ToStringPercent()),
+                height, Settings.HeightLeast, Settings.HeightMost, "M3AT_PawnSizeTip".Translate()) / HeightStep) * HeightStep;
+            Settings.pawnHeight = Mathf.Abs(height - standard) < HeightStep * 0.5f ? -1f : height;
             // Shown as how much smaller the head is than the full chibi head's, measured, not the key's amount.
             float shrink = Slider(list, "M3AT_HeadShrink".Translate(), (1f - HeadSize(Settings.headShrink)).ToStringPercent(), Settings.headShrink, 0f, 1f,
                 "M3AT_HeadShrinkTip".Translate());
@@ -466,6 +523,10 @@ namespace M3AT
             Settings.heightSpread = Mathf.Round(spread * 200f) / 200f;
             list.CheckboxLabeled("M3AT_GenderSizes".Translate(), ref Settings.genderSizes,
                 "M3AT_GenderSizesTip".Translate());
+            list.CheckboxLabeled("M3AT_AgingLooks".Translate(), ref Settings.agingLooks,
+                "M3AT_AgingLooksTip".Translate());
+            list.CheckboxLabeled("M3AT_GreyingHair".Translate(), ref Settings.greyingHair,
+                "M3AT_GreyingHairTip".Translate());
             Settings.bodyShapeStrength = Mathf.Round(Slider(list, "M3AT_BodyShapeStrength".Translate(), Settings.bodyShapeStrength.ToStringPercent(),
                 Settings.bodyShapeStrength, 0f, WalkFigures.BodyShapeMost, "M3AT_BodyShapeStrengthTip".Translate()) / BodyShapeStep) * BodyShapeStep;
             list.CheckboxLabeled("M3AT_VariedBodies".Translate(), ref Settings.variedBodies,
@@ -477,8 +538,6 @@ namespace M3AT
                     "M3AT_BodyVarietyTip".Translate(Settings.DefaultBodySpread.ToStringPercent())) * 20f) / 20f;
                 EndSubOptions(list);
             }
-            Settings.hairDetail = Mathf.Round(Slider(list, "M3AT_HairDetail".Translate(), Settings.hairDetail.ToStringPercent(), Settings.hairDetail, HairDetailLeast, 1f,
-                "M3AT_HairDetailTip".Translate(Settings.DefaultHairDetail.ToStringPercent())) / HairDetailStep) * HairDetailStep;
             if (list.ButtonTextLabeledPct("M3AT_Beards".Translate(), BeardName(Settings.beardMode), SliderLabelShare, TextAnchor.MiddleLeft, null,
                 "M3AT_BeardsTip".Translate()))
             {
@@ -605,10 +664,6 @@ namespace M3AT
                 "M3AT_HitFlashTip".Translate());
             list.CheckboxLabeled("M3AT_AutoGrips".Translate(), ref Settings.autoGrips,
                 "M3AT_AutoGripsTip".Translate());
-            list.CheckboxLabeled("M3AT_GripToolButton".Translate(), ref Settings.gripToolButton,
-                "M3AT_GripToolButtonTip".Translate());
-            list.CheckboxLabeled("M3AT_GripTool".Translate(), ref Settings.gripTool,
-                "M3AT_GripToolTip".Translate());
             int adjusted = Settings.gripOverrides.Keys.Union(Settings.offHandGrips.Keys).Count();
             if (adjusted > 0 && list.ButtonText("M3AT_GripClearAll".Translate(adjusted)))
             {
@@ -673,10 +728,10 @@ namespace M3AT
         private static void PerformanceSection(Listing_Standard list)
         {
             Header(list, "M3AT_Performance".Translate());
-            list.CheckboxLabeled("M3AT_GpuSkinning".Translate(), ref Settings.gpuSkinning,
-                "M3AT_GpuSkinningTip".Translate());
             list.CheckboxLabeled("M3AT_FewerPoses".Translate(), ref Settings.fewerPoses,
                 "M3AT_FewerPosesTip".Translate());
+            Settings.hairDetail = Mathf.Round(Slider(list, "M3AT_HairDetail".Translate(), Settings.hairDetail.ToStringPercent(), Settings.hairDetail, HairDetailLeast, 1f,
+                "M3AT_HairDetailTip".Translate(Settings.DefaultHairDetail.ToStringPercent())) / HairDetailStep) * HairDetailStep;
         }
 
         // A report for the Workshop's bug thread (BugReport.cs), and every option back to its default.
@@ -718,20 +773,71 @@ namespace M3AT
             {
                 Find.WindowStack.Add(Dialog_MessageBox.CreateConfirmation("M3AT_RestoreDefaultsConfirm".Translate(), RestoreDefaults, true));
             }
-#if FACE_TUNING
-            // The face tuning window (FaceTuning.cs), opened over the map with the options closed so the face can be seen.
-            if (Current.ProgramState == ProgramState.Playing && list.ButtonText("Face tuning window (temporary)"))
+        }
+
+        private static bool advancedOpen;   // the Advanced section shown (not saved: closed each time the options open)
+
+        // Tools few players need, folded away until its header is clicked: so far the face tuning (FaceTuning.cs), opened
+        // over the map with the options closed so the face can be seen.
+        private static void AdvancedSection(Listing_Standard list)
+        {
+            Text.Font = GameFont.Medium;
+            Rect header = list.GetRect(Text.LineHeight);
+            float icon = Text.LineHeight * 0.6f;
+            GUI.DrawTexture(new Rect(header.x, header.y + (header.height - icon) / 2f, icon, icon), advancedOpen ? TexButton.Collapse : TexButton.Reveal);
+            Widgets.Label(new Rect(header.x + icon + 6f, header.y, header.width - icon - 6f, header.height), "M3AT_Advanced".Translate());
+            Text.Font = GameFont.Small;
+            Widgets.DrawHighlightIfMouseover(header);
+            TooltipHandler.TipRegion(header, "M3AT_AdvancedTip".Translate());
+            if (Widgets.ButtonInvisible(header))
             {
-                foreach (Window w in Find.WindowStack.Windows.ToList())
-                {
-                    if (w.GetType().Name == "Dialog_ModSettings" || w.GetType().Name == "Dialog_Options")
-                    {
-                        w.Close(false);
-                    }
-                }
-                FaceTuning.Open();
+                advancedOpen = !advancedOpen;
             }
-#endif
+            list.GapLine(6f);
+            if (!advancedOpen)
+            {
+                return;
+            }
+            Text.Font = GameFont.Small;
+            list.Label("M3AT_FaceTuningHeader".Translate());
+            list.Label("M3AT_FaceTuningIntro".Translate());
+            if (Current.ProgramState == ProgramState.Playing)
+            {
+                if (list.ButtonText("M3AT_FaceTuningOpen".Translate()))
+                {
+                    foreach (Window w in Find.WindowStack.Windows.ToList())
+                    {
+                        if (w.GetType().Name == "Dialog_ModSettings" || w.GetType().Name == "Dialog_Options")
+                        {
+                            w.Close(false);
+                        }
+                    }
+                    FaceTuning.Open();
+                }
+            }
+            else
+            {
+                list.Label("M3AT_FaceTuningNeedsGame".Translate());
+            }
+            int faced = Settings.faceTunes.Keys.Union(Settings.mouthTunes.Keys).Count();
+            if (faced > 0 && list.ButtonText("M3AT_FaceClearAll".Translate(faced)))
+            {
+                Find.WindowStack.Add(Dialog_MessageBox.CreateConfirmation("M3AT_FaceClearAllConfirm".Translate(faced), () =>
+                {
+                    Settings.faceTunes.Clear();
+                    Settings.mouthTunes.Clear();
+                }, true));
+            }
+            // Here, folded away, rather than under Performance: it is much faster and should stay on, kept only for a
+            // graphics driver that poses pawns wrongly on the graphics card.
+            list.Gap(6f);
+            list.CheckboxLabeled("M3AT_GpuSkinning".Translate(), ref Settings.gpuSkinning,
+                "M3AT_GpuSkinningTip".Translate());
+            // The freecam's, here rather than in its own section, which is long enough: few will want it.
+            list.CheckboxLabeled("M3AT_FreecamClickOffLooks".Translate(), ref Settings.freecamClickOffLooks,
+                "M3AT_FreecamClickOffLooksTip".Translate());
+            list.CheckboxLabeled("M3AT_GripToolButton".Translate(), ref Settings.gripToolButton,
+                "M3AT_GripToolButtonTip".Translate());
         }
 
         // The freecam (Freecam.cs): its keys, pointer and flying.
@@ -757,12 +863,33 @@ namespace M3AT
                 }
                 Find.WindowStack.Add(new FloatMenu(buttons));
             }
-            list.CheckboxLabeled("M3AT_FreecamClickOffLooks".Translate(), ref Settings.freecamClickOffLooks,
-                "M3AT_FreecamClickOffLooksTip".Translate());
-            list.CheckboxLabeled("M3AT_FreecamPointerBack".Translate(), ref Settings.freecamPointerBack,
-                "M3AT_FreecamPointerBackTip".Translate());
-            list.CheckboxLabeled("M3AT_FreecamMenuFreesPointer".Translate(), ref Settings.freecamMenuFreesPointer,
-                "M3AT_FreecamMenuFreesPointerTip".Translate());
+            // Where the freed pointer appears: back where it was when looking began, or under the cross.
+            if (list.ButtonTextLabeledPct("M3AT_FreecamPointerBack".Translate(), PointerPlaceName(Settings.freecamPointerBack), SliderLabelShare, TextAnchor.MiddleLeft, null,
+                "M3AT_FreecamPointerBackTip".Translate()))
+            {
+                List<FloatMenuOption> places = new List<FloatMenuOption>();
+                foreach (bool back in new[] { true, false })
+                {
+                    bool picked = back;
+                    places.Add(new FloatMenuOption(PointerPlaceName(back), () => Settings.freecamPointerBack = picked));
+                }
+                Find.WindowStack.Add(new FloatMenu(places));
+            }
+            // The dot marks the last position, so it only has a say while the cursor goes back there.
+            if (Settings.freecamPointerBack)
+                list.CheckboxLabeled("M3AT_FreecamPointerDot".Translate(), ref Settings.freecamPointerDot,
+                    "M3AT_FreecamPointerDotTip".Translate());
+            if (list.ButtonTextLabeledPct("M3AT_FreecamMenuFreesPointer".Translate(), MenuSelectName(Settings.freecamMenuFreesPointer), SliderLabelShare, TextAnchor.MiddleLeft, null,
+                "M3AT_FreecamMenuFreesPointerTip".Translate()))
+            {
+                List<FloatMenuOption> kinds = new List<FloatMenuOption>();
+                foreach (bool pointer in new[] { true, false })
+                {
+                    bool picked = pointer;
+                    kinds.Add(new FloatMenuOption(MenuSelectName(pointer), () => Settings.freecamMenuFreesPointer = picked));
+                }
+                Find.WindowStack.Add(new FloatMenu(kinds));
+            }
             Settings.freecamSensitivity = Mathf.Round(Slider(list, "M3AT_LookSpeed".Translate(), Settings.freecamSensitivity.ToString("0.00"), Settings.freecamSensitivity, 0.02f, 0.6f,
                 "M3AT_LookSpeedTip".Translate(Settings.DefaultFreecamSensitivity.ToString("0.00"))) * 100f) / 100f;
             list.CheckboxLabeled("M3AT_InvertMouse".Translate(), ref Settings.freecamInvertY, "M3AT_InvertMouseTip".Translate());
@@ -788,34 +915,39 @@ namespace M3AT
             }
             // Until the sections have been drawn once there is nothing to go by, so the first draw takes a guess and the
             // next lays them out.
-            if (columnStarts == null || (relayout && measured))
+            if (columnBreak < 0 || (relayout && measured))
             {
-                columnStarts = measured ? Columns() : new[] { 4, 7 };
+                columnBreak = measured ? Columns() : 5;
                 relayout = !measured;
             }
             Widgets.BeginScrollView(inRect, ref scroll, view);
             // The columns are started by hand: the listing's rect is far taller than any of them, so it never starts one
-            // itself, and the tallest is measured before each new one so the scroll view knows how far to go.
+            // itself, and the first is measured before the second starts so the scroll view knows how far to go.
             Listing_Standard list = new Listing_Standard { ColumnWidth = (view.width - (ColumnCount - 1) * Listing.ColumnSpacing) / ColumnCount };
             list.Begin(new Rect(view.x, view.y, view.width, 100000f));
-            float tallest = 0f;
-            int column = 0;
-            for (int i = 0; i < Sections.Length; i++)
+            int n = Sections.Length;
+            void Draw(System.Action<Listing_Standard> section, int slot, bool first)
             {
-                if (column < columnStarts.Length && i == columnStarts[column])
-                {
-                    tallest = Mathf.Max(tallest, list.CurHeight);
-                    list.NewColumn();
-                    column++;
-                }
-                else if (i > 0)
+                if (!first)
                 {
                     list.Gap(SectionGap);
                 }
                 float top = list.CurHeight;
-                Sections[i](list);
-                sectionHeights[i] = list.CurHeight - top;
+                section(list);
+                sectionHeights[slot] = list.CurHeight - top;
             }
+            for (int i = 0; i < columnBreak; i++)
+            {
+                Draw(Sections[i], i, i == 0);
+            }
+            float tallest = list.CurHeight;
+            list.NewColumn();
+            Draw(PinnedTop, n, true);
+            for (int i = columnBreak; i < n; i++)
+            {
+                Draw(Sections[i], i, false);
+            }
+            Draw(PinnedBottom, n + 1, false);
             measured = true;
             shownHeight = Mathf.Max(tallest, list.CurHeight) + 12f;
             list.End();

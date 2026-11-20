@@ -46,8 +46,6 @@ namespace M3AT
             public bool lowUsed;    // mouthLow has been drawn, so a moving patch keeps its vertices posed (SkinnedFigure)
             public Vector3 centre;
             public bool smooth;   // carries normals (SkinnedFigure): shaded smoothly as the body is (MarusFace.frag.glsl _Smooth)
-            public List<Vector2> restUvs;   // the exported texture places, which FaceTuning moves from
-            public int tuned;               // the FaceTuning.Version its meshes' texture places were last laid for
             // Posed on the graphics card (SkinnedFigure.FaceOnGpu): the pawn's bones (three rows each, null when posed on the
             // CPU), counted up whenever they change, and its own blocks carrying them (BlockFor), each with the count it last
             // took them at, as the bones differ from pawn to pawn.
@@ -438,7 +436,7 @@ namespace M3AT
                 tris.Add(i);
             }
             List<Vector2> placed = Tuned(uvs);
-            return new Patch { face = MeshOf(verts, placed, tris), mouth = MeshOf(verts, Zoomed(placed, MouthRaise), tris), mouthLow = MeshOf(verts, Zoomed(placed, MouthRaisePig), tris), centre = centre, restUvs = uvs, tuned = FaceTuning.Version };
+            return new Patch { face = MeshOf(verts, placed, tris), mouth = MeshOf(verts, Zoomed(placed, MouthRaise), tris), mouthLow = MeshOf(verts, Zoomed(placed, MouthRaisePig), tris), centre = centre };
         }
 
         // A patch whose vertices are moved every frame (SkinnedFigure), made from its rest pose. The face and mouth meshes
@@ -449,7 +447,7 @@ namespace M3AT
             List<Vector2> uv = new List<Vector2>(uvs);
             List<Vector2> placed = Tuned(uv);
             List<int> t = new List<int>(tris);
-            Patch p = new Patch { face = MeshOf(v, placed, t), mouth = MeshOf(v, Zoomed(placed, MouthRaise), t), mouthLow = MeshOf(v, Zoomed(placed, MouthRaisePig), t), centre = centre, restUvs = uv, tuned = FaceTuning.Version };
+            Patch p = new Patch { face = MeshOf(v, placed, t), mouth = MeshOf(v, Zoomed(placed, MouthRaise), t), mouthLow = MeshOf(v, Zoomed(placed, MouthRaisePig), t), centre = centre };
             p.face.MarkDynamic();
             p.mouth.MarkDynamic();
             p.mouthLow.MarkDynamic();
@@ -460,13 +458,13 @@ namespace M3AT
         // Set once, roomy enough for any pose (cells, the model's own space): it is only for culling.
         public static readonly Bounds PatchBounds = new Bounds(new Vector3(0f, 0.7f, 0f), new Vector3(2.5f, 2f, 2.5f));
 
-        // The mouth's texture places: enlarged round the mouth and moved up the face by raise (texture widths). FaceTuning's
-        // mouth numbers go on top (temporary, for lining the face up in game).
+        // The mouth's texture places: enlarged round the mouth and moved up the face by raise (texture widths). The player's
+        // tuning of each face mod goes on top in the shader (FaceTuning.cs, TuneOf).
         private static List<Vector2> Zoomed(List<Vector2> uvs, float raise)
         {
             List<Vector2> zoomed = new List<Vector2>(uvs.Count);
-            Vector2 shift = new Vector2(FaceTuning.mouthX, raise + FaceTuning.mouthY);
-            float zoom = MouthZoom * FaceTuning.mouthScale;
+            Vector2 shift = new Vector2(0f, raise);
+            float zoom = MouthZoom;
             for (int i = 0; i < uvs.Count; i++)
             {
                 zoomed.Add(MouthCentre + (uvs[i] - MouthCentre - shift) / zoom);
@@ -478,35 +476,19 @@ namespace M3AT
         // little high on the chibi's head). The ridges, the flat beard and eye wounds share the patch, so move with it.
         internal const float FaceRaise = -0.006f;
 
-        // The whole face's texture places moved up by FaceRaise, then moved and scaled about the eye line by FaceTuning
-        // (texture widths; up and to the pawn's left, as the art moves, so the places move the other way).
-        private static readonly Vector2 FacePivot = new Vector2(0.5f, 1f - 70.6f / 128f);
+        // The whole face's texture places moved up by FaceRaise (texture widths; up, as the art moves, so the places move
+        // the other way). The player's tuning of each face mod is moved and scaled about the eye line (FacePivot) in the
+        // shader, per layer (FaceTuning.cs), so the ridges, flat beard and wounds sharing the patch stay put.
+        internal static readonly Vector2 FacePivot = new Vector2(0.5f, 1f - 70.6f / 128f);
         private static List<Vector2> Tuned(List<Vector2> uvs)
         {
             List<Vector2> moved = new List<Vector2>(uvs.Count);
-            Vector2 shift = new Vector2(FaceTuning.faceX, FaceRaise + FaceTuning.faceY);
+            Vector2 shift = new Vector2(0f, FaceRaise);
             for (int i = 0; i < uvs.Count; i++)
             {
-                moved.Add(FacePivot + (uvs[i] - FacePivot - shift) / FaceTuning.faceScale);
+                moved.Add(uvs[i] - shift);
             }
             return moved;
-        }
-
-        // Lays the patch's texture places again when the tuning has changed since they were last laid.
-        private static void Retune(Patch patch)
-        {
-            if (patch.tuned == FaceTuning.Version || patch.restUvs == null)
-            {
-                return;
-            }
-            patch.tuned = FaceTuning.Version;
-            List<Vector2> face = Tuned(patch.restUvs);
-            patch.face.SetUVs(0, face);
-            patch.mouth.SetUVs(0, Zoomed(face, MouthRaise));
-            if (patch.mouthLow != null)
-            {
-                patch.mouthLow.SetUVs(0, Zoomed(face, MouthRaisePig));
-            }
         }
 
         private static float Num(string s)
@@ -803,8 +785,9 @@ namespace M3AT
                     KeepController(f, tick);
                     updateMethod.Invoke(f.master, null);
                 }
-                Retune(patch);
                 Matrix4x4 placed = PlacedAt(position, yaw, size);
+                drawEyeTune = Vector3.zero;
+                BeginTuneNotes(pawn);
                 if (f.whiteTick != tick)
                 {
                     f.whiteTick = tick;
@@ -858,6 +841,7 @@ namespace M3AT
                     if (kind == "EyeballControllerComp" && f.layers[i].EndsWith("_Basic", StringComparison.Ordinal))
                     {
                         NoteEyeLayer(g, f.layers[i], shift);   // for a prosthetic eye's iris
+                        drawEyeTune = TuneOf(g, kind, 0f);     // and the eye wounds, tuned with the eyes
                     }
                     if (!woundsDrawn)
                     {
@@ -954,6 +938,7 @@ namespace M3AT
             public string kind, layer;
             public int cut;
             public Vector2 shift;   // Facial Animation's offset now (ShiftOf), texture places
+            public Vector3 tune;    // the player's tuning of its mod (TuneOf): scale less 1, then the offset
         }
 
         private struct Stacked
@@ -965,6 +950,7 @@ namespace M3AT
             public int call;   // its LayerCall, for one drawn on its own (Solo)
             public Vector2 shift;
             public float spread;   // its halves moved apart (RaceEyeSpread)
+            public Vector3 tune;   // the player's tuning of its mod (TuneOf)
         }
 
         private static readonly List<LayerCall> calls = new List<LayerCall>();
@@ -977,13 +963,14 @@ namespace M3AT
         // One layer: drawn now, or kept for DrawStacked.
         private static void Layer(bool stacking, Graphic g, string kind, string layer, int cut, Vector2 shift, Patch patch, Mesh mouth, Matrix4x4 placed, ref int place)
         {
+            Vector3 tune = TuneOf(g, kind, mouth == patch.mouthLow ? MouthRaisePig : MouthRaise);
             if (stacking)
             {
-                calls.Add(new LayerCall { g = g, kind = kind, layer = layer, cut = cut, shift = shift });
+                calls.Add(new LayerCall { g = g, kind = kind, layer = layer, cut = cut, shift = shift, tune = tune });
             }
             else
             {
-                DrawLayer(g, kind, layer, cut, shift, patch, mouth, placed, ref place);
+                DrawLayer(g, kind, layer, cut, shift, tune, patch, mouth, placed, ref place);
             }
         }
 
@@ -1009,7 +996,7 @@ namespace M3AT
                     // Facial Animation's own material, which only it can draw: every layer a draw of its own, in order.
                     for (int k = 0; k < calls.Count; k++)
                     {
-                        DrawLayer(calls[k].g, calls[k].kind, calls[k].layer, calls[k].cut, calls[k].shift, patch, mouth, placed, ref place);
+                        DrawLayer(calls[k].g, calls[k].kind, calls[k].layer, calls[k].cut, calls[k].shift, calls[k].tune, patch, mouth, placed, ref place);
                     }
                     return;
                 }
@@ -1023,7 +1010,7 @@ namespace M3AT
                 }
                 if (mode == ModeGlow)
                 {
-                    DrawLayer(call.g, call.kind, call.layer, call.cut, call.shift, patch, mouth, placed, ref place);
+                    DrawLayer(call.g, call.kind, call.layer, call.cut, call.shift, call.tune, patch, mouth, placed, ref place);
                     continue;
                 }
                 // Its colours and mask as LitFor gives its own material.
@@ -1051,7 +1038,7 @@ namespace M3AT
                 {
                     colour *= whiteTint;
                 }
-                stack.Add(new Stacked { tex = gm.mainTexture, mask = mask, colour = colour, colourTwo = two, mode = mode, cut = call.cut, mouth = call.kind == "MouthControllerComp", call = i, shift = call.shift, spread = SpreadOf(call.kind) });
+                stack.Add(new Stacked { tex = gm.mainTexture, mask = mask, colour = colour, colourTwo = two, mode = mode, cut = call.cut, mouth = call.kind == "MouthControllerComp", call = i, shift = call.shift, spread = SpreadOf(call.kind), tune = call.tune });
             }
             Vector4 mouthMap = MouthMap(mouth == patch.mouthLow ? MouthRaisePig : MouthRaise);
 #if AUTOTEST
@@ -1093,7 +1080,7 @@ namespace M3AT
                 if (solo)
                 {
                     LayerCall call = calls[stack[i].call];
-                    DrawLayer(call.g, call.kind, call.layer, call.cut, call.shift, patch, mouth, placed, ref place);
+                    DrawLayer(call.g, call.kind, call.layer, call.cut, call.shift, call.tune, patch, mouth, placed, ref place);
                     from = i + 1;
                 }
                 else
@@ -1114,8 +1101,8 @@ namespace M3AT
         // The mouth's texture places from the face's, as Zoomed makes the mouth's: scale in xy, offset in zw.
         private static Vector4 MouthMap(float raise)
         {
-            Vector2 shift = new Vector2(FaceTuning.mouthX, raise + FaceTuning.mouthY);
-            float zoom = MouthZoom * FaceTuning.mouthScale;
+            Vector2 shift = new Vector2(0f, raise);
+            float zoom = MouthZoom;
             Vector2 offset = MouthCentre - (MouthCentre + shift) / zoom;
             return new Vector4(1f / zoom, 1f / zoom, offset.x, offset.y);
         }
@@ -1333,7 +1320,7 @@ namespace M3AT
         private const float StonedSteps = 8f;
         private const float StonedFull = 0.15f;   // SmokeleafHigh severity from which the tint is whole (about 3.6 game hours left)
 
-        private static void DrawLayer(Graphic g, string kind, string layer, int cut, Vector2 shift, Patch patch, Mesh mouth, Matrix4x4 placed, ref int place)
+        private static void DrawLayer(Graphic g, string kind, string layer, int cut, Vector2 shift, Vector3 tune, Patch patch, Mesh mouth, Matrix4x4 placed, ref int place)
         {
             Material gm = g != null ? g.MatSouth : null;
             if (gm == null || gm.mainTexture == null || IsDummy(g) || cut == CutBoth)
@@ -1373,7 +1360,7 @@ namespace M3AT
                 mat.color *= whiteTint;   // (LitFor copies the colour afresh each draw)
             }
             MaterialPropertyBlock block = mode >= 0 ? BlockFor(patch, patch.smooth, cut) : null;
-            SetShift(block, shift, SpreadOf(kind));
+            SetShift(block, shift, SpreadOf(kind), tune);
             Api.SubmitFigureMesh(kind == "MouthControllerComp" ? mouth : patch.face, mat, placed * local, block,
                 FigureMeshFlags.NoCull, 0, mode >= 0 ? Flash : 0f);
             place++;
@@ -1388,6 +1375,8 @@ namespace M3AT
             public Vector4 frame;   // its middle (texture places on the face), then its way across over its span (cos, sin)
             public Vector4 cell;    // its square on the wound sheet: place and size
             public Color colour;    // times the sheet; as a Decal's, alpha under 1 makes it a scar, this the skin colour
+            public Vector4 ramp;    // its recolouring cell (make_prosthetic_decals.py's RAMPS), used in place of cell on a measured
+                                    // iris: the iris's own art redrawn in its colours; zero for none
             public bool fitIris;    // a prosthetic eye's iris: laid on Facial Animation's iris on that half (frame.x), at its size,
                                     // cut to it and moved with its gaze (IrisOn); else as frame has it, cut to the white
         }
@@ -1395,6 +1384,7 @@ namespace M3AT
         private const int ModeEyeWound = 7;
         private static readonly int woundAtId = Shader.PropertyToID("_WoundAt");
         private static readonly int woundCellId = Shader.PropertyToID("_WoundCell");
+        private static readonly int recolourId = Shader.PropertyToID("_Recolour");
         private static readonly int maskTwoId = Shader.PropertyToID("_MaskTwo");
         private static readonly Dictionary<WoundKey, Material> woundMaterials = new Dictionary<WoundKey, Material>();
 
@@ -1426,6 +1416,7 @@ namespace M3AT
                 Vector2 shift = Vector2.zero;
                 Iris fitted;
                 EyeLayer layer;
+                bool recolour = false;
                 if (w.fitIris)
                 {
                     shape = iris ?? white;   // unmeasured: cut to the iris all the same, as the art fills its square
@@ -1436,8 +1427,17 @@ namespace M3AT
                     w.frame = new Vector4(fitted.middle.x, fitted.middle.y, IrisArtShare / fitted.radius, 0f);
                     shape = layer.tex;
                     shift = layer.shift;
+                    if (w.ramp.z > 0f)
+                    {
+                        w.cell = w.ramp;
+                        recolour = true;
+                    }
                 }
-                WoundKey key = new WoundKey { iris = shape, white = null, place = place, frame = w.frame, cell = w.cell, colour = w.colour };
+                if (!recolour && w.cell.z <= 0f)
+                {
+                    continue;   // a recolouring only (age's haze), and the iris not measured
+                }
+                WoundKey key = new WoundKey { iris = shape, white = null, place = place, frame = w.frame, cell = w.cell, colour = w.colour, recolour = recolour };
                 Material m;
                 if (!woundMaterials.TryGetValue(key, out m))
                 {
@@ -1448,6 +1448,7 @@ namespace M3AT
                     m.SetFloat(faceModeId, ModeEyeWound);
                     m.SetVector(woundAtId, w.frame);
                     m.SetVector(woundCellId, w.cell);
+                    m.SetFloat(recolourId, recolour ? 1f : 0f);
                     // The eye's shape: its white, which covers the whole opening, iris and all, else the iris. In the first mask
                     // slot, which the other face layers use too: a texture set on the second (_MaskTwo) read as clear in the game.
                     m.SetTexture(ShaderPropertyIDs.MaskTex, shape ?? BaseContent.ClearTex);
@@ -1456,7 +1457,7 @@ namespace M3AT
                     woundMaterials[key] = m;
                 }
                 MaterialPropertyBlock block = BlockFor(patch, patch.smooth, cut);
-                SetShift(block, shift, drawSpread);   // on the eye, so moved out with it
+                SetShift(block, shift, drawSpread, drawEyeTune);   // on the eye, so moved out and tuned with it
                 Api.SubmitFigureMesh(patch.face, m, drawn, block, FigureMeshFlags.NoCull);
                 place++;
             }
@@ -1469,10 +1470,11 @@ namespace M3AT
             public int place;
             public Vector4 frame, cell;
             public Color colour;
+            public bool recolour;
 
             public bool Equals(WoundKey o)
             {
-                return iris == o.iris && white == o.white && place == o.place && frame == o.frame && cell == o.cell && colour == o.colour;
+                return iris == o.iris && white == o.white && place == o.place && frame == o.frame && cell == o.cell && colour == o.colour && recolour == o.recolour;
             }
 
             public override bool Equals(object o)

@@ -18,6 +18,10 @@ Early WIP, Main features:
 - CE support
 - Freecam mode
 
+## Making apparel and gene parts
+
+Other mods can add 3D garments, retexture M3AT's own, and add meshes drawn for genes, with no code: see [the modding docs](M3AT%3A%20Maru%27s%203D%20Animated%20Toons/Docs/README.md) (also in the mod's `Docs/` folder) and the Blender add-on there.
+
 ## Requirements
 
 - [Harmony](https://steamcommunity.com/sharedfiles/filedetails/?id=2009463077)

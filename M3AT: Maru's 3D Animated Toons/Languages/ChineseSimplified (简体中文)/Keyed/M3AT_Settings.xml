@@ -21,14 +21,19 @@
   <M3AT_BeardsOff>关闭</M3AT_BeardsOff>
   <M3AT_DefaultsRestored>M3AT 的设置已恢复为默认值。</M3AT_DefaultsRestored>
   <M3AT_Pawns>小人</M3AT_Pawns>
-  <M3AT_PawnSize>小人尺寸</M3AT_PawnSize>
-  <M3AT_PawnSizeTip>所有小人绘制的大小。100%（默认）为正常尺寸；儿童、性别和身高差异在此基础上叠加。只改变外观，不改变小人占据的空间。</M3AT_PawnSizeTip>
+  <M3AT_PawnSize>小人身高</M3AT_PawnSize>
+  <M3AT_PawnHeightValue>{0} 格（{1}）</M3AT_PawnHeightValue>
+  <M3AT_PawnSizeTip>成年小人绘制的身高，以地图格为单位；百分比相对于本模组的标准身高（100%，默认）。儿童、性别和身高差异在此基础上叠加。只改变外观，不改变小人占据的空间。</M3AT_PawnSizeTip>
   <M3AT_HeadShrink>头部缩小</M3AT_HeadShrink>
   <M3AT_HeadShrinkTip>头部比默认的 Q 版头小多少。最左：默认；向右：更小。不影响原版或 CE 的命中计算。</M3AT_HeadShrinkTip>
   <M3AT_HeightVariety>身高差异</M3AT_HeightVariety>
   <M3AT_HeightVarietyTip>小人身高的差异程度（默认 {0}）。采用正态分布：大多数接近正常尺寸，少数偏离较远。0% 时同性别的人一样高。每个小人的身高由其 ID 推算，因此不需要存档数据。</M3AT_HeightVarietyTip>
   <M3AT_GenderSizes>性别体型差异</M3AT_GenderSizes>
   <M3AT_GenderSizesTip>男性与女性有 10% 的体型差异，在青春期逐渐显现。关闭：两者一样大。</M3AT_GenderSizesTip>
+  <M3AT_AgingLooks>可见衰老</M3AT_AgingLooks>
+  <M3AT_AgingLooksTip>年长的小人从四十多岁起逐步出现皱纹，五十多岁后背部渐渐佝偻（背痛或虚弱时更甚），身高也略有降低；白内障会使眼睛浑浊。年龄按各种族的预期寿命计算。关闭：老人看起来和年轻人一样。</M3AT_AgingLooksTip>
+  <M3AT_GreyingHair>头发随年龄变白</M3AT_GreyingHair>
+  <M3AT_GreyingHairTip>小人变老时头发逐渐变灰，从游戏设定的颜色开始，所以生成时是深色头发的小人会保持深色，直到继续变老。染发或其他新的发色会按所选颜色显示，之后随年龄增长才再次变灰。拥有防止头发变白基因的小人永远不会变灰。只改变绘制效果：小人本身的发色不会被修改。</M3AT_GreyingHairTip>
   <M3AT_BodyShapeStrength>体型强度</M3AT_BodyShapeStrength>
   <M3AT_BodyShapeStrengthTip>瘦弱、肥胖和魁梧体型的明显程度（默认 100%）。调低则更接近标准体格，调高则更夸张；超过 100% 时衣物可能穿入身体。也会缩放“体格差异”产生的体格。男性和女性体型不受影响。</M3AT_BodyShapeStrengthTip>
   <M3AT_VariedBodies>体格差异</M3AT_VariedBodies>
@@ -102,7 +107,7 @@
   <M3AT_WeaponSizes>武器尺寸</M3AT_WeaponSizes>
   <M3AT_WeaponSizeTip>此类武器在小人手中或身上的大小，相对于同一武器放在地上时（默认 {0}）。100% 即 IsoRim 在地上绘制它的大小。</M3AT_WeaponSizeTip>
   <M3AT_SlabScale>按贴图绘制的武器</M3AT_SlabScale>
-  <M3AT_SlabScaleTip>没有 3D 模型的武器（多数其他模组的武器，或关闭 IsoRim 武器模型时的所有武器）会以从贴图切出的扁平板绘制，比 3D 模型显得更长。此项将其缩小以与模型相称（默认 {0}）。</M3AT_SlabScaleTip>
+  <M3AT_SlabScaleTip>没有 3D 模型的武器（多数其他模组的武器，或关闭 IsoRim 武器模型时的所有武器）会以从贴图切出的扁平板绘制，比 3D 模型显得更长。此项将其缩小以与模型相称，在上方各武器类型尺寸的基础上再相乘（默认 {0}）。</M3AT_SlabScaleTip>
   <M3AT_ResetWeaponSizes>重置武器尺寸</M3AT_ResetWeaponSizes>
   <M3AT_Performance>性能</M3AT_Performance>
   <M3AT_GpuSkinning>在显卡上计算动画</M3AT_GpuSkinning>
@@ -176,12 +181,18 @@
   <M3AT_FreecamKeyPointer>切换指针 / 环视</M3AT_FreecamKeyPointer>
   <M3AT_FreecamButton>切换指针（鼠标）</M3AT_FreecamButton>
   <M3AT_FreecamButtonTip>上面"切换指针"按键的鼠标按键版本：释放鼠标指针或回到环视。默认：鼠标中键</M3AT_FreecamButtonTip>
-  <M3AT_FreecamClickOffLooks>空白处左键退出指针模式</M3AT_FreecamClickOffLooks>
-  <M3AT_FreecamClickOffLooksTip>指针模式下，没有选中任何东西的左键点击会回到环视，与右键一样。关闭（默认）：只清除选择，与游戏中一样。</M3AT_FreecamClickOffLooksTip>
-  <M3AT_FreecamPointerBack>指针模式恢复指针位置</M3AT_FreecamPointerBack>
-  <M3AT_FreecamPointerBackTip>进入指针模式时，指针回到开始自由镜头前的位置（默认）。关闭：从屏幕中央、准星下方开始。</M3AT_FreecamPointerBackTip>
-  <M3AT_FreecamMenuFreesPointer>命令菜单释放指针</M3AT_FreecamMenuFreesPointer>
-  <M3AT_FreecamMenuFreesPointerTip>环视时打开的命令菜单会释放指针供你选择，菜单关闭后回到环视（默认）。关闭：菜单固定在打开的位置，通过转动视角对准选项来选择。</M3AT_FreecamMenuFreesPointerTip>
+  <M3AT_FreecamClickOffLooks>自由镜头：空白处左键退出指针模式</M3AT_FreecamClickOffLooks>
+  <M3AT_FreecamClickOffLooksTip>指针模式下，没有选中任何东西的左键点击会回到环视。关闭（默认）：只清除选择，与游戏中一样。</M3AT_FreecamClickOffLooksTip>
+  <M3AT_FreecamPointerBack>光标出现在</M3AT_FreecamPointerBack>
+  <M3AT_FreecamPointerBackTip>光标被释放时（指针模式、命令菜单、对话框或标签页）出现的位置。上次位置：回到开始环视前的位置，命令菜单也随之在该处打开（默认）。准星：屏幕中央。</M3AT_FreecamPointerBackTip>
+  <M3AT_FreecamPointerLast>上次位置</M3AT_FreecamPointerLast>
+  <M3AT_FreecamPointerCross>准星</M3AT_FreecamPointerCross>
+  <M3AT_FreecamPointerDot>显示上次位置</M3AT_FreecamPointerDot>
+  <M3AT_FreecamPointerDotTip>环视时，用一个小点标出光标被释放时将出现的位置（仅在上方选择“上次位置”时）。默认：开启</M3AT_FreecamPointerDotTip>
+  <M3AT_FreecamMenuFreesPointer>环视时的命令菜单</M3AT_FreecamMenuFreesPointer>
+  <M3AT_FreecamMenuFreesPointerTip>环视时打开的命令菜单的使用方式。指针选择：菜单释放指针供你选择，关闭后回到环视（默认）。准星选择：菜单固定在打开的位置，通过转动视角对准选项来选择。</M3AT_FreecamMenuFreesPointerTip>
+  <M3AT_FreecamMenuPointer>指针选择</M3AT_FreecamMenuPointer>
+  <M3AT_FreecamMenuCrosshair>准星选择</M3AT_FreecamMenuCrosshair>
   <M3AT_LookSpeed>转向速度</M3AT_LookSpeed>
   <M3AT_LookSpeedTip>鼠标移动时视角转动的幅度，单位为度/像素（默认 {0}）。</M3AT_LookSpeedTip>
   <M3AT_InvertMouse>反转鼠标视角</M3AT_InvertMouse>
@@ -223,6 +234,37 @@
   <M3AT_ClothesHelp>更改会立即显示在所有穿着这件服装的人身上，对所有存档都有效。"再加一件"可同时显示两件，例如用衬衫和裤子表现连体服。可在模组设置中全部清除。</M3AT_ClothesHelp>
   <M3AT_ClothesClearAll>清除服装选择（{0}）</M3AT_ClothesClearAll>
   <M3AT_ClothesClearAllConfirm>忘记你为 {0} 件服装做的选择？它们将恢复自动匹配。</M3AT_ClothesClearAllConfirm>
+  <M3AT_FaceWindowTitle>调整面部</M3AT_FaceWindowTitle>
+  <M3AT_FaceNoPawn>选择一个有动态面部的小人，并让其在 3D 视图中保持在屏幕上。其面部所用的模组会列在这里。</M3AT_FaceNoPawn>
+  <M3AT_FaceMods>当前调整的是来自以下模组的所有面部（点击一项选择）：</M3AT_FaceMods>
+  <M3AT_FaceUnknownMod>未知模组</M3AT_FaceUnknownMod>
+  <M3AT_FaceTuned>（已调整）</M3AT_FaceTuned>
+  <M3AT_FaceWhole>整张面部</M3AT_FaceWhole>
+  <M3AT_FaceMouth>嘴巴</M3AT_FaceMouth>
+  <M3AT_FaceAcross>左 / 右</M3AT_FaceAcross>
+  <M3AT_FaceUp>下 / 上</M3AT_FaceUp>
+  <M3AT_FaceSize>大小</M3AT_FaceSize>
+  <M3AT_FaceReset>重置此模组</M3AT_FaceReset>
+  <M3AT_FaceCopyOthers>将这些数值复制到这张面部的其他模组</M3AT_FaceCopyOthers>
+  <M3AT_FaceRestoreDefaults>恢复默认（所有面部模组）</M3AT_FaceRestoreDefaults>
+  <M3AT_FaceRestoreDefaultsConfirm>将所有面部模组的面部恢复到默认位置？</M3AT_FaceRestoreDefaultsConfirm>
+  <M3AT_Advanced>高级</M3AT_Advanced>
+  <M3AT_AdvancedTip>点击显示或隐藏大多数玩家用不到的工具。</M3AT_AdvancedTip>
+  <M3AT_FaceTuningHeader>面部调整</M3AT_FaceTuningHeader>
+  <M3AT_FaceTuningIntro>移动和缩放 3D 头部上的动态面部。每个绘制面部的模组（Facial Animation、它的重制材质、种族自带的面部）分别设置，对所有使用该模组面部的小人、所有存档都有效。先选择一个小人，再打开工具：此选项窗口会关闭，以便看到面部。</M3AT_FaceTuningIntro>
+  <M3AT_FaceTuningOpen>打开面部调整</M3AT_FaceTuningOpen>
+  <M3AT_FaceTuningNeedsGame>面部调整需在地图上游戏时打开。</M3AT_FaceTuningNeedsGame>
+  <M3AT_FaceHelp>改动会立即显示在所有使用此模组面部的小人上。嘴巴的移动叠加在整张面部之上。</M3AT_FaceHelp>
+  <M3AT_FacePart_Head>头部</M3AT_FacePart_Head>
+  <M3AT_FacePart_Eyeball>眼睛</M3AT_FacePart_Eyeball>
+  <M3AT_FacePart_Lid>眼睑</M3AT_FacePart_Lid>
+  <M3AT_FacePart_LidOption>眼部细节</M3AT_FacePart_LidOption>
+  <M3AT_FacePart_Brow>眉毛</M3AT_FacePart_Brow>
+  <M3AT_FacePart_Mouth>嘴巴</M3AT_FacePart_Mouth>
+  <M3AT_FacePart_Skin>皮肤</M3AT_FacePart_Skin>
+  <M3AT_FacePart_Emotion>表情</M3AT_FacePart_Emotion>
+  <M3AT_FaceClearAll>清除面部调整（{0}）</M3AT_FaceClearAll>
+  <M3AT_FaceClearAllConfirm>忘记你为 {0} 个模组做的面部调整？它们的面部将恢复默认位置。</M3AT_FaceClearAllConfirm>
   <M3AT_GripAdjust>调整握把</M3AT_GripAdjust>
   <M3AT_GripAdjustDesc>设置手握住这把武器的位置和角度。对所有同种武器、所有存档都有效。</M3AT_GripAdjustDesc>
   <M3AT_GripWindowTitle>武器握把</M3AT_GripWindowTitle>

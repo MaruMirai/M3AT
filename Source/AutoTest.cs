@@ -73,6 +73,7 @@ namespace M3AT
         private static int ticksPerFrame = 2;   // game ticks a video frame (2: 30 frames a second)
         private static string renderFile;   // the video being rendered, ffmpeg started on its first picture
         private static Process renderer;
+        private static FileStream rawOut;   // in Steam's container, where ffmpeg can't run: the raw frames, encoded on the host by autotest.sh
         private static int renderWidth, renderHeight, renderFrames;
         private static readonly Stopwatch renderTickTime = new Stopwatch(), renderWaitTime = new Stopwatch(), renderWriteTime = new Stopwatch();
         private static int renderWaitFrames;
@@ -717,14 +718,20 @@ namespace M3AT
                 case "hats": return HatsTest();
                 case "garmenttex": return GarmentTexTest();
                 case "prosthetics": return ProstheticsTest();
+                case "aging": return AgingTest();
+                case "agingstrip": return AgingStripTest("Decent", -15f, 6f);
+                case "eyetypes": return EyeTypesTest();
                 case "furskin": return FurskinTest();
                 case "facefur": return FaceFurTest();
                 case "fatseam": return FatSeamTest();
+                case "openfront": return OpenFrontTest();
                 case "sleeve": return SleeveTest();
                 case "underwear": return UnderwearTest();
                 case "builds": return BuildsTest(null);
                 case "faceab": return FaceAbTest();
                 case "beard": return BeardTest();
+                case "fringe": return FringeTest();
+                case "facetune": return FaceTuneTest();
                 case "faceanim": return FaceAnimTest(null);
                 case "faceshapes": return FaceShapesTest(null);
             }
@@ -739,6 +746,11 @@ namespace M3AT
             if (name.StartsWith("tend_"))
             {
                 return TendTest(name.Substring("tend_".Length));
+            }
+            // agingstrip_<hair defName>: the devlog strip with that hairstyle, the face seen three quarters and from a little above.
+            if (name.StartsWith("agingstrip_"))
+            {
+                return AgingStripTest(name.Substring("agingstrip_".Length), -32f, 14f);
             }
             if (name.StartsWith("weapons_"))
             {
@@ -3409,6 +3421,105 @@ namespace M3AT
             Note("Look: nothing under a garment showing through it: no shirt through the jacket or duster, no trousers through the duster, no skin on the back.");
         }
 
+        // Open-fronted garments stand in only for apparel drawn open down the front (OpenFronts.cs): the game's own duster
+        // and lab coat measured open and the robe closed, every apparel with no garment of its own noted with its front's
+        // gap and what is drawn for it, checking none drawn as an open-fronted garment has a closed front; then a pawn in
+        // the first loaded of some closed outfits the duster stood in for (mods' tribal cloak, maid dress, fatigues,
+        // vacsuit), front and three quarters.
+        private static IEnumerator OpenFrontTest()
+        {
+            Rand.PushState(20261120);
+            Pawn pawn;
+            try
+            {
+                pawn = NewPawn(middle, null);
+            }
+            finally
+            {
+                Rand.PopState();
+            }
+            Hold(pawn);
+            Look(pawn, 0f);
+            for (int k = 0; k < 20 && WalkFigures.Skin == null; k++)
+            {
+                yield return Ticks(5, "openfront", pawn);   // (the chibi loads on its first draw)
+            }
+            SkinnedFigure fig = WalkFigures.Skin;
+            if (fig == null)
+            {
+                Check("chibi loaded", false, "no skinned figure");
+                yield break;
+            }
+            const float least = 0.45f;   // SkinnedFigure.OpenFrontLeast
+            foreach (string name in new[] { "Apparel_Duster", "Apparel_LabCoat", "Apparel_Robe" })
+            {
+                ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail(name);
+                if (def == null)
+                {
+                    Note(name + ": not loaded");
+                    continue;
+                }
+                float share = SkinnedFigure.OpenFrontShare(def);
+                bool open = name != "Apparel_Robe";
+                Check(name + " measured " + (open ? "open" : "closed"), open ? share >= least : share >= 0f && share < least, share.ToString("F2"));
+            }
+            List<string> lines = new List<string>(), wrong = new List<string>();
+            foreach (ThingDef def in DefDatabase<ThingDef>.AllDefsListForReading)
+            {
+                if (def.apparel == null || fig.GarmentOf(def) >= 0)
+                {
+                    continue;
+                }
+                int[] drawn = fig.AutoStandInsFor(def);
+                List<string> names = new List<string>();
+                bool openDrawn = false;
+                foreach (int g in drawn)
+                {
+                    names.Add(fig.PieceName(g));
+                    openDrawn |= fig.PieceName(g) == "Duster" || fig.PieceName(g) == "LabCoat";
+                }
+                float share = SkinnedFigure.OpenFrontShare(def);
+                if (openDrawn || share >= 0.1f)
+                {
+                    lines.Add(def.defName + " [" + (def.modContentPack != null ? def.modContentPack.PackageId : "?") + "] front gap "
+                        + share.ToString("F2") + " -> " + (names.Count > 0 ? string.Join("+", names) : "none"));
+                }
+                if (openDrawn && share < least)
+                {
+                    wrong.Add(def.defName);
+                }
+            }
+            lines.Sort(StringComparer.Ordinal);
+            foreach (string line in lines)
+            {
+                Note(line);
+            }
+            Check("no closed apparel drawn as an open-fronted garment", wrong.Count == 0, string.Join(", ", wrong));
+            ThingDef cloak = null;
+            foreach (string name in new[] { "Apparel_TribalCloak", "Kiiro_MaidDressI", "pphhyy_BHFatigue", "Kiiro_Vacsuit" })
+            {
+                cloak = cloak ?? DefDatabase<ThingDef>.GetNamedSilentFail(name);
+            }
+            if (cloak == null)
+            {
+                Note("none of the closed outfits the duster stood in for is loaded (their mods are off), so no pictures");
+                yield break;
+            }
+            pawn.apparel.DestroyAll();
+            pawn.apparel.Wear((Apparel)ThingMaker.MakeThing(cloak, GenStuff.DefaultStuffFor(cloak)), false);
+            lookDistance = 2f;
+            lookHeight = 0.6f;
+            foreach (float yaw in new[] { 0f, 35f })
+            {
+                Look(pawn, yaw);
+                yield return Ticks(3, "openfront", pawn);
+                yield return Shot(cloak.defName + "_" + Mathf.RoundToInt(yaw));
+            }
+            lookDistance = LookDistance;
+            lookHeight = LookHeight;
+            Note("Look: " + cloak.defName + " drawn closed, no skin down its front.");
+        }
+
         // Looking into a sleeve's cuff: a drafted rifleman in trousers, a shirt and a parka close up from the front and
         // above, where the parka's right cuff swings off the wrist (hide_edges.py), with the clothes' occlusion on and off.
         private static IEnumerator SleeveTest()
@@ -3573,6 +3684,310 @@ namespace M3AT
             x.Sort(StringComparer.Ordinal);
             y.Sort(StringComparer.Ordinal);
             return string.Join("+", x) == string.Join("+", y);
+        }
+
+        // Old age (Aging.cs): one bald pawn at each age, close on the face and from the side for the stoop, then old with a
+        // bad back and a cataract in each eye, and with the agingLooks option off.
+        // Every Facial Animation eye type loaded for the pawn's gender (its own, Experimentals', UNAGI's, ... as the running
+        // face mods give them), each on a bald pawn with a bionic eye on its left and a cataract on its right: pictured close
+        // from the front, then with the gaze forced right, and checked that both irises were found and measured
+        // (FaceGaze.IrisOn), so the prosthetic eye and the cataract are fitted to that type's iris and move with it.
+        private static IEnumerator EyeTypesTest()
+        {
+            Rand.PushState(20261120);
+            Pawn pawn;
+            try
+            {
+                pawn = NewPawn(middle, null);
+            }
+            finally
+            {
+                Rand.PopState();
+            }
+            pawn.apparel.DestroyAll();
+            pawn.story.hairDef = DefDatabase<HairDef>.GetNamedSilentFail("Bald") ?? pawn.story.hairDef;
+            Hold(pawn);
+            Look(pawn, 0f);
+            lookDistance = 1.2f;
+            lookHeight = 1.0f;
+            lookPitch = 20f;
+            ThingComp eyes = null;
+            foreach (ThingComp c in pawn.AllComps)
+            {
+                if (c.GetType().Name == "EyeballControllerComp")
+                {
+                    eyes = c;
+                }
+            }
+            if (eyes == null)
+            {
+                Check("Facial Animation's eyes found", false, "no EyeballControllerComp: is Facial Animation active?");
+                yield break;
+            }
+            Type comp = eyes.GetType();
+            while (comp != null && !comp.IsGenericType)
+            {
+                comp = comp.BaseType;
+            }
+            Type typeDef = comp.GetGenericArguments()[0];
+            IEnumerable all = (IEnumerable)typeof(DefDatabase<>).MakeGenericType(typeDef).GetProperty("AllDefs").GetValue(null);
+            PropertyInfo name = eyes.GetType().GetProperty("FaceTypeDefName");
+            MethodInfo init = eyes.GetType().GetMethod("InitializeIfNeed");
+            MethodInfo dirty = eyes.GetType().GetMethod("SetDirty");
+            MethodInfo reload = eyes.GetType().GetMethod("ReloadIfNeed");
+            init.Invoke(eyes, null);
+            // Each gender in turn, as Experimentals' Dull, Sanpaku and Dragon are a woman's only.
+            foreach (Gender gender in new[] { Gender.Male, Gender.Female })
+            {
+                pawn.gender = gender;
+                pawn.story.bodyType = gender == Gender.Male ? BodyTypeDefOf.Male : BodyTypeDefOf.Female;
+                reload.Invoke(eyes, null);   // takes the gender change (Facial Animation picks a random type for it)
+                List<Def> types = new List<Def>();
+                foreach (object o in all)
+                {
+                    Def d = (Def)o;
+                    Gender g = (Gender)Traverse.Create(d).Field("gender").GetValue();
+                    string race = (string)Traverse.Create(d).Field("raceName").GetValue();
+                    if ((g == Gender.None || g == gender) && (string.IsNullOrEmpty(race) || race == pawn.def.defName))
+                    {
+                        types.Add(d);
+                    }
+                }
+                Note(types.Count + " eye types for a " + gender + " " + pawn.def.defName);
+                for (int k = 0; k < types.Count; k++)
+                {
+                    Def d = types[k];
+                    // Every other type the archotech eye and a blind (not cataract) eye, so each of the four looks is seen.
+                    string[][] adds = k % 2 == 0
+                        ? new[] { new[] { "BionicEye", "L" }, new[] { "Cataract", "R" } }
+                        : new[] { new[] { "ArchotechEye", "L" }, new[] { "Blindness", "R" } };
+                    pawn.health.RemoveAllHediffs();
+                    foreach (string[] added in adds)
+                    {
+                        HediffDef def = DefDatabase<HediffDef>.GetNamedSilentFail(added[0]);
+                        BodyPartRecord part = pawn.RaceProps.body.AllParts.Find(p => p.def.defName == "Eye" && WalkFigures.SideOf(p) == added[1]);
+                        if (def != null && part != null)
+                        {
+                            pawn.health.AddHediff(def, part);
+                        }
+                        else
+                        {
+                            Note("no " + added[0] + " or no " + added[1] + " eye");
+                        }
+                    }
+                    name.SetValue(eyes, d.defName);
+                    dirty.Invoke(eyes, null);
+                    reload.Invoke(eyes, null);
+                    pawn.Drawer.renderer.SetAllGraphicsDirty();
+                    yield return Ticks(3, "eyetypes", pawn);
+                    string mask = (string)Traverse.Create(d).Field("altMaskPath").GetValue();
+                    string shot = "eye_" + gender + "_" + d.defName + "_" + (k % 2 == 0 ? "bionic_cataract" : "archotech_blind");
+                    yield return Shot(shot);
+                    FaceLayers.TestGaze = new Vector3(0.015f, 0f, 0f);
+                    yield return Ticks(2, "eyetypes", pawn);
+                    yield return Shot(shot + "_look_right");
+                    FaceLayers.TestGaze = Vector3.zero;
+                    string irises = FaceLayers.IrisReport();
+                    Note(gender + " " + d.defName + " (" + d.modContentPack?.Name + ", " + (string.IsNullOrEmpty(mask) ? "one Basic layer" : "L/R layers") + "): " + irises);
+                    Check(gender + " " + d.defName + ": both irises measured", irises.Contains(" left ") && irises.Contains(" right ") && !irises.Contains("not fitted"), irises);
+                }
+            }
+            // Age's haze on the eyes (Aging.cs HazeOf), on the last type with no eye hediffs: none at 55, faint by 65, most at 85.
+            pawn.health.RemoveAllHediffs();
+            int lastHaze = -1;
+            foreach (float age in new[] { 55f, 65f, 72f, 85f })
+            {
+                pawn.ageTracker.AgeBiologicalTicks = (long)(age * GenDate.TicksPerYear);
+                pawn.Drawer.renderer.SetAllGraphicsDirty();
+                yield return Ticks(3, "eyetypes", pawn);
+                string seen = WalkFigures.AutoAging(pawn);
+                int at = seen.IndexOf("eye haze ", StringComparison.Ordinal);
+                int haze = at < 0 ? -1 : seen[at + 9] - '0';
+                Note((int)age + ": " + seen);
+                Check((int)age + (age < 60f ? ": no haze on the eyes" : ": haze no fainter than younger"), age < 60f ? haze == 0 : haze >= lastHaze && haze > 0, seen);
+                lastHaze = haze;
+                yield return Shot("haze_" + (int)age);
+            }
+            lookDistance = LookDistance;
+            lookHeight = LookHeight;
+            lookPitch = LookPitch;
+        }
+
+        private static IEnumerator AgingTest()
+        {
+            Rand.PushState(20261120);
+            Pawn pawn;
+            try
+            {
+                pawn = NewPawn(middle, null);
+            }
+            finally
+            {
+                Rand.PopState();
+            }
+            pawn.apparel.DestroyAll();
+            // A mohawk, so the face stays clear and the hair's colour shows on the scalp and the crest.
+            pawn.story.hairDef = DefDatabase<HairDef>.GetNamedSilentFail("Mohawk") ?? DefDatabase<HairDef>.GetNamedSilentFail("Bald") ?? pawn.story.hairDef;
+            pawn.style.beardDef = BeardDefOf.NoBeard;
+            pawn.health.RemoveAllHediffs();
+            Hold(pawn);
+            Look(pawn, 0f);
+            yield return Ticks(5, "aging", pawn);
+            yield return WaitReal(4f);   // the mohawk built (drawn bald until then)
+            // Dark hair, drawn greyer by age alone (GreyingHair.cs).
+            pawn.story.HairColor = new Color(0.2f, 0.12f, 0.08f);   // not a game colour: greys, as another mod's natural shade would
+            float lastGrey = -1f;
+            int lastLevel = -1;
+            float[] ages = { 25f, 40f, 52f, 62f, 85f };
+            for (int i = 0; i < ages.Length; i++)
+            {
+                pawn.ageTracker.AgeBiologicalTicks = (long)(ages[i] * GenDate.TicksPerYear);
+                pawn.Drawer.renderer.SetAllGraphicsDirty();
+                yield return Ticks(5, "aging", pawn);
+                string seen = WalkFigures.AutoAging(pawn);
+                Note((int)ages[i] + ": " + seen);
+                int at = seen.IndexOf("wrinkles age", StringComparison.Ordinal);
+                int level = at < 0 ? 0 : seen[at + 12] - '0';
+                Check((int)ages[i] + (ages[i] < 45f ? ": no wrinkles" : ": wrinkles no fainter than younger"), ages[i] < 45f ? level == 0 : level >= lastLevel && level > 0, seen);
+                lastLevel = level;
+                string grey = WalkFigures.AutoGrey(pawn);
+                float g = float.Parse(grey.Substring(5, 4), System.Globalization.CultureInfo.InvariantCulture);
+                Note((int)ages[i] + ": " + grey);
+                Check((int)ages[i] + ": hair no less grey than younger", g >= lastGrey, grey);
+                lastGrey = g;
+                foreach (string shot in AgingShots(pawn, ((int)ages[i]).ToString()))
+                {
+                    yield return Shot(shot);
+                }
+            }
+            foreach (string disease in new[] { "BadBack", "Cataract" })
+            {
+                HediffDef def = DefDatabase<HediffDef>.GetNamedSilentFail(disease);
+                if (def == null)
+                {
+                    Note("no " + disease);
+                    continue;
+                }
+                if (disease == "Cataract")
+                {
+                    foreach (BodyPartRecord part in pawn.RaceProps.body.AllParts)
+                    {
+                        if (part.def.defName == "Eye")
+                        {
+                            pawn.health.AddHediff(def, part);
+                        }
+                    }
+                }
+                else
+                {
+                    pawn.health.AddHediff(def, pawn.RaceProps.body.AllParts.Find(p => p.def.defName == "Spine"));
+                }
+            }
+            Check("85: hair grey", lastGrey > 0.95f, WalkFigures.AutoGrey(pawn));
+            // Dyed at 85 in a styling station colour (the first of the palette that isn't a natural one): shown as chosen.
+            ColorDef dye = DefDatabase<ColorDef>.AllDefsListForReading.Find(d => d.defName == "Structure_Blue") ?? DefDatabase<ColorDef>.AllDefsListForReading.Find(d => d.colorType == ColorType.Ideo);
+            pawn.style.nextHairColor = dye != null ? dye.color : new Color(0.6f, 0.1f, 0.5f);
+            pawn.style.FinalizeHairColor();
+            Note("dyed " + (dye != null ? dye.defName : "(none found)"));
+            yield return Ticks(3, "aging", pawn);
+            string dyed = WalkFigures.AutoGrey(pawn);
+            Check("dyed at 85: shown as dyed", dyed.StartsWith("grey 0.00", StringComparison.Ordinal), dyed);
+            foreach (string shot in AgingShots(pawn, "85_dyed"))
+            {
+                yield return Shot(shot);
+            }
+            pawn.story.HairColor = PawnHairColors.DarkBrown;   // a natural colour that is also in the palette (Burnt Umber): greyed by age
+            pawn.ageTracker.AgeBiologicalTicks = (long)(70f * GenDate.TicksPerYear);
+            yield return Ticks(5, "aging", pawn);
+            string sick = WalkFigures.AutoAging(pawn);
+            Note("70, bad back and cataracts: " + sick);
+            string undyed = WalkFigures.AutoGrey(pawn);
+            Check("70, a natural colour again: greyed by age", !undyed.StartsWith("grey 0.00", StringComparison.Ordinal), undyed);
+            foreach (string shot in AgingShots(pawn, "70_sick"))
+            {
+                yield return Shot(shot);
+            }
+            if (SettingsMod.Settings != null)
+            {
+                SettingsMod.Settings.agingLooks = false;
+                yield return Ticks(5, "aging", pawn);
+                string off = WalkFigures.AutoAging(pawn);
+                Check("option off: nothing shown", off.Contains("wrinkles none,") && off.Contains("stoop 0.0"), off);
+                foreach (string shot in AgingShots(pawn, "70_off"))
+                {
+                    yield return Shot(shot);
+                }
+                SettingsMod.Settings.agingLooks = true;
+            }
+        }
+
+        // Pictures for a devlog: one dressed pawn with its own hair (dark brown, so the greying shows) at each of several
+        // ages, a three-quarter view of the whole figure and the face close, the same spot and light each time.
+        private static IEnumerator AgingStripTest(string hairName, float faceYaw, float facePitch)
+        {
+            Rand.PushState(20261120);
+            Pawn pawn;
+            try
+            {
+                pawn = NewPawn(middle, null);
+            }
+            finally
+            {
+                Rand.PopState();
+            }
+            pawn.health.RemoveAllHediffs();
+            HairDef hair = DefDatabase<HairDef>.GetNamedSilentFail(hairName);
+            if (hair != null)
+            {
+                pawn.story.hairDef = hair;
+            }
+            pawn.style.beardDef = BeardDefOf.NoBeard;
+            pawn.story.HairColor = PawnHairColors.DarkBrown;
+            pawn.Drawer.renderer.SetAllGraphicsDirty();
+            Hold(pawn);
+            Look(pawn, 0f);
+            Note("hair " + pawn.story.hairDef.defName + ", " + pawn.gender + ", " + pawn.story.bodyType.defName);
+            yield return Ticks(5, "agingstrip", pawn);
+            yield return WaitReal(5f);   // the hairstyle built
+            foreach (float age in new[] { 20f, 45f, 55f, 62f, 70f, 85f })
+            {
+                pawn.ageTracker.AgeBiologicalTicks = (long)(age * GenDate.TicksPerYear);
+                yield return Ticks(5, "agingstrip", pawn);
+                Note((int)age + ": " + WalkFigures.AutoAging(pawn) + "; " + WalkFigures.AutoGrey(pawn));
+                lookYaw = -35f;
+                lookDistance = 2.6f;
+                lookHeight = 0.62f;
+                lookPitch = 10f;
+                yield return Shot("body_" + (int)age);
+                lookYaw = faceYaw;
+                lookDistance = 1.4f;
+                lookHeight = 1.0f;
+                lookPitch = facePitch;
+                yield return Shot("face_" + (int)age);
+            }
+            lookYaw = 0f;
+            lookPitch = LookPitch;
+            lookDistance = LookDistance;
+            lookHeight = LookHeight;
+        }
+
+        // Each shot's name for one age, setting the camera before each: the face close, then the whole figure from the side.
+        private static IEnumerable<string> AgingShots(Pawn pawn, string name)
+        {
+            lookYaw = 0f;
+            lookDistance = 1.2f;
+            lookHeight = 0.85f;   // the eyes of a stooped figure too
+            lookPitch = 5f;
+            yield return name + "_face";
+            lookYaw = 90f;
+            lookDistance = 2.4f;
+            lookHeight = 0.6f;
+            lookPitch = 8f;
+            yield return name + "_side";
+            lookYaw = 0f;
+            lookPitch = LookPitch;
+            lookDistance = LookDistance;
+            lookHeight = LookHeight;
         }
 
         private static IEnumerator ProstheticsTest()
@@ -3970,6 +4385,148 @@ namespace M3AT
             lookPitch = pitch;
             lookHeight = height;
             Note("Look: the mouth (shut, then open) in the gap between the moustache and the chin beard of Circle and Anchor, under Moustache, the same in _flat and _3d and in _open and _open_layers.");
+        }
+
+        // Hairstyles with a fringe, worn in turn by one pawn with no beard, to see where each fringe ends against the eyes
+        // (HairBuilder's row mapping): close from the front, from three quarters, and at IsoRim's own pitch. A style is
+        // found by defName or by the end of its texPath (a mod's, AFUf040 or LongE); one not loaded is noted and passed.
+        // The hair cache keeps what was built, so compare runs across a HairBuilder.Version change.
+        private static IEnumerator FringeTest()
+        {
+            Rand.PushState(20261120);
+            Pawn pawn;
+            try
+            {
+                pawn = NewPawn(middle, null);
+            }
+            finally
+            {
+                Rand.PopState();
+            }
+            pawn.apparel.DestroyAll();
+            Hold(pawn);
+            pawn.style.beardDef = BeardDefOf.NoBeard;
+            Note("Pawn: " + pawn.gender + ", head " + pawn.story.headType?.defName + ", body " + pawn.story.bodyType?.defName + "; HairBuilder version " + HairBuilder.Version + ", eye match " + HairBuilder.EyeMatch);
+            float distance = lookDistance, pitch = lookPitch, height = lookHeight;
+            bool views = oneView;
+            oneView = true;
+            Look(pawn, 0f);
+            foreach (string name in new[] { "Bob", "Mop", "Pigtails", "Curly", "Burgundy", "Wavy", "FancyBun", "Princess", "Mary", "Lisa", "LongE", "AFUf040", "AFUf017", "AFUf011" })
+            {
+                HairDef hair = DefDatabase<HairDef>.GetNamedSilentFail(name)
+                    ?? DefDatabase<HairDef>.AllDefs.FirstOrDefault(h => h.texPath != null && h.texPath.EndsWith("/" + name));
+                if (hair == null)
+                {
+                    Note("no hairstyle " + name);
+                    continue;
+                }
+                pawn.story.hairDef = hair;
+                pawn.Drawer.renderer.SetAllGraphicsDirty();
+                lookDistance = 1.0f;
+                lookHeight = 0.95f;
+                lookPitch = 10f;
+                lookYaw = 0f;
+                yield return Ticks(3, "fringe", pawn);
+                yield return WaitReal(4f);   // its hair built
+                yield return Ticks(3, "fringe", pawn);
+                yield return Shot(name + "_front");
+                lookYaw = 35f;
+                yield return Shot(name + "_three_quarter");
+                lookDistance = 2.2f;
+                lookHeight = 0.8f;
+                lookPitch = 55f;
+                lookYaw = 0f;
+                yield return Shot(name + "_game");
+            }
+            oneView = views;
+            lookDistance = distance;
+            lookPitch = pitch;
+            lookHeight = height;
+            lookYaw = 0f;
+            Note("Look: where each fringe ends against the eyes and brows (_front), compared with the style's sprite.");
+        }
+
+        // The face tool (FaceTuning.cs): a bald pawn close up from the front, its face as drawn, then its eyes' mod's face
+        // moved up and enlarged and its mouth moved down and enlarged, stacked and drawn a layer at a time (the pairs should
+        // match), noting which mod each of its parts was found in. The settings are put back after, never written.
+        private static IEnumerator FaceTuneTest()
+        {
+            Rand.PushState(20261120);
+            Pawn pawn;
+            try
+            {
+                pawn = NewPawn(middle, null);
+            }
+            finally
+            {
+                Rand.PopState();
+            }
+            pawn.apparel.DestroyAll();
+            Hold(pawn);
+            pawn.story.hairDef = DefDatabase<HairDef>.GetNamedSilentFail("Bald") ?? pawn.story.hairDef;
+            pawn.style.beardDef = BeardDefOf.NoBeard;
+            pawn.Drawer.renderer.SetAllGraphicsDirty();
+            float distance = lookDistance, pitch = lookPitch, height = lookHeight;
+            lookDistance = 1.0f;
+            lookHeight = 0.95f;
+            lookPitch = 10f;
+            Look(pawn, 0f);
+            FaceLayers.TuneWatched = pawn;
+            Settings s = SettingsMod.Settings;
+            Dictionary<string, Vector3> faces = new Dictionary<string, Vector3>(s.faceTunes), mouths = new Dictionary<string, Vector3>(s.mouthTunes);
+            s.faceTunes.Clear();
+            s.mouthTunes.Clear();
+            yield return Ticks(5, "facetune", pawn);
+            FaceLayers.TakeTuneNotes();
+            List<KeyValuePair<FaceLayers.FaceMod, List<string>>> notes = new List<KeyValuePair<FaceLayers.FaceMod, List<string>>>(FaceLayers.TuneNotes);
+            foreach (KeyValuePair<FaceLayers.FaceMod, List<string>> n in notes)
+            {
+                Note("Face mod " + n.Key.key + " (" + (n.Key.label ?? "unknown") + "): " + string.Join(", ", n.Value));
+            }
+            Check("every face part's mod found", notes.Count > 0 && notes.All(n => n.Key.key != "?"), notes.Count + " mods");
+            string eyes = notes.Where(n => n.Value.Contains("Eyeball")).Select(n => n.Key.key).FirstOrDefault();
+            string mouth = notes.Where(n => n.Value.Contains("Mouth")).Select(n => n.Key.key).FirstOrDefault();
+            yield return Shot("untuned");
+            FaceLayers.StackLayers = false;
+            yield return Ticks(2, "facetune", pawn);
+            yield return Shot("untuned_layers");
+            FaceLayers.StackLayers = true;
+            if (eyes != null)
+            {
+                s.faceTunes[eyes] = new Vector3(0f, 0.05f, 1.3f);
+                yield return Ticks(2, "facetune", pawn);
+                yield return Shot("eyes_mod_up_bigger");
+                FaceLayers.StackLayers = false;
+                yield return Ticks(2, "facetune", pawn);
+                yield return Shot("eyes_mod_up_bigger_layers");
+                FaceLayers.StackLayers = true;
+                s.faceTunes.Clear();
+            }
+            if (mouth != null)
+            {
+                // The mouth's mod's whole face moved with no mouth numbers of its own: the mouth goes with the face (it
+                // once vanished here, its missing numbers read as a size of none).
+                s.faceTunes[mouth] = new Vector3(0.02f, 0.02f, 1.1f);
+                yield return Ticks(2, "facetune", pawn);
+                yield return Shot("mouth_mod_face_moved");
+                s.faceTunes.Clear();
+                s.mouthTunes[mouth] = new Vector3(0.02f, 0.02f, 1.4f);
+                yield return Ticks(2, "facetune", pawn);
+                yield return Shot("mouth_up_bigger");
+                FaceLayers.StackLayers = false;
+                yield return Ticks(2, "facetune", pawn);
+                yield return Shot("mouth_up_bigger_layers");
+                FaceLayers.StackLayers = true;
+            }
+            s.faceTunes.Clear();
+            s.mouthTunes.Clear();
+            foreach (KeyValuePair<string, Vector3> kv in faces) { s.faceTunes[kv.Key] = kv.Value; }
+            foreach (KeyValuePair<string, Vector3> kv in mouths) { s.mouthTunes[kv.Key] = kv.Value; }
+            FaceLayers.TuneWatched = null;
+            lookDistance = distance;
+            lookPitch = pitch;
+            lookHeight = height;
+            Note("Look: eyes_mod_up_bigger has every part of the eyes' mod moved up and larger than untuned (other mods' parts where they were), mouth_mod_face_moved the brows and mouth higher and a little larger, the mouth still there; mouth_up_bigger the mouth alone higher, a little to the pawn's right and larger; each _layers picture the same as the one before it.");
         }
 
         private static IEnumerator FaceAbTest()
@@ -6298,7 +6855,7 @@ namespace M3AT
                 lines.Add(def.defName + " [" + mod + "] " + string.Join(",", def.apparel.layers.ConvertAll(l => l.defName)) + " / "
                     + string.Join(",", def.apparel.bodyPartGroups.ConvertAll(g => g.defName)) + " -> " + drawn);
                 bool belt = def.apparel.layers.Exists(l => l.defName == "Belt" || l.defName.Contains("Shield")) || def.HasComp(typeof(CompShield));
-                if (belt && drawn.StartsWith("stand-in"))
+                if (belt && drawn.StartsWith("stand-in") && !WalkFigures.AutoNamedOutright(def))
                 {
                     beltsDrawn.Add(def.defName + " " + drawn);
                 }
@@ -7347,11 +7904,16 @@ namespace M3AT
             try
             {
                 byte[] pixels = got.GetRawTextureData();
-                if (renderer == null)
+                if (renderer == null && rawOut == null)
                 {
                     StartRenderer(got.width, got.height);
                 }
-                if (renderer != null && got.width == renderWidth && got.height == renderHeight && pixels.Length == renderWidth * renderHeight * 4)
+                if (rawOut != null && got.width == renderWidth && got.height == renderHeight && pixels.Length == renderWidth * renderHeight * 4)
+                {
+                    rawOut.Write(pixels, 0, pixels.Length);
+                    renderFrames++;
+                }
+                else if (renderer != null && got.width == renderWidth && got.height == renderHeight && pixels.Length == renderWidth * renderHeight * 4)
                 {
                     renderer.StandardInput.BaseStream.Write(pixels, 0, pixels.Length);
                     renderFrames++;
@@ -7366,13 +7928,34 @@ namespace M3AT
             UnityEngine.Object.Destroy(got);
         }
 
+        // The game runs inside Steam's Linux runtime container, where the host's /usr is under /run/host and its PATH
+        // has no ffmpeg.
+        private static string FfmpegPath()
+        {
+            foreach (string path in new[] { "/usr/bin/ffmpeg", "/run/host/usr/bin/ffmpeg", "/usr/local/bin/ffmpeg" })
+            {
+                if (System.IO.File.Exists(path))
+                {
+                    return path;
+                }
+            }
+            return "ffmpeg";
+        }
+
         private static void StartRenderer(int width, int height)
         {
             renderWidth = width;
             renderHeight = height;
             renderFrames = 0;
             string fps = (60f / ticksPerFrame).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
-            ProcessStartInfo start = new ProcessStartInfo("ffmpeg")
+            if (Directory.Exists("/run/host"))
+            {
+                // (ffmpeg dies in the container on the host's libraries: the frames go to a file beside the video, with
+                // its size and rate in the name, for autotest.sh to encode)
+                rawOut = new FileStream(renderFile + "." + width + "x" + height + "@" + fps + ".rgba", FileMode.Create, FileAccess.Write);
+                return;
+            }
+            ProcessStartInfo start = new ProcessStartInfo(FfmpegPath())
             {
                 UseShellExecute = false,
                 RedirectStandardInput = true,
@@ -7397,6 +7980,12 @@ namespace M3AT
 
         private static void StopRenderer()
         {
+            if (rawOut != null)
+            {
+                rawOut.Dispose();
+                Log.Message(Tag + "wrote " + renderFrames + " raw frames for " + Path.GetFileName(renderFile));
+                rawOut = null;
+            }
             if (renderer != null)
             {
                 try
@@ -8090,6 +8679,12 @@ namespace M3AT
                 names.Add(skin.PieceName(all[i]));
             }
             return "stand-in " + string.Join("+", names);
+        }
+
+        // Whether a garment's stands_for line names this apparel, which draws it even on the Belt layer.
+        internal static bool AutoNamedOutright(ThingDef def)
+        {
+            return Ready() && skin != null && skin.StandsFor(def).Length > 0;
         }
 
         internal static string AutoOverHair(ThingDef def, HairDef style)

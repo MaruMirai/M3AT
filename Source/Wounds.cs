@@ -38,8 +38,13 @@ namespace M3AT
         private const int Panel = 0, Strip = 1, JointLight = 2;   // the bionic row's cells
         private const int TraceA = 0, TraceB = 1, Inset = 2;      // the archotech row's
         private const int EyeRow = SheetRows + 2;   // the prosthetic eyes' row: bionic, archotech
+        // The eyes' recolourings (make_prosthetic_decals.py's RAMPS): bionic, archotech and cataract (or blindness), then
+        // age's thinner haze in the next row's first cell.
+        private const int RampRow = SheetRows + 3, HazeRow = SheetRows + 4;
         private const float EyeArtSpan = 0.09f;   // a prosthetic eye's cell on the face, texture places: past the eye's opening (about 0.065), as it is cut to the eye
         private const float DecalSpan = 0.13f;   // a decal's side, model units, on the upper arm or thigh; less further down
+        private const float LegDecalScale = 1.3f;
+        private const float ThighDecalsBelow = 0.35f;   // a bionic thigh's decals' middles at least this share down it (LimbDecals)   // a bionic leg's decals against an arm's (LimbDecals)
         private const float Span = 0.12f;   // model units: a cell's side on the trunk for a wound of SpanDamage
         private const float SpanDamage = 10f;   // damage (the injury's severity) drawn at Span; a bullet does about this
         private const float LeastSize = 0.45f, MostSize = 1.8f;   // shares of that, for the slightest and the worst wounds
@@ -294,10 +299,32 @@ namespace M3AT
                     }
                     continue;
                 }
-                AddDecal(seed, b, DecalRow, Panel, span, true);   // its seams across the limb
+                // A leg is thicker and longer than an arm, so the same decals came out sparse on it: bigger there, and a
+                // second panel on the thigh and shin, and a light strip on the thigh too.
+                bool leg = bone.StartsWith("thigh", StringComparison.Ordinal) || bone.StartsWith("shin", StringComparison.Ordinal)
+                    || bone.StartsWith("foot", StringComparison.Ordinal);
+                // The thigh's top reaches in to the crotch and up the buttock, where a decal read as smeared on: kept below
+                // ThighDecalsBelow of the way down it.
+                float below = bone.StartsWith("thigh", StringComparison.Ordinal) ? ThighDecalsBelow : 0f;
+                if (leg)
+                {
+                    span *= LegDecalScale;
+                }
+                AddDecal(seed, b, DecalRow, Panel, span, true, below);   // its seams across the limb
+                if (leg && !end)
+                {
+                    AddDecal(seed * 7 + 3, b, DecalRow, Panel, span * 0.9f, true, below);
+                    if (lower)
+                    {
+                        AddDecal(seed * 7 + 4, b, DecalRow, Panel, span * 0.9f, true);   // the shin is long: a third
+                    }
+                }
+                if (lower || leg && !end)
+                {
+                    AddDecal(seed * 7 + 1, b, DecalRow, Strip, span * 1.1f, true, below);
+                }
                 if (lower)
                 {
-                    AddDecal(seed * 7 + 1, b, DecalRow, Strip, span * 1.1f, true);
                     AddDecal(seed * 7 + 2, b, DecalRow, JointLight, span * 0.75f, true);
                 }
             }
@@ -323,16 +350,42 @@ namespace M3AT
                 eyeWounds.Add(new FaceLayers.EyeWound
                 {
                     frame = new Vector4(EyeUOf(eyes[i].bone), EyeV, 1f / EyeArtSpan, 0f),
-                    cell = new Vector4((float)column / Columns, 1f - (EyeRow + 1f) / Rows, 1f / Columns, 1f / Rows),
+                    cell = EyeCell(EyeRow, column),
+                    ramp = EyeCell(RampRow, column),
                     colour = new Color32(255, 255, 255, 255),
+                    fitIris = true,
+                });
+            }
+            // A cataract or a blind eye (WalkFigures.CataractEyes, Aging.cs): the iris recoloured as a milky cloud; unmeasured,
+            // the eye row's third cell, the cloud's art. An old eye's haze is the thin cloud, as faint as its level (the colour's
+            // alpha), and only on a measured iris (no art: the cloud's would be far too strong).
+            eyes.Clear();
+            WalkFigures.CataractEyes(pawn, eyes);
+            for (int i = 0; i < eyes.Count && EyeRow < Rows; i++)
+            {
+                eyeWounds.Add(new FaceLayers.EyeWound
+                {
+                    frame = new Vector4(EyeUOf(eyes[i].bone), EyeV, 1f / EyeArtSpan, 0f),
+                    cell = eyes[i].weak ? Vector4.zero : EyeCell(EyeRow, CataractColumn),
+                    ramp = eyes[i].weak ? EyeCell(HazeRow, 0) : EyeCell(RampRow, CataractColumn),
+                    colour = eyes[i].weak ? new Color(1f, 1f, 1f, (float)eyes[i].seed / WalkFigures.HazeLevels) : Color.white,
                     fitIris = true,
                 });
             }
         }
 
+        private const int CataractColumn = 2;   // the eye row's cell of a cataract's cloud (make_prosthetic_decals.py)
+
+        // A cell of the sheet as a mode 7 square (place and size, from the bottom); none (zero) past the sheet's rows, as an
+        // older decal file has fewer.
+        private static Vector4 EyeCell(int row, int column)
+        {
+            return row < Rows ? new Vector4((float)column / Columns, 1f - (row + 1f) / Rows, 1f / Columns, 1f / Rows) : Vector4.zero;
+        }
+
         private static readonly List<WalkFigures.LimbDecal> eyes = new List<WalkFigures.LimbDecal>();
 
-        private static void AddDecal(int seed, int bone, int row, int column, float span, bool down)
+        private static void AddDecal(int seed, int bone, int row, int column, float span, bool down, float below = 0f)
         {
             if (row >= Rows)
             {
@@ -344,6 +397,7 @@ namespace M3AT
                 bones = new[] { bone },
                 cell = new Rect((float)column / Columns, 1f - (row + 1f) / Rows, 1f / Columns, 1f / Rows),
                 span = span,
+                below = below,
                 down = down,   // a strip runs along the limb, its top up it at rest
                 onClothes = false,
                 colour = new Color32(255, 255, 255, 255),

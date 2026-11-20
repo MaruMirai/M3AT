@@ -417,6 +417,7 @@ namespace M3AT
             public string bone;
             public int seed;
             public bool archotech;
+            public bool weak;   // a clouded eye (CataractEyes): age's faint haze, not a cataract or blindness; seed its level
         }
 
         private static bool Decorated(int look)
@@ -498,6 +499,12 @@ namespace M3AT
             for (int i = 0; i < eyeSign.Count; i++)
             {
                 sign = sign * 31 + eyeSign[i].seed * (eyeSign[i].archotech ? 3 : 1);
+            }
+            eyeSign.Clear();
+            CataractEyes(pawn, eyeSign);   // (Aging.cs)
+            for (int i = 0; i < eyeSign.Count; i++)
+            {
+                sign = sign * 31 + eyeSign[i].seed * 5;
             }
             for (int slot = 0; slot < SkinnedFigure.LimbBones.Length; slot++)
             {

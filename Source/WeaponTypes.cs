@@ -298,6 +298,31 @@ namespace M3AT
 
         private static List<KeyValuePair<string, float>> typeDefaults;
         private static Dictionary<string, string> fileTypes;
+        private static float fileScale = OldScaleUp, fileTall = OldFigureTall;   // anim.txt's game_scale line, else an older export's
+
+        // Cells per model unit for a grown pawn of the standard size: the size the export made its clips for, those aimed
+        // at things in the world (instruments, a tree, a partner) and the holds, as weapons keep their size whoever holds
+        // them (walk.GAME_SCALE, anim.txt's game_scale line). Read once, whether or not the figure has loaded.
+        internal static float ScaleUp
+        {
+            get
+            {
+                ReadTypeFile();
+                return fileScale;
+            }
+        }
+
+        // How tall a grown pawn of the standard size stands, cells: the mod options' pawn height is against this.
+        internal static float StandardHeight
+        {
+            get
+            {
+                ReadTypeFile();
+                return fileScale * fileTall;
+            }
+        }
+
+        private const float OldScaleUp = 1.2f, OldFigureTall = 1.25f;   // an export from before the game_scale line
 
         // Each type and its exported size, for the mod options: from the loaded figure, else read from anim.txt's
         // type_scale lines (the options can be opened before any pawn is drawn). Empty if neither has any.
@@ -316,7 +341,7 @@ namespace M3AT
             return typeDefaults;
         }
 
-        // anim.txt's type_scale and weapon_type lines, once, for when the figure isn't loaded.
+        // anim.txt's type_scale, weapon_type and game_scale lines, once, for when the figure isn't loaded.
         private static void ReadTypeFile()
         {
             if (typeDefaults != null)
@@ -332,6 +357,19 @@ namespace M3AT
                 {
                     foreach (string line in File.ReadLines(path))
                     {
+                        if (line.StartsWith("game_scale "))
+                        {
+                            string[] g = line.Split(' ');
+                            float gameScale, tall;
+                            if (g.Length > 2 && float.TryParse(g[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out gameScale)
+                                && float.TryParse(g[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out tall)
+                                && gameScale > 0f && tall > 0f)
+                            {
+                                fileScale = gameScale;
+                                fileTall = tall;
+                            }
+                            continue;
+                        }
                         if (line.StartsWith("weapon_type "))
                         {
                             string[] w = line.Split(' ');

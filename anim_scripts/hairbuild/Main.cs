@@ -251,6 +251,7 @@ namespace M3AT
             HairBuilder.FringeOn = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("M3AT_NO_FRINGE"));
             HairBuilder.HugOn = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("M3AT_NO_HUG"));
             if (int.TryParse(Environment.GetEnvironmentVariable("M3AT_HUG_GAP"), out int hugGap)) HairBuilder.HugGap = hugGap;
+            if (float.TryParse(Environment.GetEnvironmentVariable("M3AT_EYE_MATCH"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float eyeMatch)) HairBuilder.EyeMatch = eyeMatch;
             if (int.TryParse(Environment.GetEnvironmentVariable("M3AT_FRINGE_GAP"), out int fringeGap)) HairBuilder.FringeGap = fringeGap;
             if (float.TryParse(Environment.GetEnvironmentVariable("M3AT_FRINGE_TURN"), out float fringeTurn)) HairBuilder.FringeTurn = fringeTurn;
             if (float.TryParse(Environment.GetEnvironmentVariable("M3AT_SIDE_TURN"), out float sideTurn)) HairBuilder.SideTurn = sideTurn;

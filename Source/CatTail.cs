@@ -618,7 +618,7 @@ namespace M3AT
             {
                 return;
             }
-            skin.DrawTail(fig, fig.tailState, floor, at, yaw, size, pawn.story.HairColor);
+            skin.DrawTail(fig, fig.tailState, floor, at, yaw, size, WalkFigures.HairColourOf(pawn));
         }
     }
 }

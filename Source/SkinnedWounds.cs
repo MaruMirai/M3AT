@@ -31,6 +31,8 @@ namespace M3AT
             public int[] bones;      // the bones whose skin it may be on (BoneNamed)
             public Vector3 aim;      // the place at rest it goes near, if scatter is above 0
             public float scatter;    // how far from aim its middle may be, cells; 0: anywhere on the bones' skin
+            public float below;      // above 0: only skin at least this share of the way down the first bone, from its head
+                                     // toward its child's (a bionic thigh's decals kept off the crotch and buttock)
             public Rect cell;        // its square on the sheet, texture places
             public float span;       // its square's side on the body, model units
             public bool down;        // its top kept up the body as it stands at rest (blood running down); else turned at random
@@ -127,7 +129,7 @@ namespace M3AT
             {
                 System.Random r = new System.Random(d.seed);
                 Vector3 at, n;
-                if (!Spot(d.bones, d.aim, d.scatter, r, mine, out at, out n))
+                if (!Spot(d.bones, d.aim, d.scatter, d.below, r, mine, out at, out n))
                 {
                     continue;
                 }
@@ -295,12 +297,22 @@ namespace M3AT
             return most;
         }
 
-        // True if body triangle k may carry a spot: on these bones, and within scatter of aim if there is one.
-        private bool Spottable(int k, bool[] mine, Vector3 aim, float scatter)
+        // True if body triangle k may carry a spot: on these bones, within scatter of aim if there is one, and at least
+        // below's share down the bone (SpotLine's from and way: its head and its head-to-child line over its length squared).
+        private bool Spottable(int k, bool[] mine, Vector3 aim, float scatter, float below, Vector3 from, Vector3 way)
         {
             if (!mine[triBone[k]])
             {
                 return false;
+            }
+            if (below > 0f && way != Vector3.zero)
+            {
+                Piece rest = pieces[0];
+                Vector3 middle = (rest.rest[rest.tris[3 * k]] + rest.rest[rest.tris[3 * k + 1]] + rest.rest[rest.tris[3 * k + 2]]) / 3f;
+                if (Vector3.Dot(middle - from, way) < below)
+                {
+                    return false;
+                }
             }
             if (scatter <= 0f)
             {
@@ -313,8 +325,23 @@ namespace M3AT
         // A spot on the skin of these bones at rest (within scatter of aim, if above 0), picked by r, each place as likely
         // as any other (by the triangles' area), and the skin's way out there; false if none of the body is theirs. mine is
         // set to the bones.
-        private bool Spot(int[] bones, Vector3 aim, float scatter, System.Random r, bool[] mine, out Vector3 at, out Vector3 n)
+        private bool Spot(int[] bones, Vector3 aim, float scatter, float below, System.Random r, bool[] mine, out Vector3 at, out Vector3 n)
         {
+            Vector3 from = Vector3.zero, way = Vector3.zero;
+            if (below > 0f && bones.Length > 0 && bones[0] >= 0)
+            {
+                // The first bone's line at rest, to its first child's head.
+                for (int c = 0; c < boneParent.Length; c++)
+                {
+                    if (boneParent[c] == bones[0])
+                    {
+                        from = boneHead[bones[0]];
+                        Vector3 line = boneHead[c] - from;
+                        way = line.sqrMagnitude > 1e-8f ? line / line.sqrMagnitude : Vector3.zero;
+                        break;
+                    }
+                }
+            }
             for (int b = 0; b < mine.Length; b++)
             {
                 mine[b] = false;
@@ -329,7 +356,7 @@ namespace M3AT
             float total = 0f;
             for (int k = 0; k < triBone.Length; k++)
             {
-                if (Spottable(k, mine, aim, scatter))
+                if (Spottable(k, mine, aim, scatter, below, from, way))
                 {
                     total += triArea[k];
                 }
@@ -348,7 +375,7 @@ namespace M3AT
                 int chosen = -1;
                 for (int k = 0; k < triBone.Length && pick >= 0f; k++)
                 {
-                    if (Spottable(k, mine, aim, scatter))
+                    if (Spottable(k, mine, aim, scatter, below, from, way))
                     {
                         chosen = k;
                         pick -= triArea[k];
