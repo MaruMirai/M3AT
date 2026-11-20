@@ -184,7 +184,7 @@ Before you start, point the camera at your colonists the way you usually play an
   <M3AT_FreecamClickOffLooks>Freecam: empty left click closes pointer mode</M3AT_FreecamClickOffLooks>
   <M3AT_FreecamClickOffLooksTip>In pointer mode, a left click that selects nothing goes back to looking. Off (default): it only clears the selection, as in the game.</M3AT_FreecamClickOffLooksTip>
   <M3AT_FreecamPointerBack>Cursor appears at</M3AT_FreecamPointerBack>
-  <M3AT_FreecamPointerBackTip>Where the cursor appears when it is freed (pointer mode, an orders menu, a dialog or a tab). Last position: back where it was when looking began, an orders menu opening there with it (default). The crosshair: in the middle of the screen.</M3AT_FreecamPointerBackTip>
+  <M3AT_FreecamPointerBackTip>Where the cursor appears when it is freed (pointer mode, an orders menu, a dialog or a tab). Last position: back where it was when looking began, an orders menu opening there with it. The crosshair: in the middle of the screen (default).</M3AT_FreecamPointerBackTip>
   <M3AT_FreecamPointerLast>Last position</M3AT_FreecamPointerLast>
   <M3AT_FreecamPointerCross>The crosshair</M3AT_FreecamPointerCross>
   <M3AT_FreecamPointerDot>Show the last position</M3AT_FreecamPointerDot>

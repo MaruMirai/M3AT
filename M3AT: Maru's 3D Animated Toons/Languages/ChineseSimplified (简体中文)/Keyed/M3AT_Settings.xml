@@ -184,7 +184,7 @@
   <M3AT_FreecamClickOffLooks>自由镜头：空白处左键退出指针模式</M3AT_FreecamClickOffLooks>
   <M3AT_FreecamClickOffLooksTip>指针模式下，没有选中任何东西的左键点击会回到环视。关闭（默认）：只清除选择，与游戏中一样。</M3AT_FreecamClickOffLooksTip>
   <M3AT_FreecamPointerBack>光标出现在</M3AT_FreecamPointerBack>
-  <M3AT_FreecamPointerBackTip>光标被释放时（指针模式、命令菜单、对话框或标签页）出现的位置。上次位置：回到开始环视前的位置，命令菜单也随之在该处打开（默认）。准星：屏幕中央。</M3AT_FreecamPointerBackTip>
+  <M3AT_FreecamPointerBackTip>光标被释放时（指针模式、命令菜单、对话框或标签页）出现的位置。上次位置：回到开始环视前的位置，命令菜单也随之在该处打开。准星：屏幕中央（默认）。</M3AT_FreecamPointerBackTip>
   <M3AT_FreecamPointerLast>上次位置</M3AT_FreecamPointerLast>
   <M3AT_FreecamPointerCross>准星</M3AT_FreecamPointerCross>
   <M3AT_FreecamPointerDot>显示上次位置</M3AT_FreecamPointerDot>

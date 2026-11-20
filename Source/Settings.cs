@@ -107,7 +107,7 @@ namespace M3AT
         public bool freecam3D = false;   // the 3D view was on with it, so a loaded game starts in 3D (Freecam.Resume)
         public bool freecamClickOffLooks = false;   // in pointer mode, a left click on nothing goes back to looking
         public bool freecamPointerDot = true;   // a dot where the freed cursor will appear, while looking with freecamPointerBack
-        public bool freecamPointerBack = true;   // the freed pointer (pointer mode, a menu, a dialog) goes back where it was when looking began
+        public bool freecamPointerBack = false;   // the freed pointer (pointer mode, a menu, a dialog) goes back where it was when looking began
         public bool freecamSnapArchitect = false;   // the pointer jumps to the middle of the architect menu as it opens
         public bool freecamMenuFreesPointer = true;   // a menu of orders opened while looking frees the pointer, rather than being pinned in the view
         public int freecamButton = 2;   // the mouse button that toggles pointer mode (2 middle, 3 and 4 the side buttons, -1 none)
@@ -211,7 +211,7 @@ namespace M3AT
             Scribe_Values.Look(ref freecamOn, "freecamOn", false);
             Scribe_Values.Look(ref freecam3D, "freecam3D", false);
             Scribe_Values.Look(ref freecamClickOffLooks, "freecamClickOffLooks", false);
-            Scribe_Values.Look(ref freecamPointerBack, "freecamPointerBack", true);
+            Scribe_Values.Look(ref freecamPointerBack, "freecamPointerBack", false);
             Scribe_Values.Look(ref freecamPointerDot, "freecamPointerDot", true);
             Scribe_Values.Look(ref freecamMenuFreesPointer, "freecamMenuFreesPointer", true);
             Scribe_Values.Look(ref freecamSnapArchitect, "freecamSnapArchitect", false);
