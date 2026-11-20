@@ -2438,6 +2438,26 @@ KISS_CURL = 0.25
 KISS_ELBOW = (0.7, 0.3, -0.6)       # the left elbow out and down (the right mirrored)
 KISS_UPPER = {'spine.001': 1.0}   # from the waist up
 
+# Getting married (wed_at: the game's MarryAdjacentPawn job, the two fiancés a cell apart at the marriage spot for 2500
+# ticks; WalkFigures.WedOf). Both face each other holding both hands between them, palm to palm: wed_under with its
+# palms up, holding the other's from below, and wed_over with its palms down on them (WalkFigures picks one of each,
+# the man, else the bigger, under). The game draws the two WED_GAP apart, so each pair of hands meets halfway, and
+# moves the hands for two of different sizes (WalkFigures.WedHands); for the last seconds it crossfades into the kiss.
+# They sway slowly together, side to side (the partner played half a loop on, so both lean the same way), breathing.
+# A loop, laid over the idle from the waist up (WED_UPPER).
+WED_SECONDS = 6.0
+WED_BREATHS = 2
+WED_GAP = 0.5        # model units between the two figures' middles as drawn (must match WalkFigures.WedGap): the heads just clear of each other
+WED_HEIGHT = 1.2     # leg lengths over the floor the clasped palms meet at
+WED_APART = 0.75     # the palms' way out from the middle line, a share of the shoulder joints' (a little in)
+WED_LEAN = 6.0       # degrees leant in toward the partner from the waist
+WED_LOOK = -4.0      # degrees the head is tipped (- up) after the lean is taken back off it, so it looks at the partner
+WED_SWAY = 2.0       # degrees the trunk sways side to side, once a loop
+WED_CURL = 0.45      # how far the fingers close round the other's hand
+WED_ELBOW = (0.8, 0.4, -0.6)   # the left elbow out, back and down (the right mirrored)
+WED_INWARD = 0.25    # the fingers turned in toward the middle line, as hands held across do
+WED_UPPER = {'spine.001': 1.0}   # from the waist up
+
 # Beating out a fire (the game's BeatFire job: one beat, Verb_BeatFire, as soon as each 1.1 s cool-down ends, so every
 # BEAT_SECONDS). Two ways, sorted in the game by what is burning (WalkFigures.FireKind): stomping (stomp_at, work_stomp)
 # for a fire on the floor, an item or a plant, and patting (pat_at, work_pat) for one on a structure or furniture drawn
@@ -5946,6 +5966,39 @@ def kiss_at(t):
         palm = wrist + facing * HAND_HALF * LEG + fingers * (tail[hn] - head[hn]).length * 0.5
         clamp = max(clamp, hand_on(s, sign, palm, fingers, facing, X, pole=m(KISS_ELBOW)))
         close_hand(X, s, sign, KISS_CURL)
+    return X, clamp
+
+def wed_at(t, under=True):
+    """Getting married at t (0 .. 1 round the loop; see WED_GAP): facing the partner, both hands clasped with theirs
+    halfway between, palms up (under) or down on them, swaying slowly, to be laid over the idle from the waist up
+    (WED_UPPER). Returns the pose and the worst overreach."""
+    breath = 0.5 - 0.5 * math.cos(2 * math.pi * WED_BREATHS * t)
+    X, _ = posed_with(dict(STILL, DROP=0.02), 0.29, breath=breath)
+    sway = WED_SWAY * math.sin(2 * math.pi * t)
+    for bone in (SPINE, CHEST_BONE):
+        pivot = X[bone] @ head[bone]
+        across = (X[bone].to_3x3() @ Vector((1, 0, 0))).normalized()
+        turn_branch(X, bone, about(pivot, across.cross(Vector((0, 0, 1))), sway * 0.5) @ about(pivot, across, WED_LEAN * 0.5))
+    pivot = X[NECK] @ head[NECK]
+    fwd = (X[NECK].to_3x3() @ Vector((1, 0, 0))).normalized().cross(Vector((0, 0, 1)))
+    # The sway and most of the lean taken back off the head, so it keeps looking at the partner's face.
+    turn_branch(X, NECK, about(pivot, fwd, -sway * 0.7)
+                @ about(pivot, (X[NECK].to_3x3() @ Vector((1, 0, 0))).normalized(), WED_LOOK - WED_LEAN * 0.8))
+    for name, leader in FOLLOW.items():
+        X[name] = X[leader]
+    # Where the hands meet: halfway to the partner's middle, by its own middle line (the hips at rest), at WED_HEIGHT.
+    middle = head[HIPS]
+    ahead = WED_GAP * 0.5 / MODEL_LEG * LEG
+    clamp = 0.0
+    for s, sign in (('R', -1), ('L', 1)):
+        out = abs(head['upper_arm.' + s].x - middle.x) * WED_APART
+        palm = Vector((middle.x + sign * out, middle.y - ahead, WED_HEIGHT * LEG))
+        fingers = Vector((-sign * WED_INWARD, -1.0, 0.0))   # toward the partner, turned in a little
+        facing = Vector((0, 0, 1)) if under else Vector((0, 0, -1))
+        # (the palms just apart, so the two hands touch rather than pass through each other)
+        palm += facing * -0.004 * LEG
+        clamp = max(clamp, hand_on(s, sign, palm, fingers, facing, X, pole=Vector((sign * WED_ELBOW[0], WED_ELBOW[1], WED_ELBOW[2]))))
+        close_hand(X, s, sign, WED_CURL)
     return X, clamp
 
 def toss_at(t, keys=None, at=None, look=None):

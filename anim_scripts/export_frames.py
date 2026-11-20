@@ -1829,6 +1829,12 @@ if hasattr(walk, 'dress_at'):
 if hasattr(walk, 'kiss_at'):
     pose_worst = max(pose_worst, export_loop('kiss', walk.kiss_at, walk.loop_frames(walk.KISS_SECONDS), walk.KISS_SECONDS))
     masks['kiss'] = upper_mask('LR', walk.KISS_UPPER)
+    if hasattr(walk, 'wed_at'):
+        # Getting married: both hands held with the partner's, palms up (under) or down on them (over).
+        for role in ('under', 'over'):
+            pose_worst = max(pose_worst, export_loop('wed_' + role, lambda t, u=(role == 'under'): walk.wed_at(t, u),
+                                                     walk.loop_frames(walk.WED_SECONDS), walk.WED_SECONDS))
+            masks['wed_' + role] = upper_mask('LR', walk.WED_UPPER)
 # Jumping: one pass from take-off to landing, its first frame the take-off and its last the landing (the game plays it by
 # how far through the flight the pawn is, never round past the end); and the crouch held before it and after, one still
 # frame the game eases in and out (its length, LAND_SECONDS, is how long coming up out of a landing takes).

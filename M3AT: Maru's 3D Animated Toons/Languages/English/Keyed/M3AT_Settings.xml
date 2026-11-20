@@ -193,6 +193,8 @@ Before you start, point the camera at your colonists the way you usually play an
   <M3AT_FreecamMenuFreesPointerTip>How an orders menu opened while looking is used. Pointer select: the menu frees the pointer to pick from it, going back to looking once it closes (default). Crosshair select: the menu is pinned where it opened and you pick by turning the view onto an option.</M3AT_FreecamMenuFreesPointerTip>
   <M3AT_FreecamMenuPointer>Pointer select</M3AT_FreecamMenuPointer>
   <M3AT_FreecamMenuCrosshair>Crosshair select</M3AT_FreecamMenuCrosshair>
+  <M3AT_FreecamSnapArchitect>Snap to architect menu</M3AT_FreecamSnapArchitect>
+  <M3AT_FreecamSnapArchitectTip>The pointer jumps to just right of the architect menu, on the map, when it opens, and goes back where it was if the menu is closed without picking anything from it. Default: off</M3AT_FreecamSnapArchitectTip>
   <M3AT_LookSpeed>Look speed</M3AT_LookSpeed>
   <M3AT_LookSpeedTip>How far the view turns for the mouse's movement, in degrees per pixel (default {0}).</M3AT_LookSpeedTip>
   <M3AT_InvertMouse>Invert mouse look</M3AT_InvertMouse>

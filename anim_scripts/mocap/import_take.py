@@ -2,7 +2,7 @@
 # clips import_pluck.py takes out of glTFs.
 #   blender -b Models/pawnHumanRig.blend --python anim_scripts/mocap/import_take.py -- <take.csv> [from to] [--as name]
 #       [--once] [--loop shortest longest] [--fps n] [--wrist share] [--tool [--calibrate from to] [--hands right left]
-#       [--swap]]
+#       [--swap]] [--out file.json]
 # from .. to (seconds into the take) is the stretch taken; without them, from just after the rest pose to where the stop
 # gesture began. --loop finds the cycle in that stretch that closes best, shortest .. longest seconds long; without it the
 # stretch is taken whole, and unless --once the turn left between its last frame and its first is spread over it so it
@@ -116,6 +116,7 @@ swap = option('--swap', 0) is not None
 # calibrating, across the ground, rather than from the hips tracker to the chest's (for a take with the hips tracker
 # worn at the front, under the chest).
 forward_tool = option('--forward-tool', 0) is not None
+out_path = option('--out', 1)   # --out file.json: written there instead of beside walk.py (a viewer's cache)
 path = args[0]
 span = (float(args[1]), float(args[2])) if len(args) >= 3 else None
 header, devices = read(path)
@@ -614,7 +615,7 @@ out = {'source': os.path.relpath(path), 'action': 'mocap', 'first': int(round(fi
        'hips': [[round(c, 6) for c in h] for h in hips]}
 if tool:
     out['tool'] = [{k: [round(c, 6) for c in v] for k, v in e.items()} for e in tools]
-target = os.path.join(os.path.dirname(HERE), name + '_clip.json')
+target = out_path[0] if out_path else os.path.join(os.path.dirname(HERE), name + '_clip.json')
 with open(target, 'w') as f:
     json.dump(out, f)
 print('IMPORT wrote %s: %.2f .. %.2f s, %d frames at %d fps%s' % (

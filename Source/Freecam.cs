@@ -1033,24 +1033,41 @@ namespace M3AT
             }
         }
 
-        // The pointer's place as looking begins, before it is first warped to the middle.
+        // The pointer's place as looking begins, before it is first warped to the middle. Coming back from an architect
+        // menu closed with nothing picked from it, the place it was before the menu took it (SnapToArchitect), not
+        // beside the menu.
         private static void KeepLookedFrom()
         {
+            if (ArchitectClosedUnused())
+            {
+                lookedFrom = snapBack;
+                lookedFromWindow = snapBackWindow;
+                snapBackDue = false;
+            }
+            else
+            {
+                PointerNow(out lookedFrom, out lookedFromWindow);
+            }
+            haveLookedFrom = true;
+        }
+
+        // Where the pointer is now: screen pixels, y up, and the engine window's own cursor where the old engine has one.
+        private static void PointerNow(out Vector2 at, out object atWindow)
+        {
             Vector3 mouse = Input.mousePosition;
-            lookedFrom = new Vector2(Mathf.Clamp(mouse.x, 0f, Screen.width - 1), Mathf.Clamp(mouse.y, 0f, Screen.height - 1));
-            lookedFromWindow = null;
+            at = new Vector2(Mathf.Clamp(mouse.x, 0f, Screen.width - 1), Mathf.Clamp(mouse.y, 0f, Screen.height - 1));
+            atWindow = null;
             try
             {
                 if (!warpFailed && window != null && cursorPos != null)
                 {
-                    lookedFromWindow = cursorPos.GetValue(window);
+                    atWindow = cursorPos.GetValue(window);
                 }
             }
             catch (Exception)
             {
-                lookedFromWindow = null;
+                atWindow = null;
             }
-            haveLookedFrom = true;
         }
 
         // The pointer to a place on screen (the middle while looking): the engine's own cursor (its window's, a virtual one while
@@ -1506,6 +1523,107 @@ namespace M3AT
             return t;
         }
 
+        private static bool architectWas;
+        private static int snapFrames;
+        private const float SnapBeside = 30f;   // UI px past the architect menu's right edge
+        // Where the pointer was before the architect menu took it (screen pixels, y up), and whether it goes back there:
+        // set while the menu is open with nothing picked from it, kept after it closes until the pointer is back.
+        private static Vector2 snapBack;
+        private static object snapBackWindow;
+        private static bool snapBackDue;
+        private static bool snapPicked;
+        private static Designator snapDesignatorAtOpen;
+        private static int backFrames;
+
+        // An architect menu the pointer was snapped to has closed with no designator picked from it.
+        private static bool ArchitectClosedUnused()
+        {
+            return snapBackDue && !snapPicked
+                && (Find.WindowStack == null || Find.WindowStack.WindowOfType<MainTabWindow_Architect>() == null);
+        }
+
+        // With the freecamSnapArchitect option, the pointer jumps to just right of the architect menu, level with its
+        // middle, as it opens, held there a few frames as the freed pointer is, so it isn't taken back to where looking
+        // began. Closed again with nothing picked from it, the pointer goes back where it was: in pointer mode warped
+        // there; looking again, kept as the place it is freed to (KeepLookedFrom).
+        // The window's rect is in UI units, y down; the pointer's place in screen pixels, y up.
+        private static void SnapToArchitect()
+        {
+            if (!on || !Options.freecamSnapArchitect)
+            {
+                architectWas = false;
+                snapBackDue = false;
+                snapFrames = backFrames = 0;
+                return;
+            }
+            Window architect = on && Options.freecamSnapArchitect && Find.WindowStack != null
+                ? Find.WindowStack.WindowOfType<MainTabWindow_Architect>() : null;
+            if (architect == null)
+            {
+                if (architectWas && snapBackDue && !snapPicked && !lockedLast)
+                {
+                    backFrames = CentreFrames;
+                }
+                else if (architectWas)
+                {
+                    snapBackDue = false;
+                }
+                architectWas = false;
+                snapFrames = 0;
+                if (backFrames > 0)
+                {
+                    if (lockedLast || !snapBackDue)
+                    {
+                        backFrames = 0;
+                        snapBackDue = false;
+                        return;
+                    }
+                    backFrames--;
+                    Warp(snapBack, snapBackWindow);
+                    if (backFrames == 0)
+                    {
+                        snapBackDue = false;
+                    }
+                }
+                return;
+            }
+            if (!architectWas)
+            {
+                architectWas = true;
+                snapFrames = CentreFrames + 1;
+                backFrames = 0;
+                // Freed from looking this frame, the pointer would have gone where Unlock sends it; else it is where the
+                // player left it.
+                if (centreFrames > 0)
+                {
+                    snapBack = freedBack ? lookedFrom : new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+                    snapBackWindow = freedBack ? lookedFromWindow : null;
+                }
+                else
+                {
+                    PointerNow(out snapBack, out snapBackWindow);
+                }
+                snapBackDue = true;
+                snapPicked = false;
+                snapDesignatorAtOpen = Find.DesignatorManager != null ? Find.DesignatorManager.SelectedDesignator : null;
+            }
+            Designator chosen = Find.DesignatorManager != null ? Find.DesignatorManager.SelectedDesignator : null;
+            if (chosen != null && chosen != snapDesignatorAtOpen)
+            {
+                snapPicked = true;
+            }
+            if (snapFrames <= 0 || lockedLast)
+            {
+                return;
+            }
+            snapFrames--;
+            Rect r = architect.windowRect;
+            float scale = Prefs.UIScale;
+            // A little past the menu's right edge, so the pointer is on the map and not over the menu.
+            float x = Mathf.Min(r.xMax + SnapBeside, UI.screenWidth - 1f);
+            Warp(new Vector2(x * scale, Screen.height - r.center.y * scale), null);
+        }
+
         // Over the pinned menu: its contents are drawn in a group at its window's corner (a float menu has no margin).
         public static void MenuContentsPostfix(FloatMenu __instance)
         {
@@ -1542,10 +1660,15 @@ namespace M3AT
             {
                 Unlock();
             }
+            SnapToArchitect();
             if (centreFrames > 0 && !lockedLast)
             {
                 centreFrames--;
-                if (freedBack)
+                if (snapFrames > 0 || backFrames > 0)
+                {
+                    // The architect menu has the pointer this frame, not the place looking began from.
+                }
+                else if (freedBack)
                 {
                     Warp(lookedFrom, lookedFromWindow);
                 }

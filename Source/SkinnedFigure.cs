@@ -2280,6 +2280,17 @@ namespace M3AT
             }
         }
 
+        // Reach with the wrist where Chain left it scaled by k about the figure's own origin (model units, before the whole
+        // move): the clasped hands of two of different sizes getting married (WalkFigures.WedHands).
+        public void ReachScaled(Posed p, Matrix4x4 whole, string side, float k, float w)
+        {
+            int hand;
+            if (boneIndex.TryGetValue("hand." + side, out hand))
+            {
+                Reach(p, whole, side, whole.MultiplyPoint3x4(p.pos[hand] * k), w);
+            }
+        }
+
         // At lovin with no blanket (lovin_L, lovin_R; anim.txt's lovin_pair line, walk.LOVIN_CLOSER and LOVIN_SPLAY): cells
         // each is drawn across the bed toward the other, and degrees each is turned about its head, its hips away from the
         // other's, so the two lie in a V with the heads together and the knees clear.

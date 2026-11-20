@@ -219,6 +219,12 @@ namespace M3AT
         private const float SnowRelease = 0.55f;   // walk.SNOW_RELEASE: how far through the snowball clip it leaves the hand
         private const float KissNodMost = 35f;   // degrees a kisser's head tips down or up at most toward one of another height
         private const float KissGap = 0.42f;   // cells between two grown kissers' middles as drawn (KissOf), so the faces meet
+        private const float WedGap = 0.5f;   // walk.WED_GAP: model units between two getting married as drawn (times their size), their hands clasped halfway
+        private const int WedKissTicks = 300;   // game ticks before the marriage at which the two go from holding hands into the kiss
+        private const float WedKissEase = 1.2f;   // how fast they go into the kiss, per real second
+        private const int VowCycle = 520;   // game ticks of one round of vows: the first says its part, then the other
+        private const int VowLong = 200;   // game ticks each says its part for, in a round
+        private const int VowGap = 50;   // game ticks between the one's part and the other's
         private const float ShareLook = 0.6f;   // share of the way a pawn sat beside a reader turns its head toward the book (LessonLookOf)
         private const float ShareBook = 0.3f;   // cells in front of the reader the book is looked at
         private const float ShareCloser = 0.15f;   // cells a reader and its watcher sat side by side are each drawn toward the other (SharePartnerOf)
@@ -541,6 +547,8 @@ namespace M3AT
             public string tossClip;   // toss, or snowball for Romance on the Rim's snowball fight (kept while it eases out)
             public Vector3 eatWay;   // the way to the table a pawn sat eats at (EatCloser), flat, unit; kept as it eases out
             public Vector3 kissWay;   // the way and distance to the partner while kissing (KissOf), flat, cells
+            public float wedKiss;   // 0 .. 1: how far a pawn getting married has gone from holding hands into the kiss (WedKissOf), eased
+            public float? wedFace;   // which way the one it marries is (degrees clockwise from north), kept as it eases out
             public float nod;   // degrees the head tips down (+) or up (-) toward a kisser of another height at a full kiss (KissNodOf); kept as it eases out
             public float share;   // 0 .. 1: how far a reader and its watcher have drawn together (SharePartnerOf), eased
             public Vector3 shareWay;   // the way and distance to the other, flat, cells
@@ -2121,7 +2129,7 @@ namespace M3AT
             float cowering = Cowering(pawn) ? 1f : 0f;
             float leading = Leading(pawn) ? 1f : 0f;
             // Reading goes the same way as eating: laid over the sit or the idle from the waist up, in place of the carry.
-            string eatClip = skin != null ? EatOf(pawn) ?? ReadOf(pawn) ?? TeachOf(pawn) ?? KissOf(pawn) : null;
+            string eatClip = skin != null ? EatOf(pawn) ?? ReadOf(pawn) ?? TeachOf(pawn) ?? KissOf(pawn) ?? WedOf(pawn) : null;
             float eating = eatClip != null ? 1f : 0f;
             float talking = skin != null && skin.Has("talk") && TalkOf(pawn) ? 1f : 0f;
             string tossClip = skin != null ? TossClipOf(pawn) : null;
@@ -2193,6 +2201,7 @@ namespace M3AT
                 e.cower = cowering;
                 e.eat = eating;
                 e.eatClip = eatClip;
+                e.wedKiss = Wedding(eatClip) && WedKissOf(pawn) ? 1f : 0f;
                 e.lead = leading;
                 e.shield = shielding;
                 e.talk = talking;
@@ -2338,6 +2347,13 @@ namespace M3AT
                 }
                 e.eat = recent ? Mathf.MoveTowards(e.eat, eating * putAway, EatEase * Time.deltaTime) : eating;
                 e.eatClip = eatClip ?? e.eatClip;
+                if (Wedding(eatClip))
+                {
+                    // Getting married: facing the other, and into the kiss for the end.
+                    e.wedFace = FaceOf(pawn, WeddingPartner(pawn)) ?? e.wedFace;
+                    float kissing = WedKissOf(pawn) ? 1f : 0f;
+                    e.wedKiss = recent ? Mathf.MoveTowards(e.wedKiss, kissing, WedKissEase * Time.deltaTime) : kissing;
+                }
                 e.talk = recent ? Mathf.MoveTowards(e.talk, talking * putAway, TalkEase * Time.deltaTime) : talking;
                 e.toss = recent ? Mathf.MoveTowards(e.toss, tossing * putAway, TalkEase * Time.deltaTime) : tossing;
                 e.tossClip = tossClip ?? e.tossClip;
@@ -3548,6 +3564,127 @@ namespace M3AT
             return name == "RomanceOnTheRim_InitiateKiss" || name == "RomanceOnTheRim_ReceiveKiss" ? "kiss" : null;
         }
 
+        // Getting married: the game's MarryAdjacentPawn job (the marriage ceremony's two fiancés, a cell apart at the marriage
+        // spot, for 2500 ticks, then married; JobDriver_MarryAdjacentPawn, the other target A). The one it marries, once
+        // both stand there, else null.
+        private static Pawn WeddingPartner(Pawn pawn)
+        {
+            Job job = pawn.CurJob;
+            if (job == null || job.def != JobDefOf.MarryAdjacentPawn || (pawn.pather != null && pawn.pather.Moving))
+            {
+                return null;
+            }
+            Pawn other = job.targetA.Thing as Pawn;
+            return other != null && other.Spawned && other.Map == pawn.Map ? other : null;
+        }
+
+        // The marriage ceremony's clip: wed_under (palms up, holding the other's hands from below) for the man with a woman,
+        // else the bigger drawn (BigSpoon's rule), wed_over (palms down on them) for the other, laid over the idle from the
+        // waist up through eating's slot (Ease.eat, eatClip), both drawn toward each other to WedGap and facing each other;
+        // the kiss crossfaded in for its end (WedKissOf, Ease.wedKiss).
+        private static string WedOf(Pawn pawn)
+        {
+            Pawn other = WeddingPartner(pawn);
+            if (other == null || !skin.Has("wed_under") || !skin.Has("wed_over"))
+            {
+                return null;
+            }
+            return BigSpoon(pawn, other) ? "wed_under" : "wed_over";
+        }
+
+        private static bool Wedding(string clip)
+        {
+            return clip != null && clip.StartsWith("wed_", StringComparison.Ordinal);
+        }
+
+        // Whether the two getting married have come to the kiss: the last WedKissTicks before the game marries them.
+        private static bool WedKissOf(Pawn pawn)
+        {
+            int left = WedTicksLeft(pawn);
+            return left >= 0 && left <= WedKissTicks && skin.Has("kiss");
+        }
+
+        // Game ticks left before the two are married, by one clock for both (the first's by id, else its own), as each
+        // takes up the job on its own think pass; -1 if it isn't getting married.
+        private static int WedTicksLeft(Pawn pawn)
+        {
+            Pawn other = WeddingPartner(pawn);
+            if (other == null)
+            {
+                return -1;
+            }
+            Pawn first = other.thingIDNumber < pawn.thingIDNumber ? other : pawn;
+            JobDriver_MarryAdjacentPawn driver = first.jobs != null ? first.jobs.curDriver as JobDriver_MarryAdjacentPawn : null;
+            driver = driver ?? (pawn.jobs != null ? pawn.jobs.curDriver as JobDriver_MarryAdjacentPawn : null);
+            return driver != null ? driver.TicksLeftToMarry : -1;
+        }
+
+        // The wedding loop's phase, the same clock for both (the first's), the second half a loop on: the clip sways to
+        // its own side, and facing each other that keeps them swaying together the same way.
+        private static float WedPhase(Pawn pawn, string clip)
+        {
+            Pawn other = WeddingPartner(pawn);
+            float seconds = skin.SecondsOf(clip);
+            if (other == null || seconds <= 0f)
+            {
+                return LoopPhase(pawn, clip);
+            }
+            int first = Mathf.Min(pawn.thingIDNumber, other.thingIDNumber);
+            float t = Find.TickManager.TicksGame / 60f + (first % 997) * 1.618f;
+            return Mathf.Repeat(t / seconds + (pawn.thingIDNumber == first ? 0f : 0.5f), 1f);
+        }
+
+        // Whom a pawn kisses or marries (Romance on the Rim's kiss, the marriage ceremony), else null.
+        private static Pawn KissPartner(Pawn pawn)
+        {
+            if (KissOf(pawn) != null && pawn.CurJob.targetA.Thing is Pawn lover && lover.Spawned)
+            {
+                return lover;
+            }
+            return WeddingPartner(pawn);
+        }
+
+        // 1 while a pawn getting married says its vows (for the mouth, SayOf): in rounds of VowCycle ticks, the first of
+        // the two (by id) and then the other, until the kiss; else 0.
+        internal static float VowsOf(Pawn pawn)
+        {
+            Pawn other = WeddingPartner(pawn);
+            int left = WedTicksLeft(pawn);
+            if (other == null || left <= WedKissTicks + VowGap || !CanTalk(pawn))
+            {
+                return 0f;
+            }
+            int into = (2500 - left) % VowCycle;   // (the job's Duration)
+            int from = pawn.thingIDNumber < other.thingIDNumber ? VowGap : 2 * VowGap + VowLong;
+            return into >= from && into < from + VowLong ? 1f : 0f;
+        }
+
+        // Getting married, the clasped hands moved for two of different sizes: the clip has them meet halfway between two
+        // of one size WedGap apart; drawn closer by their sizes' mean (WedGap times it apart), each wrist goes to its
+        // place in the clip scaled by the mean over its own size, so the two pairs of hands meet. As far as the hands are
+        // held (not into the kiss).
+        private static void WedHands(Pawn pawn, Ease ease, SkinnedFigure.Posed fig, Matrix4x4 whole, float size)
+        {
+            if (!Wedding(ease.eatClip) || ease.eat <= 0f || size <= 0f)
+            {
+                return;
+            }
+            Pawn other = WeddingPartner(pawn);
+            if (other == null)
+            {
+                return;
+            }
+            float k = 0.5f * (size + SizeOf(other)) / size;
+            if (Mathf.Abs(k - 1f) < 0.005f)
+            {
+                return;
+            }
+            float w = Mathf.SmoothStep(0f, 1f, ease.eat) * (1f - Mathf.SmoothStep(0f, 1f, ease.wedKiss));
+            skin.ReachScaled(fig, whole, "L", k, w);
+            skin.ReachScaled(fig, whole, "R", k, w);
+            skin.Reached(fig, whole);
+        }
+
         // Degrees a kisser's head tips down (+) or up (-) so it looks at its partner's face rather than straight ahead: the
         // kiss clip is made for two of a height, so with one drawn taller (gender sizes, the height spread, age, a mod's
         // body sizes) the faces met at the taller's chin. Each looks along the line between the two heads' middles as
@@ -3557,16 +3694,19 @@ namespace M3AT
         // 0 for anyone not kissing.
         private static float KissNodOf(Pawn pawn, Ease ease, SkinnedFigure.Shape shape, float size)
         {
-            if (ease.eatClip != "kiss" || ease.eat <= 0f)
+            if ((ease.eatClip != "kiss" && !Wedding(ease.eatClip)) || ease.eat <= 0f)
             {
                 ease.nod = 0f;
                 return 0f;
             }
-            if (KissOf(pawn) != null && pawn.CurJob.targetA.Thing is Pawn lover && lover.Spawned && lover.story != null)
+            Pawn lover = KissPartner(pawn);
+            if (lover != null && lover.story != null)
             {
                 float loverSize = SizeOf(lover);
                 float rise = skin.HeadHeight(ShapeFor(lover)) * loverSize - skin.HeadHeight(shape) * size;   // cells the partner's head is higher
-                float apart = KissGap * 0.5f * (size + loverSize);
+                // (marrying, as far apart as they are drawn, hands held or kissing)
+                float gap = Wedding(ease.eatClip) ? Mathf.Lerp(WedGap, KissGap, Mathf.SmoothStep(0f, 1f, ease.wedKiss)) : KissGap;
+                float apart = gap * 0.5f * (size + loverSize);
                 ease.nod = Mathf.Clamp(-Mathf.Atan2(rise, apart) * Mathf.Rad2Deg, -KissNodMost, KissNodMost);
             }
             return ease.nod * Mathf.SmoothStep(0f, 1f, ease.eat);
@@ -3805,10 +3945,10 @@ namespace M3AT
             Interaction i;
             if (!interactions.TryGetValue(pawn.thingIDNumber, out i) || i.sayTo <= i.sayFrom || !pawn.Awake())
             {
-                return 0f;
+                return VowsOf(pawn);
             }
             int now = Find.TickManager.TicksGame;
-            return now >= i.sayFrom && now < i.sayTo ? 1f : 0f;
+            return now >= i.sayFrom && now < i.sayTo ? 1f : VowsOf(pawn);
         }
 
         // Whom the pawn had a social interaction with within GlanceTicks, if they are still about; else null.
@@ -7860,6 +8000,7 @@ namespace M3AT
                 : !lying && ease.work > 0f && ease.workKind != null ? ease.workFace
                 : !lying && !seated && ease.chatAt >= 0f && ease.chatFace.HasValue ? ease.chatFace
                 : !lying && !seated && ease.toss > 0f && ease.tossFace.HasValue ? ease.tossFace
+                : !lying && !seated && ease.eat > 0f && Wedding(ease.eatClip) && ease.wedFace.HasValue ? ease.wedFace
                 : !lying && now - ease.aimTick <= AimHold ? ease.aimFace : (float?)null;
             // IsoRim's placing of the figure (its tracker stepped by our stride, turned to our facing): where it stands, sits or
             // lies, how high it is lifted (in mid-jump, or carried by a figure IsoRim draws), its yaw and stride.
@@ -8379,9 +8520,16 @@ namespace M3AT
                     ease.readShowSide = showSide ?? ease.readShowSide;
                     string shown = ease.readShowSide != null ? "read_show_" + ease.readShowSide : null;
                     float show = ease.eatClip == "read" && shown != null && skin.Has(shown) ? Mathf.SmoothStep(0f, 1f, ease.readShow) : 0f;
-                    if (eat > 0f)
+                    // Getting married: the kiss crossfaded in over the held hands for the end (Ease.wedKiss).
+                    float wedKiss = Wedding(ease.eatClip) && skin.Has("kiss") ? Mathf.SmoothStep(0f, 1f, ease.wedKiss) : 0f;
+                    if (eat > 0f && wedKiss < 1f)
                     {
-                        skin.Over(fig, ease.eatClip, ease.eatClip == "pill" ? ease.pillAt : LoopPhase(pawn, ease.eatClip), eat * (1f - show));
+                        float eatPhase = ease.eatClip == "pill" ? ease.pillAt : Wedding(ease.eatClip) ? WedPhase(pawn, ease.eatClip) : LoopPhase(pawn, ease.eatClip);
+                        skin.Over(fig, ease.eatClip, eatPhase, eat * (1f - show) * (1f - wedKiss));
+                    }
+                    if (eat > 0f && wedKiss > 0f)
+                    {
+                        skin.Over(fig, "kiss", WedPhase(pawn, "kiss"), eat * wedKiss);
                     }
                     if (eat > 0f && show > 0f)
                     {
@@ -8576,6 +8724,7 @@ namespace M3AT
                         }
                         GripCarried(pawn, ease, fig, whole, size);
                         StrokePet(pawn, ease, fig, whole, size);
+                        WedHands(pawn, ease, fig, whole, size);
                         GripOffHand(pawn, ease, fig, whole, size);
                         HandsClear(ease, fig, whole, size);
                     }
@@ -8706,19 +8855,22 @@ namespace M3AT
                     at += Quaternion.Euler(0f, yaw, 0f) * Vector3.forward * (seatSlide * (1f - eating))
                         + ease.eatWay * (Mathf.Max(EatCloser, seatSlide) * eating);
                 }
-                else if (ease.eatClip == "kiss" && ease.eat > 0f)
+                else if ((ease.eatClip == "kiss" || Wedding(ease.eatClip)) && ease.eat > 0f)
                 {
                     // Kissing: the two stand a cell apart, so each is drawn half the way to KissGap (for its size) toward
-                    // the other, as far as it has taken up the kiss.
-                    if (KissOf(pawn) != null && pawn.CurJob.targetA.Thing is Pawn lover && lover.Spawned)
+                    // the other, as far as it has taken up the kiss. Getting married, to WedGap holding hands, then to
+                    // KissGap into the kiss.
+                    Pawn lover = KissPartner(pawn);
+                    if (lover != null)
                     {
                         Vector3 to = lover.DrawPos - pawn.DrawPos;
                         ease.kissWay = new Vector3(to.x, 0f, to.z);
                     }
+                    float gap = Wedding(ease.eatClip) ? Mathf.Lerp(WedGap, KissGap, Mathf.SmoothStep(0f, 1f, ease.wedKiss)) : KissGap;
                     float apart = ease.kissWay.magnitude;
                     if (apart > 0.01f)
                     {
-                        at += ease.kissWay / apart * (Mathf.Max(0f, apart - KissGap * size) * 0.5f * ease.eat);
+                        at += ease.kissWay / apart * (Mathf.Max(0f, apart - gap * size) * 0.5f * ease.eat);
                     }
                 }
                 else if (seated && ease.share > 0f && ease.shareWay.sqrMagnitude > 1e-4f)

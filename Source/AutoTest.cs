@@ -701,6 +701,7 @@ namespace M3AT
                 case "sleepside": return SleepSideTest();
                 case "bedin": return BedInTest();
                 case "lovin": return LovinTest();
+                case "wedding": return WeddingTest();
                 case "lovinbare": return LovinTest(true);
                 case "kidbed": return KidBedTest();
                 case "fpeye": return FirstPersonEyeTest();
@@ -1182,6 +1183,98 @@ namespace M3AT
         // lump drawn across toward the other and the heads turned to face each other (WalkFigures.LovinOf).
         // lovinbare: the same with no blanket (the bedBlankets option off): the two on their sides facing each other
         // (lovin_L, lovin_R), drawn toward each other (WalkFigures.LovinBareOf), the heads not turned.
+        // The marriage ceremony's MarryAdjacentPawn job, given straight to two fiancés a cell apart (east and west, as the
+        // game's marriage spot without one puts the second), its countdown cut to WeddingTicks so the run sees a round of
+        // vows each, the kiss and the marriage: checks each holds hands as one of wed_under and wed_over facing the other,
+        // talks in turn, goes into the kiss for the end and is married after.
+        private const int WeddingTicks = 1300;
+
+        private static IEnumerator WeddingTest()
+        {
+            Pawn a = NewPawn(middle + new IntVec3(-1, 0, 0), null);
+            Pawn b = NewPawn(middle, null);
+            a.relations.AddDirectRelation(PawnRelationDefOf.Fiance, b);
+            Pawn[] two = { a, b };
+            Note("Wedding: " + a.LabelShort + " (" + a.gender + ", id " + a.thingIDNumber + ") and " + b.LabelShort + " (" + b.gender
+                + ", id " + b.thingIDNumber + ")");
+            for (int k = 0; k < 2; k++)
+            {
+                Pawn p = two[k];
+                p.jobs.StartJob(JobMaker.MakeJob(JobDefOf.MarryAdjacentPawn, two[1 - k]), JobCondition.InterruptForced);
+                if (p.jobs.curDriver is JobDriver_MarryAdjacentPawn driver)
+                {
+                    typeof(JobDriver_MarryAdjacentPawn).GetField("ticksLeftToMarry", BindingFlags.NonPublic | BindingFlags.Instance)
+                        .SetValue(driver, WeddingTicks);
+                }
+            }
+            lookAt = (a.TrueCenter() + b.TrueCenter()) * 0.5f;
+            lookYaw = 0f;
+            lookPitch = 25f;
+            lookDistance = 2.4f;
+            lookHeight = 0.6f;
+            string[] clips = new string[2];
+            float[] faced = new float[2], eat = new float[2], kissed = new float[2];
+            bool[] spoke = new bool[2], spokeBoth = { false };
+            bool kissShot = false;
+            for (int i = 0; i < WeddingTicks / 10 + 30; i++)
+            {
+                yield return Ticks(10, "wedding", a);
+                bool marrying = a.CurJobDef == JobDefOf.MarryAdjacentPawn && b.CurJobDef == JobDefOf.MarryAdjacentPawn;
+                bool talking = false;
+                for (int k = 0; k < 2; k++)
+                {
+                    Pawn p = two[k];
+                    if (!marrying)
+                    {
+                        continue;
+                    }
+                    string clip = Field<string>(p, "eatClip");
+                    clips[k] = clip ?? clips[k];
+                    eat[k] = Mathf.Max(eat[k], Field<float>(p, "eat"));
+                    kissed[k] = Mathf.Max(kissed[k], Field<float>(p, "wedKiss"));
+                    object face = WalkFigures.AutoField(p, "wedFace");
+                    if (face is float f)
+                    {
+                        faced[k] = Mathf.Abs(Mathf.DeltaAngle(f, (two[1 - k].DrawPos - p.DrawPos).AngleFlat()));
+                    }
+                    if (WalkFigures.VowsOf(p) > 0f)
+                    {
+                        spoke[k] = true;
+                        if (talking)
+                        {
+                            spokeBoth[0] = true;
+                        }
+                        talking = true;
+                    }
+                }
+                if (i == 20 || i == 60)
+                {
+                    yield return Shot("wedding_hands_t" + i * 10);
+                }
+                if (marrying && !kissShot && Field<float>(a, "wedKiss") > 0.95f)
+                {
+                    kissShot = true;
+                    yield return Shot("wedding_kiss");
+                }
+            }
+            for (int k = 0; k < 2; k++)
+            {
+                Check("fiancé " + k + ": holding hands", eat[k] > 0.9f && clips[k] != null && clips[k].StartsWith("wed_"),
+                    "clip " + (clips[k] ?? "none") + ", taken up " + eat[k].ToString("F2"));
+                Check("fiancé " + k + ": facing the other", faced[k] < 20f, faced[k].ToString("F0") + " degrees off");
+                Check("fiancé " + k + ": said vows", spoke[k], spoke[k] ? "yes" : "never");
+                Check("fiancé " + k + ": into the kiss at the end", kissed[k] > 0.9f, "kiss " + kissed[k].ToString("F2"));
+            }
+            Check("fiancés: one holds from under, one over", clips[0] != clips[1], clips[0] + " and " + clips[1]);
+            Check("fiancés: never both talking at once", !spokeBoth[0], spokeBoth[0] ? "both at once" : "in turn");
+            Check("married", a.relations.DirectRelationExists(PawnRelationDefOf.Spouse, b), a.relations.DirectRelationExists(PawnRelationDefOf.Spouse, b) ? "spouses" : "not");
+            Note("Look: the two facing each other holding both hands between them, one pair palms up under the other's, "
+                + "swaying together the same way; the mouths moving in turn; the kiss at the end, drawn together.");
+            lookPitch = LookPitch;
+            lookDistance = LookDistance;
+            lookHeight = LookHeight;
+        }
+
         private static IEnumerator LovinTest(bool bare = false)
         {
             bool was = SettingsMod.Settings.bedBlankets;

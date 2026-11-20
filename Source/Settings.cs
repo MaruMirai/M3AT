@@ -108,6 +108,7 @@ namespace M3AT
         public bool freecamClickOffLooks = false;   // in pointer mode, a left click on nothing goes back to looking
         public bool freecamPointerDot = true;   // a dot where the freed cursor will appear, while looking with freecamPointerBack
         public bool freecamPointerBack = true;   // the freed pointer (pointer mode, a menu, a dialog) goes back where it was when looking began
+        public bool freecamSnapArchitect = false;   // the pointer jumps to the middle of the architect menu as it opens
         public bool freecamMenuFreesPointer = true;   // a menu of orders opened while looking frees the pointer, rather than being pinned in the view
         public int freecamButton = 2;   // the mouse button that toggles pointer mode (2 middle, 3 and 4 the side buttons, -1 none)
         public float freecamSensitivity = DefaultFreecamSensitivity;
@@ -213,6 +214,7 @@ namespace M3AT
             Scribe_Values.Look(ref freecamPointerBack, "freecamPointerBack", true);
             Scribe_Values.Look(ref freecamPointerDot, "freecamPointerDot", true);
             Scribe_Values.Look(ref freecamMenuFreesPointer, "freecamMenuFreesPointer", true);
+            Scribe_Values.Look(ref freecamSnapArchitect, "freecamSnapArchitect", false);
             Scribe_Values.Look(ref freecamButton, "freecamButton", 2);
             Scribe_Values.Look(ref freecamSensitivity, "freecamSensitivity", DefaultFreecamSensitivity);
             Scribe_Values.Look(ref freecamInvertY, "freecamInvertY", false);
@@ -890,6 +892,8 @@ namespace M3AT
                 }
                 Find.WindowStack.Add(new FloatMenu(kinds));
             }
+            list.CheckboxLabeled("M3AT_FreecamSnapArchitect".Translate(), ref Settings.freecamSnapArchitect,
+                "M3AT_FreecamSnapArchitectTip".Translate());
             Settings.freecamSensitivity = Mathf.Round(Slider(list, "M3AT_LookSpeed".Translate(), Settings.freecamSensitivity.ToString("0.00"), Settings.freecamSensitivity, 0.02f, 0.6f,
                 "M3AT_LookSpeedTip".Translate(Settings.DefaultFreecamSensitivity.ToString("0.00"))) * 100f) / 100f;
             list.CheckboxLabeled("M3AT_InvertMouse".Translate(), ref Settings.freecamInvertY, "M3AT_InvertMouseTip".Translate());

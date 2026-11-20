@@ -193,6 +193,8 @@
   <M3AT_FreecamMenuFreesPointerTip>环视时打开的命令菜单的使用方式。指针选择：菜单释放指针供你选择，关闭后回到环视（默认）。准星选择：菜单固定在打开的位置，通过转动视角对准选项来选择。</M3AT_FreecamMenuFreesPointerTip>
   <M3AT_FreecamMenuPointer>指针选择</M3AT_FreecamMenuPointer>
   <M3AT_FreecamMenuCrosshair>准星选择</M3AT_FreecamMenuCrosshair>
+  <M3AT_FreecamSnapArchitect>指针跳到建造菜单</M3AT_FreecamSnapArchitect>
+  <M3AT_FreecamSnapArchitectTip>打开建造菜单时，指针跳到菜单右侧的地图上；若未选择任何内容就关闭菜单，指针回到原来的位置。默认：关</M3AT_FreecamSnapArchitectTip>
   <M3AT_LookSpeed>转向速度</M3AT_LookSpeed>
   <M3AT_LookSpeedTip>鼠标移动时视角转动的幅度，单位为度/像素（默认 {0}）。</M3AT_LookSpeedTip>
   <M3AT_InvertMouse>反转鼠标视角</M3AT_InvertMouse>
