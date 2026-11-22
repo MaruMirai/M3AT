@@ -362,6 +362,10 @@ namespace M3AT
             internal PieceMeshes tail;   // its cat tail (CatTail.cs), made when first drawn
             public bool furTail, tailMadeFur;   // whether it has the furry tail, and whether those meshes are of it
             public TailState tailState;   // and how it is moving
+            internal readonly Dictionary<Piece, TailState> raceTails = new Dictionary<Piece, TailState>();   // its race's built tails' springs (RaceTails.cs)
+            internal readonly Dictionary<Piece, EarState> raceEars = new Dictionary<Piece, EarState>();     // and its built ears'
+            internal readonly Dictionary<string, TailState> modelTails = new Dictionary<string, TailState>();   // its race's model tail's, by file (RaceModels)
+            internal readonly Dictionary<string, EarState> modelEars = new Dictionary<string, EarState>();     // and model ears'
             public FaceLayers.Patch face;   // null without a face patch
             public Vector3[] faceVerts;
             public Vector3[] faceNormals;

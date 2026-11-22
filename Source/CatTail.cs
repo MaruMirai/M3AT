@@ -56,6 +56,10 @@ namespace M3AT
             public Matrix4x4[] bones;
             public int[] rootBone;     // the body's weights at the root (RootWeights), which it is skinned by as the skin
             public float[] rootWeight; // there is, so it stays on it when the hips bend from the thighs and the back
+            public bool[] inner;       // a race model's pale tip (inner lines, RaceTails.cs), null for none
+            public int bone;           // the bone it rides: the hips, or as its bone line names (a race's wings, the chest)
+            public bool plain;         // drawn without the hair's strand grain (a plain line: wings' feathers)
+            public float mirror = 1f;  // its side swing's way round (a mirror line): -1 for a left wing, so a pair swing together
             public readonly Dictionary<Shape, TailFit> fits = new Dictionary<Shape, TailFit>();
         }
 
@@ -115,7 +119,7 @@ namespace M3AT
 
         private Tail ReadTail(string path)
         {
-            Tail t = new Tail();
+            Tail t = new Tail { bone = hipsBone };
             t.piece = ReadMesh(path, false, null);
             if (turnRound)
             {
@@ -136,9 +140,34 @@ namespace M3AT
                 {
                     continue;
                 }
-                if (p[0] == "tail")
+                if (p[0] == "bone" && p.Length > 1)
+                {
+                    int named;
+                    if (!boneIndex.TryGetValue(p[1], out named))
+                    {
+                        throw new InvalidDataException(path + ": no bone " + p[1]);
+                    }
+                    t.bone = named;
+                }
+                else if (p[0] == "plain")
+                {
+                    t.plain = true;
+                }
+                else if (p[0] == "mirror" && p.Length > 1)
+                {
+                    t.mirror = Num(p[1]) < 0f ? -1f : 1f;
+                }
+                else if (p[0] == "tail")
                 {
                     joints[int.Parse(p[1])] = Vec(p, 2);
+                }
+                else if (p[0] == "inner")
+                {
+                    t.inner = t.inner ?? new bool[n];
+                    for (int i = 1; i < p.Length; i++)
+                    {
+                        t.inner[int.Parse(p[i])] = true;
+                    }
                 }
                 else if (p[0] == "tw")
                 {
@@ -297,7 +326,7 @@ namespace M3AT
             {
                 return f;
             }
-            Vector3 move = s.boneMove[hipsBone];
+            Vector3 move = s.boneMove[t.bone];
             f = new TailFit { rest = new Vector3[t.piece.rest.Length], joints = new Vector3[t.joints.Length] };
             for (int i = 0; i < f.rest.Length; i++)
             {
@@ -321,7 +350,13 @@ namespace M3AT
             {
                 return;
             }
-            Matrix4x4 hips = p.whole[hipsBone];
+            TailProbe(p, t, out point, out turn);
+        }
+
+        // The same for any tail (a race's built from its pictures, RaceTails.cs).
+        private void TailProbe(Posed p, Tail t, out Vector3 point, out Quaternion turn)
+        {
+            Matrix4x4 hips = p.whole[t.bone];
             point = hips.MultiplyPoint3x4(TailFitOf(t, p.shape).joints[Mathf.Min(TailProbeJoint, t.joints.Length - 2)]);
             turn = hips.rotation;
         }
@@ -346,16 +381,15 @@ namespace M3AT
                 p.tailMadeFur = p.furTail;
             }
             Material solid = GrainedMaterial(t.piece, p.tail);
-            PoseTail(p, t, s, floor);
+            PoseTail(p, p.tail, t, s, floor);
             DrawMeshes(p, p.tail, t.piece.rest.Length, solid, position, yaw, size, tint);
         }
 
         // Turns each bone about its joint, down the chain from the hips, and skins the tail to them.
-        private void PoseTail(Posed p, Tail t, TailState s, float floor)
+        private void PoseTail(Posed p, PieceMeshes m, Tail t, TailState s, float floor)
         {
-            PieceMeshes m = p.tail;
             TailFit f = TailFitOf(t, p.shape);
-            Matrix4x4 hips = OnSkin(p.bones, hipsBone, t, f);
+            Matrix4x4 hips = OnSkin(p.bones, t.bone, t, f);
             Matrix4x4 chain = hips;
             if (s.laid > 0f)
             {
@@ -363,7 +397,7 @@ namespace M3AT
             }
             for (int j = 0; j < t.bones.Length; j++)
             {
-                Quaternion turn = Quaternion.AngleAxis(s.side[j], Vector3.up) * Quaternion.AngleAxis(s.pitch[j], Vector3.right);
+                Quaternion turn = Quaternion.AngleAxis(s.side[j] * t.mirror, Vector3.up) * Quaternion.AngleAxis(s.pitch[j], Vector3.right);
                 chain = chain * TurnAbout(f.joints[j], turn);
                 if (s.laid > 0f || !float.IsNegativeInfinity(floor))
                 {
@@ -544,6 +578,17 @@ namespace M3AT
                 s = new SkinnedFigure.TailState(n);
                 fig.tailState = s;
             }
+            Vector3 probe;
+            Quaternion turn;
+            skin.TailProbe(fig, out probe, out turn);
+            StepTailState(pawn, s, probe, turn, at, yaw, size, sat, onGround, 0u);
+        }
+
+        // Moves one tail's state on (the gene's, or a race's built from its pictures, RaceTails.cs): probe and turn are its
+        // probe joint and the hips' turn as posed (TailProbe); seed tells two tails of one pawn apart.
+        private static void StepTailState(Pawn pawn, SkinnedFigure.TailState s, Vector3 probe, Quaternion turn, Vector3 at, float yaw, float size, float sat, bool onGround, uint seed)
+        {
+            int n = s.side.Length;
             float sway, lift;
             TailMood(pawn, out sway, out lift);
             lift += sat * TailSitLift;
@@ -551,13 +596,10 @@ namespace M3AT
             bool fresh = s.frame < 0 || Time.frameCount - s.frame > 2;
             s.frame = Time.frameCount;
             Quaternion facing = Quaternion.AngleAxis(yaw, Vector3.up);
-            Vector3 probe;
-            Quaternion turn;
-            skin.TailProbe(fig, out probe, out turn);
             Vector3 place = at + facing * (probe * size);
             Vector3 moved = place - s.wasAt;
             s.wasAt = place;
-            uint id = Mix((uint)pawn.thingIDNumber ^ EarSeed);
+            uint id = Mix(((uint)pawn.thingIDNumber ^ EarSeed) + seed * 0x9E3779B9u);
             if (fresh)
             {
                 // Started in a sway of its own, so a row of pawns does not wag together.

@@ -55,6 +55,23 @@ namespace M3AT
             return true;
         }
 
+        // And the mouth's size (1 for a pin made before the mouth was sized).
+        private static bool PinnedMouthScale(string mod, out float scale)
+        {
+            float shift;
+            scale = 1f;
+            if (!PinnedMouth(mod, out shift))
+            {
+                return false;
+            }
+            float s;
+            if (SettingsMod.Settings.faceFitMouths.TryGetValue(mod, out s) && s > 0f)
+            {
+                scale = s;
+            }
+            return true;
+        }
+
         // Art in Facial Animation's own human folders (its sets and their retextures), not a race's of its own.
         private static bool HumanArt(Graphic g)
         {
@@ -76,7 +93,7 @@ namespace M3AT
             bool raceArt = pawn.def != ThingDefOf.Human && !KnownHumanMod(mod) && (g == null || !HumanArt(g));
             if (!raceArt)
             {
-                Pin(pawn, mod);
+                Pin(pawn, mod, true);   // tuned before any human set was fitted (FaceSetFit.cs): on none
                 s.Write();
                 return;
             }
@@ -107,7 +124,8 @@ namespace M3AT
 
         // Pins mod to the fit pawn's face is drawn with now: its race's measured fit (none for the human). For the tool,
         // at the first change to a mod's tuning.
-        internal static void Pin(Pawn pawn, string mod)
+        // asTuned: pinned to no fit, as a human set tuned before its eyes were fitted was tuned on none.
+        internal static void Pin(Pawn pawn, string mod, bool asTuned = false)
         {
             Settings s = SettingsMod.Settings;
             if (s == null || mod == null || s.faceFits.ContainsKey(mod))
@@ -116,7 +134,18 @@ namespace M3AT
             }
             EyeFit fit = new EyeFit { scale = 1f };
             float mouth = 0f;
-            if (pawn != null && pawn.def != ThingDefOf.Human)
+            if (asTuned)
+            {
+            }
+            else if (pawn != null && pawn.def == ThingDefOf.Human)
+            {
+                HumanFitOf(pawn, out fit);   // its face set's fit (FaceSetFit.cs)
+                if (fit.scale <= 0f)
+                {
+                    fit.scale = 1f;
+                }
+            }
+            else if (pawn != null)
             {
                 raceEyeFits.TryGetValue(pawn.def, out fit);
                 if (fit.scale <= 0f)
@@ -127,6 +156,8 @@ namespace M3AT
             }
             s.faceFits[mod] = new Vector3(fit.scale, fit.rise, fit.spread);
             s.faceFitRows[mod] = new Vector2(fit.row, mouth);
+            float mouthScale;
+            s.faceFitMouths[mod] = pawn != null && pawn.def != ThingDefOf.Human && raceMouthScales.TryGetValue(pawn.def, out mouthScale) ? mouthScale : 1f;
         }
 
         // Drops a mod's pin (its tuning reset): it follows the automatic fit again.
@@ -137,6 +168,7 @@ namespace M3AT
             {
                 s.faceFits.Remove(mod);
                 s.faceFitRows.Remove(mod);
+                s.faceFitMouths.Remove(mod);
             }
         }
     }

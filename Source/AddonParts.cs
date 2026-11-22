@@ -31,6 +31,10 @@ namespace M3AT
             public readonly List<Color> tints = new List<Color>();
             public readonly List<bool> tails = new List<bool>();   // a body part below the waist the armour option hides, as the cat tail
             public bool ears;
+            public string modelEars, modelTail;   // the race's own model ears and tail drawn in place of those add-ons (RaceModels), null for none
+            public Color earTint, tailTint;       // in the add-on's colour times its art's
+            public bool wingL, wingR;             // a winged race's model wings (RaceModels' wings), by its wing parts
+            public Color wingTint;
         }
 
         private static readonly Dictionary<int, RaceParts> raceParts = new Dictionary<int, RaceParts>();
@@ -50,7 +54,7 @@ namespace M3AT
         private static bool HasRaceEars(Pawn pawn)
         {
             RaceParts r;
-            return RacePartsOn && raceParts.TryGetValue(pawn.thingIDNumber, out r) && r.ears;
+            return raceParts.TryGetValue(pawn.thingIDNumber, out r) && ((RacePartsOn && r.ears) || (RaceModelsOn && r.modelEars != null));
         }
 
         // For the autotest: the race parts as last looked at, by name, "" for none.
@@ -136,6 +140,11 @@ namespace M3AT
             {
                 return;
             }
+            RaceModel winged;
+            if (RaceModelsOn && RaceModels.TryGetValue(pawn.def.defName, out winged) && winged.wings != null && skin.HasModelTail(winged.wings[0]) && skin.HasModelTail(winged.wings[1]))
+            {
+                WingsOf(pawn, tree, out r.wingL, out r.wingR, out r.wingTint);
+            }
             List<PawnRenderNode> nodes = new List<PawnRenderNode>();
             Walk(tree.rootNode, nodes);
             if (nodes.Count == 0)
@@ -156,6 +165,8 @@ namespace M3AT
             bool[] onHead = new bool[nodes.Count];
             string[] skip = new string[nodes.Count];
             bool[] hairAddon = new bool[nodes.Count];
+            string[] model = new string[nodes.Count];
+            bool[] modelIsEars = new bool[nodes.Count];
             for (int i = 0; i < nodes.Count; i++)
             {
                 PawnRenderNode n = nodes[i];
@@ -179,10 +190,15 @@ namespace M3AT
                         }
                     }
                 }
+                if (skip[i] == null && path != null)
+                {
+                    model[i] = ModelFileFor(pawn.def, System.IO.Path.GetFileName(path), out modelIsEars[i]);   // its pictures still read, for its colour
+                }
                 List<string> named = path != null ? HairBuilder.AddonWords(System.IO.Path.GetFileName(path)) : new List<string>();
                 bool thin = named.Exists(w => w == "ear" || w == "ears" || w == "wing" || w == "wings" || w == "fin" || w == "fins" || w == "feather" || w == "feathers");
                 bool isTail = named.Contains("tail") || named.Contains("tails");
-                made[i] = new SkinnedFigure.AddonSource { onHead = onHead[i], thin = thin, tail = isTail, name = pawn.def.defName + "/" + (path != null ? System.IO.Path.GetFileName(path) : "addon" + i) };
+                bool isEar = named.Contains("ear") || named.Contains("ears");
+                made[i] = new SkinnedFigure.AddonSource { onHead = onHead[i], thin = thin, tail = isTail, ear = isEar, name = pawn.def.defName + "/" + (path != null ? System.IO.Path.GetFileName(path) : "addon" + i) };
             }
             for (int f = 0; f < 4; f++)
             {
@@ -249,6 +265,21 @@ namespace M3AT
                 }
                 if (skip[i] != null || (s.px[0] == null && s.px[1] == null && s.px[2] == null && s.px[3] == null))
                 {
+                    continue;
+                }
+                if (model[i] != null)
+                {
+                    Color tint = colours[i] * SkinnedFigure.AddonMean(s);
+                    if (modelIsEars[i])
+                    {
+                        r.modelEars = model[i];
+                        r.earTint = tint;
+                    }
+                    else
+                    {
+                        r.modelTail = model[i];
+                        r.tailTint = tint;
+                    }
                     continue;
                 }
                 if (s.glow == null && Marking(pawn, s, onHead[i] ? headNode : bodyNode, tree))
@@ -527,22 +558,54 @@ namespace M3AT
 
         // Draws the pawn's race parts (from DrawDressed): the head's left off under what hides the ears (as the gene's ears)
         // or with no head; a tail under the armour that hides the cat tail; none under a blanket.
-        private static void DrawRaceParts(Pawn pawn, SkinnedFigure.Posed fig, GarmentMask mask, int worn, bool headless, Vector3 at, float yaw, float size)
+        private static void DrawRaceParts(Pawn pawn, SkinnedFigure.Posed fig, GarmentMask mask, int worn, bool headless, Vector3 at, float yaw, float size, float sat, float tailFloor, bool tailOnGround)
         {
-            if (!RacePartsOn || racePartsFailed || fig.tucked || !(pawn.def is ThingDef) || pawn.def.defName == "Human")
+            if ((!RacePartsOn && !RaceModelsOn) || racePartsFailed || fig.tucked || !(pawn.def is ThingDef) || pawn.def.defName == "Human")
             {
                 return;
             }
             RaceParts r = RacePartsOf(pawn, worn);
-            if (r.sources.Count == 0)
+            if (r.sources.Count == 0 && r.modelEars == null && r.modelTail == null && !r.wingL && !r.wingR)
             {
                 return;
             }
             bool earsHidden = EarHiding != EarHiding.Never && skin.HidesEars(mask, wornBuffer, EarHiding == EarHiding.Helmets);
             bool tailHidden = ArmourHidesTail && skin.HidesTail(mask, wornBuffer);
-            for (int i = 0; i < r.sources.Count; i++)
+            RaceModel m;
+            if (RaceModelsOn && (r.modelEars != null || r.modelTail != null || r.wingL || r.wingR) && RaceModels.TryGetValue(pawn.def.defName, out m))
+            {
+                if (r.modelEars != null && !headless && !earsHidden)
+                {
+                    DrawModelEars(pawn, fig, r.modelEars, at, yaw, size, r.earTint, Color.Lerp(r.earTint, m.lining, m.liningShare));
+                }
+                if (r.modelTail != null)
+                {
+                    DrawModelTail(pawn, fig, r.modelTail, r.modelTail, tailHidden, at, yaw, size, sat, tailFloor, tailOnGround, r.tailTint, Color.Lerp(r.tailTint, m.tip, m.tipShare));
+                }
+                // Wings: both on one set of springs, mirrored, so they open and close together.
+                Color wingTip = Color.Lerp(r.wingTint, m.tip, m.tipShare);
+                if (r.wingL && m.wings != null)
+                {
+                    DrawModelTail(pawn, fig, m.wings[0], "wings", false, at, yaw, size, sat, tailFloor, tailOnGround, r.wingTint, wingTip);
+                }
+                if (r.wingR && m.wings != null)
+                {
+                    DrawModelTail(pawn, fig, m.wings[1], "wings", false, at, yaw, size, sat, tailFloor, tailOnGround, r.wingTint, wingTip);
+                }
+            }
+            for (int i = 0; RacePartsOn && i < r.sources.Count; i++)
             {
                 SkinnedFigure.AddonSource s = r.sources[i];
+                if (s.glow == null && r.tails[i])
+                {
+                    // A tail moves on its springs (RaceTails.cs), stepped hidden too.
+                    SkinnedFigure.Piece built = skin.AddonPiece(s);
+                    if (built != null && skin.IsRaceTail(built))
+                    {
+                        DrawRaceTail(pawn, fig, built, tailHidden, at, yaw, size, sat, tailFloor, tailOnGround, r.tints[i]);
+                        continue;
+                    }
+                }
                 if ((s.onHead && (headless || earsHidden)) || (r.tails[i] && tailHidden))
                 {
                     continue;
@@ -557,7 +620,11 @@ namespace M3AT
                     continue;
                 }
                 SkinnedFigure.Piece piece = skin.AddonPiece(s);
-                if (piece != null)
+                if (piece != null && skin.IsRaceEar(piece))
+                {
+                    DrawRaceEar(pawn, fig, piece, at, yaw, size, r.tints[i]);
+                }
+                else if (piece != null)
                 {
                     skin.DrawAddon(fig, piece, s.onHead, at, yaw, size, r.tints[i]);
                 }

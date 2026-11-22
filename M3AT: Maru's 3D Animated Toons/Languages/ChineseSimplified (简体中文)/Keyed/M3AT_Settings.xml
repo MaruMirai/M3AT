@@ -38,6 +38,10 @@
   <M3AT_OtherRacesTip>模组种族（鼠族、米莉拉等）的小人会显示为带动画的3D小人，而不是平面图片，除非已有IsoRim扩展包为该种族提供3D外观。它们会使用该种族的肤色、头发、服装和面部；开启下方选项时还会有耳朵、尾巴等部件。IsoRim的"保持纸片"列表仍可让任意种族保持平面。</M3AT_OtherRacesTip>
   <M3AT_RaceParts>根据图片生成种族部件</M3AT_RaceParts>
   <M3AT_RacePartsTip>模组种族的耳朵、尾巴、角、翅膀等会根据该种族自己的图片生成3D形状，让种族在3D小人上保持其外观。它们只是粗略的替代：现实中很薄的部件可能会显得较厚。</M3AT_RacePartsTip>
+  <M3AT_RaceModels>热门种族的专属耳朵和尾巴模型</M3AT_RaceModels>
+  <M3AT_RaceModelsTip>鼠族（Ratkin）和狼族（Wolfein）使用专门制作的耳朵和尾巴模型，会像基因耳朵和尾巴一样摆动，取代根据其图片生成的形状。</M3AT_RaceModelsTip>
+  <M3AT_RaceMouthInk>更清晰的嘴巴</M3AT_RaceMouthInk>
+  <M3AT_RaceMouthInkTip>柔和的手绘嘴巴（Facial Animation - Experimentals 自带的以及模组种族的）会重新绘制为深色轮廓，去掉浅色光晕和嘴唇阴影，种族的嘴巴也会调整到接近人类的大小，使其在较大的3D脸上更清楚。已经是硬线条的面部（如 Facial Animation - Retexture）保持不变。</M3AT_RaceMouthInkTip>
   <M3AT_BodyShapeStrength>体型强度</M3AT_BodyShapeStrength>
   <M3AT_BodyShapeStrengthTip>瘦弱、肥胖和魁梧体型的明显程度（默认 100%）。调低则更接近标准体格，调高则更夸张；超过 100% 时衣物可能穿入身体。也会缩放“体格差异”产生的体格。男性和女性体型不受影响。</M3AT_BodyShapeStrengthTip>
   <M3AT_VariedBodies>体格差异</M3AT_VariedBodies>

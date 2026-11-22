@@ -61,6 +61,8 @@ namespace M3AT
         public float heightSpread = DefaultHeightSpread;   // the standard deviation of pawns' own heights about their gender's, of the standard size (WalkFigures.HeightSize)
         public bool agingLooks = true;   // old pawns drawn wrinkled, stooped and a little shorter, with cataracts clouding the eye (Aging.cs, WalkFigures.AgingLooks)
         public bool greyingHair = true;   // hair drawn greying with age, a dye or other new colour starting it again (GreyingHair.cs, WalkFigures.GreyingHair)
+        public bool raceMouthInk = true;   // soft mouths (races', Experimentals') redrawn with the retexture's hard lines and races' sized (FaceRestyle.cs)
+        public bool raceModels = true;  // the popular races' own ears and tails, modelled for them, in place of their built parts (RaceTails.cs)
         public bool raceParts = true;   // a race's ears, tails, horns and wings built in 3D from their sprites on the chibi (AddonParts.cs)
         public bool otherRaces = true;   // humanlike races with no IsoRim alien pack drawn as chibis rather than flat cards (OtherRaces.cs)
         public bool variedBodies = true;    // each pawn's build spread about its body type's by the Thin, Fat and Hulk keys (WalkFigures.VariedBuild)
@@ -104,6 +106,7 @@ namespace M3AT
         // mouth's move. A tuned mod without one was tuned before the fit was pinned (FacePins.cs).
         public Dictionary<string, Vector3> faceFits = new Dictionary<string, Vector3>();
         public Dictionary<string, Vector2> faceFitRows = new Dictionary<string, Vector2>();
+        public Dictionary<string, float> faceFitMouths = new Dictionary<string, float>();   // and the mouth's size (none: 1, pinned before it was fitted)
         public bool autoGrips = true;   // another mod's weapon held by its grip as found in its art (WalkFigures.AutoGrips, GripFinder)
         public bool retexturedWeaponModels = true;   // the game's own weapons keep IsoRim's model though another mod redraws their art (WalkFigures.RetexturedWeaponModels)
         public bool vatClothes = false;    // a pawn in a growth vat or biosculpter pod drawn in its clothes (WalkFigures.VatClothes); off: without them
@@ -176,6 +179,8 @@ namespace M3AT
             Scribe_Values.Look(ref greyingHair, "greyingHair", true);
             Scribe_Values.Look(ref otherRaces, "otherRaces", true);
             Scribe_Values.Look(ref raceParts, "raceParts", true);
+            Scribe_Values.Look(ref raceModels, "raceModels", true);
+            Scribe_Values.Look(ref raceMouthInk, "raceMouthInk", true);
             Scribe_Values.Look(ref variedBodies, "variedBodies", true);
             Scribe_Values.Look(ref bodySpread, "bodySpread", DefaultBodySpread);
             Scribe_Values.Look(ref bodyShapeStrength, "bodyShapeStrength", 1f);
@@ -286,6 +291,11 @@ namespace M3AT
             if (faceFitRows == null)
             {
                 faceFitRows = new Dictionary<string, Vector2>();
+            }
+            Scribe_Collections.Look(ref faceFitMouths, "faceFitMouths", LookMode.Value, LookMode.Value);
+            if (faceFitMouths == null)
+            {
+                faceFitMouths = new Dictionary<string, float>();
             }
             Scribe_Collections.Look(ref clothingChoices, "clothingChoices", LookMode.Value, LookMode.Value);
             if (clothingChoices == null)
@@ -441,7 +451,7 @@ namespace M3AT
                     || field.Name == nameof(Settings.gripOverrides) || field.Name == nameof(Settings.offHandGrips)
                     || field.Name == nameof(Settings.clothingChoices)
                     || field.Name == nameof(Settings.faceTunes) || field.Name == nameof(Settings.mouthTunes)
-                    || field.Name == nameof(Settings.faceFits) || field.Name == nameof(Settings.faceFitRows))   // the player's own work, not an option: cleared by its own button
+                    || field.Name == nameof(Settings.faceFits) || field.Name == nameof(Settings.faceFitRows) || field.Name == nameof(Settings.faceFitMouths))   // the player's own work, not an option: cleared by its own button
                 {
                     continue;
                 }
@@ -891,6 +901,10 @@ namespace M3AT
                 "M3AT_OtherRacesTip".Translate());
             list.CheckboxLabeled("M3AT_RaceParts".Translate(), ref Settings.raceParts,
                 "M3AT_RacePartsTip".Translate());
+            list.CheckboxLabeled("M3AT_RaceModels".Translate(), ref Settings.raceModels,
+                "M3AT_RaceModelsTip".Translate());
+            list.CheckboxLabeled("M3AT_RaceMouthInk".Translate(), ref Settings.raceMouthInk,
+                "M3AT_RaceMouthInkTip".Translate());
             list.CheckboxLabeled("M3AT_ArmourDrawScale".Translate(), ref Settings.armourDrawScale,
                 "M3AT_ArmourDrawScaleTip".Translate());
             list.CheckboxLabeled("M3AT_MarineBulk".Translate(), ref Settings.marineBulk,
@@ -936,6 +950,7 @@ namespace M3AT
                     Settings.mouthTunes.Clear();
                     Settings.faceFits.Clear();
                     Settings.faceFitRows.Clear();
+                    Settings.faceFitMouths.Clear();
                 }, true));
             }
             // Here, folded away, rather than under Performance: it is much faster and should stay on, kept only for a

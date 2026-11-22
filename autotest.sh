@@ -62,6 +62,8 @@ dotnet build Source/M3AT.csproj -p:DefineConstants=AUTOTEST -v q -nologo 9>&- | 
 # Mods left out of test runs, as they draw over the pictures (Center Marker's marks at the map's middle, where the test
 # patch is): taken out of ModsConfig.xml for the run and the file put back as it was by the trap.
 skip_mods=(jia.center.marker)
+# M3AT_SKIP_MODS: more packageIds (lower case, space separated) left out of this run, e.g. barb.facetexture to see the faces without the retexture.
+read -r -a more_skips <<< "${M3AT_SKIP_MODS:-}"; skip_mods+=("${more_skips[@]}")
 mods_config="$HOME/.config/unity3d/Ludeon Studios/RimWorld by Ludeon Studios/Config/ModsConfig.xml"
 mods_kept="${lock%.lock}.ModsConfig.xml"
 if [ -f "$mods_kept" ]; then

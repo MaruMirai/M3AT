@@ -766,6 +766,7 @@ namespace M3AT
         public static void Draw(Pawn pawn, Patch patch, Vector3 position, float yaw, float size, EyeWound[] wounds = null, bool lowMouth = false, float speaking = 0f)
         {
             TakeEyeFit(pawn);   // its eyes' layers fitted to a human's (FaceGaze.cs), whichever comes first
+            drawMouthScale = 1f;
             if (patch == null || !Available || !Api.ViewReady)
             {
                 return;
@@ -832,6 +833,7 @@ namespace M3AT
                     if (kind == "MouthControllerComp")
                     {
                         shift.y += RaceMouthShift(pawn, g);   // another race's mouth on a human's row
+                        drawMouthScale = RaceMouthScale(pawn, g);   // and at about a human's size (FaceRestyle.cs)
                     }
                     else if (kind == "EyeballControllerComp")
                     {
@@ -1039,7 +1041,7 @@ namespace M3AT
                 {
                     colour *= whiteTint;
                 }
-                stack.Add(new Stacked { tex = gm.mainTexture, mask = mask, colour = colour, colourTwo = two, mode = mode, cut = call.cut, mouth = call.kind == "MouthControllerComp", call = i, shift = call.shift, spread = SpreadOf(call.kind), tune = call.tune });
+                stack.Add(new Stacked { tex = call.kind == "MouthControllerComp" ? MouthTexture(call.g, gm.mainTexture, call.layer) : gm.mainTexture, mask = mask, colour = colour, colourTwo = two, mode = mode, cut = call.cut, mouth = call.kind == "MouthControllerComp", call = i, shift = call.shift, spread = SpreadOf(call.kind), tune = call.tune });
             }
             Vector4 mouthMap = MouthMap(mouth == patch.mouthLow ? MouthRaisePig : MouthRaise);
 #if AUTOTEST
@@ -1356,6 +1358,10 @@ namespace M3AT
                 * Matrix4x4.Scale(new Vector3(grow, grow, grow))
                 * Matrix4x4.Translate(-patch.centre);
             Material mat = mode >= 0 ? LitFor(gm, mode, place) : gm;   // a shader not known here: Facial Animation's own, unlit
+            if (mode >= 0 && kind == "MouthControllerComp")
+            {
+                mat.mainTexture = MouthTexture(g, gm.mainTexture, layer);   // a soft mouth inked (FaceRestyle.cs)
+            }
             if (mode >= 0 && kind == "LidControllerComp" && layer == "Bottom")
             {
                 mat.color *= whiteTint;   // (LitFor copies the colour afresh each draw)
@@ -1458,7 +1464,7 @@ namespace M3AT
                     woundMaterials[key] = m;
                 }
                 MaterialPropertyBlock block = BlockFor(patch, patch.smooth, cut);
-                SetShift(block, shift, drawSpread, drawEyeTune);   // on the eye, so moved out and tuned with it
+                SetShift(block, shift, SpreadOf("EyeballControllerComp"), drawEyeTune);   // on the eye, so moved out and tuned with it
                 Api.SubmitFigureMesh(patch.face, m, drawn, block, FigureMeshFlags.NoCull);
                 place++;
             }

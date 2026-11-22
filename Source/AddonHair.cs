@@ -66,7 +66,7 @@ namespace M3AT
                 List<object> addons = RaceAddons(pawn.def);
                 if (addons == null)
                 {
-                    return own;
+                    return RaceFitted(pawn, own);   // its own hairstyle, drawn round the race's head
                 }
                 ThingComp comp = null;
                 foreach (ThingComp c in pawn.AllComps)
@@ -373,23 +373,8 @@ namespace M3AT
             {
                 return null;
             }
-            string head = pawn.story != null && pawn.story.headType != null ? pawn.story.headType.graphicPath : null;
-            Texture2D[] heads = new Texture2D[3];
-            string[] views = { "_south", "_east", "_north" };
-            for (int v = 0; v < 3 && head != null; v++)
-            {
-                heads[v] = ContentFinder<Texture2D>.Get(head + views[v], false);
-            }
-            if (heads[1] == null && head != null)
-            {
-                heads[1] = ContentFinder<Texture2D>.Get(head + "_west", false);   // mirrored below
-            }
-            Color32[][] headPx = new Color32[3][];
-            for (int v = 0; v < 3; v++)
-            {
-                headPx[v] = heads[v] != null ? Pixels(heads[v], v == 1 && heads[1].name.EndsWith("_west", StringComparison.Ordinal)) : null;
-            }
-            if (headPx[0] == null || headPx[1] == null || headPx[2] == null || !HumanBoxes())
+            Color32[][] headPx = HeadPixels(pawn);
+            if (headPx == null || !HumanBoxes())
             {
                 return null;   // no head to fit it by
             }
@@ -453,6 +438,125 @@ namespace M3AT
             def = new HairDef { defName = "M3AT_" + key.Replace('/', '_'), label = own != null ? own.label : "hair", texPath = key };
             standIns[key] = def;
             return def;
+        }
+
+        // The pawn's head sprite's south, east and north views (the east from the west mirrored if it has none), or null.
+        private static Color32[][] HeadPixels(Pawn pawn)
+        {
+            string head = pawn.story != null && pawn.story.headType != null ? pawn.story.headType.graphicPath : null;
+            if (head == null)
+            {
+                return null;
+            }
+            Texture2D[] heads = new Texture2D[3];
+            string[] views = { "_south", "_east", "_north" };
+            for (int v = 0; v < 3; v++)
+            {
+                heads[v] = ContentFinder<Texture2D>.Get(head + views[v], false);
+            }
+            if (heads[1] == null)
+            {
+                heads[1] = ContentFinder<Texture2D>.Get(head + "_west", false);   // mirrored below
+            }
+            Color32[][] headPx = new Color32[3][];
+            for (int v = 0; v < 3; v++)
+            {
+                headPx[v] = heads[v] != null ? Pixels(heads[v], v == 1 && heads[1].name.EndsWith("_west", StringComparison.Ordinal)) : null;
+                if (headPx[v] == null)
+                {
+                    return null;
+                }
+            }
+            return headPx;
+        }
+
+        // ---- Another race's hairstyle, fitted as its add-on hair is.
+
+        // In 2D a hairstyle is drawn over the pawn's own head sprite as it is, so on a race whose head is another size or
+        // place in its frame the hair sits round that head: Ratkin's is 0.28 of its frame wide against the human head's
+        // 0.36, and lower; Milira's wider and shorter. The builder fits every style to the human head (HeadSprites), so on
+        // those races the hair came out too narrow and too low, the fringe down over the eyes Facial Animation draws for
+        // the human layout. So for a race other than the human (one of Humanoid Alien Races' races, whose hair isn't its
+        // add-ons) whose head box is more than RaceHeadSlack of the frame off the human one on any side, its hairstyle is
+        // given to the builder fitted from that head to the human one (FitToHuman, as the add-on hair is), as a stand-in
+        // named for the race, the head and the style (each built and cached once).
+        private const float RaceHeadSlack = 0.012f;   // of the frame (1.5 px at 128)
+        private static readonly Dictionary<string, HairDef> raceFitted = new Dictionary<string, HairDef>();
+        private static readonly Dictionary<string, bool> headsAlike = new Dictionary<string, bool>();
+
+        private static HairDef RaceFitted(Pawn pawn, HairDef own)
+        {
+            if (own == null || own.texPath == null || pawn.def == ThingDefOf.Human || !alienRaceField.DeclaringType.IsInstanceOfType(pawn.def)
+                || pawn.story.headType == null || !HumanBoxes())
+            {
+                return own;
+            }
+            string headPath = pawn.story.headType.graphicPath;
+            string key = AddonPrefix + GenText.SanitizeFilename(pawn.def.defName) + "/" + GenText.SanitizeFilename(System.IO.Path.GetFileName(headPath)) + "/" + GenText.SanitizeFilename(own.defName);
+            HairDef def;
+            if (raceFitted.TryGetValue(key, out def))
+            {
+                return def ?? own;
+            }
+            def = null;
+            bool alike;
+            Color32[][] headPx = null;
+            if (!headsAlike.TryGetValue(headPath, out alike))
+            {
+                headPx = HeadPixels(pawn);
+                alike = headPx == null || HeadLikeHuman(headPx);
+                headsAlike[headPath] = alike;
+                if (headPx != null)
+                {
+                    int[] b = BoxOf(headPx[0]);
+                    Log.Message(Tag + "the head " + headPath + " of " + pawn.def.defName + (b == null ? " is empty" : " spans columns " + b[0] + "-" + b[1] + ", rows " + b[2] + "-" + b[3]
+                        + " (the human's " + humanBoxes[0][0] + "-" + humanBoxes[0][1] + ", " + humanBoxes[0][2] + "-" + humanBoxes[0][3] + ")")
+                        + (alike ? ": hair is built as for a human's." : ": hair worn on it is fitted from it to the human head."));
+                }
+            }
+            if (!alike)
+            {
+                headPx = headPx ?? HeadPixels(pawn);
+                Sprites sprites = headPx != null ? Read(own.texPath) : null;
+                if (sprites != null)
+                {
+                    Color32[][] fitted = new Color32[3][];
+                    for (int v = 0; v < 3; v++)
+                    {
+                        fitted[v] = FitToHuman(sprites.px[v], headPx[v], humanBoxes[v]);
+                    }
+                    combined[key] = From(fitted[0], fitted[1], fitted[2]);
+                    def = new HairDef { defName = "M3AT_" + key.Replace('/', '_'), label = own.label, texPath = key };
+                }
+            }
+            if (raceFitted.Count > 2048)
+            {
+                raceFitted.Clear();
+            }
+            raceFitted[key] = def;
+            return def ?? own;
+        }
+
+        // Whether a head's box is the human head's in every view, within RaceHeadSlack.
+        private static bool HeadLikeHuman(Color32[][] headPx)
+        {
+            int slack = Mathf.CeilToInt(RaceHeadSlack * Size);
+            for (int v = 0; v < 3; v++)
+            {
+                int[] b = BoxOf(headPx[v]);
+                if (b == null)
+                {
+                    return true;   // nothing to fit by
+                }
+                for (int k = 0; k < 4; k++)
+                {
+                    if (Math.Abs(b[k] - humanBoxes[v][k]) > slack)
+                    {
+                        return false;
+                    }
+                }
+            }
+            return true;
         }
 
         // Lays one add-on graphic's three views over the layers, cut by the head where it is drawn behind it (under not

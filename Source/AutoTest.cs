@@ -735,6 +735,9 @@ namespace M3AT
                 case "fringe": return FringeTest();
                 case "facetune": return FaceTuneTest();
                 case "facepins": return FacePinsTest();
+                case "racefaces": return RaceFacesTest(FaceRaces, FacesPerRace, true);
+                case "humanfaces": return RaceFacesTest(new[] { "Human" }, 8, false);
+                case "facedev": return FaceDevTest();
                 case "faceanim": return FaceAnimTest(null);
                 case "faceshapes": return FaceShapesTest(null);
             }
@@ -3104,6 +3107,181 @@ namespace M3AT
                 yield return Ticks(2, "race", human);
                 yield return Shot("human_cat_ears");
             }
+            lookDistance = LookDistance;
+            lookHeight = LookHeight;
+            lookPitch = LookPitch;
+            SettingsMod.Settings.otherRaces = otherRacesWas;
+            WalkFigures.OtherRacesChanged();
+        }
+
+        // Faces only (racefaces): three pawns of each race the test runs know (those loaded) and two humans beside them,
+        // each face close from the front and three quarters, to compare how each race's face mod reads on the chibi.
+        private static readonly string[] FaceRaces = { "Human", "Ratkin", "Wolfein_Race", "Milira_Race", "Kiiro_Race" };
+        private const int FacesPerRace = 2;
+
+        // humanfaces: eight humans alone, each face from the front and with the mouth open (run with M3AT_SKIP_MODS to see the
+        // faces some face mod leaves, the retexture's left out).
+        private static IEnumerator RaceFacesTest(string[] faceRaces, int perRace, bool compare)
+        {
+            bool otherRacesWas = SettingsMod.Settings.otherRaces;
+            SettingsMod.Settings.otherRaces = true;
+            WalkFigures.OtherRacesChanged();
+            List<Pawn> pawns = new List<Pawn>();
+            List<string> labels = new List<string>();
+            Rand.PushState(20261122);
+            try
+            {
+                int n = 0;
+                foreach (string race in faceRaces)
+                {
+                    ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail(race);
+                    PawnKindDef kind = def == null ? null : race == "Human" ? PawnKindDefOf.Colonist : DefDatabase<PawnKindDef>.AllDefs.FirstOrDefault(k => k.race == def);
+                    if (kind == null)
+                    {
+                        Note("no race " + race);
+                        continue;
+                    }
+                    for (int i = 0; i < (race == "Human" && compare ? 1 : perRace); i++)
+                    {
+                        Pawn pawn = PawnGenerator.GeneratePawn(new PawnGenerationRequest(kind, Faction.OfPlayer, forceGenerateNewPawn: true,
+                            fixedBiologicalAge: 22f + 4f * (i % 3), fixedChronologicalAge: 22f + 4f * (i % 3), fixedGender: i % 2 == 1 ? Gender.Male : Gender.Female));
+                        pawn.equipment.DestroyAllEquipment();
+                        foreach (Apparel worn in pawn.apparel.WornApparel.ToList())
+                        {
+                            if (worn.def.apparel.bodyPartGroups.Contains(BodyPartGroupDefOf.UpperHead) || worn.def.apparel.bodyPartGroups.Contains(BodyPartGroupDefOf.FullHead)
+                                || worn.def.apparel.bodyPartGroups.Contains(BodyPartGroupDefOf.Eyes))
+                            {
+                                pawn.apparel.Remove(worn);
+                                worn.Destroy();
+                            }
+                        }
+                        Spawn(pawn, middle + new IntVec3(2 * (n % 8) - 7, 0, 3 * (n / 8) - 2));
+                        pawn.Rotation = Rot4.South;
+                        Hold(pawn);
+                        pawns.Add(pawn);
+                        labels.Add(race + "_" + i);
+                        n++;
+                    }
+                }
+            }
+            finally
+            {
+                Rand.PopState();
+            }
+            Look(pawns[0], 0f);
+            yield return Ticks(5, "racefaces", pawns[0]);
+            for (int wait = 0; wait < 60 && WalkFigures.HairBuilding > 0; wait++)
+            {
+                yield return WaitReal(1f);
+            }
+            for (int i = 0; i < pawns.Count; i++)
+            {
+                lookDistance = 0.75f;
+                lookHeight = 1.05f;
+                lookPitch = 5f;
+                Look(pawns[i], 0f);
+                FaceLayers.TuneWatched = pawns[i];
+                yield return Ticks(3, "racefaces", pawns[i]);
+                FaceLayers.TakeTuneNotes();
+                foreach (KeyValuePair<FaceLayers.FaceMod, List<string>> note in FaceLayers.TuneNotes)
+                {
+                    Note(labels[i] + " face from " + note.Key.key + ": " + string.Join(", ", note.Value));
+                }
+                // Before (the mouths as the race's mod draws them, at its size) and after (FaceRestyle.cs).
+                bool inkWas = SettingsMod.Settings.raceMouthInk;
+                if (compare)
+                {
+                    SettingsMod.Settings.raceMouthInk = false;
+                    FaceLayers.TestNoMouthFit = true;
+                    yield return Ticks(2, "racefaces", pawns[i]);
+                    yield return Shot(labels[i] + "_before");
+                    SettingsMod.Settings.raceMouthInk = inkWas;
+                    FaceLayers.TestNoMouthFit = false;
+                }
+                FaceLayers.TestMouthOpen = true;
+                yield return Ticks(2, "racefaces", pawns[i]);
+                yield return Shot(labels[i] + "_open");
+                FaceLayers.TestMouthOpen = false;
+                yield return Ticks(2, "racefaces", pawns[i]);
+                yield return Shot(labels[i] + "_front");
+                if (!compare)
+                {
+                    continue;
+                }
+                lookDistance = 1.6f;
+                lookHeight = 0.8f;
+                lookPitch = 30f;
+                Look(pawns[i], 25f);
+                yield return Ticks(2, "racefaces", pawns[i]);
+                yield return Shot(labels[i] + "_play");
+            }
+            FaceLayers.TuneWatched = null;
+            lookDistance = LookDistance;
+            lookHeight = LookHeight;
+            lookPitch = LookPitch;
+            SettingsMod.Settings.otherRaces = otherRacesWas;
+            WalkFigures.OtherRacesChanged();
+        }
+
+        // The dev window's all-faces sliders (FaceDevTune.cs): a human and a Wolfein (else any other race) close from the
+        // front, untouched, then with each group pushed, so each picture should differ from the first only in that group.
+        private static IEnumerator FaceDevTest()
+        {
+            bool otherRacesWas = SettingsMod.Settings.otherRaces;
+            SettingsMod.Settings.otherRaces = true;
+            WalkFigures.OtherRacesChanged();
+            List<Pawn> pawns = new List<Pawn>();
+            Rand.PushState(20261122);
+            try
+            {
+                foreach (string race in new[] { "Human", "Wolfein_Race" })
+                {
+                    ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail(race);
+                    PawnKindDef kind = def == null ? null : race == "Human" ? PawnKindDefOf.Colonist : DefDatabase<PawnKindDef>.AllDefs.FirstOrDefault(k => k.race == def);
+                    if (kind == null)
+                    {
+                        continue;
+                    }
+                    Pawn pawn = PawnGenerator.GeneratePawn(new PawnGenerationRequest(kind, Faction.OfPlayer, forceGenerateNewPawn: true, fixedBiologicalAge: 22f, fixedChronologicalAge: 22f, fixedGender: Gender.Female));
+                    pawn.equipment.DestroyAllEquipment();
+                    pawn.apparel.DestroyAll();
+                    pawn.story.hairDef = DefDatabase<HairDef>.GetNamedSilentFail("Bald") ?? pawn.story.hairDef;   // nothing over the eyes
+                    Spawn(pawn, middle + new IntVec3(3 * pawns.Count, 0, 0));
+                    pawn.Rotation = Rot4.South;
+                    Hold(pawn);
+                    pawns.Add(pawn);
+                }
+            }
+            finally
+            {
+                Rand.PopState();
+            }
+            Vector3 none = new Vector3(0f, 0f, 1f);
+            Vector3[][] cases =
+            {
+                new[] { none, none, none },
+                new[] { none, new Vector3(0.02f, 0.015f, 1.3f), none },
+                new[] { new Vector3(0.03f, 0.03f, 1.15f), none, none },
+                new[] { none, none, new Vector3(0.02f, -0.02f, 1.6f) },
+            };
+            string[] names = { "untouched", "eyes_up_out_bigger", "face_right_up_bigger", "mouth_right_down_bigger" };
+            for (int i = 0; i < pawns.Count; i++)
+            {
+                lookDistance = 0.75f;
+                lookHeight = 1.05f;
+                lookPitch = 5f;
+                Look(pawns[i], 0f);
+                yield return Ticks(5, "facedev", pawns[i]);
+                for (int c = 0; c < cases.Length; c++)
+                {
+                    FaceLayers.DevFace = cases[c][0];
+                    FaceLayers.DevEyes = cases[c][1];
+                    FaceLayers.DevMouth = cases[c][2];
+                    yield return Ticks(2, "facedev", pawns[i]);
+                    yield return Shot(pawns[i].def.defName + "_" + names[c]);
+                }
+            }
+            FaceLayers.DevFace = FaceLayers.DevEyes = FaceLayers.DevMouth = none;
             lookDistance = LookDistance;
             lookHeight = LookHeight;
             lookPitch = LookPitch;

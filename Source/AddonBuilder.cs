@@ -42,6 +42,7 @@ namespace M3AT
             public bool onHead;
             public bool thin;           // an ear or wing: kept flat (AddonThin)
             public bool tail;           // a tail: shaped from a side picture if it has one, as the front and back draw it end on or tucked behind
+            public bool ear;            // an ear: moved on the gene ears' springs (RaceTails.cs)
             public Material glow;       // drawn with a glow shader (a halo): not built, but drawn as a glow card of this material (AddonGlowOf)
             public Color32[][] px = new Color32[4][];      // AddonTexSize square, rows bottom up
             public float[][] toUv = new float[4][];        // the node frame (X right, Z up the picture, cells) to the picture's uv: u = a0 + a1 X + a2 Z, v = a3 + a4 X + a5 Z
@@ -322,7 +323,9 @@ namespace M3AT
                     tris = new List<int>(cut);
                 }
             }
-            return TexturedAddon(src, verts, tris, low, high);
+            Piece piece = TexturedAddon(src, verts, tris, low, high);
+            ChainAddon(src, piece, verts, tris);   // a tail or ear gets joints to move on (RaceTails.cs)
+            return piece;
         }
 
         // A picture pixel's place (its column and row, at its middle with + 0.5) back on the model: across (x for the front
@@ -1060,17 +1063,7 @@ namespace M3AT
             {
                 return;
             }
-            PieceMeshes m;
-            if (!p.addons.TryGetValue(piece, out m))
-            {
-                m = NewPieceMeshes(piece);
-                m.tinted = false;
-                if (piece.mark != null)
-                {
-                    m.parts.Add(new MeshPart { mesh = m.solid, material = piece.mark, outline = false });
-                }
-                p.addons[piece] = m;
-            }
+            PieceMeshes m = AddonMeshes(p, piece);
             Pose(p, piece, AddonShape(piece, onHead, p.shape), m);
             DrawMeshes(p, m, piece.rest.Length, solid, position, yaw, size, tint, lineTint: tint * piece.mean);
         }

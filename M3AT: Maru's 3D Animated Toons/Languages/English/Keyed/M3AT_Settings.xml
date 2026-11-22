@@ -38,6 +38,10 @@
   <M3AT_OtherRacesTip>Pawns of modded races (Ratkin, Milira and the like) are drawn as animated 3D pawns rather than flat pictures, unless an IsoRim pack already gives the race a 3D look. They get the race's skin colour, hair, clothes and face, and with the option below its ears, tails and the like. IsoRim's "Keep as paper" list still keeps any race flat.</M3AT_OtherRacesTip>
   <M3AT_RaceParts>Race parts from their pictures</M3AT_RaceParts>
   <M3AT_RacePartsTip>A modded race's ears, tails, horns, wings and the like are made into 3D shapes from the race's own pictures, so the race keeps its look on 3D pawns. They are rough stand-ins: a part that is thin in life may come out thick.</M3AT_RacePartsTip>
+  <M3AT_RaceModels>Modelled ears and tails for popular races</M3AT_RaceModels>
+  <M3AT_RaceModelsTip>Ratkin and Wolfein get ears and tails modelled for them, which move like the gene ears and tails, in place of the shapes made from their pictures.</M3AT_RaceModelsTip>
+  <M3AT_RaceMouthInk>Crisper mouths</M3AT_RaceMouthInk>
+  <M3AT_RaceMouthInkTip>Soft, painted mouths (Facial Animation - Experimentals' own and modded races') are redrawn with dark outlines and without their pale glow and lip shading, and a race's mouths drawn at about a human's size, so they read on the large 3D face. Faces already drawn with hard lines, such as Facial Animation - Retexture's, are left as they are.</M3AT_RaceMouthInkTip>
   <M3AT_BodyShapeStrength>Body shape strength</M3AT_BodyShapeStrength>
   <M3AT_BodyShapeStrengthTip>How strongly thin, fat and hulk bodies are shaped (default 100%). Lower makes them closer to an average build, higher exaggerates them; past 100% clothes may clip into the body. Also scales the builds from Varied bodies. Male and female shapes are unchanged.</M3AT_BodyShapeStrengthTip>
   <M3AT_VariedBodies>Varied bodies</M3AT_VariedBodies>

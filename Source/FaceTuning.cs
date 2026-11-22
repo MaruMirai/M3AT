@@ -98,7 +98,9 @@ namespace M3AT
         {
             Settings s = SettingsMod.Settings;
             bool mouth = kind == "MouthControllerComp";
-            if (s == null || (!noting && s.faceTunes.Count == 0 && (!mouth || s.mouthTunes.Count == 0)))
+            bool sized = mouth && Mathf.Abs(drawMouthScale - 1f) > 1e-4f;   // another race's mouth fitted to a human's size (FaceRestyle.cs)
+            sized |= DevTuning;   // the dev window's numbers on every face (FaceDevTune.cs)
+            if (s == null || (!noting && !sized && s.faceTunes.Count == 0 && (!mouth || s.mouthTunes.Count == 0)))
             {
                 return Vector3.zero;
             }
@@ -118,13 +120,18 @@ namespace M3AT
             {
                 mouthTune = new Vector3(0f, 0f, 1f);   // TryGetValue leaves zeros when there is none, a mouth of no size
             }
-            if (!faced && !mouthed)
+            if (!faced && !mouthed && !sized)
             {
                 return Vector3.zero;
             }
             if (!faced)
             {
                 face = new Vector3(0f, 0f, 1f);
+            }
+            if (DevTuning)
+            {
+                face = new Vector3(face.x + DevFace.x, face.y + DevFace.y, face.z * DevFace.z);
+                mouthTune = new Vector3(mouthTune.x + DevMouth.x, mouthTune.y + DevMouth.y, mouthTune.z * DevMouth.z);
             }
             // The face: f = P + (f0 - P - d) / scale, from the places as drawn untuned (f0), about the eye line P.
             float a = 1f / Mathf.Max(0.05f, face.z);
@@ -135,7 +142,7 @@ namespace M3AT
             }
             // The mouth's places (m0 = C + (f0 - C - r) / Z, Zoomed) taken back to the face's, tuned as the face, then zoomed
             // again with the mouth's own move and size on top: m = C + (f - C - r - dm) / (Z ms).
-            float ms = Mathf.Max(0.05f, mouthTune.z);
+            float ms = Mathf.Max(0.05f, mouthTune.z) * (mouth ? drawMouthScale : 1f);
             Vector2 c = MouthCentre;
             Vector2 r = new Vector2(0f, raise);
             Vector2 dm = new Vector2(mouthTune.x, mouthTune.y);

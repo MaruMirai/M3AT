@@ -6939,7 +6939,7 @@ namespace M3AT
             {
                 skin.DrawHorns(fig, horns, at, yaw, size);   // through the hair, but not through a hat
             }
-            DrawRaceParts(pawn, fig, mask, wornVersion, headless, at, yaw, size);   // a race's ears, tails, horns and wings from its sprites (AddonParts.cs)
+            DrawRaceParts(pawn, fig, mask, wornVersion, headless, at, yaw, size, sat, tailFloor, tailOnGround);   // a race's ears, tails, horns and wings from its sprites (AddonParts.cs)
             if (HasCatTail(pawn) && !fig.tucked)
             {
                 DrawCatTail(pawn, fig, mask, wornBuffer, at, yaw, size, sat, tailFloor, tailOnGround);

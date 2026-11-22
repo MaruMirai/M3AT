@@ -609,16 +609,15 @@ namespace M3AT
                 p.earsMadeOf = file;
             }
             Material solid = GrainedMaterial(piece, p.ears);
-            PoseEars(p, e, s, goneL, goneR);
+            PoseEars(p, p.ears, e, s, goneL, goneR);
             // The lining goes in the scalp's place: DrawMeshes shades that ScalpShade, which is taken back out here.
             Color inner = (file == RaceEarFile ? Color.Lerp(skin, RaceLining, RacePink) : Color.Lerp(skin, EarLining, EarPink)) / ScalpShade;
             DrawMeshes(p, p.ears, piece.rest.Length, solid, position, yaw, size, tint, null, default(Color), e.inner, inner);
         }
 
         // Lays the ears' keys on their rest pose and swings them on their joints, then carries them on the head bone.
-        private void PoseEars(Posed p, Ears e, EarState s, bool goneL, bool goneR)
+        private void PoseEars(Posed p, PieceMeshes m, Ears e, EarState s, bool goneL, bool goneR)
         {
-            PieceMeshes m = p.ears;
             EarFit f = FitOf(e, p.shape);
             Matrix4x4 head = p.bones[headBone];
             for (int side = 0; side < 2; side++)
@@ -829,6 +828,19 @@ namespace M3AT
                 s = new SkinnedFigure.EarState();
                 fig.earState = s;
             }
+            bool floppy = file == SkinnedFigure.FloppyEarFile;
+            Vector3 rootL, rootR;
+            Quaternion turn;
+            skin.EarRoot(fig, file, 0, out rootL, out turn);
+            skin.EarRoot(fig, file, 1, out rootR, out turn);
+            StepEarState(pawn, s, floppy, floppy ? skin.EarBoneCount(file) : 0, rootL, rootR, turn, 2, 0, at, yaw, size);
+        }
+
+        // Moves an ear state on (the gene's pair, or one of a race's ears built from its pictures, RaceTails.cs): rootL and
+        // rootR are each side's root as posed (EarRoot) and turn the head's; sides: 2 for a pair, 1 for one ear on side 0;
+        // seed tells a pawn's ears apart for their flicks.
+        private static void StepEarState(Pawn pawn, SkinnedFigure.EarState s, bool floppy, int joints, Vector3 rootL, Vector3 rootR, Quaternion turn, int sides, int seed, Vector3 at, float yaw, float size)
+        {
             float up, down;
             bool flat;
             EarMood(pawn, out up, out down, out flat);
@@ -838,14 +850,10 @@ namespace M3AT
             bool fresh = s.frame < 0 || Time.frameCount - s.frame > 2;
             s.frame = Time.frameCount;
             Quaternion facing = Quaternion.AngleAxis(yaw, Vector3.up);
-            int id = pawn.thingIDNumber;
-            bool floppy = file == SkinnedFigure.FloppyEarFile;
-            int joints = floppy ? skin.EarBoneCount(file) : 0;
-            for (int side = 0; side < 2; side++)
+            int id = pawn.thingIDNumber + seed;
+            for (int side = 0; side < sides; side++)
             {
-                Vector3 root;
-                Quaternion turn;
-                skin.EarRoot(fig, file, side, out root, out turn);
+                Vector3 root = side == 0 ? rootL : rootR;
                 Vector3 place = at + facing * (root * size);
                 Vector3 moved = place - s.wasAt[side];
                 s.wasAt[side] = place;
@@ -914,7 +922,7 @@ namespace M3AT
                         s.downSpeed[side] += ((wantDown - s.down[side]) * EarSpring - s.downSpeed[side] * EarDamp) * EarStep;
                         s.down[side] += s.downSpeed[side] * EarStep;
                     }
-                    if (side == 1)
+                    if (side == sides - 1)
                     {
                         s.carry = carried;
                     }

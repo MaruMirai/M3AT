@@ -273,7 +273,7 @@ namespace M3AT
         // lid's bottom layer, of every eye style of the race's face mod averaged, against the human set loaded; by the
         // irises Wolfein's eyes, wide but with bigger irises still, came out a fifth too small, and Kiiro's, big irises in
         // small eyes, narrower still; through the layer's tuning, WithEyeFit), each half moved out by its spread to stand HumanIrisApart apart once scaled (the shader's
-        // Spread), and moved up to HumanEyeRow (through its shift). Each is left alone within its slack and kept within its most.
+        // Spread), and moved up so its whites' middle is the human set's (EyeRowOf; HumanEyeRow by the irises if unreadable, through its shift). Each is left alone within its slack and kept within its most.
         private const float HumanIrisApart = 0.118f;   // texture widths between the irises' middles, a human face's
         private const float HumanEyeRow = 0.453f;      // and their middles' row, v up (Facial Animation 0.451, Experimentals 0.456)
         private const float HumanEyeSize = 0.058f;     // a whole eye's size (EyeSizeOf) if the human set's can't be measured: Facial Animation - Retexture's
@@ -301,6 +301,10 @@ namespace M3AT
             if (m != null && m.key != "?")
             {
                 raceEyeMods[pawn.def] = m.key;
+                if (pawn.def == RimWorld.ThingDefOf.Human)
+                {
+                    NoteHumanEyeMod(pawn, m.key);   // a human's face set fitted by its own mod (FaceSetFit.cs)
+                }
             }
         }
 
@@ -344,13 +348,13 @@ namespace M3AT
 
         private static float SpreadOf(string kind)
         {
-            return SpreadsWithEyes(kind) ? drawSpread : 0f;
+            return SpreadsWithEyes(kind) ? drawSpread + DevEyes.y : 0f;   // the dev window's on top (FaceDevTune.cs)
         }
 
         // The move up for one of the pawn being drawn's layers (its shift's y).
         private static float EyeRiseOf(string kind)
         {
-            return SpreadsWithEyes(kind) ? drawEyeFit.rise : 0f;
+            return SpreadsWithEyes(kind) ? drawEyeFit.rise + DevEyes.x : 0f;
         }
 
         // A layer's tuning (TuneOf's: its texture places times 1 + x, moved by (y, z)) with the eyes' scale laid on for an
@@ -358,12 +362,14 @@ namespace M3AT
         // times bigger there and the player's tuning still moves it.
         private static Vector3 WithEyeFit(Vector3 tune, string kind)
         {
-            float k = drawEyeFit.scale;
+            float k = drawEyeFit.scale * DevEyes.z;
             if (!SpreadsWithEyes(kind) || k <= 0f || Mathf.Abs(k - 1f) < 1e-4f)
             {
                 return tune;
             }
-            Vector2 middle = new Vector2(0.5f, drawEyeFit.row);
+            // About the race's own eye row (a human's eyes, with no fit, about HumanEyeRow), moved up with the dev window's
+            // rise as the eyes are, so its size slider doesn't move them.
+            Vector2 middle = new Vector2(0.5f, (drawEyeFit.row > 0f ? drawEyeFit.row : HumanEyeRow) + DevEyes.x);
             float a = (1f + tune.x) / k;
             Vector2 b = new Vector2(tune.y, tune.z) / k + middle * (1f - 1f / k);
             return new Vector3(a - 1f, b.x, b.y);
@@ -375,7 +381,16 @@ namespace M3AT
         {
             EyeFit fit;
             string mod;
-            if (raceEyeMods.TryGetValue(pawn.def, out mod) && PinnedEyes(mod, out fit))
+            if (pawn.def == RimWorld.ThingDefOf.Human)
+            {
+                if (!HumanFitOf(pawn, out fit))
+                {
+                    fit = new EyeFit { scale = 1f };
+                }
+                drawEyeFit = fit;
+                drawSpread = fit.spread;
+            }
+            else if (raceEyeMods.TryGetValue(pawn.def, out mod) && PinnedEyes(mod, out fit))
             {
                 drawEyeFit = fit;   // the fit the player tuned this face mod on (FacePins.cs)
                 drawSpread = fit.spread;
@@ -419,10 +434,17 @@ namespace M3AT
             }
             if (race == RimWorld.ThingDefOf.Human)
             {
+                // By its own face mod (FaceSetFit.cs), not the race: a human's set may be any of the loaded ones.
+                EyeFit human;
+                if (!HumanFitOf(pawn, out human))
+                {
+                    human = new EyeFit { scale = 1f };
+                }
+                drawEyeFit = human;
 #if AUTOTEST
-                TestEyeScales[pawn.thingIDNumber] = 1f;
+                TestEyeScales[pawn.thingIDNumber] = human.scale;
 #endif
-                return 0f;
+                return human.spread;
             }
             if (raceEyeFits.TryGetValue(race, out fit))
             {
@@ -482,13 +504,25 @@ namespace M3AT
                         {
                             fit.spread = 0f;
                         }
-                        fit.rise = Mathf.Clamp(HumanEyeRow - fit.row, -EyeRowMost, EyeRowMost);
+                        // The height by the eyes' whites, the whole eye, averaged over the styles (EyeSizeOf): Ratkin's and
+                        // Milira's whites sit higher round their irises than the human sets', so with the irises on the
+                        // human row their eyes read about 0.005 high. The irises' row only if the whites can't be read.
+                        float ownRow = EyeRowOf(RootOf(g)), humanRow = HumanEyeRowNow();
+                        if (ownRow > 0f && humanRow > 0f)
+                        {
+                            fit.row = ownRow;
+                            fit.rise = Mathf.Clamp(humanRow - ownRow, -EyeRowMost, EyeRowMost);
+                        }
+                        else
+                        {
+                            fit.rise = Mathf.Clamp(HumanEyeRow - fit.row, -EyeRowMost, EyeRowMost);
+                        }
                         if (Math.Abs(fit.rise) < EyeRowSlack)
                         {
                             fit.rise = 0f;
                         }
                         measured = true;
-                        why = "irises " + apart.ToString("F3") + " apart at row " + fit.row.ToString("F3") + " (v up); whole eye " + (own > 0f ? own.ToString("F4") : "unmeasured")
+                        why = "irises " + apart.ToString("F3") + " apart, the eyes' middle at row " + fit.row.ToString("F3") + " (v up); whole eye " + (own > 0f ? own.ToString("F4") : "unmeasured")
                             + " against a human's " + human.ToString("F4");
                     }
                 }
@@ -515,7 +549,26 @@ namespace M3AT
         // ---- The whole eye's size, over a face mod's eye styles.
 
         private static readonly Dictionary<string, float> eyeSizes = new Dictionary<string, float>();
-        private static float humanEyeSize = -1f;
+        private static readonly Dictionary<string, float> eyeRows = new Dictionary<string, float>();   // the whites' middle row, v up
+
+
+        // A face set's eye whites' middle row (v up, the mean over both eyes of every style), 0 if it has none.
+        private static float EyeRowOf(string root)
+        {
+            if (root == null)
+            {
+                return 0f;
+            }
+            EyeSizeOf(root);
+            float row;
+            return eyeRows.TryGetValue(root, out row) ? row : 0f;
+        }
+
+        // The human face set's, as loaded (as HumanEyeSizeNow).
+        private static float HumanEyeRowNow()
+        {
+            return RefEyeRow;   // the reference, which human sets are fitted to too (FaceSetFit.cs), whichever is loaded
+        }
 
         // The face set's folder an eye layer's texture is in: its path up to its Eyes folder ("Things/Pawn/Ratkin/"), or null.
         private static string RootOf(Graphic g)
@@ -556,7 +609,7 @@ namespace M3AT
                     }
                 }
             }
-            double sum = 0;
+            double sum = 0, rows = 0;
             int n = 0;
             const int Read = 256;
             foreach (Texture2D tex in found.Values)
@@ -593,13 +646,15 @@ namespace M3AT
                     if (c1 >= c0 + 2 && r1 >= r0 + 2)
                     {
                         sum += Math.Sqrt((c1 - c0 + 1) * (r1 - r0 + 1)) / Read;
+                        rows += (r0 + r1 + 1) / 2.0 / Read;   // rows bottom first, so v up
                         n++;
                     }
                 }
             }
             size = n > 0 ? (float)(sum / n) : 0f;
             eyeSizes[root] = size;
-            Log.Message(Tag + "the whole eye of the face set in " + root + ": " + (n > 0 ? size.ToString("F4") + " of the face texture, over " + found.Count + " eye styles." : "no eye whites found."));
+            eyeRows[root] = n > 0 ? (float)(rows / n) : 0f;
+            Log.Message(Tag + "the whole eye of the face set in " + root + ": " + (n > 0 ? size.ToString("F4") + " of the face texture, its middle at row " + eyeRows[root].ToString("F4") + " (v up), over " + found.Count + " eye styles." : "no eye whites found."));
             return size;
         }
 
@@ -607,19 +662,7 @@ namespace M3AT
         // HumanEyeSize if neither can be measured.
         private static float HumanEyeSizeNow()
         {
-            if (humanEyeSize < 0f)
-            {
-                humanEyeSize = EyeSizeOf("Things/Pawn/FA-Experimentals/");
-                if (humanEyeSize <= 0f)
-                {
-                    humanEyeSize = EyeSizeOf("Things/Pawn/Humanlike/");
-                }
-                if (humanEyeSize <= 0f)
-                {
-                    humanEyeSize = HumanEyeSize;
-                }
-            }
-            return humanEyeSize;
+            return RefEyeSize;   // as HumanEyeRowNow
         }
 
         // ---- Facial Animation's iris, measured.
