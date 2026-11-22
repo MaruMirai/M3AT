@@ -1,6 +1,6 @@
 """Makes underwear for the chibi from its own body, for UnderWhere (Malistaticy.UnderWhere) and mods like it.
 
-    blender -b Models/pawnHumanRig.blend --python anim_scripts/make_underwear.py -- <out folder> [garment ...] [--blend out.blend]
+    blender -b Models/pawnHumanRig.blend --python anim_scripts/make_underwear.py -- <out folder> [garment ...] [--blend out.blend] [--plain]
 
 As make_pants.py makes the trousers: the body (walk.BODY_PARTS, joined) is copied in its rest pose and base shape, cut
 by planes, and pushed OFFSET out along the skin's smooth normals, one surface. Every plane is bisected through the mesh
@@ -24,6 +24,13 @@ GARMENT_PROPS give each its UnderWhere def and GARMENTS its layer and groups, so
     Bra        a band under the chest, two cups rising to a strap each over the shoulders, a V between them.
     Chestwrap  a wide band round the chest, its top slanting across as a wound cloth's would.
     Loincloth  a low brief with a flap hung from the waistband front and back to mid-thigh, its hem ragged.
+
+The tank top and the loincloth are made from textured garments in Models/garments rather than the body (SOURCES), so
+they match the set drawn now (the briefs, crop top and shorts are the trousers and shirt cut by hand): the tank top is the
+CropTop as it is with the BasicShirt below its hem joined on (crop_lengthened), so it comes down to the shirt's hem over
+the hips, the loincloth the Underwear briefs as
+they are with the flaps added, textured from a plain patch of the trousers' image (FLAP_PATCH). Each keeps its source's
+image and stand-off. --plain makes them from the body like the rest, untextured.
 
 The loincloth's flaps hang flat (each row as far out as its furthest column needs) clear of the thighs, so they carry their own weights (the hips at the waistband, going over to
 each thigh by side further down), written into the .glb with the rig; GARMENT_PROPS' part_weights keeps them and gives the
@@ -51,8 +58,10 @@ BOXERS = {'waist': 0.06, 'rise_back': 0.03, 'leg': 0.70}   # (the leg at the thi
 # ankles), as make_from_groups.py makes those, whole, with no cut at all.
 LONG_JOHNS_GROUPS = ('-CollarShirt -Jacket -FlakJacket', '-Pants')
 # Tank top: the hem over the thigh's head; the neckline's half width and its lowest point at the front and the back over
-# the thigh's head; the straps' outer edge from the middle; and the armhole's bottom over the thigh's head.
-TANKTOP = {'hem': 0.03, 'neck_half': 0.085, 'neck_front': 0.37, 'neck_back': 0.45, 'strap_out': 0.15, 'armhole': 0.36}
+# the thigh's head; the straps' outer edge from the middle; the armhole's bottom over the thigh's head; and the share of
+# the neckline's half width its bottom runs flat before its corners turn up at 45 degrees.
+TANKTOP = {'hem': 0.03, 'neck_half': 0.085, 'neck_front': 0.37, 'neck_back': 0.45, 'strap_out': 0.15, 'armhole': 0.36,
+           'scoop_flat': 0.5}
 # Bra (over the thigh's head): the band's bottom; the band's top at the sides and back; the V between the cups and its
 # half width; each cup's top and how far out from the middle it is highest; the straps' middle and half width.
 BRA = {'bottom': 0.27, 'band': 0.32, 'v': 0.31, 'v_half': 0.02, 'cup_top': 0.40, 'cup_out': 0.10, 'strap': 0.10,
@@ -67,6 +76,15 @@ FLAP = {'top_half': 0.085, 'hem_half': 0.10, 'hem': -0.42, 'gap': 0.012, 'teeth'
         'rows': 5, 'flare': 0.02}
 # How far down the flap (0 at the waistband, 1 at the hem) it is the thighs' rather than the hips', at most.
 FLAP_THIGHS = 0.85
+# The garments the tank top and the loincloth are cut from (Models/garments/<name>.glb), and the flaps' place on the
+# briefs' image (the trousers', u and v from its bottom left): a plain stretch of cloth left of the front's middle seam.
+SOURCES = {'Tanktop': 'CropTop', 'Loincloth': 'Underwear'}
+# The tank top is the crop top with the shirt it was cut from carried on below its hem, to the shirt's own hem.
+TANKTOP_BELOW = 'BasicShirt'
+GARMENT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'Models', 'garments')
+FLAP_PATCH = ((0.08, 0.57), (0.16, 0.775))
+# A source's vertices this close (leg lengths) are one: its copies along a UV seam.
+SOURCE_WELD = 0.002
 
 argv = sys.argv[sys.argv.index('--') + 1:]
 out_blend = None
@@ -74,6 +92,8 @@ if '--blend' in argv:
     i = argv.index('--blend')
     out_blend = argv[i + 1]
     argv = argv[:i] + argv[i + 2:]
+plain = '--plain' in argv
+argv = [a for a in argv if a != '--plain']
 out_dir = argv[0]
 wanted = argv[1:]
 
@@ -115,6 +135,29 @@ def fresh():
     bm.from_mesh(body.data)
     bm.transform(bw)
     return bm
+
+source_materials = {}
+
+def source(name):
+    """The garment name's .glb as a bmesh in world space, its vertices welded within SOURCE_WELD (the file splits them
+    along its UV seams, which would leave every island a piece of its own), and its materials kept for the garment made from it."""
+    before = set(bpy.data.objects)
+    bpy.ops.import_scene.gltf(filepath=os.path.join(GARMENT_DIR, name + '.glb'), merge_vertices=True,
+                              disable_bone_shape=True)
+    new = [o for o in bpy.data.objects if o not in before]
+    o = [x for x in new if x.type == 'MESH'][0]
+    bm = bmesh.new()
+    bm.from_mesh(o.data)
+    bm.transform(o.matrix_world)
+    # (the importer merges only exact matches, and the copies either side of a seam are a hair apart)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=SOURCE_WELD * leg)
+    source_materials[name] = list(o.data.materials)
+    for x in new:
+        bpy.data.objects.remove(x)
+    return bm
+
+def made_from(name):
+    return None if plain else SOURCES.get(name)
 
 # The body's own vertices by place (a bisect copies a layer's values onto the vertices it makes, so they are told by
 # place), for lean.
@@ -313,8 +356,79 @@ def long_johns():
     keep_largest(bm)
     return bm
 
+def open_loop(bm, start):
+    """The open edge loop through start, in order round it."""
+    loop, v, came = [start], start, None
+    while True:
+        nxt = [e.other_vert(v) for e in v.link_edges if e.is_boundary and e.other_vert(v) is not came]
+        if not nxt or nxt[0] is start:
+            return loop
+        came, v = v, nxt[0]
+        loop.append(v)
+
+# How near (leg lengths) a point of the crop top's hem must be to the shirt's edge it lies on.
+ON_EDGE = 0.001
+
+def crop_lengthened():
+    """The crop top (made by hand from the shirt) as it is, with the shirt below its hem joined on: the shirt is cut along
+    the crop top's hem, each of whose points lies on one of the shirt's edges or corners (a knife cut through it), its part
+    below kept, and the two welded along that line, so the neck, armholes, straps and texture are the crop top's own."""
+    crop, shirt = source(made_from('Tanktop')), source(TANKTOP_BELOW)
+    hem = [v.co.copy() for v in open_loop(crop, min(crop.verts, key=lambda v: v.co.z))]
+    cut_at = []
+    for p in hem:
+        v = min(shirt.verts, key=lambda v: (v.co - p).length)
+        if (v.co - p).length > ON_EDGE * leg:
+            best, fac = None, 0.0
+            for e in shirt.edges:
+                a, b = e.verts[0].co, e.verts[1].co
+                t = max(0.0, min(1.0, (p - a).dot(b - a) / (b - a).length_squared))
+                d = (a.lerp(b, t) - p).length
+                if best is None or d < best[0]:
+                    best, fac = (d, e), t
+            if best[0] > ON_EDGE * leg:
+                raise RuntimeError('the crop top\'s hem point %s is %.4f leg lengths off the shirt' % (tuple(p), best[0] / leg))
+            e = best[1]
+            _, v = bmesh.utils.edge_split(e, e.verts[0], fac)   # (its texture places interpolated)
+            v.co = p
+        cut_at.append(v)
+    hem_edges = set()
+    for a, b in zip(cut_at, cut_at[1:] + cut_at[:1]):
+        e = next((e for e in a.link_edges if e.other_vert(a) is b), None)
+        if e is None:
+            faces = [f for f in a.link_faces if b in f.verts]
+            if not faces:
+                raise RuntimeError('the crop top\'s hem runs between %s and %s across more than one of the shirt\'s faces'
+                                   % (tuple(a.co), tuple(b.co)))
+            _, l = bmesh.utils.face_split(faces[0], a, b)
+            e = l.edge
+        hem_edges.add(e)
+    # The shirt below the line: every face reached from its lowest without crossing it.
+    low = min(shirt.faces, key=lambda f: f.calc_center_median().z)
+    keep, stack = {low}, [low]
+    while stack:
+        f = stack.pop()
+        for e in f.edges:
+            if e in hem_edges:
+                continue
+            for g in e.link_faces:
+                if g not in keep:
+                    keep.add(g)
+                    stack.append(g)
+    bmesh.ops.delete(shirt, geom=[f for f in shirt.faces if f not in keep], context='FACES')
+    bmesh.ops.delete(shirt, geom=[v for v in shirt.verts if not v.link_faces], context='VERTS')
+    mesh = bpy.data.meshes.new('below')
+    shirt.to_mesh(mesh)
+    shirt.free()
+    crop.from_mesh(mesh)   # (added to the crop top's)
+    bpy.data.meshes.remove(mesh)
+    bmesh.ops.remove_doubles(crop, verts=crop.verts[:], dist=ON_EDGE * leg)
+    return crop
+
 def tanktop():
     s = TANKTOP
+    if made_from('Tanktop'):
+        return crop_lengthened()
     bm = fresh()
     cut(bm, Plane((0, 0, H(s['hem'])), (0, 0, -1)))
     arms_off(bm, 0.0)
@@ -322,15 +436,20 @@ def tanktop():
     # back (the chest's front and back about 0.15 leg lengths either side of the spine).
     nh, so = s['neck_half'] * leg, s['strap_out'] * leg
     zf, zb = H(s['neck_front']), H(s['neck_back'])
-    scoop = Plane((0, 0, (zf + zb) / 2), (0, -(zb - zf) / (0.3 * leg), 1))
+    lean = -(zb - zf) / (0.3 * leg)
+    scoop = Plane((0, 0, (zf + zb) / 2), (0, lean, 1))
     sides = [Plane((nh, 0, 0), (-1, 0, 0)), Plane((-nh, 0, 0), (1, 0, 0))]
+    # The scoop's bottom corners cut off at 45 degrees from SCOOP_FLAT of its half width out, so it is a U, not a box.
+    fl = s['scoop_flat'] * nh
+    corners = [Plane((sign * fl, 0, (zf + zb) / 2), (-sign, lean, 1)) for sign in (1.0, -1.0)]
     armholes = [Plane((so, 0, 0), (1, 0, 0)), Plane((-so, 0, 0), (-1, 0, 0))]
     low = Plane((0, 0, H(s['armhole'])), (0, 0, 1))
     upper = lambda p: p.z > H(s['armhole']) - 0.05 * leg
-    for pl in sides + armholes + [scoop]:
-        split(bm, pl, upper, fine=pl is not scoop)   # (the straps narrower than the shoulder's faces)
+    for pl in sides + armholes + corners + [scoop]:
+        split(bm, pl, upper, fine=pl not in (scoop,) + tuple(corners))   # (the straps narrower than the shoulder's faces)
     split(bm, low)
-    drop(bm, lambda p: (scoop.past(p) and sides[0].past(p) and sides[1].past(p))
+    drop(bm, lambda p: (scoop.past(p) and sides[0].past(p) and sides[1].past(p) and corners[0].past(p)
+                        and corners[1].past(p))
          or (low.past(p) and (armholes[0].past(p) or armholes[1].past(p))))
     keep_largest(bm)
     return bm
@@ -385,6 +504,8 @@ def chestwrap():
     return bm
 
 def loincloth():
+    if made_from('Loincloth'):
+        return source(made_from('Loincloth'))
     return brief(LOIN_BRIEF)
 
 MAKERS = {'Panties': panties, 'Boxers': boxers, 'LongJohns': long_johns, 'Tanktop': tanktop, 'Bra': bra,
@@ -434,7 +555,19 @@ def clear_corners(bm, off):
             v.co += n * w
 
 def finish(name, bm):
-    """The cut piece as an object: lean, pushed off the skin, normals out."""
+    """The cut piece as an object: lean, pushed off the skin, normals out. One cut from a garment (SOURCES) already
+    stands off the skin, its faces the way it had them: only what the cuts left loose or thin is tidied."""
+    if made_from(name):
+        keep_largest(bm)
+        bmesh.ops.dissolve_degenerate(bm, dist=1e-4 * leg, edges=bm.edges[:])
+        bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context='VERTS')
+        bmesh.ops.triangulate(bm, faces=[f for f in bm.faces if len(f.verts) > 4])
+        mesh = bpy.data.meshes.new(name)
+        bm.to_mesh(mesh)
+        bm.free()
+        o = bpy.data.objects.new(name, mesh)
+        bpy.context.collection.objects.link(o)
+        return o
     lean(bm)
     mesh = bpy.data.meshes.new(name)
     bm.to_mesh(mesh)
@@ -466,17 +599,43 @@ def finish(name, bm):
         o.shape_key_clear()
     return o
 
-def add_flaps(o):
-    """The loincloth's two flaps, hung from the waistband front and back, as part of o's mesh with weights of their own."""
+def waist_line(o):
+    """The waistband of a brief made from a garment: its open edge loop through its highest vertex, as a height going
+    linearly with y (fitted over the loop near the middle), as LOIN_BRIEF's plane is for the one cut from the body."""
+    bm = bmesh.new()
+    bm.from_mesh(o.data)
+    top = max(bm.verts, key=lambda v: v.co.z)
+    loop, stack = set(), [top]
+    while stack:
+        v = stack.pop()
+        if v in loop:
+            continue
+        loop.add(v)
+        stack += [e.other_vert(v) for e in v.link_edges if e.is_boundary]
+    pts = [v.co.copy() for v in loop if abs(v.co.x) < 0.1 * leg] or [v.co.copy() for v in loop]
+    bm.free()
+    n = len(pts)
+    my, mz = sum(p.y for p in pts) / n, sum(p.z for p in pts) / n
+    vy = sum((p.y - my) ** 2 for p in pts)
+    slope = sum((p.y - my) * (p.z - mz) for p in pts) / vy if vy > 1e-9 else 0.0
+    return lambda y: mz + slope * (y - my)
+
+def add_flaps(o, waist_z=None, patch=None):
+    """The loincloth's two flaps, hung from the waistband front and back, as part of o's mesh with weights of their own.
+    waist_z(y) is the waistband's height (else LOIN_BRIEF's plane); patch, a rectangle of texture places, the image the
+    flaps are given (the top of the flap at its top), else none."""
     s = FLAP
-    tip = math.atan2(LOIN_BRIEF['rise_back'] * leg, 0.25 * leg)
-    def waist_z(y):   # the brief's waistband plane's height at y
-        return H(LOIN_BRIEF['waist']) - math.tan(tip) * y
+    if waist_z is None:
+        tip = math.atan2(LOIN_BRIEF['rise_back'] * leg, 0.25 * leg)
+        def waist_z(y):   # the brief's waistband plane's height at y
+            return H(LOIN_BRIEF['waist']) - math.tan(tip) * y
     hips = o.vertex_groups.new(name=walk.HIPS)
     thighs = {'L': o.vertex_groups.new(name='thigh.L'), 'R': o.vertex_groups.new(name='thigh.R')}
     bm = bmesh.new()
     bm.from_mesh(o.data)
     deform = bm.verts.layers.deform.verify()
+    uvl = bm.loops.layers.uv.active if patch else None
+    across_down = {}
     off = OFFSET * leg
     cols, rows = s['columns'], s['rows']
     for way in (-1.0, 1.0):   # the front (-y) and the back (+y)
@@ -521,11 +680,17 @@ def add_flaps(o):
                     v[deform][thighs['L'].index] = below * across
                     v[deform][thighs['R'].index] = below * (1.0 - across)
                 grid[r].append(v)
+                across_down[v] = (across, t)
         for r in range(rows):
             for c in range(cols):
                 quad = [grid[r][c], grid[r][c + 1], grid[r + 1][c + 1], grid[r + 1][c]]
                 f = bm.faces.new(quad if way > 0 else list(reversed(quad)))
                 f.smooth = True
+                if uvl is not None:
+                    (u0, v0), (u1, v1) = patch
+                    for loop in f.loops:
+                        a, t = across_down[loop.vert]
+                        loop[uvl].uv = (u0 + (u1 - u0) * a, v1 - (v1 - v0) * min(1.0, t))
     # Faces out from the body: the front flap's toward -y, the back's toward +y.
     bm.to_mesh(o.data)
     bm.free()
@@ -538,6 +703,10 @@ def uv_and_material(o):
     # split the exported vertices, nearly doubling them)
     for p in o.data.polygons:
         p.use_smooth = True
+    if made_from(o.name):
+        for m in source_materials[made_from(o.name)]:
+            o.data.materials.append(m)
+        return
     mat = bpy.data.materials.new(o.name)
     mat.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value = (0.8, 0.8, 0.8, 1.0)
     o.data.materials.append(mat)
@@ -564,7 +733,10 @@ for name, maker in MAKERS.items():
         continue
     o = finish(name, maker())
     if name == 'Loincloth':
-        add_flaps(o)
+        if made_from(name):
+            add_flaps(o, waist_line(o), FLAP_PATCH)
+        else:
+            add_flaps(o)
     uv_and_material(o)
     path = os.path.join(out_dir, name + '.glb')
     export(o, path, name == 'Loincloth')

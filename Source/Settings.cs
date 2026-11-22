@@ -15,6 +15,16 @@ namespace M3AT
         Never,
     }
 
+    // When a pawn drawn taller than the ceiling over it crouches under it (WalkFigures.CeilingOf): under any roof; only
+    // while IsoRimZ draws the floor above over it (the upper floor viewed), as otherwise the roof isn't drawn; or never.
+    // Kept in this order, as the menu lists them.
+    public enum CeilingCrouch
+    {
+        Always,
+        FloorShown,
+        Never
+    }
+
     public enum BeardMode
     {
         Flat,
@@ -51,6 +61,8 @@ namespace M3AT
         public float heightSpread = DefaultHeightSpread;   // the standard deviation of pawns' own heights about their gender's, of the standard size (WalkFigures.HeightSize)
         public bool agingLooks = true;   // old pawns drawn wrinkled, stooped and a little shorter, with cataracts clouding the eye (Aging.cs, WalkFigures.AgingLooks)
         public bool greyingHair = true;   // hair drawn greying with age, a dye or other new colour starting it again (GreyingHair.cs, WalkFigures.GreyingHair)
+        public bool raceParts = true;   // a race's ears, tails, horns and wings built in 3D from their sprites on the chibi (AddonParts.cs)
+        public bool otherRaces = true;   // humanlike races with no IsoRim alien pack drawn as chibis rather than flat cards (OtherRaces.cs)
         public bool variedBodies = true;    // each pawn's build spread about its body type's by the Thin, Fat and Hulk keys (WalkFigures.VariedBuild)
         public float bodySpread = DefaultBodySpread;   // and the standard deviation of that spread, in key amounts
         public float bodyShapeStrength = 1f;   // how strongly the Thin, Fat and Hulk keys are applied, 0 .. BodyShapeMost of each (WalkFigures.BodyShapeStrength)
@@ -66,6 +78,12 @@ namespace M3AT
         public bool armourHidesTail = true;   // body armour (a garment with hide_clothes, not a vacsuit) leaves the gene tail off (WalkFigures.ArmourHidesTail)
         public EarHiding earHiding = EarHiding.Helmets;   // which headgear leaves the gene ears off (WalkFigures.EarHiding)
         public BeardMode beardMode = BeardMode.Flat;   // how beards are drawn (WalkFigures.Beards, FlatBeards)
+        public CeilingCrouch ceilingCrouch = CeilingCrouch.FloorShown;   // when a pawn taller than the ceiling crouches under it (WalkFigures.CeilingOf)
+        public bool powerArmourBulk;   // Spacer power armour over the torso, arms and legs draws its wearer armourBulk bigger and broader (ArmourSize.cs)
+        public float armourBulk = DefaultArmourBulk;   // that size, of the pawn's own; GrimWorld's Space Marine armour's too (marineBulk)
+        public const float DefaultArmourBulk = 1.25f;   // a Space Marine of about 2.2 m to a person's 1.75
+        public bool marineBulk = true;   // GrimWorld 40,000's Space Marine and Custodes armour draws its wearer armourBulk bigger and broader (ArmourSize.cs)
+        public bool armourDrawScale = true;   // body armour a mod draws scaled up when worn (its apparel drawData scale: GrimWorld's Custodes, Valdor) draws its wearer that much bigger
         public bool gripToolButton = true;   // the M3AT tools' toggle among the play settings, bottom right of the map (GripTool.cs)
         public bool gripTool = false;        // that toggle: Adjust grip and Adjust clothing buttons on pawns (GripTool.cs, ClothingTool.cs)
         // The player's own choice of garments for apparel with none of its own, by apparel defName (ClothingTool.cs,
@@ -81,6 +99,11 @@ namespace M3AT
         // the mouth's on top of it.
         public Dictionary<string, Vector3> faceTunes = new Dictionary<string, Vector3>();
         public Dictionary<string, Vector3> mouthTunes = new Dictionary<string, Vector3>();
+        // The automatic fit (FaceGaze.cs) each tuned face mod was tuned on, which it keeps being drawn with, so a later change
+        // to the measuring leaves a face as the player left it: the eyes' scale, rise and spread, and the eyes' row and the
+        // mouth's move. A tuned mod without one was tuned before the fit was pinned (FacePins.cs).
+        public Dictionary<string, Vector3> faceFits = new Dictionary<string, Vector3>();
+        public Dictionary<string, Vector2> faceFitRows = new Dictionary<string, Vector2>();
         public bool autoGrips = true;   // another mod's weapon held by its grip as found in its art (WalkFigures.AutoGrips, GripFinder)
         public bool retexturedWeaponModels = true;   // the game's own weapons keep IsoRim's model though another mod redraws their art (WalkFigures.RetexturedWeaponModels)
         public bool vatClothes = false;    // a pawn in a growth vat or biosculpter pod drawn in its clothes (WalkFigures.VatClothes); off: without them
@@ -151,6 +174,8 @@ namespace M3AT
             Scribe_Values.Look(ref heightSpread, "heightSpread", DefaultHeightSpread);
             Scribe_Values.Look(ref agingLooks, "agingLooks", true);
             Scribe_Values.Look(ref greyingHair, "greyingHair", true);
+            Scribe_Values.Look(ref otherRaces, "otherRaces", true);
+            Scribe_Values.Look(ref raceParts, "raceParts", true);
             Scribe_Values.Look(ref variedBodies, "variedBodies", true);
             Scribe_Values.Look(ref bodySpread, "bodySpread", DefaultBodySpread);
             Scribe_Values.Look(ref bodyShapeStrength, "bodyShapeStrength", 1f);
@@ -166,6 +191,11 @@ namespace M3AT
             Scribe_Values.Look(ref armourHidesTail, "armourHidesTail", true);
             Scribe_Values.Look(ref earHiding, "earHiding", EarHiding.Helmets);
             Scribe_Values.Look(ref beardMode, "beardMode", BeardMode.Flat);
+            Scribe_Values.Look(ref ceilingCrouch, "ceilingCrouch", CeilingCrouch.FloorShown);
+            Scribe_Values.Look(ref powerArmourBulk, "powerArmourBulk", false);
+            Scribe_Values.Look(ref armourBulk, "armourBulk", DefaultArmourBulk);
+            Scribe_Values.Look(ref marineBulk, "marineBulk", true);
+            Scribe_Values.Look(ref armourDrawScale, "armourDrawScale", true);
             Scribe_Values.Look(ref retexturedWeaponModels, "retexturedWeaponModels", true);
             Scribe_Values.Look(ref autoGrips, "autoGrips", true);
             Scribe_Values.Look(ref groundGarments, "groundGarments", false);
@@ -247,6 +277,16 @@ namespace M3AT
             {
                 mouthTunes = new Dictionary<string, Vector3>();
             }
+            Scribe_Collections.Look(ref faceFits, "faceFits", LookMode.Value, LookMode.Value);
+            if (faceFits == null)
+            {
+                faceFits = new Dictionary<string, Vector3>();
+            }
+            Scribe_Collections.Look(ref faceFitRows, "faceFitRows", LookMode.Value, LookMode.Value);
+            if (faceFitRows == null)
+            {
+                faceFitRows = new Dictionary<string, Vector2>();
+            }
             Scribe_Collections.Look(ref clothingChoices, "clothingChoices", LookMode.Value, LookMode.Value);
             if (clothingChoices == null)
             {
@@ -305,9 +345,16 @@ namespace M3AT
         // The head's size at a shrink, of the full chibi head's.
         private const float GazeMost = 4f, GazeStep = 0.25f;   // the eye movement slider's top and steps
 
-        private static float HeadSize(float shrink)
+        internal static float HeadSize(float shrink)
         {
             return 1f - (1f - ShrunkSize) * shrink;
+        }
+
+        // The Shrinkhead amount that makes the head this share of the full chibi head's (HeadSize's inverse; above 1 if
+        // the key can't shrink it that far).
+        internal static float ShrinkFor(float headSize)
+        {
+            return (1f - headSize) / (1f - ShrunkSize);
         }
 
         public SettingsMod(ModContentPack content) : base(content)
@@ -322,22 +369,23 @@ namespace M3AT
 
         // The options' sections, in the order they are read: down the first column, then the second. Two columns rather
         // than three, so the long labels and sliders have room. The freecam always heads the second column and the
-        // weapon sizes always end it (Pinned); the sections between flow from the bottom of the first column to under
+        // weapon sizes and the folded Advanced and Mod compatibility sections always end it (Pinned); the sections between flow from the bottom of the first column to under
         // the freecam, and where they break is worked out from how tall each section came out (Columns), so the
         // columns come out even whatever the window's width or the wrapping of the text.
         private static readonly System.Action<Listing_Standard>[] Sections =
         {
             PawnsSection, ClothesSection, InjuriesSection, DrawingSection, CombatSection,
-            PerformanceSection, ProblemsSection, AdvancedSection,
+            PerformanceSection, ProblemsSection,
         };
         private static readonly System.Action<Listing_Standard> PinnedTop = FreecamSection;
-        private static readonly System.Action<Listing_Standard> PinnedBottom = WeaponSizesSection;
+        // The weapon sizes, then the folded sections, last so that opening one only lengthens the column downward.
+        private static readonly System.Action<Listing_Standard>[] PinnedBottom = { WeaponSizesSection, AdvancedSection, CompatibilitySection };
         private const int ColumnCount = 2;
         private const float SectionGap = 12f;   // px between two sections in a column, as the listing's own Gap
 
         // Each section's height, px, as last drawn (the flowing ones, then the pinned top and bottom), and the flowing
         // section the second column carries on from.
-        private static readonly float[] sectionHeights = new float[Sections.Length + 2];
+        private static readonly float[] sectionHeights = new float[Sections.Length + 1 + PinnedBottom.Length];
         private static int columnBreak = -1;
         // The columns are worked out again only as the window opens (or its width changes), not while it is open, so a
         // section doesn't jump to another column under the pointer when a checkbox shows or hides the options under it.
@@ -352,7 +400,11 @@ namespace M3AT
             int n = Sections.Length;
             int best = n;
             float bestTallest = float.MaxValue;
-            float pinned = sectionHeights[n] + sectionHeights[n + 1] + SectionGap;
+            float pinned = sectionHeights[n];
+            for (int i = 0; i < PinnedBottom.Length; i++)
+            {
+                pinned += SectionGap + sectionHeights[n + 1 + i];
+            }
             for (int a = 1; a <= n; a++)
             {
                 float right = pinned + (a < n ? ColumnHeight(a, n) + 2f * SectionGap : 0f);
@@ -388,7 +440,8 @@ namespace M3AT
                 if (field.IsInitOnly || field.Name == nameof(Settings.freecamOn) || field.Name == nameof(Settings.freecam3D)
                     || field.Name == nameof(Settings.gripOverrides) || field.Name == nameof(Settings.offHandGrips)
                     || field.Name == nameof(Settings.clothingChoices)
-                    || field.Name == nameof(Settings.faceTunes) || field.Name == nameof(Settings.mouthTunes))   // the player's own work, not an option: cleared by its own button
+                    || field.Name == nameof(Settings.faceTunes) || field.Name == nameof(Settings.mouthTunes)
+                    || field.Name == nameof(Settings.faceFits) || field.Name == nameof(Settings.faceFitRows))   // the player's own work, not an option: cleared by its own button
                 {
                     continue;
                 }
@@ -407,6 +460,7 @@ namespace M3AT
                 groundGarmentsBaked = Settings.groundGarments;
                 WalkFigures.RebakeGroundClothes();
             }
+            WalkFigures.OtherRacesChanged();   // IsoRim asks every race again if the option changed
             if (weaponModelsBaked != Settings.retexturedWeaponModels)
             {
                 weaponModelsBaked = Settings.retexturedWeaponModels;
@@ -500,6 +554,12 @@ namespace M3AT
                 : mode == SleepWear.Pajamas ? "M3AT_SleepPajamas".Translate() : "M3AT_SleepNothing".Translate();
         }
 
+        private static string CeilingName(CeilingCrouch mode)
+        {
+            return mode == CeilingCrouch.Always ? "M3AT_CeilingAlways".Translate() : mode == CeilingCrouch.FloorShown
+                ? "M3AT_CeilingFloorShown".Translate() : "M3AT_CeilingNever".Translate();
+        }
+
         private static string BeardName(BeardMode mode)
         {
             return mode == BeardMode.Flat ? "2D" : mode == BeardMode.ThreeD ? "3D" : "M3AT_BeardsOff".Translate();
@@ -548,6 +608,26 @@ namespace M3AT
                 {
                     BeardMode picked = mode;
                     modes.Add(new FloatMenuOption(BeardName(mode), () => Settings.beardMode = picked));
+                }
+                Find.WindowStack.Add(new FloatMenu(modes));
+            }
+            list.CheckboxLabeled("M3AT_PowerArmourBulk".Translate(), ref Settings.powerArmourBulk,
+                "M3AT_PowerArmourBulkTip".Translate());
+            if (Settings.powerArmourBulk || Settings.marineBulk)
+            {
+                BeginSubOptions(list);
+                Settings.armourBulk = Mathf.Round(Slider(list, "M3AT_ArmourBulk".Translate(), Settings.armourBulk.ToStringPercent(), Settings.armourBulk, 1f, 1.6f,
+                    "M3AT_ArmourBulkTip".Translate(Settings.DefaultArmourBulk.ToStringPercent())) * 20f) / 20f;
+                EndSubOptions(list);
+            }
+            if (list.ButtonTextLabeledPct("M3AT_CeilingCrouch".Translate(), CeilingName(Settings.ceilingCrouch), SliderLabelShare, TextAnchor.MiddleLeft, null,
+                "M3AT_CeilingCrouchTip".Translate()))
+            {
+                List<FloatMenuOption> modes = new List<FloatMenuOption>();
+                foreach (CeilingCrouch mode in new[] { CeilingCrouch.Always, CeilingCrouch.FloorShown, CeilingCrouch.Never })
+                {
+                    CeilingCrouch picked = mode;
+                    modes.Add(new FloatMenuOption(CeilingName(mode), () => Settings.ceilingCrouch = picked));
                 }
                 Find.WindowStack.Add(new FloatMenu(modes));
             }
@@ -778,24 +858,50 @@ namespace M3AT
         }
 
         private static bool advancedOpen;   // the Advanced section shown (not saved: closed each time the options open)
+        private static bool compatibilityOpen;   // and the Mod compatibility section
+
+        // A folded section's header: its name with an arrow, opened and closed by a click.
+        private static void FoldHeader(Listing_Standard list, string label, string tip, ref bool open)
+        {
+            Text.Font = GameFont.Medium;
+            Rect header = list.GetRect(Text.LineHeight);
+            float icon = Text.LineHeight * 0.6f;
+            GUI.DrawTexture(new Rect(header.x, header.y + (header.height - icon) / 2f, icon, icon), open ? TexButton.Collapse : TexButton.Reveal);
+            Widgets.Label(new Rect(header.x + icon + 6f, header.y, header.width - icon - 6f, header.height), label);
+            Text.Font = GameFont.Small;
+            Widgets.DrawHighlightIfMouseover(header);
+            TooltipHandler.TipRegion(header, tip);
+            if (Widgets.ButtonInvisible(header))
+            {
+                open = !open;
+            }
+            list.GapLine(6f);
+        }
+
+        // Options for other mods' things, folded away until its header is clicked: other races (OtherRaces.cs) and their parts
+        // (AddonParts.cs), and GrimWorld 40,000's armour sizes.
+        private static void CompatibilitySection(Listing_Standard list)
+        {
+            FoldHeader(list, "M3AT_Compatibility".Translate(), "M3AT_CompatibilityTip".Translate(), ref compatibilityOpen);
+            if (!compatibilityOpen)
+            {
+                return;
+            }
+            list.CheckboxLabeled("M3AT_OtherRaces".Translate(), ref Settings.otherRaces,
+                "M3AT_OtherRacesTip".Translate());
+            list.CheckboxLabeled("M3AT_RaceParts".Translate(), ref Settings.raceParts,
+                "M3AT_RacePartsTip".Translate());
+            list.CheckboxLabeled("M3AT_ArmourDrawScale".Translate(), ref Settings.armourDrawScale,
+                "M3AT_ArmourDrawScaleTip".Translate());
+            list.CheckboxLabeled("M3AT_MarineBulk".Translate(), ref Settings.marineBulk,
+                "M3AT_MarineBulkTip".Translate());
+        }
 
         // Tools few players need, folded away until its header is clicked: so far the face tuning (FaceTuning.cs), opened
         // over the map with the options closed so the face can be seen.
         private static void AdvancedSection(Listing_Standard list)
         {
-            Text.Font = GameFont.Medium;
-            Rect header = list.GetRect(Text.LineHeight);
-            float icon = Text.LineHeight * 0.6f;
-            GUI.DrawTexture(new Rect(header.x, header.y + (header.height - icon) / 2f, icon, icon), advancedOpen ? TexButton.Collapse : TexButton.Reveal);
-            Widgets.Label(new Rect(header.x + icon + 6f, header.y, header.width - icon - 6f, header.height), "M3AT_Advanced".Translate());
-            Text.Font = GameFont.Small;
-            Widgets.DrawHighlightIfMouseover(header);
-            TooltipHandler.TipRegion(header, "M3AT_AdvancedTip".Translate());
-            if (Widgets.ButtonInvisible(header))
-            {
-                advancedOpen = !advancedOpen;
-            }
-            list.GapLine(6f);
+            FoldHeader(list, "M3AT_Advanced".Translate(), "M3AT_AdvancedTip".Translate(), ref advancedOpen);
             if (!advancedOpen)
             {
                 return;
@@ -828,6 +934,8 @@ namespace M3AT
                 {
                     Settings.faceTunes.Clear();
                     Settings.mouthTunes.Clear();
+                    Settings.faceFits.Clear();
+                    Settings.faceFitRows.Clear();
                 }, true));
             }
             // Here, folded away, rather than under Performance: it is much faster and should stay on, kept only for a
@@ -951,7 +1059,10 @@ namespace M3AT
             {
                 Draw(Sections[i], i, false);
             }
-            Draw(PinnedBottom, n + 1, false);
+            for (int i = 0; i < PinnedBottom.Length; i++)
+            {
+                Draw(PinnedBottom[i], n + 1 + i, false);
+            }
             measured = true;
             shownHeight = Mathf.Max(tallest, list.CurHeight) + 12f;
             list.End();

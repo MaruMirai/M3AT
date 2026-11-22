@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.RegularExpressions;
 using RimWorld;
 using Verse;
@@ -29,6 +30,7 @@ namespace M3AT
             public HashSet<string> stuff = new HashSet<string>();
             public string[] tokens;         // a garment's: the words of its def's name (NameTokens)
             public string text;             // an apparel's: its defName and label, lower case, for the tokens to be found in
+            public HashSet<string> headNouns; // an apparel's: what its label says it is (HeadNouns)
         }
 
         private List<Profile> standInProfiles;   // every garment that can stand in, made on first use
@@ -48,6 +50,9 @@ namespace M3AT
         private const float TechStep = 2f;          // levels apart at which SameTech is gone
         private const float SameStuff = 0.03f;      // added for sharing a stuff category (cloth, leather, metal)
         private const float NameWords = 0.15f;      // added for all the garment's name words in the apparel's name or label
+        private const float HeadNounBonus = 0.5f;   // and more if its label ends on one of them: a priest robe is a robe
+                                                    // and a psyker jacket a jacket, whatever their groups say (GrimWorld's
+                                                    // were drawn as a flak vest and plate armour)
         private const float GenericBonus = 0.03f;   // added for the plain garments (Generic), so they win ties
         private const float ChildOnlyShare = 0.7f;  // a garment for children's apparel only (the kid romper) on anything
         private const float NarrowShare = 0.7f;     // a Narrow garment on apparel with none of its name words
@@ -90,10 +95,13 @@ namespace M3AT
         {
             { "scarf", new[] { "neckerchief", "kerchief", "muffler", "shemagh", "keffiyeh", "snood" } },
             { "short", new[] { "hotpant", "hot pant" } },   // hotpants are the short shorts, not the shorts
-            { "crop", new[] { "tank top", "tanktop", "halter", "tube top" } },
+            { "crop", new[] { "halter", "tube top" } },
+            { "tanktop", new[] { "tank top", "singlet", "camisole" } },   // a tank top is the tank top's, not the crop top's
             // CE's exoframe (name words exo and frame) is any exoskeleton or exosuit: Passive Exoskeletons' and The Dead
             // Man's Switch's, which scored as power armour or flak by their coverage.
             { "frame", new[] { "exoskelet", "exosuit" } },
+            // CE's radio pack is any pack with a radio: GrimWorld's vox-caster backpacks.
+            { "radio", new[] { "vox", "comms", "transceiver", "communicat" } },
         };
         private static readonly Dictionary<string, string[]> NameNot = new Dictionary<string, string[]>
         {
@@ -118,13 +126,28 @@ namespace M3AT
         private static readonly HashSet<string> Generic = new HashSet<string>
         {
             "BasicShirt", "Pants", "Jacket", "Duster", "FlakVest", "SimpleHelmet", "AdvancedHelmet", "Tuque", "CollarShirt",
-            "PowerArmor", "Parka", "GasMask", "ClothMask",
+            "PowerArmor", "Parka", "GasMask", "ClothMask", "CE_Backpack",
         };
 
         // Garments that are a narrower kind of a plain one (a crop top of a shirt, shorts of trousers): drawn for apparel
         // whose name says so (a tank top, hotpants, a short skirt), but behind the plain one on coverage alone, as they
         // were only 0.03 behind it on a plain sweater or jeans.
-        private static readonly HashSet<string> Narrow = new HashSet<string> { "CropTop", "Shorts", "ShortShorts" };
+        private static readonly HashSet<string> Narrow = new HashSet<string> { "CropTop", "Tanktop", "Shorts", "ShortShorts" };
+
+        // A pack: apparel worn only on a backpack layer (CE's and GrimWorld's Backpack, Ratkin's BackPack), or named a
+        // backpack, whatever groups it gives (Torso, Shoulders, Waist), is matched as PackLayer over PackGroup alone, so
+        // every pack takes a pack garment: GrimWorld's covered Torso where CE's backpack covers Shoulders, and none was
+        // drawn. Webbing (apparel named as it, WebbingWords, not a pack) is matched as CE's tactical vest is, its layer and
+        // Torso: GrimWorld's combat webbing, on Shell and Belt over the whole body, was drawn as nothing or a robe.
+        private const string PackLayer = "Backpack";
+        private const string PackGroup = "Back";
+        private const string WebbingLayer = "Webbing";
+        private const string ShoulderLayer = "Shoulder";
+        private static readonly string[] NotPackWords = { "cape", "cloak" };   // never a pack (GrimWorld's scout cape)
+        // Headgear whose label says it is one of these is a hat, even if armour: GrimWorld's Space Marine hoods cover the
+        // whole head as armour and took the power armour helmet.
+        private static readonly HashSet<string> HatNouns = new HashSet<string> { "hood", "cap", "hat", "beret", "bandana", "headwrap", "turban", "bonnet" };
+        private static readonly string[] WebbingWords = { "webbing", "chest rig", "load bearing", "load-bearing" };
 
         // Name words too common to tell garments apart.
         private static readonly HashSet<string> CommonWords = new HashSet<string> { "hat", "helmet", "armor", "armour", "apparel", "kid" };
@@ -224,9 +247,11 @@ namespace M3AT
             }
             Profile a = ProfileOf(def, 0);
             a.mask = IsMaskNamed(a.text);
-            if (!a.armour && !a.mask && a.groups.Contains("UpperHead"))
+            a.headNouns = HeadNouns(def.label);
+            if ((!a.armour || a.headNouns.Overlaps(HatNouns)) && !a.mask && a.groups.Contains("UpperHead"))
             {
-                // A hat, however much of the head its groups say: matched as a hat, not as a mask or full helmet.
+                // A hat, however much of the head its groups say: matched as a hat, not as a mask or full helmet. Armour
+                // too if its label says it is a hat (HatNouns).
                 a.groups.Remove("Eyes");
                 a.groups.Remove("Mouth");
             }
@@ -384,6 +409,10 @@ namespace M3AT
                 plus += SameStuff;
             }
             plus += NameWords * named;
+            if (named >= 1f && a.headNouns != null && Array.Exists(g.tokens, x => a.headNouns.Contains(Singular(x))))
+            {
+                plus += HeadNounBonus;
+            }
             if (Generic.Contains(g.name))
             {
                 plus += GenericBonus;
@@ -479,6 +508,149 @@ namespace M3AT
             return words.ToArray();
         }
 
+        // What a label says the apparel is: its last word and the word before its first "of", lower case, without a
+        // plural s and anything in brackets (a priest robe is a robe, robes of Malcador robes), which says more than its
+        // groups, as mods give a long coat the groups of plate armour.
+        private static readonly Regex Brackets = new Regex(@"\(.*?\)");
+        private static readonly Regex LowerWords = new Regex("[a-z]+");
+
+        private static HashSet<string> HeadNouns(string label)
+        {
+            HashSet<string> found = new HashSet<string>();
+            MatchCollection words = LowerWords.Matches(Brackets.Replace((label ?? "").ToLowerInvariant(), " "));
+            if (words.Count > 0)
+            {
+                found.Add(Singular(words[words.Count - 1].Value));
+            }
+            for (int i = 1; i < words.Count; i++)
+            {
+                if (words[i].Value == "of")
+                {
+                    found.Add(Singular(words[i - 1].Value));
+                    break;
+                }
+            }
+            return found;
+        }
+
+        private static string Singular(string w)
+        {
+            return w.Length > 3 && w.EndsWith("s") && !w.EndsWith("ss") ? w.Substring(0, w.Length - 1) : w;
+        }
+
+        // A defName as words, lower case: ElysianHelmetOpen held "top" run together, which the top hat took.
+        private static readonly Regex LowerUpper = new Regex("([a-z])([A-Z])");
+
+        private static string WordsOf(string defName)
+        {
+            return LowerUpper.Replace((defName ?? "").Replace('_', ' '), "$1 $2").ToLowerInvariant();
+        }
+
+        // Packs, webbing, pauldrons and eyewear matched as what they are, their layers and groups replaced: webbing (by
+        // name) as CE's tactical vest; a pack (packLayers, or named a backpack, but not a cape or cloak) as PackLayer over
+        // PackGroup; a cape or cloak on a backpack layer as on the Shell (GrimWorld's scout cape); pauldrons (worn only on
+        // a shoulder layer, GrimWorld's GW_Shoulder) as ShoulderLayer over the Shoulders; worn only over the eyes
+        // (EyeCover) as over the eyes alone, as goggles or a headset giving UpperHead took the simple helmet.
+        private static void AsWhatItIs(Profile p, bool packLayers, bool shoulderLayers)
+        {
+            if (IsWebbing(p.text))
+            {
+                Replace(p, WebbingLayer, "Torso");
+            }
+            else if (IsPack(p.text, packLayers))
+            {
+                Replace(p, PackLayer, PackGroup);
+            }
+            else if (packLayers)
+            {
+                p.layers.Clear();
+                p.layers.Add("Shell");
+            }
+            else if (shoulderLayers)
+            {
+                Replace(p, ShoulderLayer, "Shoulders");
+            }
+            else if (p.layers.Count > 0 && p.layers.TrueForAll(x => x == "EyeCover") && p.groups.Count > 0)
+            {
+                p.groups.Clear();
+                p.groups.Add("Eyes");
+            }
+        }
+
+        private static void Replace(Profile p, string layer, string group)
+        {
+            p.layers.Clear();
+            p.layers.Add(layer);
+            p.groups.Clear();
+            p.groups.Add(group);
+        }
+
+        private static bool IsWebbing(string text)
+        {
+            return Array.Exists(WebbingWords, w => text.Contains(w));
+        }
+
+        private static bool IsPack(string text, bool packLayers)
+        {
+            return (packLayers || text.Contains("backpack")) && !Array.Exists(NotPackWords, w => text.Contains(w));
+        }
+
+        // Worn on a backpack layer and nothing else but the belt (a jump pack is on both).
+        private static bool PackLayers(List<string> names, List<string> labels)
+        {
+            bool any = false;
+            for (int i = 0; i < names.Count; i++)
+            {
+                bool pack = (names[i] + " " + labels[i]).IndexOf("backpack", StringComparison.OrdinalIgnoreCase) >= 0;
+                if (!pack && names[i] != "Belt")
+                {
+                    return false;
+                }
+                any |= pack;
+            }
+            return any;
+        }
+
+        // Worn only on shoulder layers (GrimWorld's GW_Shoulder, its pauldrons).
+        private static bool ShoulderLayers(List<string> names, List<string> labels)
+        {
+            for (int i = 0; i < names.Count; i++)
+            {
+                if ((names[i] + " " + labels[i]).IndexOf("shoulder", StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    return false;
+                }
+            }
+            return names.Count > 0;
+        }
+
+        private static void LayerNames(ApparelProperties ap, out List<string> names, out List<string> labels)
+        {
+            names = new List<string>();
+            labels = new List<string>();
+            for (int i = 0; ap.layers != null && i < ap.layers.Count; i++)
+            {
+                names.Add(ap.layers[i].defName);
+                labels.Add(ap.layers[i].label ?? "");
+            }
+        }
+
+        // A pack of power armour: one of Spacer tech or later fitted over the neck and shoulders too (GrimWorld's Space
+        // Marine packs), which the power armour garments draw with their own backpack, so it takes no stand-in.
+        private static bool ArmourPack(ThingDef def)
+        {
+            if (def.techLevel < TechLevel.Spacer)
+            {
+                return false;
+            }
+            HashSet<string> groups = new HashSet<string>();
+            for (int i = 0; def.apparel.bodyPartGroups != null && i < def.apparel.bodyPartGroups.Count; i++)
+            {
+                AddGroup(groups, def.apparel.bodyPartGroups[i].defName);
+            }
+            return groups.Contains("Neck") && groups.Contains("Shoulders");
+        }
+
         private static bool IsMaskNamed(string text)
         {
             for (int i = 0; i < MaskWords.Length; i++)
@@ -491,17 +663,39 @@ namespace M3AT
             return false;
         }
 
-        // Shields (CE's, VFE's), anything else energy-shielding and anything worn on the belt (packs, lances: IsoRim draws
-        // them as worn gear, WornGears.cs, though Combat Extended adds its Backpack layer to some): never drawn as clothes.
+        // Shields (CE's, VFE's, by layer or category); anything on the belt or energy-shielding unless also worn on a body
+        // layer, and for a shield in it covering the arms or legs too (packs, lances: IsoRim draws them as worn gear,
+        // WornGears.cs; but GrimWorld's Terminator armour lists the belt and its Custodes plate has a shield in it, while
+        // Biotech's heavy shield unit, Middle over the torso, is a shield); power armour's packs (ArmourPack): never drawn
+        // as clothes. A pack or webbing on the belt (AsWhatItIs) takes a pack or webbing garment.
         private static bool NeverStoodIn(ThingDef def)
         {
             ApparelProperties ap = def.apparel;
+            string text = WordsOf(def.defName) + " " + (def.label ?? "").ToLowerInvariant();
+            List<string> names, labels;
+            LayerNames(ap, out names, out labels);
+            bool packLayers = PackLayers(names, labels);
+            if (IsWebbing(text))
+            {
+                return false;
+            }
+            if (IsPack(text, packLayers))
+            {
+                return ArmourPack(def);
+            }
+            if (packLayers)
+            {
+                return false;
+            }
+            bool belt = false, body = false;
             for (int i = 0; ap.layers != null && i < ap.layers.Count; i++)
             {
-                if (ap.layers[i] == ApparelLayerDefOf.Belt || ap.layers[i].defName.IndexOf("Shield", StringComparison.OrdinalIgnoreCase) >= 0)
+                if (ap.layers[i].defName.IndexOf("Shield", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     return true;
                 }
+                belt |= ap.layers[i] == ApparelLayerDefOf.Belt;
+                body |= Array.IndexOf(BodyLayers, BodyLayerOf(ap.layers[i])) >= 0;
             }
             for (int i = 0; def.thingCategories != null && i < def.thingCategories.Count; i++)
             {
@@ -510,7 +704,13 @@ namespace M3AT
                     return true;
                 }
             }
-            return def.HasComp(typeof(CompShield));
+            bool limbs = false;
+            for (int i = 0; ap.bodyPartGroups != null && i < ap.bodyPartGroups.Count; i++)
+            {
+                string g = ap.bodyPartGroups[i].defName;
+                limbs |= g == "Arms" || g == "Legs";
+            }
+            return (!body && belt) || (def.HasComp(typeof(CompShield)) && !(body && limbs));
         }
 
         private static Profile ProfileOf(ThingDef def, int piece)
@@ -541,7 +741,10 @@ namespace M3AT
             {
                 p.stuff.Add(def.stuffCategories[i].defName);
             }
-            p.text = (def.defName + " " + (def.label ?? "")).ToLowerInvariant();
+            p.text = WordsOf(def.defName) + " " + (def.label ?? "").ToLowerInvariant();
+            List<string> names, labels;
+            LayerNames(ap, out names, out labels);
+            AsWhatItIs(p, PackLayers(names, labels), ShoulderLayers(names, labels));
             return p;
         }
 
@@ -607,8 +810,8 @@ namespace M3AT
                 if (def != null)
                 {
                     p = ProfileOf(def, g);
-                    // Its layer and groups lines add to the def's: the crop top is UnderWhere's tank top and a top worn
-                    // on the skin over the shoulders too.
+                    // Its layer and groups lines add to the def's: the tank top is UnderWhere's tank top and a top worn
+                    // on the skin too.
                     for (int i = 0; i < lineLayers.Length; i++)
                     {
                         if (!p.layers.Contains(lineLayers[i]))
@@ -620,15 +823,20 @@ namespace M3AT
                     {
                         AddGroup(p.groups, piece.groups[i]);
                     }
+                    List<string> names, labels;   // again, as the lines may have added to a pack's groups
+                    LayerNames(def.apparel, out names, out labels);
+                    AsWhatItIs(p, PackLayers(names, labels), ShoulderLayers(names, labels));
                 }
                 else if (lineLayers.Length > 0 && piece.groups != null)
                 {
-                    p = new Profile { piece = g, tech = TechLevel.Undefined };
+                    p = new Profile { piece = g, tech = TechLevel.Undefined, text = (piece.name ?? "").ToLowerInvariant() };
                     p.layers.AddRange(lineLayers);
                     for (int i = 0; i < piece.groups.Length; i++)
                     {
                         AddGroup(p.groups, piece.groups[i]);
                     }
+                    List<string> names = new List<string>(lineLayers), labels = names.ConvertAll(x => "");
+                    AsWhatItIs(p, PackLayers(names, labels), ShoulderLayers(names, labels));
                 }
                 else
                 {
@@ -636,7 +844,7 @@ namespace M3AT
                 }
                 // Its kind (tech level, stuff, armour) from the apparel its like line names, if the game has it, over its
                 // def's: the shorts aren't behind the trousers on those alone, and the crop top isn't an Animal-tech
-                // undergarment because UnderWhere's tank top is.
+                // undergarment because UnderWhere's tank top is (as it was its garment once).
                 ThingDef like = piece.like != null ? DefDatabase<ThingDef>.GetNamedSilentFail(piece.like) : null;
                 if (like != null && like.apparel != null)
                 {
@@ -647,8 +855,13 @@ namespace M3AT
                     p.noble = kind.noble;
                 }
                 // Its name words are its own name's, not those of whichever def describes it (UnderWhere_Tanktop for
-                // the crop top).
+                // the tank top).
                 p.tokens = NameTokens(piece.name ?? "");
+                if (NoStandIn.Contains(piece.name ?? "") && piece.name.StartsWith("Hat"))
+                {
+                    // A NoStandIn hat needs "hat" too: the top hat's "top" alone was found in GrimWorld's topbanded helmet.
+                    p.tokens = new[] { "hat" }.Concat(p.tokens).ToArray();
+                }
                 p.name = piece.name;   // the garment's own name, which Generic goes by
                 p.namedOnly = NoStandIn.Contains(piece.name ?? "");
                 p.mask = Masks.Contains(piece.name ?? "");

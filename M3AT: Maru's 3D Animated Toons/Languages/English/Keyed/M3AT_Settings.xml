@@ -34,6 +34,10 @@
   <M3AT_AgingLooksTip>Older pawns get wrinkles in stages from their late forties, a stooped back from their late fifties (more with a bad back or frailty) and lose a little height; cataracts cloud the eye. Ages go by each race's life expectancy. Off: old pawns look young.</M3AT_AgingLooksTip>
   <M3AT_GreyingHair>Hair greys with age</M3AT_GreyingHair>
   <M3AT_GreyingHairTip>Hair fades to grey as pawns grow old, from where the game left it, so a pawn made dark-haired stays so until it ages further. A dye or other new hair colour shows as chosen and only greys again with more age. Pawns with genes that keep their hair from greying never grey. Only the drawing changes: the pawn's own hair colour is untouched.</M3AT_GreyingHairTip>
+  <M3AT_OtherRaces>Other races as 3D pawns (early)</M3AT_OtherRaces>
+  <M3AT_OtherRacesTip>Pawns of modded races (Ratkin, Milira and the like) are drawn as animated 3D pawns rather than flat pictures, unless an IsoRim pack already gives the race a 3D look. They get the race's skin colour, hair, clothes and face, and with the option below its ears, tails and the like. IsoRim's "Keep as paper" list still keeps any race flat.</M3AT_OtherRacesTip>
+  <M3AT_RaceParts>Race parts from their pictures</M3AT_RaceParts>
+  <M3AT_RacePartsTip>A modded race's ears, tails, horns, wings and the like are made into 3D shapes from the race's own pictures, so the race keeps its look on 3D pawns. They are rough stand-ins: a part that is thin in life may come out thick.</M3AT_RacePartsTip>
   <M3AT_BodyShapeStrength>Body shape strength</M3AT_BodyShapeStrength>
   <M3AT_BodyShapeStrengthTip>How strongly thin, fat and hulk bodies are shaped (default 100%). Lower makes them closer to an average build, higher exaggerates them; past 100% clothes may clip into the body. Also scales the builds from Varied bodies. Male and female shapes are unchanged.</M3AT_BodyShapeStrengthTip>
   <M3AT_VariedBodies>Varied bodies</M3AT_VariedBodies>
@@ -246,7 +250,7 @@ Before you start, point the camera at your colonists the way you usually play an
   <M3AT_FaceAcross>Left / right</M3AT_FaceAcross>
   <M3AT_FaceUp>Down / up</M3AT_FaceUp>
   <M3AT_FaceSize>Size</M3AT_FaceSize>
-  <M3AT_FaceReset>Reset this mod</M3AT_FaceReset>
+  <M3AT_FaceReset>Back to automatic</M3AT_FaceReset>
   <M3AT_FaceCopyOthers>Copy these numbers to this face's other mods</M3AT_FaceCopyOthers>
   <M3AT_FaceRestoreDefaults>Restore defaults (every face mod)</M3AT_FaceRestoreDefaults>
   <M3AT_FaceRestoreDefaultsConfirm>Put every face mod's faces back where they are drawn by default?</M3AT_FaceRestoreDefaultsConfirm>
@@ -256,7 +260,8 @@ Before you start, point the camera at your colonists the way you usually play an
   <M3AT_FaceTuningIntro>Move and size the animated faces on the 3D head. Each mod that draws faces (Facial Animation, its retextures, a race's own faces) is set on its own, and kept for everyone with that mod's faces, in every game. Select a pawn, then open the tool: these options close so the face can be seen.</M3AT_FaceTuningIntro>
   <M3AT_FaceTuningOpen>Open face tuning</M3AT_FaceTuningOpen>
   <M3AT_FaceTuningNeedsGame>Face tuning opens while playing on a map.</M3AT_FaceTuningNeedsGame>
-  <M3AT_FaceHelp>Changes show at once on everyone using this mod's faces. The mouth moves on top of the whole face.</M3AT_FaceHelp>
+  <M3AT_FaceHelp>Changes show at once on everyone using this mod's faces. The mouth moves on top of the whole face. M3AT fits other races' faces to the human layout by itself; once you tune a mod, it keeps the look you set even if that automatic fitting changes in an update. Back to automatic undoes your tuning for this mod.</M3AT_FaceHelp>
+  <M3AT_FaceTuneCleared>M3AT now fits {1} faces automatically, so your face tuning for {0} was reset. Tune it again in the face tool if it still needs it.</M3AT_FaceTuneCleared>
   <M3AT_FacePart_Head>head</M3AT_FacePart_Head>
   <M3AT_FacePart_Eyeball>eyes</M3AT_FacePart_Eyeball>
   <M3AT_FacePart_Lid>eyelids</M3AT_FacePart_Lid>
@@ -288,4 +293,25 @@ Before you start, point the camera at your colonists the way you usually play an
   <M3AT_GripRestoreDefault>Restore default for this weapon</M3AT_GripRestoreDefault>
   <M3AT_GripSeenStance>Where the hand goes when drafted.</M3AT_GripSeenStance>
   <M3AT_GripOffSeenStance>Where the other hand goes when drafted.</M3AT_GripOffSeenStance>
+  <M3AT_PowerArmourBulk>Power armour makes the wearer bigger</M3AT_PowerArmourBulk>
+  <M3AT_PowerArmourBulkTip>A pawn in power armour (Spacer-tech armour over the body, arms and legs, such as marine, cataphract and recon armour) is drawn bigger and broader, with a smaller head for its size, as the armoured giant it is. Off by default, as the game's own armour is worn by ordinary people.</M3AT_PowerArmourBulkTip>
+  <M3AT_ArmourBulk>Armoured size</M3AT_ArmourBulk>
+  <M3AT_ArmourBulkTip>How much bigger power armour draws its wearer, here and for GrimWorld 40,000's Space Marines (Mod compatibility). Default: {0} (a Space Marine of about 2.2 m to a person's 1.75).</M3AT_ArmourBulkTip>
+  <M3AT_CeilingCrouch>Taller than the ceiling</M3AT_CeilingCrouch>
+  <M3AT_CeilingCrouchTip>What a pawn drawn taller than the ceiling over it does indoors: crouch and stoop under it.
+
+Always: under any roof.
+
+When the floor above is shown (default): only while IsoRimZ draws the upper floor over it, as otherwise no ceiling is drawn for its head to go through.
+
+Never: it stands at its full height.</M3AT_CeilingCrouchTip>
+  <M3AT_CeilingAlways>Always crouch</M3AT_CeilingAlways>
+  <M3AT_CeilingFloorShown>When the floor above is shown</M3AT_CeilingFloorShown>
+  <M3AT_CeilingNever>Never crouch</M3AT_CeilingNever>
+  <M3AT_Compatibility>Mod compatibility</M3AT_Compatibility>
+  <M3AT_CompatibilityTip>Click to show or hide options for other mods' things.</M3AT_CompatibilityTip>
+  <M3AT_ArmourDrawScale>Armour drawn bigger makes the wearer bigger</M3AT_ArmourDrawScale>
+  <M3AT_ArmourDrawScaleTip>Body armour another mod draws scaled up when worn (such as GrimWorld 40,000's Custodes armour, 110%) draws its wearer that much bigger.</M3AT_ArmourDrawScaleTip>
+  <M3AT_MarineBulk>GrimWorld 40,000: Space Marines are giants</M3AT_MarineBulk>
+  <M3AT_MarineBulkTip>A pawn in GrimWorld 40,000's Space Marine or Custodes power armour is drawn bigger and broader, with a smaller head for its size, by the armoured size under Pawns. GrimWorld's Marines are ordinary pawns made Marines by their armour, so it is the armour that makes them big. Scout armour, the Sisters of Silence and Malcador's robes are left as they are.</M3AT_MarineBulkTip>
 </LanguageData>

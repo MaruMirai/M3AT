@@ -540,6 +540,7 @@ namespace M3AT
             public float pillAt;   // how far through the pill clip it is, 0 .. 1 (PillOf; kept as it eases out, so it stays down)
             public int pillTicks;   // game ticks the chew it is timed by takes (the most left of it seen)
             public float look;   // degrees the head is turned about the vertical, eased (LessonLookOf: at a lesson)
+            public float ceilingDrop;   // cells the head is brought down under a ceiling, eased (ArmourSize.cs, CeilingPose)
             public float talk;   // 0 .. 1: how far into talking it is (TalkOf: a board game, a speech)
             public float speaking;   // 0 .. 1: how much of a talking clip it was posed with this frame (the mouth moves, FaceLayers)
             public int speakingFrame = -1;   // the frame speaking was set on (Time.frameCount); other frames count as none
@@ -1002,17 +1003,26 @@ namespace M3AT
         }
 
         // A weapon that is itself thrown: the vanilla verb's throw log (as IsoRim marks one), or Combat
-        // Extended's grenades and pila, whose verbs CE replaces with its own (Verb_ShootCEOneUse, no throw log) and marks
-        // by tag instead. CE's disposable rocket launcher shares that verb, so the verb alone won't do.
+        // Extended's grenades and pila, whose verbs CE replaces with its own and marks by tag instead. CE's disposable
+        // launchers (its M72 LAW, other mods' AT4s) share the grenades' verb, Verb_ShootCEOneUse, and in the game that verb
+        // carries the throw log too, so a CE verb's log is not gone by: only its tags or the game's Grenades category,
+        // which CE's grenades are in and its launchers aren't (they were thrown like grenades, the rocket flicked from the hand).
         private static bool Thrown(ThingDef weapon)
         {
             if (weapon == null)
             {
                 return false;
             }
+            bool ceVerb = false;
             for (int i = 0; weapon.IsWeapon && weapon.Verbs != null && i < weapon.Verbs.Count; i++)
             {
-                RulePackDef log = weapon.Verbs[i].rangedFireRulepack;
+                VerbProperties verb = weapon.Verbs[i];
+                if (verb.verbClass != null && verb.verbClass.Namespace == "CombatExtended")
+                {
+                    ceVerb = true;
+                    continue;
+                }
+                RulePackDef log = verb.rangedFireRulepack;
                 if (log != null && log.defName == "Combat_RangedFire_Thrown")
                 {
                     return true;   // the vanilla verb's throw log, as IsoRim tells a thrown weapon
@@ -1026,6 +1036,11 @@ namespace M3AT
                     return true;
                 }
             }
+            if (ceVerb)
+            {
+                ThingCategoryDef grenades = DefDatabase<ThingCategoryDef>.GetNamedSilentFail("Grenades");
+                return grenades != null && weapon.IsWithinCategory(grenades);
+            }
             return false;
         }
 
@@ -1035,11 +1050,27 @@ namespace M3AT
         private static bool unarmedKnown;
 
         private const string StandInGrenade = "Weapon_GrenadeFrag";   // walk.THROW_PACK: the grenade the export poses
+        // The plain tube launcher the export poses (walk.DRAFTED, WEAPONS, AIMED), both fists upright under it; any other
+        // gun drawn as a plain tube with nothing of its own in the export (another mod's AT4) is held as it.
+        internal const string StandInTube = "CE_DisposableRocketLauncher";
+
+        // A two-handed gun whose art is a plain tube (GripFinder.IsTube: nothing hangs below a long thin body).
+        private static bool PlainTube(ThingDef weapon)
+        {
+            if (!weapon.IsRangedWeapon || Thrown(weapon) || KindOf(weapon) != "rifle")
+            {
+                return false;
+            }
+            Graphic g = weapon.graphicData != null ? weapon.graphicData.Graphic : null;
+            Material mat = g != null ? g.MatSingle : null;
+            return mat != null && GripFinder.IsTube(mat.mainTexture, weapon.equippedAngleOffset);
+        }
         private static readonly Dictionary<ThingDef, string> borrowed = new Dictionary<ThingDef, string>();
 
         // The weapon's own name in the export (walk.DRAFTED, walk.WEAPONS): its defName, a unique (Odyssey) or persona
-        // (Royalty) weapon's the plain one's, since they look the same, and a grenade the export doesn't name (Combat
-        // Extended's own, another mod's) the frag grenade's, so it is held and thrown as one.
+        // (Royalty) weapon's the plain one's, since they look the same, a grenade the export doesn't name (Combat
+        // Extended's own, another mod's) the frag grenade's, so it is held and thrown as one, and a plain tube launcher it
+        // doesn't name StandInTube's.
         private static string WeaponName(ThingDef weapon)
         {
             string name;
@@ -1052,6 +1083,11 @@ namespace M3AT
                 && skin.HoldOf(name) == null && skin.WeaponTypeOf(name) == null)
             {
                 name = StandInGrenade;
+            }
+            else if (skin != null && name != StandInTube && skin.Has("drafted_" + StandInTube) && !skin.Has("drafted_" + name)
+                && !skin.Has("aim_" + name) && skin.HoldOf(name) == null && skin.WeaponTypeOf(name) == null && PlainTube(weapon))
+            {
+                name = StandInTube;
             }
             if (skin != null)
             {
@@ -1322,6 +1358,7 @@ namespace M3AT
                     return;
                 }
                 Api.AddFigureDrawer(DrawFigure, FigureKinds.People);
+                AddRaceRule();   // other humanlike races as figures, with the otherRaces option (OtherRaces.cs)
                 Api.AddFacingHold(CuddledAnimal);
                 if (Api.Version >= 77)
                 {
@@ -1767,11 +1804,11 @@ namespace M3AT
             float grown = GrownAge(pawn);
             if (grown > 0f)
             {
-                return Mathf.Lerp(BirthSize, 1f, Growth.Evaluate(Mathf.Clamp01(pawn.ageTracker.AgeBiologicalYearsFloat / grown))) * ScaleUp * PawnSize * GenderSize(pawn) * HeightSize(pawn) * AgeSize(pawn);
+                return Mathf.Lerp(BirthSize, 1f, Growth.Evaluate(Mathf.Clamp01(pawn.ageTracker.AgeBiologicalYearsFloat / grown))) * ScaleUp * PawnSize * GenderSize(pawn) * HeightSize(pawn) * AgeSize(pawn) * ArmourSizeOf(pawn);
             }
             float factor = pawn.ageTracker != null && pawn.ageTracker.CurLifeStage != null ? pawn.ageTracker.CurLifeStage.bodySizeFactor : 1f;
             float size = Api.FigureSizeFor(factor);
-            return size * ScaleUp * PawnSize * GenderSize(pawn) * HeightSize(pawn) * AgeSize(pawn);
+            return size * ScaleUp * PawnSize * GenderSize(pawn) * HeightSize(pawn) * AgeSize(pawn) * ArmourSizeOf(pawn);
         }
 
         private const float MostGrownAge = 10000f;   // years: a life stage starting later than this is not one a pawn ages into (GrownAge)
@@ -1926,7 +1963,7 @@ namespace M3AT
         {
             if (pawn.genes == null)
             {
-                return null;
+                return HasRaceEars(pawn) ? new List<string> { NoHumanEarsKey } : null;
             }
             GeneDef[] defs = GeneKeyDefs();
             List<string> keys = null;
@@ -1937,7 +1974,7 @@ namespace M3AT
                     (keys = keys ?? new List<string>()).Add(GeneKeys[i]);
                 }
             }
-            if (EarFileOf(pawn) != null)
+            if (EarFileOf(pawn) != null || HasRaceEars(pawn))   // a gene's ears, or a race's built from its sprites (AddonParts.cs)
             {
                 (keys = keys ?? new List<string>()).Add(NoHumanEarsKey);
             }
@@ -1994,12 +2031,15 @@ namespace M3AT
             {
                 return skin.ShapeOf(BabyBody, null, 0f, shrink, 1f - BabyGrowth(pawn), 0f, limbs, null, genes);
             }
-            BodyTypeDef body = pawn.story.bodyType;
+            string body = BodyKeyOf(pawn.story.bodyType, pawn.gender);   // a race's own body type by its name (OtherRaces.cs)
+            // Bulked up by its armour (ArmourSize.cs): broader. Grown by it at all: its head shrunk to keep a normal pawn's size.
+            bool bulky = body != "Child" && ArmourBulky(pawn);
+            shrink = ArmouredHeadShrink(pawn, shrink);
             string gender = pawn.gender == Gender.Female ? "Female" : pawn.gender == Gender.Male ? "Male" : null;
             float spread = SettingsMod.Settings != null && SettingsMod.Settings.variedBodies ? SettingsMod.Settings.bodySpread : 0f;
             List<KeyValuePair<string, float>> builds;
             float strength = BodyShapeStrength;
-            if (spread > 0f && body != null && (builds = VariedBuild(pawn, body.defName, spread)) != null)
+            if (spread > 0f && body != null && (builds = VariedBuild(pawn, body, spread)) != null)
             {
                 for (int i = 0; i < builds.Count; i++)
                 {
@@ -2007,12 +2047,18 @@ namespace M3AT
                 }
                 // The gender's key whole, as a Male or Female body has it and a build is added on (GenderOnBuilds), and the
                 // builds on top; a child's on the base body, with no gender's.
-                string key = body.defName == "Child" ? null : gender ?? (body.defName == "Male" || body.defName == "Female" ? body.defName : null);
-                return skin.ShapeOf(key, null, 0f, shrink, 1f, PregnancyOf(pawn), limbs, builds, genes);
+                string key = body == "Child" ? null : gender ?? (body == "Male" || body == "Female" ? body : null);
+                return skin.ShapeOf(key, null, 0f, shrink, 1f, PregnancyOf(pawn), limbs, bulky ? ArmouredBuild(builds, body, strength) : builds, genes);
+            }
+            if (bulky)
+            {
+                // Its body type's own key (a Thin, Fat or Hulk one) as a build, under the armour's Hulk, on its gender's shape.
+                string key = gender ?? (body == "Male" || body == "Female" ? body : null);
+                return skin.ShapeOf(key, null, 0f, shrink, 1f, PregnancyOf(pawn), limbs, ArmouredBuild(null, body, strength), genes);
             }
             // A Thin, Fat or Hulk body's own key at the strength; a Male or Female one is a gender's shape, left whole.
-            float bodyAmount = body != null && System.Array.IndexOf(BuildKeys, body.defName) >= 0 ? strength : 1f;
-            return skin.ShapeOf(body != null ? body.defName : null, gender, GenderOnBuilds, shrink, bodyAmount, PregnancyOf(pawn), limbs, null, genes);
+            float bodyAmount = body != null && System.Array.IndexOf(BuildKeys, body) >= 0 ? strength : 1f;
+            return skin.ShapeOf(body, gender, GenderOnBuilds, shrink, bodyAmount, PregnancyOf(pawn), limbs, null, genes);
         }
 
         // Varied bodies (the mod options): the pawn's build as amounts of the Thin, Fat and Hulk keys, spread about its body
@@ -5955,6 +6001,10 @@ namespace M3AT
                     }
                 }
             }
+            // On a pawn in Space Marine armour, a garment with a version for it (PauldronsBig for the pauldrons) is drawn as
+            // that, for the armour's bulked-up shoulders.
+            ArmourPads(worn);
+            MarinePads(pawn, all, worn);
             // A held garment (a shield) only while CE would draw it: drafted, or a job or duty that shows the weapon. One
             // carried on the back the rest of the time (CarriedOnBack) is always drawn, in the hand or on the back.
             for (int g = 1; !shieldShows && g < skin.Pieces; g++)
@@ -6889,6 +6939,7 @@ namespace M3AT
             {
                 skin.DrawHorns(fig, horns, at, yaw, size);   // through the hair, but not through a hat
             }
+            DrawRaceParts(pawn, fig, mask, wornVersion, headless, at, yaw, size);   // a race's ears, tails, horns and wings from its sprites (AddonParts.cs)
             if (HasCatTail(pawn) && !fig.tucked)
             {
                 DrawCatTail(pawn, fig, mask, wornBuffer, at, yaw, size, sat, tailFloor, tailOnGround);
@@ -8208,7 +8259,10 @@ namespace M3AT
                 // drafted stance and less again aiming, as the trunk's bend takes the arms and weapon down with it.
                 float stooped = !lying && !crawling && flight < 0f && swim <= 0f && duck <= 0f && rise <= 0f
                     ? StoopOf(pawn) * Mathf.Lerp(1f, StoopDrafted, ease.drafted) * Mathf.Lerp(1f, StoopAiming, ease.aim) * (seated ? StoopSeated : 1f) : 0f;
-                skin.Stoop(fig, stooped);
+                // Under a ceiling it would stand taller than (ArmourSize.cs): crouched and, if need be, bent forward.
+                float ceilingCrouch, ceilingStoop;
+                CeilingPose(pawn, ease, size, !lying && !crawling && !seated && flight < 0f && swim <= 0f && duck <= 0f, out ceilingCrouch, out ceilingStoop);
+                skin.Stoop(fig, Mathf.Max(stooped, ceilingStoop));
                 if (seated && ease.share > 0f && ease.shareWay.sqrMagnitude > 1e-4f)
                 {
                     // At a shared reading: leant toward the other (on the figure's right if it lies to +x as the figure faces).
@@ -8471,7 +8525,7 @@ namespace M3AT
                     skin.Add(fig, skin.Variant("land", ease.landedRoll), 0f, crouch * land);
                     // Behind cover, or an old pawn's knees giving a little standing still (Aging.cs).
                     float aged = sat <= 0f ? AgeKnees * stooped / StoopMost * (1f - moving) : 0f;
-                    skin.Crouch(fig, Mathf.Max(cover, aged) * (1f - bend * (1f - onTheMove)) * land);
+                    skin.Crouch(fig, Mathf.Max(Mathf.Max(cover, aged) * (1f - bend * (1f - onTheMove)) * land, ceilingCrouch));
                     float stroke = swim > 0f ? StrokeOf(ease, moving) : moving;
                     skin.Add(fig, "swim", cycle, stroke * swim);
                     skin.Add(fig, "tread", LoopPhase(pawn, "tread"), (1f - stroke) * swim);

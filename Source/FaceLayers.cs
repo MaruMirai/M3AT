@@ -765,8 +765,7 @@ namespace M3AT
         // syllables (MouthOpen), Facial Animation's "open" mouth shape swapped in for whatever mouth it shows.
         public static void Draw(Pawn pawn, Patch patch, Vector3 position, float yaw, float size, EyeWound[] wounds = null, bool lowMouth = false, float speaking = 0f)
         {
-            float measured;
-            drawSpread = raceEyeSpreads.TryGetValue(pawn.def, out measured) ? measured : 0f;   // its eyes' layers, whichever comes first
+            TakeEyeFit(pawn);   // its eyes' layers fitted to a human's (FaceGaze.cs), whichever comes first
             if (patch == null || !Available || !Api.ViewReady)
             {
                 return;
@@ -836,12 +835,14 @@ namespace M3AT
                     }
                     else if (kind == "EyeballControllerComp")
                     {
-                        drawSpread = RaceEyeSpread(pawn, g);   // another race's eyes as far apart as a human's
+                        drawSpread = RaceEyeSpread(pawn, g);   // another race's eyes fitted to a human's
                     }
+                    shift.y += EyeRiseOf(kind);   // and moved up to a human's row
                     if (kind == "EyeballControllerComp" && f.layers[i].EndsWith("_Basic", StringComparison.Ordinal))
                     {
                         NoteEyeLayer(g, f.layers[i], shift);   // for a prosthetic eye's iris
-                        drawEyeTune = TuneOf(g, kind, 0f);     // and the eye wounds, tuned with the eyes
+                        NoteEyeMod(pawn, g);                   // and the mod its eyes' fit is pinned by (FacePins.cs)
+                        drawEyeTune = WithEyeFit(TuneOf(g, kind, 0f), kind);     // and the eye wounds, tuned with the eyes
                     }
                     if (!woundsDrawn)
                     {
@@ -963,7 +964,7 @@ namespace M3AT
         // One layer: drawn now, or kept for DrawStacked.
         private static void Layer(bool stacking, Graphic g, string kind, string layer, int cut, Vector2 shift, Patch patch, Mesh mouth, Matrix4x4 placed, ref int place)
         {
-            Vector3 tune = TuneOf(g, kind, mouth == patch.mouthLow ? MouthRaisePig : MouthRaise);
+            Vector3 tune = WithEyeFit(TuneOf(g, kind, mouth == patch.mouthLow ? MouthRaisePig : MouthRaise), kind);   // a race's eyes at a human's size (FaceGaze.cs)
             if (stacking)
             {
                 calls.Add(new LayerCall { g = g, kind = kind, layer = layer, cut = cut, shift = shift, tune = tune });

@@ -31,11 +31,12 @@ TECH_STEP = 2   # levels apart at which SAME_TECH is gone
 PAIR_COST = 0.03
 SAME_STUFF = 0.03
 NAME_WORDS = 0.15
+HEAD_NOUN = 0.5   # more for a garment the apparel's label ends on (head_noun)
 GENERIC_BONUS = 0.03
 CHILD_ONLY_SHARE = 0.7
 NARROW_SHARE = 0.7
 # A narrower kind of a plain garment: behind it on coverage alone, unless the apparel's name says so (StandIns.cs).
-NARROW = {'CropTop', 'Shorts', 'ShortShorts'}
+NARROW = {'CropTop', 'Tanktop', 'Shorts', 'ShortShorts'}
 WEIGHT = {'Torso': 3, 'Legs': 3, 'Arms': 2, 'Shoulders': 1, 'Neck': 0.5, 'Waist': 1, 'Hands': 1, 'Feet': 1,
           'UpperHead': 3, 'Eyes': 2, 'Mouth': 2, 'FullHead': 1}
 SAME = {'Teeth': 'Mouth', 'LeftShoulder': 'Shoulders', 'RightShoulder': 'Shoulders', 'LeftHand': 'Hands',
@@ -61,15 +62,17 @@ NO_STAND_IN = {
     'CE_SimpleNightVision', 'CE_AdvancedNightVision', 'Scarf'}
 # Other words naming the same thing as a NO_STAND_IN garment's name word, and phrases holding it that don't (StandIns.cs).
 NAME_ALIKE = {'frame': ('exoskelet', 'exosuit'),   # CE's exoframe is any exoskeleton (StandIns.cs)
+              'radio': ('vox', 'comms', 'transceiver', 'communicat'),   # CE's radio pack is any pack with a radio
               'scarf': ('neckerchief', 'kerchief', 'muffler', 'shemagh', 'keffiyeh', 'snood'),
               'short': ('hotpant', 'hot pant'),   # hotpants are the short shorts, not the shorts
-              'crop': ('tank top', 'tanktop', 'halter', 'tube top')}
+              'crop': ('halter', 'tube top'),
+              'tanktop': ('tank top', 'singlet', 'camisole')}   # a tank top is the tank top's, not the crop top's
 NAME_NOT = {'scarf': ('headscarf', 'head scarf'), 'pants': ('hotpant', 'underpant')}
 # A NO_STAND_IN garment named by the apparel is the thing itself: coverage at least NAMED_COVER, NAMED_BONUS ahead.
 NAMED_COVER = 0.5
 NAMED_BONUS = 1.0
 GENERIC = {'BasicShirt', 'Pants', 'Jacket', 'Duster', 'FlakVest', 'SimpleHelmet', 'AdvancedHelmet', 'Tuque', 'CollarShirt',
-           'PowerArmor', 'Parka', 'GasMask', 'ClothMask'}
+           'PowerArmor', 'Parka', 'GasMask', 'ClothMask', 'CE_Backpack'}
 # Garments over the face, standing in only for apparel named as one (MASK_WORDS): mods give plain hats FullHead.
 MASKS = {'GasMask', 'ClothMask', 'WarMask', 'VisageMask', 'WarVeil', 'CultistMask', 'CeremonialCultistMask'}
 MASK_WORDS = ('mask', 'respirator', 'balaclava', 'veil')
@@ -147,7 +150,8 @@ def mod_folders(mod, version='1.7'):
         m = re.fullmatch(r'v?(\d+)\.(\d+)', t)
         return (int(m.group(1)), int(m.group(2))) if m else None
     want = ver(version)
-    lf = os.path.join(mod, 'LoadFolders.xml')
+    # (found whatever its case, as the game does: many mods ship loadFolders.xml)
+    lf = next((os.path.join(mod, n) for n in os.listdir(mod) if n.lower() == 'loadfolders.xml'), os.path.join(mod, 'LoadFolders.xml'))
     if os.path.exists(lf):
         try:
             root = ET.parse(lf).getroot()
@@ -240,12 +244,80 @@ def under(layer):
     return 'Underwear' if LAYER_ORDER.get(layer, 0) < LAYER_ORDER['OnSkin'] else layer
 
 
+# A pack: apparel worn only on a backpack layer (CE's and GrimWorld's Backpack, Ratkin's BackPack), or named a backpack,
+# whatever its groups (Torso, Shoulders, Waist): matched as PACK_LAYER over PACK_GROUP alone, so every pack takes a pack
+# garment. Webbing: apparel named as it (WEBBING_WORDS), not a pack, matched as CE's tactical vest is (its Webbing layer,
+# Torso), as GrimWorld's combat webbing (Shell, Belt, the whole body) was drawn as nothing or a robe (StandIns.cs).
+PACK_LAYER, PACK_GROUP = 'Backpack', 'Back'
+WEBBING_LAYER = 'Webbing'
+SHOULDER_LAYER = 'Shoulder'
+WEBBING_WORDS = ('webbing', 'chest rig', 'load bearing', 'load-bearing')
+
+
+def pack_layer(layer):
+    return 'backpack' in (layer + ' ' + LAYER_LABEL.get(layer, '')).lower()
+
+
+def all_pack_layers(layers):
+    """Worn on a backpack layer and nothing else but the belt (a jump pack is on both)."""
+    return any(pack_layer(x) for x in layers) and all(pack_layer(x) or x == 'Belt' for x in layers)
+
+
+# Never a pack, whatever its layer: GrimWorld's scout cape is worn on the backpack layer.
+NOT_PACK_WORDS = ('cape', 'cloak')
+# A pack of power armour: one of SPACER_TECH or later fitted over the neck and shoulders too (GrimWorld's Space Marine
+# packs), which the power armour garments draw with their own backpack, so it takes no stand-in (a canvas pack on it).
+SPACER_TECH = ('Spacer', 'Ultra', 'Archotech')
+
+
+def words_of(def_name):
+    """A defName as words, lower case: ElysianHelmetOpen held "top" run together (StandIns.cs's WordsOf)."""
+    return re.sub(r'([a-z])([A-Z])', r'\1 \2', def_name.replace('_', ' ')).lower()
+
+
+def text_of(d):
+    return words_of(d['name']) + ' ' + d['label'].lower()
+
+
+def is_pack(text, layers):
+    return (all_pack_layers(layers) or 'backpack' in text) and not any(w in text for w in NOT_PACK_WORDS)
+
+
+def armour_pack(d):
+    return d['tech'] in SPACER_TECH and {'Neck', 'Shoulders'} <= groups_of(d['groups'])
+
+
+def is_webbing(text):
+    return any(w in text for w in WEBBING_WORDS)
+
+
+def as_what_it_is(p, layers):
+    """Packs, webbing and eyewear matched as what they are, their layers and groups replaced (StandIns.cs's AsWhatItIs).
+    Worn only over the eyes (EyeCover): goggles, glasses, a visor or headset, matched as over the eyes alone, as one with
+    UpperHead (the enginseer's goggles, a headset) took the simple helmet."""
+    if is_webbing(p['text']):
+        p.update(layers=[WEBBING_LAYER], groups={'Torso'})
+    elif is_pack(p['text'], layers):
+        p.update(layers=[PACK_LAYER], groups={PACK_GROUP})
+    elif all_pack_layers(layers):
+        p['layers'] = ['Shell']   # a cape or cloak worn on the backpack layer: over the clothes
+    elif layers and all('shoulder' in (x + ' ' + LAYER_LABEL.get(x, '')).lower() for x in layers):
+        p.update(layers=[SHOULDER_LAYER], groups={'Shoulders'})   # pauldrons (GrimWorld's GW_Shoulder)
+    elif p['layers'] and all(x == 'EyeCover' for x in p['layers']) and p['groups']:
+        p['groups'] = {'Eyes'}
+    return p
+
+
 def profile(d):
+    return as_what_it_is(_profile(d), d['layers'])
+
+
+def _profile(d):
     return dict(def_=d, mask=any(w in (d['name'] + ' ' + d['label']).lower() for w in MASK_WORDS),
                 name=d['name'], layers=list(dict.fromkeys(under(x) for x in d['layers'])), groups=groups_of(d['groups']),
                 armour=any('armor' in c.lower() for c in d['cats']), noble=any('noble' in c.lower() for c in d['cats']),
                 vacsuit='Vacsuit' in d['tags'] or 'vacsuit' in d['name'].lower(), child='Adult' not in d['stage'],
-                tech=d['tech'], stuff=set(d['stuff']), text=(d['name'] + ' ' + d['label']).lower())
+                tech=d['tech'], stuff=set(d['stuff']), text=text_of(d))
 
 
 def tokens(def_name):
@@ -253,9 +325,29 @@ def tokens(def_name):
     return [t.lower() for t in re.findall(r'[A-Z][a-z]+|[a-z]+', n) if len(t) >= 3 and t.lower() not in COMMON_WORDS]
 
 
+def garment_tokens(name):
+    """A garment's name words; a NO_STAND_IN hat's keep "hat", as the top hat's "top" alone was found in topbanded."""
+    words = tokens(name)
+    return ['hat'] + words if name in NO_STAND_IN and name.startswith('Hat') else words
+
+
 def never(d):
-    return any(l == 'Belt' or 'shield' in l.lower() for l in d['layers']) \
-        or any('shield' in c.lower() for c in d['cats']) or 'CompProperties_Shield' in d['comps']
+    """Shields (by layer or category); anything on the belt or energy-shielding unless also worn on a body layer, and
+    for a shield in it covering the arms or legs too (Terminator armour lists the belt, Custodes plate has a shield in
+    it; Biotech's heavy shield unit, Middle over the torso, is a shield); power armour's packs (armour_pack). A pack or
+    webbing on the belt (as_what_it_is) takes a pack or webbing garment."""
+    text = text_of(d)
+    if is_webbing(text):
+        return False
+    if is_pack(text, d['layers']):
+        return armour_pack(d)
+    if all_pack_layers(d['layers']):
+        return False
+    if any('shield' in l.lower() for l in d['layers']) or any('shield' in c.lower() for c in d['cats']):
+        return True
+    body = any(under(l) in BODY for l in d['layers'])
+    limbs = bool({'Arms', 'Legs'} & set(d['groups']))
+    return (not body and 'Belt' in d['layers']) or ('CompProperties_Shield' in d['comps'] and not (body and limbs))
 
 
 def layer_share(a, g):
@@ -292,9 +384,26 @@ def factors(a, g):
     if a['stuff'] & g['stuff']:
         plus += SAME_STUFF
     plus += NAME_WORDS * named
+    if named >= 1 and head_nouns(a['def_']['label']) & {singular(x) for x in g['tokens']}:
+        plus += HEAD_NOUN
     if g['garment'] in GENERIC:
         plus += GENERIC_BONUS
     return times, plus
+
+
+def head_nouns(label):
+    """The last word of a label and the word before its first "of", lower case, without a plural s and anything in
+    brackets: what the apparel is (a priest robe is a robe, a psyker jacket a jacket, robes of Malcador robes), which
+    says more than its groups, as many mods give a long coat the groups of plate armour (StandIns.cs's HeadNouns)."""
+    words = re.findall(r'[a-z]+', re.sub(r'\(.*?\)', ' ', label.lower()))
+    out = {singular(words[-1])} if words else set()
+    if 'of' in words[1:]:
+        out.add(singular(words[words.index('of', 1) - 1]))
+    return out
+
+
+def singular(w):
+    return w[:-1] if len(w) > 3 and w.endswith('s') and not w.endswith('ss') else w
 
 
 def name_found(text, t):
@@ -317,9 +426,15 @@ def usable(a, g):
         and (g['garment'] not in OPEN_FRONTS or open_front_share(a['def_']) >= OPEN_FRONT_LEAST)
 
 
+# Headgear whose label says it is one of these is a hat even if armour: GrimWorld's Space Marine hoods cover the whole
+# head as armour and took the power armour helmet.
+HAT_NOUNS = {'hood', 'cap', 'hat', 'beret', 'bandana', 'headwrap', 'turban', 'bonnet'}
+
+
 def as_hat(a):
-    """Unarmoured headgear not named as a mask is matched as a hat, whatever of the face its groups say."""
-    if not a['armour'] and not a['mask'] and 'UpperHead' in a['groups']:
+    """Unarmoured headgear not named as a mask, or headgear named a hat (HAT_NOUNS), is matched as a hat, whatever of
+    the face its groups say."""
+    if (not a['armour'] or head_nouns(a['def_']['label']) & HAT_NOUNS) and not a['mask'] and 'UpperHead' in a['groups']:
         a['groups'] = a['groups'] - {'Eyes', 'Mouth'}
     return a
 
@@ -399,10 +514,12 @@ def main():
             g = profile(d)
             g['layers'] += [x for x in lines.get('layer', []) if x not in g['layers']]   # its lines add layers and groups
             g['groups'] |= groups_of(lines.get('groups', []))
+            as_what_it_is(g, d['layers'])   # again, as the lines may have added to a pack's groups
         elif lines.get('layer') and lines.get('groups'):
             # No apparel of its own on disk: by its layer (one or more) and groups lines, as StandIns.cs.
             g = dict(mask=False, armour=False, noble=False, vacsuit=False, child=False, tech=None, stuff=set(),
                      layers=lines['layer'], groups=groups_of(lines['groups']), text=name.lower())
+            as_what_it_is(g, lines['layer'])
         else:
             continue
         # Its kind (tech level, stuff, armour) from the apparel its like line names, if there, over its def's.
@@ -410,7 +527,7 @@ def main():
         if like:
             k = profile(like)
             g.update(tech=k['tech'], stuff=k['stuff'], armour=k['armour'], noble=k['noble'])
-        g.update(name=name, garment=name, tokens=tokens(name), named_only=name in NO_STAND_IN)
+        g.update(name=name, garment=name, tokens=garment_tokens(name), named_only=name in NO_STAND_IN)
         garments.append(g)
     for name in sorted(defs):
         d = defs[name]

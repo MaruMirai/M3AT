@@ -1,13 +1,13 @@
 # M3AT: the garment CropTop on the chibi (SkinnedFigure.cs), game model space, as skin.txt.
 # defs: the apparel it is drawn for. layer and groups (if any): it also stands in for apparel with no garment of
 # its own worn on that layer and covering one of those body part groups.
-defs UnderWhere_Tanktop
+defs Apparel_CropTop
 layer Underwear OnSkin
 groups Torso Shoulders
 # like: the apparel its kind (tech level, stuff) is taken from when none of its defs is loaded.
 like Apparel_BasicShirt
 # stands_for: apparel it is drawn for as a stand-in whatever the scoring says.
-stands_for Kiiro_Underwear_Normal Kiiro_Stocking_Black Kiiro_Stocking_White Kiiro_Pantynose_Black Kiiro_Pantynose_White Kiiro_TShirtShort
+stands_for Kiiro_TShirtShort Kiiro_RunningShirt
 # texture: its image (t lines, a place on it per vertex); tint: whether the apparel's colour tints it.
 texture garment_BasicShirt.png
 # hide k ...: body triangles (skin.txt's f lines, from 0) left out while it is worn.

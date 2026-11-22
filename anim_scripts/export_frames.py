@@ -66,13 +66,13 @@ GARMENT_PROPS = {
     # --phoenix), the locust armour, a recon base, with boosters on its boots (make_locust.py), and Biotech's mechlord
     # suit, a recon base with fins, blades and a core (make_mechlord.py). Marine armour's helmet also stands in for
     # Odyssey's vacsuit helmet (its suit has a garment of its own, make_vacsuit.py).
-    'PowerArmor': {'hide_body': True, 'hard': True, 'solid_parts': 'marine_backpack',
+    'PowerArmor': {'hide_body': True, 'pads': True, 'hard': True, 'solid_parts': 'marine_backpack',
                    'defs': 'Apparel_PowerArmor'},
     # The grenadier armour (make_grenadier.py): the marine armour with a launcher tube over the left shoulder, weighted as
     # one piece to the chest in the file.
-    'ArmorMarineGrenadier': {'hide_body': True, 'hard': True, 'part_weights': True, 'solid_parts': 'marine_backpack'},
+    'ArmorMarineGrenadier': {'hide_body': True, 'pads': True, 'hard': True, 'part_weights': True, 'solid_parts': 'marine_backpack'},
     # Prestige marine armour: the marine armour's mesh with gold scrollwork painted on (prestige_paint.py), its own file.
-    'PowerArmorPrestige': {'hide_body': True, 'hard': True, 'solid_parts': 'marine_backpack',
+    'PowerArmorPrestige': {'hide_body': True, 'pads': True, 'hard': True, 'solid_parts': 'marine_backpack',
                            'defs': 'Apparel_ArmorMarinePrestige'},
     # The vacsuit helmet has a garment of its own (VacsuitHelmet), so this is the marine helmet's only.
     'PowerArmorHelmet': {'hard': True, 'defs': 'Apparel_PowerArmorHelmet'},
@@ -94,14 +94,14 @@ GARMENT_PROPS = {
     # mechlord's), its visor kept.
     'ArmorHelmetMechCommander': {'hard': True, 'hide_hair': True, 'hide_face': False},
     'ArmorHelmetMechlordHelmet': {'hard': True, 'hide_hair': True, 'hide_face': False},
-    'ArmorCataphract': {'hide_body': True, 'hard': True, 'solid_parts': 'cataphract_backpack',
+    'ArmorCataphract': {'hide_body': True, 'pads': True, 'hard': True, 'solid_parts': 'cataphract_backpack',
                         'defs': 'Apparel_ArmorCataphract'},
     # Prestige cataphract armour: the cataphract armour's mesh with gold scrollwork painted on (prestige_paint.py).
-    'ArmorCataphractPrestige': {'hide_body': True, 'hard': True, 'solid_parts': 'cataphract_backpack',
+    'ArmorCataphractPrestige': {'hide_body': True, 'pads': True, 'hard': True, 'solid_parts': 'cataphract_backpack',
                                 'defs': 'Apparel_ArmorCataphractPrestige'},
     # The phoenix armour (make_grenadier.py --phoenix): the cataphract armour with a flamebolt launcher behind the left
     # shoulder, weighted as one piece to the chest in the file.
-    'ArmorCataphractPhoenix': {'hide_body': True, 'hard': True, 'part_weights': True, 'solid_parts': 'cataphract_backpack'},
+    'ArmorCataphractPhoenix': {'hide_body': True, 'pads': True, 'hard': True, 'part_weights': True, 'solid_parts': 'cataphract_backpack'},
     'ArmorHelmetCataphract': {'hide_head': True, 'hard': True},
     # The prestige helmets (make_prestige_helmets.py): the plain ones with gold added after the game's sprites, a crest
     # across the marine's, wings on the recon's, the cataphract's face gilded with a fin on top. Each is drawn for the
@@ -181,6 +181,23 @@ GARMENT_PROPS['Collar'] = {'hide_hair': False, 'hide_face': False}
 # palette is pale, so always tinted, as a mod's scarf may be neither made of stuff nor dyed.
 GARMENT_PROPS['Scarf'] = {'hide_hair': False, 'hide_face': False, 'tint': True}
 GARMENTS['Scarf'] = ('Overhead OnSkin Middle Shell', 'Neck')
+# Combat Extended's packs and tactical vest also stand in for other mods' packs and webbing without CE loaded, when no
+# def of theirs is there to describe them (StandIns.cs's AsWhatItIs matches any pack as on the Backpack layer, webbing
+# as on the Webbing layer over the Torso); without CE's defs the plain pack wins a tie (GENERIC).
+GARMENTS['CE_Backpack'] = ('Backpack', 'Shoulders')
+GARMENTS['CE_TribalBackpack'] = ('Backpack', 'Shoulders')
+GARMENTS['CE_RadioPack'] = ('Backpack', 'Shoulders')
+GARMENTS['CE_TacVest'] = ('Webbing', 'Torso')
+# GrimWorld 40,000's shoulder pads (its GW_Shoulder layer, over its power armour): make_pauldrons_from.py's pads (Maru's
+# own, mirrored), each one piece on its shoulder and upper arm (part_weights), stand in for anything worn only on a
+# shoulder layer (StandIns.cs's AsWhatItIs matches it as on the Shoulder layer over the Shoulders). PauldronsBig, the pad's
+# Big key, is no stand-in itself (no layer line, no def of its own): its marine_of line has it drawn in Pauldrons' place on
+# a pawn in Space Marine armour (WalkFigures.MarinePads), whose shoulders are bulked up.
+# The marine and cataphract armour and their variants (their 'pads' property) are drawn with the Pauldrons too, without
+# GrimWorld (WalkFigures.ArmourPads), in the armour's colour.
+GARMENTS['Pauldrons'] = ('Shoulder', 'Shoulders')
+GARMENT_PROPS['Pauldrons'] = {'hard': True, 'part_weights': True}
+GARMENT_PROPS['PauldronsBig'] = {'hard': True, 'part_weights': True, 'marine_of': 'Pauldrons'}
 # The Furskin gene's tufts (anim_scripts/make_fur_edges.py): drawn for the gene, not for apparel (its def is no apparel's, and
 # SkinnedFigure.FurPiece finds it by that name). "fur": the body stays whole under it, as its skin is the undercoat, and
 # it is written with the normals of the skin under each vertex, so the tufts are lit as the skin is and their roots melt into it.
@@ -213,9 +230,11 @@ for _shield, _standoff in (('CE_MeleeShield', 1.25), ('CE_BallisticShield', 1.75
 # the leg struts and joint discs whole on their bones, so "part_weights" keeps them all but the belt's and cuffs'.
 GARMENT_PROPS['CE_ExoFrame'] = {'hard': True, 'part_weights': True}
 # Underwear and light clothes (Models/garments: briefs, a bandeau, a sleeveless crop top, mid-thigh shorts and short
-# shorts). Four are UnderWhere's own (Malistaticy.UnderWhere: its Underwear and UnderwearTop layers, under the skin
-# layer): the briefs its panties, the shorts its boxers, the crop top its tank top, the bandeau its chest wrap; its bra,
-# loincloth take stand-ins. The long johns (make_underwear.py's, the collared shirt's and trousers' body faces whole,
+# shorts, a tank top, a bra and a loincloth). Each of UnderWhere's (Malistaticy.UnderWhere: its Underwear and
+# UnderwearTop layers, under the skin layer) has its own: the briefs its panties, the shorts its boxers, the bandeau its
+# chest wrap, and make_underwear.py's tank top (the crop top carried down to the basic shirt's hem, as its sprite:
+# the crop top bared the midriff), bra (plain, as the bandeau) and loincloth (the briefs with a ragged flap hung
+# front and back, with weights of their own, part_weights) its tank top, bra and loincloth. The long johns (make_underwear.py's, the collared shirt's and trousers' body faces whole,
 # painted a waffle-knit union suit by paint_long_johns.py) are its long johns. Each also stands in for other mods' apparel by its layer and groups
 # (GARMENTS; the game takes any layer drawn under OnSkin as "Underwear", StandIns.cs), the crop top and shorts as
 # outer clothes too. A garment whose def is loaded is described by that def, its layer line adding layers, as
@@ -223,7 +242,10 @@ GARMENT_PROPS['CE_ExoFrame'] = {'hard': True, 'part_weights': True}
 # trousers on those alone.
 for _under, _def, _layers, _groups, _like in (('Underwear', 'UnderWhere_Panties', 'Underwear', 'Legs', 'Apparel_Pants'),
                                               ('Shorts', 'UnderWhere_Boxers', 'Underwear OnSkin', 'Legs', 'Apparel_Pants'),
-                                              ('CropTop', 'UnderWhere_Tanktop', 'Underwear OnSkin', 'Torso,Shoulders', 'Apparel_BasicShirt'),
+                                              ('CropTop', None, 'Underwear OnSkin', 'Torso,Shoulders', 'Apparel_BasicShirt'),
+                                              ('Tanktop', 'UnderWhere_Tanktop', 'Underwear OnSkin', 'Torso', 'Apparel_BasicShirt'),
+                                              ('Bra', 'UnderWhere_Bra', 'Underwear', 'Torso', 'Apparel_BasicShirt'),
+                                              ('Loincloth', 'UnderWhere_Loincloth', 'Underwear', 'Legs', 'Apparel_TribalA'),
                                               ('Chestwrap', 'UnderWhere_Chestwrap', 'Underwear', 'Torso', 'Apparel_BasicShirt'),
                                               ('ShortShorts', None, 'OnSkin', 'Legs', 'Apparel_Pants'),
                                               ('LongJohns', 'UnderWhere_LongJohns', 'Underwear', 'Torso,Legs', 'Apparel_Pants')):
@@ -231,19 +253,49 @@ for _under, _def, _layers, _groups, _like in (('Underwear', 'UnderWhere_Panties'
     if _def:
         GARMENT_PROPS[_under]['defs'] = _def
     GARMENTS[_under] = (_layers, _groups)
+GARMENT_PROPS['Loincloth']['part_weights'] = True
 # Apparel stood in for by name, whatever the scoring says (a "stands_for" line; every garment naming it is drawn): what
 # the defs can't tell apart. Kiiro's (Kiiro_Race) underwear is a bra and briefs, its simple underwear a bandeau and
 # briefs, its stockings a bra, briefs and thigh-high stockings and its pantyhose a bra and tights (the trousers), and
-# its short T-shirt a cropped tee, by their sprites.
+# its short T-shirt and running shirt cropped tops (the running shirt took the crop top by its scores only while the crop
+# top was described by UnderWhere's tank top), by their sprites.
 STANDS_FOR = {
-    'CropTop': ('Kiiro_Underwear_Normal', 'Kiiro_Stocking_Black', 'Kiiro_Stocking_White', 'Kiiro_Pantynose_Black',
-                'Kiiro_Pantynose_White', 'Kiiro_TShirtShort'),
+    'Bra': ('Kiiro_Underwear_Normal', 'Kiiro_Stocking_Black', 'Kiiro_Stocking_White', 'Kiiro_Pantynose_Black',
+            'Kiiro_Pantynose_White'),
+    'CropTop': ('Kiiro_TShirtShort', 'Kiiro_RunningShirt'),
     'Chestwrap': ('Kiiro_SimpleUnderwear',),
     'Underwear': ('Kiiro_Underwear_Normal', 'Kiiro_SimpleUnderwear', 'Kiiro_Stocking_Black', 'Kiiro_Stocking_White'),
     'Pants': ('Kiiro_Stocking_Black', 'Kiiro_Stocking_White', 'Kiiro_Pantynose_Black', 'Kiiro_Pantynose_White'),
     # Vanilla Weapons Expanded - Heavy Weapons' exoskeleton frame, on the Belt layer, which is never otherwise stood in for.
     'CE_ExoFrame': ('VWE_Apparel_Exoframe',),
 }
+# GrimWorld 40,000's headgear the scoring can't place, by their sprites: its scout helmets are an ear piece with an
+# antenna and a mic (the airwire headset), with a rangefinder over the eye (the gunlink) or with twin lenses (CE's
+# advanced night vision); the Emperor's laurels a band; its masks over the face or its lower half; the Death Korps of
+# Krieg's stahlhelm and gas mask the gas mask with the advanced helmet (its sides and back come down as a stahlhelm's
+# do; the simple helmet's brim is flat all round), its commissar's the gas mask with the peaked cap; the Kasrkin's
+# helmet, goggles and rebreather the gas mask with the simple helmet, as the Cadian helmet is.
+_GW_KRIEG = ('GW_HOI_DM_KriegGuardHelmet', 'GW_HOI_DM_KriegGrenadierHelmet', 'GW_HOI_DM_KriegEngineerHelmet',
+             'GW_HOI_DM_KriegOfficerHelmet')
+for _name, _defs in {
+        'AirwireHeadset': ('GW_SM_ScoutHelmet_A', 'GW_SM_ScoutHelmet_C'),
+        'Gunlink': ('GW_SM_ScoutHelmet_B', 'GW_SM_ScoutHelmet_D'),
+        'CE_AdvancedNightVision': ('GW_SM_ScoutHelmet_E',),
+        'Coronet': ('GW_Rulers_EmperorHelmet', 'GW_Rulers_EmperorHelmetW'),
+        'VisageMask': ('GW_HOI_ROR_LuciferBlackMask',),
+        'ClothMask': ('GW_TotE_VenatariHelmet', 'GW_TotE_SoSHelmetB'),
+        'GasMask': _GW_KRIEG + ('GW_HOI_DM_KriegCommissarHelmet', 'GW_HOI_CadianKasrkin_Helmet'),
+        'AdvancedHelmet': _GW_KRIEG,
+        'AuthorityCap': ('GW_HOI_DM_KriegCommissarHelmet',),
+        'SimpleHelmet': ('GW_HOI_CadianKasrkin_Helmet',),
+        # Its hand-held shields (the shield layer, which never takes a stand-in): the small combat shields as CE's melee
+        # shield, the rest, storm shields and the tall plates of the Custodes and Primaris, as its ballistic shield.
+        'CE_MeleeShield': ('GW_SM_CombatShieldA', 'GW_SM_CombatShieldB', 'GW_SM_CombatShieldC', 'GW_SM_CombatShieldD'),
+        'CE_BallisticShield': ('GW_SM_StormShieldA', 'GW_SM_StormShieldB', 'GW_SM_StormShieldC', 'GW_SM_StormShieldD',
+                               'GW_SM_PrimarisShield', 'GW_SM_SalamanderShield', 'GM_SS_ShieldLionsC', 'GM_SS_ShieldLionsW',
+                               'GM_TotE_ShieldPraesidium', 'GM_TotE_ShieldSCaptain'),
+        }.items():
+    STANDS_FOR[_name] = STANDS_FOR.get(_name, ()) + _defs
 for _name, _defs in STANDS_FOR.items():
     GARMENT_PROPS.setdefault(_name, {})['stands_for'] = ' '.join(_defs)
 # Garments that keep the weights on them: loose ones standing well off the skin, which on the body's weights stretch
@@ -1126,6 +1178,12 @@ def write_garment(g, path):
         if props.get('baby_romper', False):
             f.write('# baby_romper: worn by a baby a few hours old with nothing over its trunk or legs.\n')
             f.write('baby_romper yes\n')
+        if props.get('pads', False):
+            f.write('# pads: worn with the Pauldrons garment (its own colour), unless apparel of its own has them drawn.\n')
+            f.write('pads yes\n')
+        if props.get('marine_of'):
+            f.write('# marine_of: drawn in place of that garment on a pawn in Space Marine armour.\n')
+            f.write('marine_of %s\n' % props['marine_of'])
         if 'colour' in props:
             f.write('colour %.3f %.3f %.3f\n' % tuple(props['colour'])[:3])
         if props.get('held', False):

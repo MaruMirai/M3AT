@@ -34,6 +34,10 @@
   <M3AT_AgingLooksTip>年长的小人从四十多岁起逐步出现皱纹，五十多岁后背部渐渐佝偻（背痛或虚弱时更甚），身高也略有降低；白内障会使眼睛浑浊。年龄按各种族的预期寿命计算。关闭：老人看起来和年轻人一样。</M3AT_AgingLooksTip>
   <M3AT_GreyingHair>头发随年龄变白</M3AT_GreyingHair>
   <M3AT_GreyingHairTip>小人变老时头发逐渐变灰，从游戏设定的颜色开始，所以生成时是深色头发的小人会保持深色，直到继续变老。染发或其他新的发色会按所选颜色显示，之后随年龄增长才再次变灰。拥有防止头发变白基因的小人永远不会变灰。只改变绘制效果：小人本身的发色不会被修改。</M3AT_GreyingHairTip>
+  <M3AT_OtherRaces>其他种族显示为3D小人（早期）</M3AT_OtherRaces>
+  <M3AT_OtherRacesTip>模组种族（鼠族、米莉拉等）的小人会显示为带动画的3D小人，而不是平面图片，除非已有IsoRim扩展包为该种族提供3D外观。它们会使用该种族的肤色、头发、服装和面部；开启下方选项时还会有耳朵、尾巴等部件。IsoRim的"保持纸片"列表仍可让任意种族保持平面。</M3AT_OtherRacesTip>
+  <M3AT_RaceParts>根据图片生成种族部件</M3AT_RaceParts>
+  <M3AT_RacePartsTip>模组种族的耳朵、尾巴、角、翅膀等会根据该种族自己的图片生成3D形状，让种族在3D小人上保持其外观。它们只是粗略的替代：现实中很薄的部件可能会显得较厚。</M3AT_RacePartsTip>
   <M3AT_BodyShapeStrength>体型强度</M3AT_BodyShapeStrength>
   <M3AT_BodyShapeStrengthTip>瘦弱、肥胖和魁梧体型的明显程度（默认 100%）。调低则更接近标准体格，调高则更夸张；超过 100% 时衣物可能穿入身体。也会缩放“体格差异”产生的体格。男性和女性体型不受影响。</M3AT_BodyShapeStrengthTip>
   <M3AT_VariedBodies>体格差异</M3AT_VariedBodies>
@@ -246,7 +250,7 @@
   <M3AT_FaceAcross>左 / 右</M3AT_FaceAcross>
   <M3AT_FaceUp>下 / 上</M3AT_FaceUp>
   <M3AT_FaceSize>大小</M3AT_FaceSize>
-  <M3AT_FaceReset>重置此模组</M3AT_FaceReset>
+  <M3AT_FaceReset>恢复自动调整</M3AT_FaceReset>
   <M3AT_FaceCopyOthers>将这些数值复制到这张面部的其他模组</M3AT_FaceCopyOthers>
   <M3AT_FaceRestoreDefaults>恢复默认（所有面部模组）</M3AT_FaceRestoreDefaults>
   <M3AT_FaceRestoreDefaultsConfirm>将所有面部模组的面部恢复到默认位置？</M3AT_FaceRestoreDefaultsConfirm>
@@ -256,7 +260,8 @@
   <M3AT_FaceTuningIntro>移动和缩放 3D 头部上的动态面部。每个绘制面部的模组（Facial Animation、它的重制材质、种族自带的面部）分别设置，对所有使用该模组面部的小人、所有存档都有效。先选择一个小人，再打开工具：此选项窗口会关闭，以便看到面部。</M3AT_FaceTuningIntro>
   <M3AT_FaceTuningOpen>打开面部调整</M3AT_FaceTuningOpen>
   <M3AT_FaceTuningNeedsGame>面部调整需在地图上游戏时打开。</M3AT_FaceTuningNeedsGame>
-  <M3AT_FaceHelp>改动会立即显示在所有使用此模组面部的小人上。嘴巴的移动叠加在整张面部之上。</M3AT_FaceHelp>
+  <M3AT_FaceHelp>改动会立即显示在所有使用此模组面部的小人上。嘴巴的移动叠加在整张面部之上。M3AT会自动将其他种族的面部调整到人类的布局；你调整过某个模组后，即使更新改变了自动调整，它也会保持你设定的样子。“恢复自动调整”会撤销你对此模组的调整。</M3AT_FaceHelp>
+  <M3AT_FaceTuneCleared>M3AT现在会自动调整{1}的面部，因此你对{0}的面部调整已被重置。如仍有需要，请在面部工具中重新调整。</M3AT_FaceTuneCleared>
   <M3AT_FacePart_Head>头部</M3AT_FacePart_Head>
   <M3AT_FacePart_Eyeball>眼睛</M3AT_FacePart_Eyeball>
   <M3AT_FacePart_Lid>眼睑</M3AT_FacePart_Lid>
@@ -288,4 +293,25 @@
   <M3AT_GripRestoreDefault>将此武器恢复默认</M3AT_GripRestoreDefault>
   <M3AT_GripSeenStance>征召时手的位置。</M3AT_GripSeenStance>
   <M3AT_GripOffSeenStance>征召时另一只手的位置。</M3AT_GripOffSeenStance>
+  <M3AT_PowerArmourBulk>动力装甲使穿戴者变大</M3AT_PowerArmourBulk>
+  <M3AT_PowerArmourBulkTip>穿着动力装甲（覆盖躯干、手臂和腿部的太空科技装甲，例如海军陆战队装甲、重装甲和侦察装甲）的小人会被画得更高大、更魁梧，头部相对更小，像一位全副武装的巨人。默认关闭，因为游戏本身的装甲是普通人穿的。</M3AT_PowerArmourBulkTip>
+  <M3AT_ArmourBulk>装甲体型</M3AT_ArmourBulk>
+  <M3AT_ArmourBulkTip>动力装甲使穿戴者变大多少，同时用于 GrimWorld 40,000 的星际战士（模组兼容）。默认：{0}（星际战士约 2.2 米，常人约 1.75 米）。</M3AT_ArmourBulkTip>
+  <M3AT_CeilingCrouch>高于天花板时</M3AT_CeilingCrouch>
+  <M3AT_CeilingCrouchTip>被画得比头顶天花板还高的小人在室内的表现：蹲下并弯腰。
+
+总是：在任何屋顶下。
+
+显示上层时（默认）：仅当 IsoRimZ 在其上方绘制上一层楼时，因为否则没有绘制天花板，头不会穿过去。
+
+从不：保持完整身高。</M3AT_CeilingCrouchTip>
+  <M3AT_CeilingAlways>总是蹲下</M3AT_CeilingAlways>
+  <M3AT_CeilingFloorShown>显示上层时</M3AT_CeilingFloorShown>
+  <M3AT_CeilingNever>从不蹲下</M3AT_CeilingNever>
+  <M3AT_Compatibility>模组兼容</M3AT_Compatibility>
+  <M3AT_CompatibilityTip>点击显示或隐藏与其他模组物品相关的选项。</M3AT_CompatibilityTip>
+  <M3AT_ArmourDrawScale>放大绘制的装甲使穿戴者变大</M3AT_ArmourDrawScale>
+  <M3AT_ArmourDrawScaleTip>其他模组在穿戴时放大绘制的身体装甲（例如 GrimWorld 40,000 的禁军装甲，110%）会让穿戴者按同样比例变大。</M3AT_ArmourDrawScaleTip>
+  <M3AT_MarineBulk>GrimWorld 40,000：星际战士是巨人</M3AT_MarineBulk>
+  <M3AT_MarineBulkTip>穿着 GrimWorld 40,000 星际战士或禁军动力装甲的小人会按“小人”下的装甲体型被画得更高大、更魁梧，头部相对更小。GrimWorld 的星际战士是靠装甲成为星际战士的普通小人，所以由装甲决定体型。侦察兵装甲、寂静修女和马卡多的长袍不受影响。</M3AT_MarineBulkTip>
 </LanguageData>

@@ -51,6 +51,7 @@ previews/
 # Harness build output (anim_scripts/hairbuild)
 anim_scripts/hairbuild/bin/
 anim_scripts/hairbuild/obj/
+anim_scripts/garmentfit/obj/
 CLAUDE.local.md
 
 # Discord bot token for discord/setup_server.py: never committed.

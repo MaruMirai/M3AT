@@ -59,7 +59,17 @@ fi
 # (9>&-: the build leaves dotnet's compiler server running, which would otherwise keep the lock open after this exits,
 # and every later run would wait on it for good)
 dotnet build Source/M3AT.csproj -p:DefineConstants=AUTOTEST -v q -nologo 9>&- | grep -E " error |Build succeeded" | sort -u
-trap 'dotnet build Source/M3AT.csproj -v q -nologo 9>&- | grep -E " error |Build succeeded" | sort -u' EXIT
+# Mods left out of test runs, as they draw over the pictures (Center Marker's marks at the map's middle, where the test
+# patch is): taken out of ModsConfig.xml for the run and the file put back as it was by the trap.
+skip_mods=(jia.center.marker)
+mods_config="$HOME/.config/unity3d/Ludeon Studios/RimWorld by Ludeon Studios/Config/ModsConfig.xml"
+mods_kept="${lock%.lock}.ModsConfig.xml"
+if [ -f "$mods_kept" ]; then
+    cp "$mods_kept" "$mods_config"   # a run killed before its trap ran: its load order back first
+fi
+cp "$mods_config" "$mods_kept"
+for m in "${skip_mods[@]}"; do sed -i "/<li>$m<\/li>/d" "$mods_config"; done
+trap 'cp "$mods_kept" "$mods_config" && rm -f "$mods_kept"; dotnet build Source/M3AT.csproj -v q -nologo 9>&- | grep -E " error |Build succeeded" | sort -u' EXIT
 log="$HOME/.config/unity3d/Ludeon Studios/RimWorld by Ludeon Studios/Logs/Player.log"
 start=(-quicktest); [ -n "$load" ] && start=("-m3atTestLoad=$load")
 # Through Steam (steam -applaunch, its own launch options added), when it is running: since the update of 2026-11-19 the

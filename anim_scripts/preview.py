@@ -142,6 +142,9 @@ GAME_DLCS = ('Core', 'Royalty', 'Ideology', 'Biotech', 'Anomaly', 'Odyssey')
 SPRITE_ROOTS = [os.path.join(os.path.dirname(HERE), 'weapon_sprites', dlc) for dlc in GAME_DLCS]
 SPRITE_PREFIX = 'Things/Item/Equipment/'
 KIND_LOOK = {'rifle': 'Gun_AssaultRifle', 'pistol': 'Gun_Autopistol', 'bow': 'Bow_Recurve', 'melee': 'MeleeWeapon_Knife'}
+# Entries for another mod's weapon (not in the game's Defs): its sprite in that mod's installed folder, draw size, angle offset.
+WORKSHOP = os.path.expanduser('~/.local/share/Steam/steamapps/workshop/content/294100')
+MOD_LOOKS = {'CE_DisposableRocketLauncher': (os.path.join(WORKSHOP, '3495749827', 'Textures', 'Things', 'Weapons', 'CE_M72.png'), (1.0, 1.0), 0.0)}
 TURNED = 1 - 1e-6   # a handle's quaternion dot its last below this has been turned (about 0.16 degrees): mathutils
                     # keeps single precision, so a re-pose alone can leave it a little under 1
 HANDLE = 'MaruHand.'   # + side: the empty a held hand follows (G to move it, R to turn it)
@@ -780,6 +783,8 @@ def weapon_defs():
 def weapon_look(kind):
     """A WEAPONS entry's sprite file ('' when none is found), draw size (cells) and angle offset (degrees), from its
     weapon's def."""
+    if kind in MOD_LOOKS and os.path.isfile(MOD_LOOKS[kind][0]):
+        return MOD_LOOKS[kind]
     found = weapon_defs().get(KIND_LOOK.get(kind, kind))
     if found is None:
         return '', (1.0, 1.0), -65.0 if kind == 'melee' or kind.startswith('MeleeWeapon_') else 0.0

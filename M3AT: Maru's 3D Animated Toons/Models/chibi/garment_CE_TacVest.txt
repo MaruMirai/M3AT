@@ -2,6 +2,8 @@
 # defs: the apparel it is drawn for. layer and groups (if any): it also stands in for apparel with no garment of
 # its own worn on that layer and covering one of those body part groups.
 defs CE_Apparel_TacVest
+layer Webbing
+groups Torso
 # texture: its image (t lines, a place on it per vertex); tint: whether the apparel's colour tints it.
 texture garment_CE_TacVest.png
 # hide k ...: body triangles (skin.txt's f lines, from 0) left out while it is worn.

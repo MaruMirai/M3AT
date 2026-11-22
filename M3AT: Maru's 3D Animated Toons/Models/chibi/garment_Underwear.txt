@@ -9,7 +9,7 @@ like Apparel_Pants
 # stands_for: apparel it is drawn for as a stand-in whatever the scoring says.
 stands_for Kiiro_Underwear_Normal Kiiro_SimpleUnderwear Kiiro_Stocking_Black Kiiro_Stocking_White
 # texture: its image (t lines, a place on it per vertex); tint: whether the apparel's colour tints it.
-texture garment_Underwear.png
+texture garment_Loincloth.png
 # hide k ...: body triangles (skin.txt's f lines, from 0) left out while it is worn.
 hide 12 185 210 211 268 511 516 532 552 625 631 632 636 651 711
 v -0.00029 0.49128 0.02045

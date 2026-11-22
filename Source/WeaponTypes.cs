@@ -209,12 +209,26 @@ namespace M3AT
                 Vector2 now = FistOnSprite(fist, hand, a, top, behind, def.equippedAngleOffset, drawn);
                 return Vector2.Scale(new Vector2(set.x - 0.5f, set.y - 0.5f), drawn) - now;
             }
-            if (!AutoGrips || Thrown(def) || HoldOf(WeaponName(def), slab) != null)
+            if (!AutoGrips || Thrown(def))
+            {
+                return Vector2.zero;
+            }
+            // A plain tube held as StandInTube is measured against that one's own art, which its hold was made on.
+            bool tube = WeaponName(def) == StandInTube && OwnName(def) != StandInTube;
+            if (!tube && HoldOf(WeaponName(def), slab) != null)
             {
                 return Vector2.zero;
             }
             string kind = KindOf(def), refName;
-            if (holdName != kind || !GripReference.TryGetValue(kind, out refName))
+            if (tube)
+            {
+                if (holdName != StandInTube)
+                {
+                    return Vector2.zero;
+                }
+                refName = StandInTube;
+            }
+            else if (holdName != kind || !GripReference.TryGetValue(kind, out refName))
             {
                 return Vector2.zero;   // held by another kind's hold than its own (the rifle's, by default): nothing to measure against
             }
@@ -227,7 +241,11 @@ namespace M3AT
             }
             string type = TypeOf(def);
             string find = kind == "rifle" ? "gun" : type == "melee_2h" ? "melee2" : "melee";
-            Texture refArt = OwnArt(refDef.graphicData.texPath);
+            // The reference's own art: the game's at its path for a kind's (another mod may put its own there), a tube's
+            // (Combat Extended's, a mod's) as its def draws it.
+            Graphic refGraphic = tube ? refDef.graphicData.Graphic : null;
+            Texture refArt = tube ? (refGraphic != null && refGraphic.MatSingle != null ? refGraphic.MatSingle.mainTexture : null)
+                : OwnArt(refDef.graphicData.texPath);
             Vector2 grip, refGrip;
             if (!GripFinder.Find(mat.mainTexture, find, def.equippedAngleOffset, out grip)
                 || !GripFinder.Find(refArt, kind == "rifle" ? "gun" : "melee", refDef.equippedAngleOffset, out refGrip))

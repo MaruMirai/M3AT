@@ -5722,6 +5722,7 @@ garment Beret garment_Beret.txt
 garment Blindfold garment_Blindfold.txt
 garment BodyStrap garment_BodyStrap.txt
 garment BowlerHat garment_BowlerHat.txt
+garment Bra garment_Bra.txt
 garment Broadwrap garment_Broadwrap.txt
 garment Burka garment_Burka.txt
 garment Cape garment_Cape.txt
@@ -5765,10 +5766,13 @@ garment IntegratorHeadset garment_IntegratorHeadset.txt
 garment Jacket garment_Jacket.txt
 garment KidRomper garment_KidRomper.txt
 garment LabCoat garment_LabCoat.txt
+garment Loincloth garment_Loincloth.txt
 garment LongJohns garment_LongJohns.txt
 garment MechlordSuit garment_MechlordSuit.txt
 garment Pants garment_Pants.txt
 garment Parka garment_Parka.txt
+garment Pauldrons garment_Pauldrons.txt
+garment PauldronsBig garment_PauldronsBig.txt
 garment PlateArmor garment_PlateArmor.txt
 garment PowerArmor garment_PowerArmor.txt
 garment PowerArmorHelmet garment_PowerArmorHelmet.txt
@@ -5788,6 +5792,7 @@ garment ShortShorts garment_ShortShorts.txt
 garment SimpleHelmet garment_SimpleHelmet.txt
 garment Slicecap garment_Slicecap.txt
 garment Tailcap garment_Tailcap.txt
+garment Tanktop garment_Tanktop.txt
 garment TortureCrown garment_TortureCrown.txt
 garment TribalA garment_TribalA.txt
 garment TribalHeaddress garment_TribalHeaddress.txt

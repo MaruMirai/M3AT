@@ -111,6 +111,10 @@ DRAFTED = {
     'Gun_IncendiaryLauncher': {'kind': 'rifle', 'R': (-0.3104, -0.4795, 0.3901), 'R_turn': (105.9551, -174.6567, 11.094), 'L': (0.2253, -0.3415, 0.1857)},
     'Gun_TripleRocket': {'kind': 'rifle', 'R': (-0.3166, -0.4663, 0.4572), 'R_turn': (105.9551, -174.6567, 11.094), 'L': (0.2253, -0.3415, 0.1857)},
     'Gun_DoomsdayRocket': {'kind': 'rifle', 'R': (-0.3166, -0.4663, 0.4572), 'R_turn': (105.9551, -174.6567, 11.094), 'L': (0.2423, -0.3174, 0.1642)},
+    # Combat Extended's disposable rocket launcher, a plain tube, both fists upright on it as on an AT4's grips (the
+    # thumb lines along its top, the left the right mirrored; worked out from the rifle's slab stance, the right fist kept
+    # where it is), the left as far up it as that arm reaches. Other mods' plain tubes borrow it (WalkFigures.WeaponName).
+    'CE_DisposableRocketLauncher': {'kind': 'rifle', 'R': (-0.2792, -0.3522, 0.4649), 'R_turn': (97.8114, 166.937, 4.9181), 'L': (-0.0477, -0.4236, 0.2595), 'L_turn': (-107.9578, -16.5419, -10.7124)},
     'Gun_ChargeRifle': {'kind': 'rifle', 'R': (-0.2628, -0.3558, 0.457), 'L': (0.1563, -0.2698, 0.1724)},
     'Gun_ChargeLance': {'kind': 'rifle', 'R': (-0.2628, -0.3558, 0.457), 'L': (0.1168, -0.2704, 0.1386)},
     'Pila': {'kind': 'rifle', 'R': (-0.2578, -0.3744, 0.2149), 'R_turn': (-64.6928, 1.9417, 117.7251), 'R_elbow': None, 'L': (0.2748, -0.3776, 0.3486), 'L_turn': (-28.55, -33.9862, -117.3661), 'body': dict(DROP=0.07, NARROW=0.0, STAGGER=0.22, LEAN=4.0)},
@@ -334,6 +338,9 @@ WEAPONS = {
     'Gun_IncendiaryLauncher': dict(hand='R', line='hand', drop=0.0, behind=0.12, roll=77.3609, aim=(-0.8438, 0.478, 0.244), at=(-0.104, -0.0735, 0.0001)),
     'Gun_TripleRocket': dict(hand='R', line='hand', drop=0.0, behind=0.12, roll=77.3609, aim=(-0.8438, 0.478, 0.244), at=(-0.1096, -0.0403, -0.0022)),
     'Gun_DoomsdayRocket': dict(hand='R', line='hand', drop=0.0, behind=0.12, roll=77.3609, aim=(-0.8438, 0.478, 0.244), at=(-0.1096, -0.0403, -0.0022)),
+    # A plain tube held from under it by an upright fist: its top along the fist's thumb line, its length along the hand
+    # square to that; the fist under the tube 30% from its back on CE's M72 sprite (GripFinder's tube grip).
+    'CE_DisposableRocketLauncher': dict(hand='R', line='hand', drop=0.0, behind=0.12, roll=87.4, aim=(-0.5417, 0.8218, 0.1764), at=(-0.072, 0.0091, -0.0266)),
     'Gun_ChargeRifle': dict(hand='R', line='hand', drop=0.0, behind=0.12, roll=78.4268, aim=(-0.874, 0.4098, 0.2612), at=(-0.0659, -0.0563, -0.0102)),
     'Gun_ChargeLance': dict(hand='R', line='hand', drop=0.0, behind=0.12, roll=78.4268, aim=(-0.874, 0.4098, 0.2612), at=(-0.1261, 0.0121, -0.0005)),
     'Pila': dict(hand='R', line='hand', drop=0.0, behind=0.03, roll=98.6146, aim=(-0.4336, -0.8776, 0.2046), at=(-0.0478, -0.0442, -0.0062)),
@@ -521,6 +528,8 @@ AIMED = {
     'Weapon_GrenadeEMP': None,
     'Weapon_GrenadeTox': None,
     'Gun_DoomsdayRocket': dict(fist=(-0.3009, -0.2103, 0.5624), body=dict(HEAD_TILT=27.78), support=0.4074, under=0.1049, wrap=76.4235, other_turn=(76.2612, -72.3131, 7.1915)),
+    # The slab rifle's fist; the left fist upright on the same line ahead under the tube, turned as the right one mirrored.
+    'CE_DisposableRocketLauncher': dict(kind='rifle', fist=(-0.13, -0.3, 0.56), support=0.4489, under=0.1077, other_turn=(172.9176, -7.7506, 56.8578)),
     'Gun_BoltActionRifle': dict(fist=(0.0731, -0.3852, 0.5393), elbow=30.99, other_turn=(74.8761, -20.872, 26.6132), support=0.2851, under=0.0833),
     'Gun_PumpShotgun': dict(support=0.1572, under=0.1118, other_turn=(80.7439, -10.546, 33.9946), elbow=51.6, fist=(0.0406, -0.4223, 0.5286)),
     'Gun_ChainShotgun': dict(fist=(0.1859, -0.4207, 0.5263), other_turn=(98.998, -10.5561, 35.6602), support=0.3039, under=0.0872),

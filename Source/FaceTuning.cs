@@ -396,6 +396,8 @@ namespace M3AT
                 {
                     s.faceTunes.Clear();
                     s.mouthTunes.Clear();
+                    s.faceFits.Clear();
+                    s.faceFitRows.Clear();
                     s.Write();
                 }, true));
             }
@@ -413,6 +415,7 @@ namespace M3AT
                         {
                             Set(s.mouthTunes, n.Key.key, s.mouthTunes.TryGetValue(n.Key.key, out had) ? had : new Vector3(0f, 0f, 1f), m);
                         }
+                        Pinned(pawn, n.Key.key);
                     }
                 }
                 changed = true;
@@ -429,10 +432,25 @@ namespace M3AT
             if (Set(s.faceTunes, picked, face, f) | Set(s.mouthTunes, picked, mouth, m))
             {
                 changed = true;
+                Pinned(pawn, picked);
             }
             if (changed && !Input.GetMouseButton(0))
             {
                 Write();   // once the slider is let go, not every step of a drag
+            }
+        }
+
+        // A tuned mod pinned to the fit its face is drawn with now, an untuned one let go back to the automatic fit (FacePins.cs).
+        private static void Pinned(Pawn pawn, string mod)
+        {
+            Settings s = SettingsMod.Settings;
+            if (s.faceTunes.ContainsKey(mod) || s.mouthTunes.ContainsKey(mod))
+            {
+                FaceLayers.Pin(pawn, mod);
+            }
+            else
+            {
+                FaceLayers.Unpin(mod);
             }
         }
 

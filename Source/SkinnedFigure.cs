@@ -111,6 +111,8 @@ namespace M3AT
             public bool hidesClothes;   // a garment's: the garments worn under it are left off (body armour, HidesClothes)
             public bool withLegwear;    // a garment's: also worn once the torso and legs are covered (the shoes, WalkFigures.WornGarments)
             public bool forBaby;        // a garment's: worn by a baby a few hours old (the baby romper, WalkFigures.BabyRomperOf)
+            public bool pads;           // a garment's: worn with the Pauldrons garment (the marine and cataphract armour, WalkFigures.ArmourPads)
+            public string marineOf;     // a garment's: the garment it is drawn in place of on a pawn in Space Marine armour (PauldronsBig, WalkFigures.MarinePads)
             public bool held;           // a garment's: held in the hand (a shield, its held line), drawn only while the game shows
                                         // the weapon (WalkFigures.WornGarments); it hides nothing and is in no clearance (HeldMask)
             public bool heldOnBack;     // and with a held_at line: carried on the back as exported, and in the hand while shown (Shields.cs)
@@ -355,6 +357,7 @@ namespace M3AT
             internal string earsMadeOf;  // and the file those meshes are of
             internal Piece hornsPiece;   // the horns its horn meshes are for (Horns.cs)
             internal PieceMeshes horns;
+            internal readonly Dictionary<Piece, PieceMeshes> addons = new Dictionary<Piece, PieceMeshes>();   // its race parts built from their sprites (AddonBuilder.cs)
             public EarState earState;   // and how they are moving
             internal PieceMeshes tail;   // its cat tail (CatTail.cs), made when first drawn
             public bool furTail, tailMadeFur;   // whether it has the furry tail, and whether those meshes are of it
@@ -764,6 +767,27 @@ namespace M3AT
             return piece > 0 && piece < pieces.Length && pieces[piece].forBaby;
         }
 
+        // True if this garment is worn with the Pauldrons garment (its pads line: the marine and cataphract armour).
+        public bool HasPads(int piece)
+        {
+            return piece > 0 && piece < pieces.Length && pieces[piece].pads;
+        }
+
+        // The garment drawn in this one's place on a pawn in Space Marine armour (one whose marine_of line names it: the
+        // big pauldrons for the pauldrons), or -1.
+        public int MarineVersionOf(int piece)
+        {
+            string name = piece > 0 && piece < pieces.Length ? pieces[piece].name : null;
+            for (int g = 1; name != null && g < pieces.Length; g++)
+            {
+                if (pieces[g].marineOf == name)
+                {
+                    return g;
+                }
+            }
+            return -1;
+        }
+
         // True if this garment is held in the hand (its held line: a shield).
         public bool IsHeld(int piece)
         {
@@ -1015,6 +1039,12 @@ namespace M3AT
                         break;
                     case "baby_romper":
                         piece.forBaby = p[1] == "yes";
+                        break;
+                    case "pads":
+                        piece.pads = p[1] == "yes";
+                        break;
+                    case "marine_of":
+                        piece.marineOf = p[1];
                         break;
                     case "held":
                         piece.held = p[1] == "yes";
@@ -1596,6 +1626,12 @@ namespace M3AT
 
         // ---- shapes
 
+        // The most of the Shrinkhead key a shape takes. Past all of it only for a pawn grown by its armour, whose head is
+        // kept a normal pawn's size however small the player has made heads (WalkFigures.ArmouredHeadShrink): the key
+        // scales the head evenly, and every key is a straight-line move, so the head and all that is fitted to it (hats,
+        // hair, the face) go on shrinking alike.
+        public const float MostShrink = 1.1f;
+
         // The shape for a body type's key (null or one the body lacks: the base body) with the head shrunk by shrink
         // (0 .. 1 of the Shrinkhead key). genderKey (Male or Female, or null) is added on top of a body type that is not
         // itself a gender's (Thin, Fat, Hulk) at genderAmount; a key named for the pair ("Hulk_Female") is added as well
@@ -1620,7 +1656,7 @@ namespace M3AT
             }
             string pairKey = genderKey != null && HasKey(bodyKey + "_" + genderKey) ? bodyKey + "_" + genderKey : null;
             genderAmount = HasKey(genderKey) ? Mathf.Round(Mathf.Clamp01(genderAmount) * 100f) / 100f : 0f;
-            shrink = HasKey(ShrinkKey) ? Mathf.Round(Mathf.Clamp01(shrink) * 100f) / 100f : 0f;
+            shrink = HasKey(ShrinkKey) ? Mathf.Round(Mathf.Clamp(shrink, 0f, MostShrink) * 100f) / 100f : 0f;
             bodyAmount = Mathf.Round(Mathf.Clamp(bodyAmount, 0f, MostKeyAmount) * 100f) / 100f;
             pregnant = HasKey(PregnantKey) ? Mathf.Round(Mathf.Clamp01(pregnant) * 100f) / 100f : 0f;
             babyLimbs = HasKey(BabyLimbsKey) ? Mathf.Round(Mathf.Clamp01(babyLimbs) * 100f) / 100f : 0f;

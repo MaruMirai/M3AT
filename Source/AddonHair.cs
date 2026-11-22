@@ -286,6 +286,45 @@ namespace M3AT
             return words;
         }
 
+        // For AddonParts.cs: whether a HAR add-on is one of the hair ones built into the hair here.
+        internal static bool HairAddon(object addon)
+        {
+            return !addonFailed && HarReady() && IsHairAddon(addon);
+        }
+
+        // For AddonParts.cs: whether a graphic of the race's is one of its hair add-ons (its add-on found by path, as Make
+        // finds it), which the hair is built from and so isn't a part of its own.
+        internal static bool HairGraphic(ThingDef race, string path)
+        {
+            if (addonFailed || race == null || path == null || !HarReady())
+            {
+                return false;
+            }
+            List<object> addons = RaceAddons(race);
+            if (addons == null)
+            {
+                return false;   // none of its add-ons is hair
+            }
+            object best = null;
+            int bestLength = -1;
+            foreach (object a in addons)
+            {
+                string own = addonPathField.GetValue(a) as string;
+                if (own != null && own.Length > bestLength && path.StartsWith(own, StringComparison.OrdinalIgnoreCase))
+                {
+                    best = a;
+                    bestLength = own.Length;
+                }
+            }
+            return best != null && IsHairAddon(best);
+        }
+
+        // For AddonParts.cs: a file name's words (WordsOf).
+        internal static List<string> AddonWords(string name)
+        {
+            return WordsOf(name ?? "");
+        }
+
         private static bool IsHairAddon(object addon)
         {
             string path = addonPathField.GetValue(addon) as string;

@@ -194,11 +194,17 @@ namespace M3AT
         internal static float RaceMouthShift(Pawn pawn, Graphic g)
         {
             ThingDef race = pawn.def;
+            float shift;
+            string mod = ModOf(g).key;
+            CheckPins(pawn, mod, g);
+            if (PinnedMouth(mod, out shift))
+            {
+                return shift;   // the fit the player tuned this face mod on (FacePins.cs)
+            }
             if (race == RimWorld.ThingDefOf.Human)
             {
                 return 0f;
             }
-            float shift;
             if (!raceMouthRows.TryGetValue(race, out shift))
             {
                 Texture tex = LayerTexture(g);
@@ -254,19 +260,81 @@ namespace M3AT
             return shift;
         }
 
-        // ---- Another race's eyes, set as far apart as a human's.
+        // ---- Another race's eyes, put where a human's are, at a human's size and as far apart.
 
-        // A race's own face mod may set the eyes closer together than the human faces the patch is laid out for (Kiiro Race
-        // Facial Animation's irises are 0.100 of the texture apart, the human sets' 0.114 .. 0.120: on the chibi its eyes
-        // looked pinched together). So for a race other than the human, the eye, lid, brow and lid option layers are read
-        // with each half moved out by its spread (the shader's Spread): measured once per race from its first eyeball
-        // texture with both irises (each half's alpha-weighted middle column), half the difference from HumanIrisApart.
+        // A race's own face mod draws its eyes for its own 2D head, so they may sit elsewhere on the texture than the human
+        // faces the patch is laid out for, be another size or be set closer together: Kiiro Race Facial Animation's irises
+        // are 0.100 of the texture apart, Milira's 0.094, the human sets' 0.114 .. 0.120 (on the chibi Kiiro's looked
+        // pinched together); Ratkin's and Wolfein's sit 0.02 .. 0.03 lower than a human's, so with their mouths moved up to
+        // the human row the face was squeezed between them; Wolfein's are a fifth wider. So for a race other than the human
+        // the eye, lid, brow and lid option layers (SpreadsWithEyes) are fitted, measured once per race from its first
+        // eyeball texture with both irises (each half's alpha-weighted middle and spread, as anim_scripts' measurement of the
+        // sets had it): scaled about the eyes' middle so the whole eye is a human's size (EyeSizeOf: the eye whites, the
+        // lid's bottom layer, of every eye style of the race's face mod averaged, against the human set loaded; by the
+        // irises Wolfein's eyes, wide but with bigger irises still, came out a fifth too small, and Kiiro's, big irises in
+        // small eyes, narrower still; through the layer's tuning, WithEyeFit), each half moved out by its spread to stand HumanIrisApart apart once scaled (the shader's
+        // Spread), and moved up to HumanEyeRow (through its shift). Each is left alone within its slack and kept within its most.
         private const float HumanIrisApart = 0.118f;   // texture widths between the irises' middles, a human face's
+        private const float HumanEyeRow = 0.453f;      // and their middles' row, v up (Facial Animation 0.451, Experimentals 0.456)
+        private const float HumanEyeSize = 0.058f;     // a whole eye's size (EyeSizeOf) if the human set's can't be measured: Facial Animation - Retexture's
         private const float EyeSpreadSlack = 0.003f;   // a spread under this is left alone
         private const float EyeSpreadMost = 0.03f;
-        private static readonly Dictionary<ThingDef, float> raceEyeSpreads = new Dictionary<ThingDef, float>();
+        private const float EyeRowSlack = 0.004f;      // a move up or down under this is left alone
+        private const float EyeRowMost = 0.05f;
+        private const float EyeScaleSlack = 0.04f;     // a scale within this of 1 is left alone
+        private const float EyeScaleLeast = 0.75f, EyeScaleMost = 1.3f;
+
+        private struct EyeFit
+        {
+            public float spread;   // texture widths each half is moved out
+            public float rise;     // texture widths the eyes are moved up
+            public float scale;    // how many times bigger the eyes are drawn
+            public float row;      // the race's own eye row (v up), the middle they are scaled about
+        }
+
+        private static readonly Dictionary<ThingDef, EyeFit> raceEyeFits = new Dictionary<ThingDef, EyeFit>();
+        private static readonly Dictionary<ThingDef, string> raceEyeMods = new Dictionary<ThingDef, string>();   // the face mod each race's eyes come from
+        // FaceLayers.Draw: the mod a race's irises (its _Basic eyeball layer) come from.
+        internal static void NoteEyeMod(Pawn pawn, Graphic g)
+        {
+            FaceMod m = ModOf(g);
+            if (m != null && m.key != "?")
+            {
+                raceEyeMods[pawn.def] = m.key;
+            }
+        }
+
+#if AUTOTEST
+        internal static readonly Dictionary<int, float> TestEyeScales = new Dictionary<int, float>();   // each pawn's eyes' scale as last drawn (facepins)
+
+        // The facepins scenario: a race's measured eye scale changed, as an update to the measuring would change it.
+        internal static bool TestSetRaceEyeScale(ThingDef race, float scale)
+        {
+            EyeFit fit;
+            if (!raceEyeFits.TryGetValue(race, out fit))
+            {
+                return false;
+            }
+            fit.scale = scale;
+            raceEyeFits[race] = fit;
+            return true;
+        }
+
+        internal static string TestEyeModOf(ThingDef race)
+        {
+            string mod;
+            return raceEyeMods.TryGetValue(race, out mod) ? mod : null;
+        }
+
+        internal static float TestRaceEyeScale(ThingDef race)
+        {
+            EyeFit fit;
+            return raceEyeFits.TryGetValue(race, out fit) ? fit.scale : 1f;
+        }
+#endif
         private static readonly HashSet<Texture> eyesUnmeasured = new HashSet<Texture>();
         private static float drawSpread;   // the pawn being drawn's (Draw), for its eye layers (SpreadOf)
+        private static EyeFit drawEyeFit = new EyeFit { scale = 1f };   // and the rest of its eyes' fit (EyeRiseOf, WithEyeFit)
 
         // True for the layers that are moved with the eyes.
         private static bool SpreadsWithEyes(string kind)
@@ -279,19 +347,90 @@ namespace M3AT
             return SpreadsWithEyes(kind) ? drawSpread : 0f;
         }
 
-        // The spread (texture widths each half is moved out) for this race, measured from g (an eyeball layer's graphic)
-        // the first time one can be; 0 for the human or until measured.
+        // The move up for one of the pawn being drawn's layers (its shift's y).
+        private static float EyeRiseOf(string kind)
+        {
+            return SpreadsWithEyes(kind) ? drawEyeFit.rise : 0f;
+        }
+
+        // A layer's tuning (TuneOf's: its texture places times 1 + x, moved by (y, z)) with the eyes' scale laid on for an
+        // eye layer: read at P + (t - P) / k about the race's eyes' middle P, after the tuning t, so the art comes out k
+        // times bigger there and the player's tuning still moves it.
+        private static Vector3 WithEyeFit(Vector3 tune, string kind)
+        {
+            float k = drawEyeFit.scale;
+            if (!SpreadsWithEyes(kind) || k <= 0f || Mathf.Abs(k - 1f) < 1e-4f)
+            {
+                return tune;
+            }
+            Vector2 middle = new Vector2(0.5f, drawEyeFit.row);
+            float a = (1f + tune.x) / k;
+            Vector2 b = new Vector2(tune.y, tune.z) / k + middle * (1f - 1f / k);
+            return new Vector3(a - 1f, b.x, b.y);
+        }
+
+        // Sets the pawn being drawn's eye fit from what was measured of its race (Draw, before its layers, so the lids and
+        // brows drawn before the eyeball take it); none for the human or before it is measured.
+        private static void TakeEyeFit(Pawn pawn)
+        {
+            EyeFit fit;
+            string mod;
+            if (raceEyeMods.TryGetValue(pawn.def, out mod) && PinnedEyes(mod, out fit))
+            {
+                drawEyeFit = fit;   // the fit the player tuned this face mod on (FacePins.cs)
+                drawSpread = fit.spread;
+            }
+            else if (pawn.def != RimWorld.ThingDefOf.Human && raceEyeFits.TryGetValue(pawn.def, out fit))
+            {
+                drawEyeFit = fit;
+                drawSpread = fit.spread;
+            }
+            else
+            {
+                drawEyeFit = new EyeFit { scale = 1f };
+                drawSpread = 0f;
+            }
+        }
+
+        // The spread (texture widths each half is moved out) for this race, measured with the rest of its fit from g (an
+        // eyeball layer's graphic) the first time one can be; 0 for the human or until measured.
         internal static float RaceEyeSpread(Pawn pawn, Graphic g)
         {
             ThingDef race = pawn.def;
+            EyeFit fit;
+            // The mod its irises come from (FaceLayers.Draw notes it from the _Basic layer; a race's face may take other
+            // eyeball layers from Facial Animation's own), whose pinned fit this race's eyes take.
+            string mod;
+            if (!raceEyeMods.TryGetValue(race, out mod))
+            {
+                mod = null;
+            }
+            if (mod != null)
+            {
+                CheckPins(pawn, mod, null);
+            }
+            if (PinnedEyes(mod, out fit))
+            {
+                drawEyeFit = fit;
+#if AUTOTEST
+                TestEyeScales[pawn.thingIDNumber] = fit.scale;
+#endif
+                return fit.spread;
+            }
             if (race == RimWorld.ThingDefOf.Human)
             {
+#if AUTOTEST
+                TestEyeScales[pawn.thingIDNumber] = 1f;
+#endif
                 return 0f;
             }
-            float spread;
-            if (raceEyeSpreads.TryGetValue(race, out spread))
+            if (raceEyeFits.TryGetValue(race, out fit))
             {
-                return spread;
+                drawEyeFit = fit;
+#if AUTOTEST
+                TestEyeScales[pawn.thingIDNumber] = fit.scale;
+#endif
+                return fit.spread;
             }
             Texture tex = LayerTexture(g);
             if (tex == null || eyesUnmeasured.Contains(tex))
@@ -300,32 +439,57 @@ namespace M3AT
             }
             string why = "unreadable";
             bool measured = false;
+            fit = new EyeFit { scale = 1f };
             try
             {
                 int read = Math.Min(MouthReadMost, Math.Max(16, tex.width));
-                Color32[] px = Api.ReadSpritePixels(tex, read);
+                Color32[] px = Api.ReadSpritePixels(tex, read);   // rows bottom first
                 if (px != null && px.Length >= read * read)
                 {
-                    double[] sum = new double[2], su = new double[2];
+                    double[] sum = new double[2], su = new double[2], sv = new double[2], suu = new double[2], svv = new double[2];
                     for (int i = 0; i < read * read; i++)
                     {
-                        int c = i % read;
+                        int c = i % read, r = i / read;
                         int half = c < read / 2 ? 0 : 1;
                         float a = px[i].a / 255f;
+                        double u = (c + 0.5) / read, v = (r + 0.5) / read;
                         sum[half] += a;
-                        su[half] += a * (c + 0.5) / read;
+                        su[half] += a * u;
+                        sv[half] += a * v;
+                        suu[half] += a * u * u;
+                        svv[half] += a * v * v;
                     }
                     why = "alpha " + sum[0].ToString("F1") + " and " + sum[1].ToString("F1");
                     if (sum[0] > MouthLeastAlpha && sum[1] > MouthLeastAlpha)
                     {
-                        float apart = (float)(su[1] / sum[1] - su[0] / sum[0]);
-                        spread = Mathf.Clamp((HumanIrisApart - apart) / 2f, -EyeSpreadMost, EyeSpreadMost);
-                        if (Math.Abs(spread) < EyeSpreadSlack)
+                        double size = 0, row = 0;
+                        for (int h = 0; h < 2; h++)
                         {
-                            spread = 0f;
+                            double mu = su[h] / sum[h], mv = sv[h] / sum[h];
+                            size += (Math.Sqrt(Math.Max(0, suu[h] / sum[h] - mu * mu)) + Math.Sqrt(Math.Max(0, svv[h] / sum[h] - mv * mv))) / 4;
+                            row += mv / 2;
+                        }
+                        float apart = (float)(su[1] / sum[1] - su[0] / sum[0]);
+                        fit.row = (float)row;
+                        float own = EyeSizeOf(RootOf(g)), human = HumanEyeSizeNow();
+                        fit.scale = own > 0f ? Mathf.Clamp(human / own, EyeScaleLeast, EyeScaleMost) : 1f;
+                        if (Mathf.Abs(fit.scale - 1f) < EyeScaleSlack)
+                        {
+                            fit.scale = 1f;
+                        }
+                        fit.spread = Mathf.Clamp((HumanIrisApart - apart * fit.scale) / 2f, -EyeSpreadMost, EyeSpreadMost);
+                        if (Math.Abs(fit.spread) < EyeSpreadSlack)
+                        {
+                            fit.spread = 0f;
+                        }
+                        fit.rise = Mathf.Clamp(HumanEyeRow - fit.row, -EyeRowMost, EyeRowMost);
+                        if (Math.Abs(fit.rise) < EyeRowSlack)
+                        {
+                            fit.rise = 0f;
                         }
                         measured = true;
-                        why = "irises " + apart.ToString("F3") + " apart";
+                        why = "irises " + apart.ToString("F3") + " apart at row " + fit.row.ToString("F3") + " (v up); whole eye " + (own > 0f ? own.ToString("F4") : "unmeasured")
+                            + " against a human's " + human.ToString("F4");
                     }
                 }
             }
@@ -339,9 +503,123 @@ namespace M3AT
                 Log.Warning(Tag + "couldn't measure " + race.defName + "'s Facial Animation eyes from " + tex.name + " (" + why + "); its next eye texture will be tried.");
                 return 0f;
             }
-            raceEyeSpreads[race] = spread;
-            Log.Message(Tag + race.defName + "'s Facial Animation eyes (" + tex.name + ", " + why + ") " + (spread == 0f ? "left as they are, as a human's." : "each moved " + (spread > 0 ? "out " : "in ") + Math.Abs(spread).ToString("F3") + " of the face texture, as far apart as a human's."));
-            return spread;
+            raceEyeFits[race] = fit;
+            drawEyeFit = fit;
+            bool none = fit.spread == 0f && fit.rise == 0f && fit.scale == 1f;
+            Log.Message(Tag + race.defName + "'s Facial Animation eyes (" + tex.name + ", " + why + ") " + (none ? "left as they are, as a human's."
+                : "fitted to a human's: drawn " + fit.scale.ToString("F2") + " times the size, each moved " + (fit.spread >= 0 ? "out " : "in ") + Math.Abs(fit.spread).ToString("F3")
+                + " and " + (fit.rise >= 0 ? "up " : "down ") + Math.Abs(fit.rise).ToString("F3") + " of the face texture."));
+            return fit.spread;
+        }
+
+        // ---- The whole eye's size, over a face mod's eye styles.
+
+        private static readonly Dictionary<string, float> eyeSizes = new Dictionary<string, float>();
+        private static float humanEyeSize = -1f;
+
+        // The face set's folder an eye layer's texture is in: its path up to its Eyes folder ("Things/Pawn/Ratkin/"), or null.
+        private static string RootOf(Graphic g)
+        {
+            string path = g != null ? g.path : null;
+            int at = path != null ? path.IndexOf("/Eyes/", StringComparison.Ordinal) : -1;
+            return at >= 0 ? path.Substring(0, at + 1) : null;
+        }
+
+        // The whole eye's size (texture widths) of a face set: in each of its lid styles' eye whites (Lids/<style>/<gender>/
+        // normal_bottom_south, as drawn: the last loaded mod's at each path, so a retexture's), each eye's opaque box, the root
+        // of its width by its height, averaged over both eyes and every style. 0 if it has none.
+        private static float EyeSizeOf(string root)
+        {
+            if (root == null)
+            {
+                return 0f;
+            }
+            float size;
+            if (eyeSizes.TryGetValue(root, out size))
+            {
+                return size;
+            }
+            Dictionary<string, Texture2D> found = new Dictionary<string, Texture2D>();
+            string lids = root + "Lids/";
+            foreach (ModContentPack mod in LoadedModManager.RunningModsListForReading)
+            {
+                ModContentHolder<Texture2D> holder = mod.GetContentHolder<Texture2D>();
+                if (holder == null)
+                {
+                    continue;
+                }
+                foreach (KeyValuePair<string, Texture2D> t in holder.contentList)
+                {
+                    if (t.Value != null && t.Key.StartsWith(lids, StringComparison.Ordinal) && t.Key.EndsWith("/normal_bottom_south", StringComparison.Ordinal))
+                    {
+                        found[t.Key] = t.Value;   // a later mod's over an earlier's, as the game finds it
+                    }
+                }
+            }
+            double sum = 0;
+            int n = 0;
+            const int Read = 256;
+            foreach (Texture2D tex in found.Values)
+            {
+                Color32[] px;
+                try
+                {
+                    px = Api.ReadSpritePixels(tex, Read);
+                }
+                catch (Exception)
+                {
+                    px = null;
+                }
+                if (px == null || px.Length < Read * Read)
+                {
+                    continue;
+                }
+                for (int half = 0; half < 2; half++)
+                {
+                    int c0 = Read, c1 = -1, r0 = Read, r1 = -1;
+                    for (int r = 0; r < Read; r++)
+                    {
+                        for (int c = half * Read / 2; c < (half + 1) * Read / 2; c++)
+                        {
+                            if (px[r * Read + c].a >= 128)
+                            {
+                                c0 = Math.Min(c0, c);
+                                c1 = Math.Max(c1, c);
+                                r0 = Math.Min(r0, r);
+                                r1 = Math.Max(r1, r);
+                            }
+                        }
+                    }
+                    if (c1 >= c0 + 2 && r1 >= r0 + 2)
+                    {
+                        sum += Math.Sqrt((c1 - c0 + 1) * (r1 - r0 + 1)) / Read;
+                        n++;
+                    }
+                }
+            }
+            size = n > 0 ? (float)(sum / n) : 0f;
+            eyeSizes[root] = size;
+            Log.Message(Tag + "the whole eye of the face set in " + root + ": " + (n > 0 ? size.ToString("F4") + " of the face texture, over " + found.Count + " eye styles." : "no eye whites found."));
+            return size;
+        }
+
+        // The human face set's whole eye as loaded (Experimentals' folder, which its retextures fill, else the base set's),
+        // HumanEyeSize if neither can be measured.
+        private static float HumanEyeSizeNow()
+        {
+            if (humanEyeSize < 0f)
+            {
+                humanEyeSize = EyeSizeOf("Things/Pawn/FA-Experimentals/");
+                if (humanEyeSize <= 0f)
+                {
+                    humanEyeSize = EyeSizeOf("Things/Pawn/Humanlike/");
+                }
+                if (humanEyeSize <= 0f)
+                {
+                    humanEyeSize = HumanEyeSize;
+                }
+            }
+            return humanEyeSize;
         }
 
         // ---- Facial Animation's iris, measured.

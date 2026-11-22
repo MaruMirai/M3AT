@@ -5,6 +5,8 @@ defs Apparel_PowerArmor
 # texture: its image (t lines, a place on it per vertex); tint: whether the apparel's colour tints it.
 texture garment_ArmorMarineGrenadier.png
 hide_clothes yes
+# pads: worn with the Pauldrons garment (its own colour), unless apparel of its own has them drawn.
+pads yes
 # hide k ...: body triangles (skin.txt's f lines, from 0) left out while it is worn.
 hide 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
 hide 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63

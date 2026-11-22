@@ -2,6 +2,8 @@
 # defs: the apparel it is drawn for. layer and groups (if any): it also stands in for apparel with no garment of
 # its own worn on that layer and covering one of those body part groups.
 defs Apparel_GasMask CE_Apparel_GasMask
+# stands_for: apparel it is drawn for as a stand-in whatever the scoring says.
+stands_for GW_HOI_DM_KriegGuardHelmet GW_HOI_DM_KriegGrenadierHelmet GW_HOI_DM_KriegEngineerHelmet GW_HOI_DM_KriegOfficerHelmet GW_HOI_DM_KriegCommissarHelmet GW_HOI_CadianKasrkin_Helmet
 # texture: its image (t lines, a place on it per vertex); tint: whether the apparel's colour tints it.
 texture garment_GasMask.png
 hide_hair no

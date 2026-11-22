@@ -728,11 +728,13 @@ namespace M3AT
                 case "openfront": return OpenFrontTest();
                 case "sleeve": return SleeveTest();
                 case "underwear": return UnderwearTest();
+                case "grimworld": return GrimWorldTest();
                 case "builds": return BuildsTest(null);
                 case "faceab": return FaceAbTest();
                 case "beard": return BeardTest();
                 case "fringe": return FringeTest();
                 case "facetune": return FaceTuneTest();
+                case "facepins": return FacePinsTest();
                 case "faceanim": return FaceAnimTest(null);
                 case "faceshapes": return FaceShapesTest(null);
             }
@@ -2979,6 +2981,10 @@ namespace M3AT
                 yield break;
             }
             Note("race " + race + ", kind " + kind.defName);
+            // A race with no IsoRim alien pack is a card unless the otherRaces option makes it a figure (OtherRaces.cs).
+            bool otherRacesWas = SettingsMod.Settings.otherRaces;
+            SettingsMod.Settings.otherRaces = true;
+            WalkFigures.OtherRacesChanged();
             List<Pawn> pawns = new List<Pawn>();
             Rand.PushState(20261117);
             try
@@ -2987,13 +2993,24 @@ namespace M3AT
                 {
                     Pawn pawn = PawnGenerator.GeneratePawn(new PawnGenerationRequest(kind, Faction.OfPlayer, forceGenerateNewPawn: true));
                     pawn.equipment.DestroyAllEquipment();
+                    // Bare heads, so the race's ears (AddonParts.cs) and hair show.
+                    foreach (Apparel worn in pawn.apparel.WornApparel.ToList())
+                    {
+                        if (worn.def.apparel.bodyPartGroups.Contains(BodyPartGroupDefOf.UpperHead) || worn.def.apparel.bodyPartGroups.Contains(BodyPartGroupDefOf.FullHead))
+                        {
+                            pawn.apparel.Remove(worn);
+                            worn.Destroy();
+                        }
+                    }
                     Spawn(pawn, middle + new IntVec3(2 * i - 3, 0, 0));
                     pawn.Rotation = Rot4.South;
                     Hold(pawn);
                     pawns.Add(pawn);
                     HairDef drawn = HairBuilder.HairOf(pawn);
                     Note("pawn " + i + ": hairstyle " + (pawn.story.hairDef != null ? pawn.story.hairDef.defName : "none") + ", drawn as " + (drawn != null ? drawn.texPath : "none")
-                        + ", head " + (pawn.story.headType != null ? pawn.story.headType.graphicPath : "none"));
+                        + ", head " + (pawn.story.headType != null ? pawn.story.headType.graphicPath : "none")
+                        + ", body type " + (pawn.story.bodyType != null ? pawn.story.bodyType.defName : "none") + ", " + pawn.gender);
+                    Check("race_figure_" + i, IsoRim.Api.FigureModeOf(pawn) != IsoRim.FigureMode.Card, "IsoRim draws it as " + IsoRim.Api.FigureModeOf(pawn));
                 }
             }
             finally
@@ -3015,11 +3032,35 @@ namespace M3AT
             {
                 yield return WaitReal(1f);
             }
+            // Each pawn's face close from the front, and the mod each face part's art comes from (FaceLayers.ModOf).
+            for (int i = 0; i < pawns.Count; i++)
+            {
+                lookDistance = 0.7f;
+                lookHeight = 1.05f;
+                lookPitch = 5f;
+                Look(pawns[i], 0f);
+                FaceLayers.TuneWatched = pawns[i];
+                yield return Ticks(3, "race", pawns[i]);
+                FaceLayers.TakeTuneNotes();
+                foreach (KeyValuePair<FaceLayers.FaceMod, List<string>> n in FaceLayers.TuneNotes)
+                {
+                    Note("pawn " + i + " face from " + n.Key.key + " (" + (n.Key.label ?? "unknown") + "): " + string.Join(", ", n.Value));
+                }
+                yield return Shot(i + "_face");
+            }
+            FaceLayers.TuneWatched = null;
             for (int i = 0; i < pawns.Count; i++)
             {
                 Pawn pawn = pawns[i];
                 HairDef drawn = HairBuilder.HairOf(pawn);
-                Check("race_hair_" + i, drawn != null && drawn != pawn.story.hairDef, "drawn as " + (drawn != null ? drawn.texPath : "none"));
+                string parts = WalkFigures.RacePartNames(pawn);
+                Note("pawn " + i + " race parts: " + (parts.Length > 0 ? parts : "none"));
+                if (i == 0)
+                {
+                    WalkFigures.SaveRaceParts(pawn, outDir, "part");   // the pictures each was built from
+                }
+                // A race whose hair is HAR add-ons (Kiiro) is drawn by a stand-in hairstyle; any other by its own.
+                Check("race_hair_" + i, drawn != null, "drawn as " + (drawn != null ? drawn.texPath : "none") + (drawn != null && drawn != pawn.story.hairDef ? " (add-on hair)" : ""));
                 lookDistance = 1.3f;
                 lookHeight = 0.9f;
                 lookPitch = 12f;
@@ -3066,6 +3107,8 @@ namespace M3AT
             lookDistance = LookDistance;
             lookHeight = LookHeight;
             lookPitch = LookPitch;
+            SettingsMod.Settings.otherRaces = otherRacesWas;
+            WalkFigures.OtherRacesChanged();
         }
 
         private static IEnumerator FurskinTest()
@@ -3670,7 +3713,7 @@ namespace M3AT
         }
 
         // UnderWhere's underwear and Kiiro's (Kiiro_Race) light clothes on the new garments (briefs, bandeau, crop top,
-        // shorts, short shorts, Models/garments): a woman and a man in each set, alone and under a shirt and trousers,
+        // shorts, short shorts, tank top, bra, loincloth, Models/garments): a woman and a man in each set, alone and under a shirt and trousers,
         // from the front, the side and the back. Wants UnderWhere active; Kiiro's sets are passed over without it. Each
         // apparel is checked for the garment it should get, "own <garment>" or "stand-in <garment>+<garment>"
         // (WalkFigures.AutoStandIns).
@@ -3678,16 +3721,17 @@ namespace M3AT
         {
             string[][] sets =
             {
-                new[] { "UnderWhere_Panties", "own Underwear", "UnderWhere_Bra", "stand-in CropTop" },
-                new[] { "UnderWhere_Boxers", "own Shorts", "UnderWhere_Tanktop", "own CropTop" },
-                new[] { "UnderWhere_Loincloth", "stand-in Underwear", "UnderWhere_Chestwrap", "own Chestwrap" },
+                new[] { "UnderWhere_Panties", "own Underwear", "UnderWhere_Bra", "own Bra" },
+                new[] { "UnderWhere_Boxers", "own Shorts", "UnderWhere_Tanktop", "own Tanktop" },
+                new[] { "UnderWhere_Loincloth", "own Loincloth", "UnderWhere_Chestwrap", "own Chestwrap" },
                 new[] { "UnderWhere_LongJohns", "own LongJohns" },
                 new[] { "UnderWhere_Panties", null, "UnderWhere_Bra", null, "Apparel_BasicShirt", null, "Apparel_Pants", null },
                 new[] { "UnderWhere_LongJohns", null, "Apparel_BasicShirt", null, "Apparel_Pants", null },
-                new[] { "Kiiro_Underwear_Normal", "stand-in CropTop+Underwear" },
+                new[] { "UnderWhere_Loincloth", null, "UnderWhere_Tanktop", null, "Apparel_BasicShirt", null, "Apparel_Pants", null },
+                new[] { "Kiiro_Underwear_Normal", "stand-in Bra+Underwear" },
                 new[] { "Kiiro_SimpleUnderwear", "stand-in Chestwrap+Underwear" },
-                new[] { "Kiiro_Stocking_Black", "stand-in CropTop+Underwear+Pants" },
-                new[] { "Kiiro_Pantynose_White", "stand-in CropTop+Pants" },
+                new[] { "Kiiro_Stocking_Black", "stand-in Bra+Underwear+Pants" },
+                new[] { "Kiiro_Pantynose_White", "stand-in Bra+Pants" },
                 new[] { "Kiiro_HotPant", "stand-in ShortShorts", "Kiiro_RunningShirt", "stand-in CropTop" },
                 new[] { "Kiiro_Shorts", null, "Kiiro_TShirtShort", "stand-in CropTop" },
                 new[] { "Kiiro_ShortDressII", "stand-in ShortShorts", "Kiiro_TShirt", "stand-in BasicShirt" },
@@ -3759,6 +3803,214 @@ namespace M3AT
             lookPitch = LookPitch;
             lookYaw = 0f;
             Note("Look: each set drawn alone (sets 0-3, 6-12); under the shirt and trousers (sets 4, 5) and under Kiiro's hotpants and T-shirt (set 13) none of the underwear showing through, the long johns' waffle knit, placket and ribbed cuffs at the wrists and ankles.");
+        }
+
+        // GrimWorld 40,000 (its 1.7 uploads active): a row of grown men, a plain colonist, a Cadian, a Death Korps of Krieg
+        // guardsman, a Space Marine, an Astartes scout, a Custodian and Valdor, each checked for what its apparel is drawn as
+        // (its stands_for lines and the matcher's rules) and for its size against its own before it was dressed (the
+        // marineBulk and armourDrawScale options, ArmourSize.cs); pictured as a row from the front, three quarters and the
+        // side, then each close, then the Marine drafted with its storm shield up; then a roof put over the Marine and Valdor
+        // with ceilingCrouch Always, checking both crouch under it (Ease.ceilingDrop) and stand again with it Never.
+        private static IEnumerator GrimWorldTest()
+        {
+            if (DefDatabase<ThingDef>.GetNamedSilentFail("GW_SM_TacticusArmor") == null)
+            {
+                Check("GrimWorld active", false, "no GW_SM_TacticusArmor: activate GrimWorld 40,000's Angels of Death and the rest");
+                yield break;
+            }
+            // Each outfit: apparel, then what it should be drawn as (WalkFigures.AutoStandIns' answer, any order), or null.
+            object[][] outfits =
+            {
+                new object[] { "plain", new[] { "Apparel_BasicShirt", null, "Apparel_Pants", null }, 1f },
+                new object[] { "cadian", new[] { "GW_HOI_Cadian_Fatigues", "stand-in CollarShirt+Pants", "GW_HOI_Cadian_FlakArmor", "stand-in FlakVest",
+                    "GW_HOI_Cadian_Helmet", "stand-in SimpleHelmet", "GW_HOI_BattlelineBackpack", "stand-in CE_Backpack",
+                    "GW_HOI_CadianCombatWebbing", "stand-in CE_TacVest" }, 1f },
+                new object[] { "krieg", new[] { "GW_HOI_DM_KriegUniform", "stand-in CollarShirt+Pants",
+                    "GW_HOI_DM_KriegGuardHelmet", "stand-in AdvancedHelmet+GasMask", "GW_HOI_DM_KriegBelt", "stand-in CE_TacVest" }, 1f },
+                new object[] { "marine", new[] { "GW_SM_FibroVest", null, "GW_SM_TacticusArmor", "stand-in PowerArmor",
+                    "GW_SM_TacticusHelmet_Simple", "stand-in PowerArmorHelmet", "GW_SM_TacticusShoulderPads_TypeA", "stand-in Pauldrons",
+                    "GW_SM_TacticusBackpack", "none", "GW_SM_StormShieldA", "stand-in CE_BallisticShield" }, 1.25f },
+                new object[] { "scout", new[] { "GW_SM_FibroVest", null, "GW_SM_Scout", "stand-in PowerArmor", "GW_SM_ScoutHelmet_B", "stand-in Gunlink",
+                    "GW_SM_ScoutCape", "stand-in Cape", "GW_SM_ScoutShoulderPads_TypeA", "stand-in Pauldrons" }, 1f },
+                new object[] { "custodian", new[] { "GW_TotE_CustodesGuardArmor", "stand-in PowerArmor",
+                    "GW_TotE_CustodesGuardHelmet", "stand-in PowerArmorHelmet", "GW_TotE_CustodesGuardShoulder", "stand-in Pauldrons" }, 1.25f },
+                new object[] { "valdor", new[] { "GW_Rulers_ValdorArmor", "stand-in PowerArmor", "GW_Rulers_ValdorHelmet", "stand-in PowerArmorHelmet",
+                    "GW_Rulers_ValdorShoulder", "stand-in Pauldrons" }, 1.4f },
+            };
+            Pawn[] pawns = new Pawn[outfits.Length];
+            float[] before = new float[outfits.Length];
+            Rand.PushState(20261121);
+            try
+            {
+                for (int k = 0; k < outfits.Length; k++)
+                {
+                    pawns[k] = NewPawn(middle + IntVec3.East * (2 * k - outfits.Length + 1), null);
+                    pawns[k].gender = Gender.Male;
+                    pawns[k].story.bodyType = BodyTypeDefOf.Male;
+                    pawns[k].apparel.DestroyAll();
+                }
+            }
+            finally
+            {
+                Rand.PopState();
+            }
+            HoldOthersAway(pawns);
+            for (int k = 0; k < pawns.Length; k++)
+            {
+                Hold(pawns[k]);
+            }
+            yield return Ticks(5, "grimworld", pawns[3]);
+            for (int k = 0; k < outfits.Length; k++)
+            {
+                before[k] = WalkFigures.SizeOfForTest(pawns[k]);
+                string[] worn = (string[])outfits[k][1];
+                if (DefDatabase<ThingDef>.GetNamedSilentFail(worn[0]) == null)
+                {
+                    Note((string)outfits[k][0] + ": no " + worn[0] + " (its mod isn't active: the Death Korps of Krieg are in Dead Men, 1.6 only), left bare");
+                    continue;
+                }
+                for (int i = 0; i + 1 < worn.Length; i += 2)
+                {
+                    ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail(worn[i]);
+                    if (def == null)
+                    {
+                        Check((string)outfits[k][0] + ": " + worn[i] + " loaded", false, "not loaded");
+                        continue;
+                    }
+                    pawns[k].apparel.Wear((Apparel)ThingMaker.MakeThing(def, GenStuff.DefaultStuffFor(def)), false);
+                    if (worn[i + 1] != null)
+                    {
+                        string got = WalkFigures.AutoStandIns(def);
+                        Check((string)outfits[k][0] + ": " + worn[i] + " is " + worn[i + 1], SameGarments(got, worn[i + 1]), got);
+                    }
+                }
+                bool wearing = true;
+                for (int i = 0; i + 1 < worn.Length; i += 2)
+                {
+                    wearing &= pawns[k].apparel.WornApparel.Exists(a => a.def.defName == worn[i]);
+                }
+                Check((string)outfits[k][0] + ": wears all of it", wearing, string.Join(", ", pawns[k].apparel.WornApparel.ConvertAll(a => a.def.defName)));
+                float after = WalkFigures.SizeOfForTest(pawns[k]);
+                float want = (float)outfits[k][2];
+                Check((string)outfits[k][0] + ": drawn " + want.ToString("0.00") + " of its own size", Mathf.Abs(after / before[k] - want) < 0.01f,
+                    (after / before[k]).ToString("F3") + " (" + before[k].ToString("F3") + " to " + after.ToString("F3") + ")");
+                Hold(pawns[k]);
+            }
+            lookDistance = 11f;
+            lookHeight = 0.9f;
+            lookPitch = 12f;
+            foreach (float yaw in new[] { 0f, 35f, 90f })
+            {
+                lookAt = Centre(pawns);
+                lookYaw = yaw;
+                yield return Ticks(10, "grimworld", pawns[3]);
+                yield return Shot("row_" + Mathf.RoundToInt(yaw));
+            }
+            lookDistance = 3.2f;
+            lookHeight = 0.9f;
+            lookPitch = 10f;
+            for (int k = 0; k < pawns.Length; k++)
+            {
+                foreach (float yaw in new[] { 20f, 160f })
+                {
+                    Look(pawns[k], yaw);
+                    yield return Ticks(3, "grimworld", pawns[k]);
+                    yield return Shot((string)outfits[k][0] + "_" + Mathf.RoundToInt(yaw));
+                }
+            }
+            // The Marine drafted: its storm shield (CE's ballistic shield standing in) out of the back and into the guard,
+            // played at normal speed as the draw runs on frame time.
+            Pawn marine = pawns[3];
+            // (a mod's message box at the start, GrimWorld's or another's, forces the pause, so nothing would run on game
+            // time: noted and closed)
+            foreach (Window w in new List<Window>(Find.WindowStack.Windows))
+            {
+                if (w is Dialog_MessageBox box)
+                {
+                    Note("closed a message box forcing the pause: " + (box.title ?? "") + " " + Clip(box.text.ToString().Replace("\n", " "), 300));
+                    box.Close(false);
+                }
+            }
+            marine.drafter.Drafted = true;
+            Look(marine, 0f);   // (drawn, so its figure is stepped: off camera it isn't)
+            yield return Unpaused(marine, () => false, 2.5f);
+            Note("marine's shield: " + WalkFigures.ShieldReport(marine) + "; shieldClip " + WalkFigures.AutoField(marine, "shieldClip") + ", shield " + WalkFigures.AutoField(marine, "shield")
+                + ", drafted " + marine.Drafted + ", tick " + Find.TickManager.TicksGame);
+            object shieldOut = WalkFigures.AutoField(marine, "shieldOut");
+            Check("marine: the storm shield taken into the guard drafted", shieldOut is float f && f >= 0.99f, shieldOut == null ? "null" : shieldOut.ToString());
+            foreach (float yaw in new[] { 0f, 50f })
+            {
+                Look(marine, yaw);
+                yield return Ticks(3, "grimworld", marine);
+                yield return Shot("marine_drafted_" + Mathf.RoundToInt(yaw));
+            }
+            marine.drafter.Drafted = false;
+            Hold(marine);
+            // Ceilings: a roof over the Marine (1.25 of a grown pawn, just over the wall height) and Valdor (1.4).
+            CeilingCrouch was = SettingsMod.Settings.ceilingCrouch;
+            Pawn valdor = pawns[6];
+            foreach (Pawn p in new[] { marine, valdor })
+            {
+                foreach (IntVec3 c in GenAdj.CellsAdjacent8Way(p).Concat(new[] { p.Position }))
+                {
+                    if (c.InBounds(map))
+                    {
+                        map.roofGrid.SetRoof(c, RoofDefOf.RoofConstructed);
+                    }
+                }
+            }
+            Note("wall height " + IsoRim.Api.WallHeight.ToString("F2") + " cells; Marine stands " + (1.25f * WalkFigures.SizeOfForTest(marine)).ToString("F2")
+                + ", Valdor " + (1.25f * WalkFigures.SizeOfForTest(valdor)).ToString("F2"));
+            SettingsMod.Settings.ceilingCrouch = CeilingCrouch.Always;
+            yield return Unpaused(marine, () => false, 2f);
+            foreach (Pawn p in new[] { marine, valdor })
+            {
+                object drop = WalkFigures.AutoField(p, "ceilingDrop");
+                Check(p.LabelShort + " crouches under the roof (Always)", p.Position.Roofed(map) && drop is float d && d > 0.01f, drop == null ? "null" : ((float)drop).ToString("F3"));
+            }
+            lookDistance = 5f;
+            lookHeight = 0.8f;
+            lookPitch = 6f;
+            foreach (float yaw in new[] { 0f, 90f })
+            {
+                lookAt = (marine.DrawPos + valdor.DrawPos) * 0.5f;
+                lookYaw = yaw;
+                yield return Ticks(3, "grimworld", valdor);
+                yield return Shot("ceiling_always_" + Mathf.RoundToInt(yaw));
+            }
+            SettingsMod.Settings.ceilingCrouch = CeilingCrouch.FloorShown;
+            yield return Unpaused(marine, () => false, 2f);
+            object shown = WalkFigures.AutoField(valdor, "ceilingDrop");
+            Check("Valdor stands up under the roof (FloorShown, no upper floor drawn)", shown is float s && s < 0.01f, shown == null ? "null" : ((float)shown).ToString("F3"));
+            SettingsMod.Settings.ceilingCrouch = CeilingCrouch.Never;
+            yield return Unpaused(marine, () => false, 2f);
+            object never = WalkFigures.AutoField(valdor, "ceilingDrop");
+            Check("Valdor stands up under the roof (Never)", never is float n && n < 0.01f, never == null ? "null" : ((float)never).ToString("F3"));
+            lookAt = (marine.DrawPos + valdor.DrawPos) * 0.5f;
+            lookYaw = 90f;
+            yield return Ticks(3, "grimworld", valdor);
+            yield return Shot("ceiling_never_90");
+            SettingsMod.Settings.ceilingCrouch = was;
+            foreach (Pawn p in new[] { marine, valdor })
+            {
+                foreach (IntVec3 c in GenAdj.CellsAdjacent8Way(p).Concat(new[] { p.Position }))
+                {
+                    if (c.InBounds(map))
+                    {
+                        map.roofGrid.SetRoof(c, null);
+                    }
+                }
+            }
+            lookDistance = LookDistance;
+            lookHeight = LookHeight;
+            lookPitch = LookPitch;
+            lookYaw = 0f;
+            Note("Look: the Marine, Custodian and Valdor bigger and broader with heads of a normal size; the pauldrons over the armour's shoulders; the Krieg gas mask under the helmet; the scout's gunlink and cape; the storm shield in the left fist drafted; the Marine and Valdor crouched and stooped under the roof with Always.");
+        }
+
+        private static string Clip(string s, int most)
+        {
+            return s.Length > most ? s.Substring(0, most) + "..." : s;
         }
 
         // The same garments in any order: a stand-in pair or set is listed by score, or a stands_for set by the export's order.
@@ -4542,6 +4794,91 @@ namespace M3AT
         // The face tool (FaceTuning.cs): a bald pawn close up from the front, its face as drawn, then its eyes' mod's face
         // moved up and enlarged and its mouth moved down and enlarged, stacked and drawn a layer at a time (the pairs should
         // match), noting which mod each of its parts was found in. The settings are put back after, never written.
+        // facepins: a tuned face mod keeps the automatic fit it was tuned on (FacePins.cs). A Wolfein (its own face mod,
+        // fitted) and a human: an old tuning of the race's mod (no pin) is cleared; an old one of the human's mod is kept and
+        // pinned to no fit; a new tuning of the race's mod pins the fit it is drawn with; a change to the measuring leaves the
+        // pinned face as it was and moves an untuned one; Back to automatic (its tuning reset) unpins it. Wants Wolfein Race
+        // and its Facial Animation mod.
+        private static IEnumerator FacePinsTest()
+        {
+            ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail("Wolfein_Race");
+            PawnKindDef kind = def == null ? null : DefDatabase<PawnKindDef>.AllDefs.FirstOrDefault(k => k.race == def);
+            if (kind == null)
+            {
+                Check("facepins", false, "no Wolfein_Race (its mod off?)");
+                yield break;
+            }
+            Settings s = SettingsMod.Settings;
+            bool otherRacesWas = s.otherRaces;
+            s.otherRaces = true;
+            WalkFigures.OtherRacesChanged();
+            Dictionary<string, Vector3> faces = new Dictionary<string, Vector3>(s.faceTunes), mouths = new Dictionary<string, Vector3>(s.mouthTunes), fits = new Dictionary<string, Vector3>(s.faceFits);
+            Dictionary<string, Vector2> rows = new Dictionary<string, Vector2>(s.faceFitRows);
+            s.faceTunes.Clear();
+            s.mouthTunes.Clear();
+            s.faceFits.Clear();
+            s.faceFitRows.Clear();
+            Pawn wolf = PawnGenerator.GeneratePawn(new PawnGenerationRequest(kind, Faction.OfPlayer, forceGenerateNewPawn: true));
+            wolf.equipment.DestroyAllEquipment();
+            Spawn(wolf, middle);
+            wolf.Rotation = Rot4.South;
+            Hold(wolf);
+            Pawn human = NewPawn(middle + new IntVec3(2, 0, 0), null);
+            Hold(human);
+            Look(wolf, 0f);
+            yield return Ticks(5, "facepins", wolf);
+            string wolfMod = FaceLayers.TestEyeModOf(def);
+            string humanMod = FaceLayers.TestEyeModOf(ThingDefOf.Human);
+            float measured = FaceLayers.TestRaceEyeScale(def);
+            Note("Wolfein's eyes from " + wolfMod + ", measured scale " + measured.ToString("F2") + "; the human's from " + humanMod);
+            Check("mods found", wolfMod != null && humanMod != null && wolfMod != humanMod, wolfMod + " / " + humanMod);
+            if (wolfMod == null || humanMod == null)
+            {
+                yield break;
+            }
+            // Old tunings, unpinned.
+            s.faceTunes[wolfMod] = new Vector3(0f, 0.02f, 1.1f);
+            s.faceTunes[humanMod] = new Vector3(0f, 0.01f, 1.05f);
+            yield return Ticks(3, "facepins", wolf);
+            Check("old race tuning cleared", !s.faceTunes.ContainsKey(wolfMod) && !s.faceFits.ContainsKey(wolfMod), "tuned " + s.faceTunes.ContainsKey(wolfMod));
+            Vector3 humanFit;
+            Check("old human tuning kept, pinned to no fit", s.faceTunes.ContainsKey(humanMod) && s.faceFits.TryGetValue(humanMod, out humanFit) && Mathf.Abs(humanFit.x - 1f) < 1e-4f,
+                "tuned " + s.faceTunes.ContainsKey(humanMod) + ", pinned " + s.faceFits.ContainsKey(humanMod));
+            // A new tuning, as the tool makes it: pinned to the fit drawn now.
+            s.faceTunes[wolfMod] = new Vector3(0f, 0.01f, 1.0f);
+            FaceLayers.Pin(wolf, wolfMod);
+            Vector3 pinned;
+            s.faceFits.TryGetValue(wolfMod, out pinned);
+            Check("new tuning pinned to the fit drawn", Mathf.Abs(pinned.x - measured) < 1e-4f, "pinned scale " + pinned.x.ToString("F2") + ", measured " + measured.ToString("F2"));
+            yield return Ticks(2, "facepins", wolf);
+            yield return Shot("tuned");
+            // The measuring changes (an update): the tuned face keeps its pinned fit.
+            FaceLayers.TestSetRaceEyeScale(def, measured * 0.7f);
+            yield return Ticks(3, "facepins", wolf);
+            float drawn;
+            FaceLayers.TestEyeScales.TryGetValue(wolf.thingIDNumber, out drawn);
+            Check("pinned face ignores a new fit", Mathf.Abs(drawn - measured) < 1e-4f, "drawn " + drawn.ToString("F2") + ", pinned " + measured.ToString("F2"));
+            // Back to automatic: the tuning reset unpins it, and it takes the new fit.
+            s.faceTunes.Remove(wolfMod);
+            FaceLayers.Unpin(wolfMod);
+            yield return Ticks(3, "facepins", wolf);
+            FaceLayers.TestEyeScales.TryGetValue(wolf.thingIDNumber, out drawn);
+            Check("untuned face follows the new fit", Mathf.Abs(drawn - measured * 0.7f) < 1e-4f && !s.faceFits.ContainsKey(wolfMod), "drawn " + drawn.ToString("F2"));
+            yield return Shot("automatic_new_fit");
+            FaceLayers.TestSetRaceEyeScale(def, measured);
+            s.faceTunes.Clear();
+            s.mouthTunes.Clear();
+            s.faceFits.Clear();
+            s.faceFitRows.Clear();
+            foreach (KeyValuePair<string, Vector3> k in faces) s.faceTunes[k.Key] = k.Value;
+            foreach (KeyValuePair<string, Vector3> k in mouths) s.mouthTunes[k.Key] = k.Value;
+            foreach (KeyValuePair<string, Vector3> k in fits) s.faceFits[k.Key] = k.Value;
+            foreach (KeyValuePair<string, Vector2> k in rows) s.faceFitRows[k.Key] = k.Value;
+            s.otherRaces = otherRacesWas;
+            WalkFigures.OtherRacesChanged();
+            s.Write();   // the player's tunings back in the file too, which clearing the old one wrote over
+        }
+
         private static IEnumerator FaceTuneTest()
         {
             Rand.PushState(20261120);
@@ -7896,6 +8233,7 @@ namespace M3AT
                 yield break;
             }
             float until = Time.realtimeSinceStartup + seconds;
+            int ticked = Find.TickManager.TicksGame;
             Find.TickManager.CurTimeSpeed = TimeSpeed.Normal;
             yield return null;
             while (Time.realtimeSinceStartup < until && !done())
@@ -7903,6 +8241,17 @@ namespace M3AT
                 Find.TickManager.CurTimeSpeed = TimeSpeed.Normal;
                 yield return null;
                 Probe("unpaused", pawn);
+            }
+            if (Find.TickManager.TicksGame == ticked && Time.realtimeSinceStartup >= until)
+            {
+                // (the game never ran: say what held it, a window forcing the pause most likely)
+                List<string> windows = new List<string>();
+                foreach (Window w in Find.WindowStack.Windows)
+                {
+                    windows.Add(w.GetType().FullName + (w.forcePause ? " (forces pause)" : ""));
+                }
+                Note("unpaused: the game didn't tick in " + seconds.ToString("0.0") + " s; paused " + Find.TickManager.Paused + ", forced "
+                    + Find.WindowStack.WindowsForcePause + ", windows: " + string.Join(", ", windows));
             }
             Pause();
         }
@@ -8622,7 +8971,21 @@ namespace M3AT
             }
             SkinnedFigure.Hold hold = HoldOf(WeaponName(w.def), AsSlab(w));
             return "slab " + AsSlab(w) + ", name " + WeaponName(w.def) + ", kind " + KindOf(w.def) + ", type " + TypeOf(w.def) + ", drafted clip " + DraftedClip(pawn)
-                + ", aim clips " + AimName(pawn) + ", own hold " + (hold != null) + ", fitted to " + FitArtOf(w) + ", " + AutoGripOf(pawn, w);
+                + ", aim clips " + AimName(pawn) + ", own hold " + (hold != null) + ", fitted to " + FitArtOf(w) + ", " + AutoGripOf(pawn, w)
+                + ", thrown " + Thrown(w.def) + " (" + ThrownWhy(w.def) + ")";
+        }
+
+        // What Thrown goes by, for the notes: each verb's class and fire log, and the weapon's tags.
+        private static string ThrownWhy(ThingDef def)
+        {
+            List<string> parts = new List<string>();
+            for (int i = 0; def.Verbs != null && i < def.Verbs.Count; i++)
+            {
+                VerbProperties v = def.Verbs[i];
+                parts.Add("verb " + (v.verbClass != null ? v.verbClass.Name : "?") + " log " + (v.rangedFireRulepack != null ? v.rangedFireRulepack.defName : "none"));
+            }
+            parts.Add("tags " + (def.weaponTags != null ? string.Join(" ", def.weaponTags) : "none"));
+            return string.Join("; ", parts);
         }
 
         // The last grip slide DrawWeapon gave this pawn's weapon (GripSlide, in cells of the art's own axes, before the

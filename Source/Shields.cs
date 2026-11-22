@@ -173,14 +173,50 @@ namespace M3AT
         private const float ShieldEase = 4f;   // how fast a pawn brings its shield up into the guard (or lowers it), per real second
         private const float ShieldDrawIn = 0.15f;   // the share of shield_draw over which it is eased in from the arm's own pose
 
+#if AUTOTEST
+        // What the shield code sees of a pawn, for the autotest: the shield on its back, whether it shows, and each worn
+        // apparel's held garment.
+        internal static string ShieldReport(Pawn pawn)
+        {
+            List<string> held = new List<string>();
+            foreach (Apparel a in pawn.apparel.WornApparel)
+            {
+                int g = HeldGarmentOf(a.def);
+                held.Add(a.def.defName + "=" + g + (g > 0 ? "(" + skin.PieceName(g) + ", back " + skin.CarriedOnBack(g) + ", clip " + (skin.ShieldDrawOf(g) ?? "none") + ")" : ""));
+            }
+            int back = ShieldOnBack(pawn);
+            return "on back " + back + ", shows " + ShieldShows(pawn) + ", up " + ShieldUp(pawn) + "; " + string.Join("; ", held);
+        }
+#endif
+
+        // The held garment (a shield) drawn for this apparel: its own, else one standing in for it (a stands_for line:
+        // GrimWorld's shields as CE's), or -1.
+        private static int HeldGarmentOf(ThingDef def)
+        {
+            int g = skin.GarmentOf(def);
+            if (g > 0)
+            {
+                return skin.IsHeld(g) ? g : -1;
+            }
+            int[] standIns = skin.StandInsFor(def);
+            for (int k = 0; k < standIns.Length; k++)
+            {
+                if (skin.IsHeld(standIns[k]))
+                {
+                    return standIns[k];
+                }
+            }
+            return -1;
+        }
+
         // The worn shield carried on the back that is drawn here (its garment), or -1.
         private static int ShieldOnBack(Pawn pawn)
         {
             List<Apparel> worn = pawn.apparel != null ? pawn.apparel.WornApparel : null;
             for (int i = 0; skin != null && worn != null && i < worn.Count; i++)
             {
-                int g = skin.GarmentOf(worn[i].def);
-                if (skin.IsHeld(g) && skin.CarriedOnBack(g))
+                int g = HeldGarmentOf(worn[i].def);
+                if (g > 0 && skin.CarriedOnBack(g))
                 {
                     return g;
                 }
@@ -304,7 +340,7 @@ namespace M3AT
             }
             for (int i = 0; i < worn.Count; i++)
             {
-                if (skin.IsHeld(skin.GarmentOf(worn[i].def)))
+                if (HeldGarmentOf(worn[i].def) > 0)
                 {
                     return true;
                 }
