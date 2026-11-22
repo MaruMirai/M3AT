@@ -16,7 +16,8 @@ namespace M3AT
     //     underside is the highest cut that leaves the most separate parts hanging below it (stock, grip, magazine, ...).
     //     The grip is the rearmost of them that is not the stock, and on it the rearmost leg reaching more than half its
     //     depth down (a trigger guard or a lip can join it to the magazine), followed up its slant to just under the body.
-    //     With no pistol grip, the stock's wrist: its thinnest column behind the body.
+    //     With no pistol grip, the stock's wrist: its thinnest column behind the body. With nothing hanging at all, a long
+    //     thin tube (a disposable launcher): its underside TubeGrip of the way from its rear.
     //   - A melee weapon, its head to the right: along its long axis the handle is the narrowest stretch from the left
     //     end, a pommel left out, the guard or head where it widens. The fist in the handle's middle, near the guard on a
     //     two-handed one, 40% of the way along a long shaft.
@@ -25,6 +26,8 @@ namespace M3AT
     public static class GripFinder
     {
         private const int Size = 128;
+        private const float TubeGrip = 0.3f;       // a tube's grip from its rear end, a share of its length
+        private const float TubeThickest = 0.3f;   // a tube's art at most this tall for its length
 
         private static readonly Dictionary<ValueTuple<int, string, float>, Vector2?> found = new Dictionary<ValueTuple<int, string, float>, Vector2?>();
 
@@ -53,7 +56,12 @@ namespace M3AT
                         {
                             m[k] = px[k].a > 128;
                         }
-                        at = kind == "gun" ? Gun(Turned(m, -offset), offset) : Melee(m, kind == "melee2");
+                        bool tube = false;
+                        at = kind == "gun" ? Gun(Turned(m, -offset), offset, out tube) : Melee(m, kind == "melee2");
+                        if (kind == "gun")
+                        {
+                            tubes[new ValueTuple<int, float>(key.Item1, offset)] = tube && at.HasValue;
+                        }
                     }
                 }
                 catch (Exception e)
@@ -68,6 +76,17 @@ namespace M3AT
                 uv = at.Value;
             }
             return at.HasValue;
+        }
+
+        private static readonly Dictionary<ValueTuple<int, float>, bool> tubes = new Dictionary<ValueTuple<int, float>, bool>();
+
+        // Whether a gun's art is a plain tube (its grip found as one: nothing hangs below a long thin body), as a disposable
+        // rocket launcher is. offset as Find's.
+        public static bool IsTube(Texture tex, float offset)
+        {
+            Vector2 uv;
+            bool tube;
+            return tex != null && Find(tex, "gun", offset, out uv) && tubes.TryGetValue(new ValueTuple<int, float>(tex.GetInstanceID(), offset), out tube) && tube;
         }
 
         // ---- the mask: m[j * Size + i], row j going up the sprite
@@ -222,8 +241,9 @@ namespace M3AT
         }
 
         // A gun turned level (muzzle to the right); the place is turned back by offset.
-        private static Vector2? Gun(bool[] mask, float offset)
+        private static Vector2? Gun(bool[] mask, float offset, out bool tube)
         {
+            tube = false;
             bool[] m = Largest(mask);
             int i0 = Size, i1 = -1, j0 = Size, j1 = -1;
             int[] top = new int[Size], bot = new int[Size];
@@ -279,6 +299,18 @@ namespace M3AT
             if (parts == null)
             {
                 return null;
+            }
+            if (parts.Count == 0)
+            {
+                // Nothing hangs below the body: a tube (a disposable rocket launcher), held from under it. Only a long,
+                // thin one, as a boxy gun with nothing below is no clearer than before.
+                int along = (int)(i0 + TubeGrip * length);
+                if (j1 - j0 + 1 > TubeThickest * length || bot[along] >= Size)
+                {
+                    return null;
+                }
+                tube = true;
+                return TurnPoint(new Vector2((along + 0.5f) / Size, (bot[along] + 0.5f) / Size), offset);
             }
             Part stock = null;
             if (parts.Count > 0 && parts[0].rear && (parts.Count > 1 || parts[0].hi - parts[0].lo > 0.25f * length))

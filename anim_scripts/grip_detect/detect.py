@@ -68,6 +68,13 @@ def gun(m, info, pistol=False):
         return (i0 + 0.3 * L) / N, (rows[0] + rows[-1]) / 2 / N
     base, parts, _ = best
     info['base'] = int(base)
+    if not parts:
+        # Nothing hangs below the body: a long thin tube (a disposable launcher), held from under it (TubeGrip,
+        # TubeThickest in GripFinder.cs).
+        i = int(i0 + 0.3 * L)
+        if rows[-1] - rows[0] + 1 <= 0.3 * L and m[:, i].any():
+            info['how'] = 'tube'
+            return (i + 0.5) / N, (np.nonzero(m[:, i])[0][0] + 0.5) / N
     info['parts'] = [(round(float(p['lo']-i0)/L,2), round(float(p['hi']-i0)/L,2), int(p['depth']), bool(p['rear'])) for p in parts]
     stock = None
     if not pistol and parts and parts[0]['rear'] and (len(parts) > 1 or (parts[0]['hi'] - parts[0]['lo']) > 0.25 * L):
@@ -198,7 +205,7 @@ def detect(path, kind, offset=0.0):
 
 def trusted(r, kind):
     """Whether a detection is sure enough to use (else the kind's hold stays): guns and melee only."""
-    return r['how'] in ('grip', 'wrist', 'hilt', 'shaft') and kind not in ('pistol', 'bow')
+    return r['how'] in ('grip', 'wrist', 'hilt', 'shaft', 'tube') and kind not in ('pistol', 'bow')
 
 def category(e):
     t = e['type']
