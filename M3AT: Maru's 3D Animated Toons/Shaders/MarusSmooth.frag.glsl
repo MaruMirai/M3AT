@@ -67,6 +67,7 @@ layout(set = 2, binding = 0) uniform MaterialUniforms
     float _ShadeBands; // @default = 0.0   levels the sun's shade is rounded to (2 or more); 0 = smooth (SkinnedFigure.ShadeBands)
     float _Glass;     // @default = 0.0   1: a visor's glass (def MarusGlass, SkinnedFigure.DrawVisor), see GlassColour
     float _IsoFlash;  // @default = 0.0   per draw (IsoRim's HitFlash, M3AT's HitFlash.cs): how red a hit figure is now, 0 = not at all
+    float _OutlineId; // @default = 0.0   the screen-space outline's part pass (defs MarusOutlineId*, ScreenOutlines.cs): above 0, write only this into alpha
 } uMaterial;
 
 layout(set = 2, binding = 1) uniform sampler2D _MainTex;
@@ -404,6 +405,14 @@ void main()
     if (color.a < 0.5)
         discard;
 #endif
+    // The screen-space outline's part pass (ScreenOutlines.cs): drawn over the figure's own faces at the depth they have,
+    // with a blend that multiplies the picture by this colour (MarusOutlineId), so the colour is left as it is and the
+    // alpha, 1 there until now, becomes the part's code.
+    if (uMaterial._OutlineId > 0.0)
+    {
+        outColor = vec4(1.0, 1.0, 1.0, uMaterial._OutlineId);
+        return;
+    }
     // Light pass: where an upright face meets the ground, face and ground have the same depth on
     // the foot line and the ground can win there, so the bottom row of pixels is left to the
     // overlay (else that ground pixel would take the face's light instead). Ground at height 0.

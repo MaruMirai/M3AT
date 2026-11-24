@@ -110,8 +110,10 @@ namespace M3AT
             public bool overHair;       // a garment's: worn over the hair, pushed out past it rather than tucking it (HatOverHair.cs)
             public bool hidesClothes;   // a garment's: the garments worn under it are left off (body armour, HidesClothes)
             public bool withLegwear;    // a garment's: also worn once the torso and legs are covered (the shoes, WalkFigures.WornGarments)
+            public float hemShare = -1f;   // a skirt's or dress's: how far down the body its hem comes, 0 the top, 1 the feet (HemLengths.cs); -1 none
             public bool forBaby;        // a garment's: worn by a baby a few hours old (the baby romper, WalkFigures.BabyRomperOf)
             public bool pads;           // a garment's: worn with the Pauldrons garment (the marine and cataphract armour, WalkFigures.ArmourPads)
+            public float sole;          // a garment's: how far it reaches below the body's soles at rest, model units (its sole line, SoleOf)
             public string marineOf;     // a garment's: the garment it is drawn in place of on a pawn in Space Marine armour (PauldronsBig, WalkFigures.MarinePads)
             public bool held;           // a garment's: held in the hand (a shield, its held line), drawn only while the game shows
                                         // the weapon (WalkFigures.WornGarments); it hides nothing and is in no clearance (HeldMask)
@@ -187,6 +189,7 @@ namespace M3AT
             internal List<string> geneKeys;   // the gene keys it has whole (null: none), which MeasureHead leaves out too
             internal Vector3 headLow, headHigh;
             internal readonly Dictionary<(int, GarmentMask), PieceShape> letOut = new Dictionary<(int, GarmentMask), PieceShape>();   // webbing let out, by garment and garments under it (LetOut.cs)
+            internal readonly Dictionary<GarmentMask, ArmRoom> armRoom = new Dictionary<GarmentMask, ArmRoom>();   // the trunk's girth for the held arms, by garments worn (ArmsClear.cs)
         }
 
         private Piece[] pieces;
@@ -328,9 +331,11 @@ namespace M3AT
             public bool tinted;
             public int outlineMarkAt = -1;   // where the outline's light pass is in parts; -1: not added yet
             public bool textureMarked;   // a textured garment's light pass is in parts
+            public int textureMarkAt = -1;   // and where (Draw sets its material each time, as a garment painted with an apparel's art has its own)
             public int clearAt = -1;   // where its two stencil-clearing parts are in parts (SetSlot); -1: not added yet
             public int grainMarkAt = -1;   // the body's: where the light pass of its strand grain is in parts (BodyMaterial); -1: not added yet
             public int afterAt = -1;   // where its redraw after IsoRim's ambient occlusion is in parts (SetSlot); -1: not added yet
+            public int idAt = -1;   // where its screen-space outline's code part is in parts (ScreenOutlines.cs); -1: not added yet
             public bool isSkin;   // the body or the fur on it, which never take the occlusion (ClothesOcclusion)
             public bool dressed;  // a garment (or the fur): skinned by the pawn's dress bones while it has a pylon (Prosthetics.cs)
             public int bare = -1;   // the bare feet its triangles were left out for (Unshod)
@@ -355,6 +360,8 @@ namespace M3AT
             internal PieceMeshes beard;
             internal PieceMeshes ears;   // its gene's ears (CatEars.cs), made when first drawn
             internal string earsMadeOf;  // and the file those meshes are of
+            internal Color32[] earPaint;  // the ears' colours with a lining fading out (EarLining.cs's LiningPaint), and what for
+            internal Color32 earPaintTint, earPaintInner;
             internal Piece hornsPiece;   // the horns its horn meshes are for (Horns.cs)
             internal PieceMeshes horns;
             internal readonly Dictionary<Piece, PieceMeshes> addons = new Dictionary<Piece, PieceMeshes>();   // its race parts built from their sprites (AddonBuilder.cs)
@@ -388,6 +395,8 @@ namespace M3AT
             public float lean;    // degrees the trunk is leant sideways over the hips, + to the figure's left (Lean)
             public float stoop;   // degrees the upper back is bent forward, the head kept up (Stoop)
             public GarmentMask wornMask;       // the garments it has on this draw (Wearing)
+            public GarmentMask soleMask;       // the garments sole was worked out for (SoleOf)
+            public float sole = -1f;           // the most any of them reaches below the body's soles, model units; -1 not yet
             public bool gearPack;      // and whether an equipment pack is drawn on its back
             public float packScale = 1f;   // the size an equipment pack is drawn at, of this figure's: as big on every pawn
             public float backpackScale = 1f;   // and a backpack, likewise, a child's being a smaller one
@@ -414,6 +423,7 @@ namespace M3AT
             public bool tucked;   // under IsoRim's blanket in bed: only the head is drawn (BedTuck.cs); set before HideUnder
             public Matrix4x4[] bones;   // what the meshes are skinned by: a cut bone squashed to the joint it was cut at
             public Matrix4x4[] whole;   // the same uncut, for what rides a bone (BoneOf, JointOf)
+            internal int coverFrame = -1, coverSlot = -1;   // the frame and slot the screen-space outline's box was last drawn for (ScreenOutlines.cs)
             public float[] boneRows;   // bones as 12 numbers each, the top three rows (ReadBones), what the meshes are skinned from
             public Matrix4x4[] shownBones, shownWhole;   // bones, whole and pos as the meshes were last posed (Finish)
             public Vector3[] shownPos;
@@ -692,7 +702,14 @@ namespace M3AT
                 return found;
             }
             string text = (layer.defName + " " + (layer.label ?? "")).ToLowerInvariant();
-            if (text.Contains("under"))
+            if (Array.IndexOf(HeadLayers, layer.defName) >= 0)
+            {
+                // The head layers are themselves, whatever their labels say: in the game the Overhead layer came out as the
+                // Shell by its label (as patched), so garments described by their layer lines ("Overhead": the hairband,
+                // the nun's veil) never shared a layer with any hat and stood in for nothing.
+                found = layer.defName;
+            }
+            else if (text.Contains("under"))
             {
                 found = UnderwearLayer;
             }
@@ -1047,6 +1064,12 @@ namespace M3AT
                     case "pads":
                         piece.pads = p[1] == "yes";
                         break;
+                    case "sole":
+                        piece.sole = float.Parse(p[1], CultureInfo.InvariantCulture);
+                        break;
+                    case "hem_share":
+                        piece.hemShare = float.Parse(p[1], CultureInfo.InvariantCulture);
+                        break;
                     case "marine_of":
                         piece.marineOf = p[1];
                         break;
@@ -1375,6 +1398,10 @@ namespace M3AT
                 else if (p[0] == "gear")
                 {
                     ReadGear(p);
+                }
+                else if (p[0] == "helmet_back")
+                {
+                    ReadHelmetBack(p);
                 }
                 else if (p[0] == "dress_loop" && p.Length > 3)
                 {
@@ -2274,8 +2301,9 @@ namespace M3AT
 
         // After Chain: bends the arm on side ("R" or "L") so its wrist goes w (0 .. 1) of the way to target (model units,
         // the whole move in, as JointOf gives), as far as it reaches; the elbow kept in the plane it was bent in and the hand
-        // keeping its turn. Call Reached once the arms are done.
-        public void Reach(Posed p, Matrix4x4 whole, string side, Vector3 target, float w)
+        // keeping its turn. Call Reached once the arms are done. pole (model units, before the whole move): the elbow bent
+        // toward it instead (ArmsClear).
+        public void Reach(Posed p, Matrix4x4 whole, string side, Vector3 target, float w, Vector3? pole = null)
         {
             int upper, fore, hand;
             if (w <= 0f || !boneIndex.TryGetValue("upper_arm." + side, out upper) || !boneIndex.TryGetValue("forearm." + side, out fore)
@@ -2295,7 +2323,11 @@ namespace M3AT
             }
             Vector3 along = line.normalized;
             to = shoulder + along * d;
-            Vector3 bend = Vector3.ProjectOnPlane(elbow - shoulder, along);
+            Vector3 bend = Vector3.ProjectOnPlane((pole ?? elbow) - shoulder, along);
+            if (bend.sqrMagnitude < 1e-8f && pole != null)
+            {
+                bend = Vector3.ProjectOnPlane(elbow - shoulder, along);
+            }
             if (bend.sqrMagnitude < 1e-8f)
             {
                 bend = Vector3.ProjectOnPlane(Vector3.down, along);   // a straight arm: its elbow down
@@ -3203,6 +3235,28 @@ namespace M3AT
             return 0f;
         }
 
+        // How far the garments the figure had on at its last draw (Wearing) reach below the body's soles at rest, model units:
+        // armour built standing on thick soles under the feet (the cataphract, marine and recon armour), which lifts its
+        // wearer by that much while it is on its feet (WalkFigures, in placing it). The most of any of them.
+        public float SoleOf(Posed p)
+        {
+            if (p.sole >= 0f && p.soleMask == p.wornMask)
+            {
+                return p.sole;
+            }
+            float sole = 0f;
+            for (int g = 1; g < pieces.Length && g <= MaxHiding; g++)
+            {
+                if (pieces[g].sole > sole && (p.wornMask & GarmentBit(g)) != 0)
+                {
+                    sole = pieces[g].sole;
+                }
+            }
+            p.soleMask = p.wornMask;
+            p.sole = sole;
+            return sole;
+        }
+
         // What the figure has on this draw, which places what it carries on its back. Before any of it is drawn.
         public void Wearing(Posed p, GarmentMask mask, bool gearPack, float packScale, float backpackScale)
         {
@@ -3623,8 +3677,11 @@ namespace M3AT
             GarmentMask over = 0;
             for (int h = 1; h < pieces.Length && h <= MaxHiding; h++)
             {
-                if (h != g && (mask & (GarmentBit(h))) != 0 && (NoHideMask & (GarmentBit(h))) == 0 && worn[h] != null && worn[h] != worn[g]
-                    && GoesOver(worn[h].def.apparel, worn[g].def.apparel))
+                // (Two garments drawn for one apparel, a pair stand-in, don't hide each other, but for a skirt: a uniform drawn
+                // as the collared shirt and a skirt has the shirt tucked in.)
+                if (h != g && (mask & (GarmentBit(h))) != 0 && (NoHideMask & (GarmentBit(h))) == 0 && worn[h] != null
+                    && (worn[h] != worn[g] || IsSkirt(h) != IsSkirt(g))
+                    && PieceGoesOver(h, g, worn[h].def.apparel, worn[g].def.apparel))
                 {
                     over |= GarmentBit(h);
                 }
@@ -3635,6 +3692,38 @@ namespace M3AT
         // True if apparel outer goes over apparel inner: on an outer layer, or on the same layer the one on the torso over
         // the one that isn't. Shirts and trousers are cut from the same body faces at the same offset, so where a shirt
         // overlaps the waist the two lie exactly on each other, and without this they fight for the same pixels.
+        // GoesOver for garment h over garment g, drawn for those apparel: a skirt (a Skirt... garment with a hem_share line, HemLengths.cs) goes over
+        // whatever is worn with it on the shirt layer or under it (a shirt tucked into it; Kiiro puts its skirts on a layer
+        // of its own under its shirts), and only what is on an outer layer (a jacket) goes over it.
+        private bool PieceGoesOver(int h, int g, ApparelProperties outer, ApparelProperties inner)
+        {
+            bool hSkirt = IsSkirt(h), gSkirt = IsSkirt(g);
+            if (hSkirt != gSkirt)
+            {
+                float skirtTop = Mathf.Max(ApparelLayerDefOf.OnSkin.drawOrder, OuterLayer(hSkirt ? outer : inner));
+                if (OuterLayer(hSkirt ? inner : outer) <= skirtTop)
+                {
+                    return hSkirt;
+                }
+            }
+            return GoesOver(outer, inner);
+        }
+
+        private bool[] skirtPieces;
+
+        private bool IsSkirt(int g)
+        {
+            if (skirtPieces == null)
+            {
+                skirtPieces = new bool[pieces.Length];
+                for (int i = 1; i < pieces.Length; i++)
+                {
+                    skirtPieces[i] = pieces[i].hemShare >= 0f && pieces[i].name.StartsWith("Skirt");
+                }
+            }
+            return g > 0 && g < skirtPieces.Length && skirtPieces[g];
+        }
+
         private static bool GoesOver(ApparelProperties outer, ApparelProperties inner)
         {
             float outerLayer = OuterLayer(outer), innerLayer = OuterLayer(inner);
@@ -3917,7 +4006,9 @@ namespace M3AT
         // Draws one piece (0 the body, else a garment) posed as End left it, as Api.DrawModel would draw a model: position
         // true space (cells), yaw degrees about the vertical, size the model's scale, tint its colour.
         // A textured garment is drawn with its image times tint (white: as it is), its outline in its mean colour times tint.
-        public void Draw(Posed p, int piece, Vector3 position, float yaw, float size, Color tint, bool isSkin = false)
+        // cloth: the garment painted with the art of the apparel it stands in for (SpriteClothes.cs), drawn in its own colours
+        // in place of its image times tint; null: its own.
+        public void Draw(Posed p, int piece, Vector3 position, float yaw, float size, Color tint, bool isSkin = false, ClothImage cloth = null)
         {
             if (TuckedAway(p, piece))
             {
@@ -3927,22 +4018,35 @@ namespace M3AT
             PieceMeshes m = Pose(p, piece);
             m.isSkin = isSkin;
             // Fetched each time: IsoRim makes its materials once the 3D view is up, which may be after this pawn was first seen.
-            Material textured = g.texture != null ? TexturedMaterial(g) : null;
+            Piece look = g;
+            Color mean = g.mean;
+            if (cloth != null && g.texture != null && TexturedMaterial(cloth.holder) != null)
+            {
+                look = cloth.holder;
+                mean = cloth.mean;
+                tint = Color.white;
+            }
+            Material textured = look.texture != null ? TexturedMaterial(look) : null;
             Color32[] shaded = g.shade != null ? ShadedPaint(g, tint) : null;
             if (textured == null)
             {
-                DrawMeshes(p, m, g.rest.Length, SolidMaterial(), position, yaw, size, g.texture != null ? tint * g.mean : tint, null, default(Color),
+                DrawMeshes(p, m, g.rest.Length, SolidMaterial(), position, yaw, size, g.texture != null ? tint * mean : tint, null, default(Color),
                     null, default(Color), null, shaded);
             }
             else
             {
-                if (!m.textureMarked && g.mark != null)
+                if (look.mark != null)
                 {
                     // The same mesh again in its light pass, drawn with the same matrix by DrawParts.
-                    m.parts.Add(new MeshPart { mesh = m.solid, material = g.mark, outline = false });
-                    m.textureMarked = true;
+                    if (m.textureMarkAt < 0)
+                    {
+                        m.textureMarkAt = m.parts.Count;
+                        m.parts.Add(new MeshPart { mesh = m.solid, material = look.mark, outline = false });
+                        m.textureMarked = true;
+                    }
+                    m.parts[m.textureMarkAt].material = look.mark;
                 }
-                DrawMeshes(p, m, g.rest.Length, textured, position, yaw, size, tint, null, default(Color), null, default(Color), tint * g.mean, shaded);
+                DrawMeshes(p, m, g.rest.Length, textured, position, yaw, size, tint, null, default(Color), null, default(Color), tint * mean, shaded);
             }
             if (g.visor != null)
             {
@@ -4404,14 +4508,21 @@ namespace M3AT
             }
             List<MeshPart> parts = m.parts;
             bool skipAfter = m.afterAt >= 0 && (!OcclusionShows || (ClothesOcclusion && !m.isSkin));
-            if (!Outlines || skipAfter)
+            // The screen-space outline: no shell, a code part instead (ScreenOutlines.cs).
+            bool screen = ScreenOutlinesNow;
+            bool shells = Outlines && !screen;
+            if (screen)
+            {
+                SetIdPart(m, solid);
+            }
+            if (!shells || skipAfter || m.idAt >= 0)
             {
                 // Only the parts wanted (the solid ones and their light passes, without the outlines; the redraw only after
-                // an occlusion pass): DrawParts draws whatever it is given.
+                // an occlusion pass; the code part only for the screen-space outline): DrawParts draws whatever it is given.
                 solidParts.Clear();
                 for (int i = 0; i < m.parts.Count; i++)
                 {
-                    if ((Outlines || !m.parts[i].outline) && !(skipAfter && i == m.afterAt))
+                    if ((shells || !m.parts[i].outline) && !(skipAfter && i == m.afterAt) && (screen || i != m.idAt))
                     {
                         solidParts.Add(m.parts[i]);
                     }
@@ -4422,6 +4533,10 @@ namespace M3AT
             if (!FigureOnScreen(position, yaw, local))
             {
                 return;
+            }
+            if (screen)
+            {
+                DrawFigureCover(p, TrueSpace(position, yaw, local));
             }
             DrawParts(parts, position, yaw, local, m.gpuShape != null ? BlockOf(p, m.dressed) : null, p.flash);
         }
@@ -4435,9 +4550,11 @@ namespace M3AT
         {
             get { return SettingsMod.Settings == null || SettingsMod.Settings.outlines; }
         }
-        public static bool Silhouette   // false: the outline is drawn as IsoRim draws its figures', over the body too (the mod's options set it)
+        // false: the outline is drawn as IsoRim draws its figures', over the body too (the mod's options set it). The
+        // screen-space mode draws the silhouette's shell wherever it can't be drawn (ScreenOutlinesNow).
+        public static bool Silhouette
         {
-            get { return SettingsMod.Settings == null || SettingsMod.Settings.silhouetteOutlines; }
+            get { return Mode != OutlineMode.Lines; }
         }
         private static readonly List<MeshPart> solidParts = new List<MeshPart>();
 

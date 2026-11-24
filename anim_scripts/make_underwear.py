@@ -24,6 +24,9 @@ GARMENT_PROPS give each its UnderWhere def and GARMENTS its layer and groups, so
     Bra        a band under the chest, two cups rising to a strap each over the shoulders, a V between them.
     Chestwrap  a wide band round the chest, its top slanting across as a wound cloth's would.
     Loincloth  a low brief with a flap hung from the waistband front and back to mid-thigh, its hem ragged.
+    Leotard    the tank top's scoop and straps over a brief's high-cut leg openings, one piece (leotards, swimsuits).
+    Stockings  each leg from part way down the thigh to the toes (thigh-high stockings), closer to the skin.
+    Tights     everything below a waistband, feet and all (pantyhose, tights, leggings), closer to the skin.
 
 The tank top and the loincloth are made from textured garments in Models/garments rather than the body (SOURCES), so
 they match the set drawn now (the briefs, crop top and shorts are the trousers and shirt cut by hand): the tank top is the
@@ -66,6 +69,14 @@ TANKTOP = {'hem': 0.03, 'neck_half': 0.085, 'neck_front': 0.37, 'neck_back': 0.4
 # half width; each cup's top and how far out from the middle it is highest; the straps' middle and half width.
 BRA = {'bottom': 0.27, 'band': 0.32, 'v': 0.31, 'v_half': 0.02, 'cup_top': 0.40, 'cup_out': 0.10, 'strap': 0.10,
        'strap_half': 0.017}
+# Leotard: the tank top's scoop and straps (a little higher at the neck, the straps wider) over a brief's high-cut leg
+# openings, cut higher at the hip than the panties', as a leotard or swimsuit is.
+LEOTARD = dict(TANKTOP, neck_front=0.39, neck_back=0.40, strap_out=0.16, waist=0.0, rise_back=0.0, gusset=0.035,
+               side=0.0, back_slope=0.7, exact=True)
+# Stockings: from this share down the thigh (its head 0, the knee 1) to the toes.
+STOCKINGS = {'top': 0.45}
+# Tights: a waistband, as the panties' but a little higher.
+TIGHTS = {'waist': 0.05, 'rise_back': 0.03}
 # Chest wrap (over the thigh's head): its bottom, its top at the middle and how much higher it is per leg length to the
 # figure's left (a slant across the chest).
 CHESTWRAP = {'bottom': 0.27, 'top': 0.38, 'slant': 0.4}
@@ -432,6 +443,38 @@ def tanktop():
     bm = fresh()
     cut(bm, Plane((0, 0, H(s['hem'])), (0, 0, -1)))
     arms_off(bm, 0.0)
+    scoop_and_straps(bm, s)
+    keep_largest(bm)
+    return bm
+
+def leotard():
+    """The tank top's scoop and straps over a high-cut brief's leg openings, one piece: a leotard, swimsuit or bodysuit."""
+    bm = fresh()
+    arms_off(bm, 0.0)
+    scoop_and_straps(bm, LEOTARD)
+    leg_openings(bm, LEOTARD)
+    keep_largest(bm)
+    return bm
+
+def stockings():
+    """Each leg from STOCKINGS' top (a share down the thigh) to the toes, feet and all: thigh-high stockings."""
+    bm = fresh()
+    arms_off(bm, 0.0)
+    for side, sign in (('L', 1.0), ('R', -1.0)):
+        a, b = joint('thigh.' + side), joint('thigh.' + side, tail=True)
+        cut(bm, Plane(a.lerp(b, STOCKINGS['top']), a - b), side_of(sign))
+    return bm
+
+def tights():
+    """Everything below a waistband, feet and all: tights, pantyhose or leggings."""
+    bm = fresh()
+    arms_off(bm, 0.0)
+    waistband(bm, TIGHTS)
+    keep_largest(bm)
+    return bm
+
+def scoop_and_straps(bm, s):
+    """A scoop neck front and back and a strap over each shoulder, the tank top's numbers (s) saying where."""
     # The scoop: the faces within neck_half of the middle above a plane from neck_front at the front to neck_back at the
     # back (the chest's front and back about 0.15 leg lengths either side of the spine).
     nh, so = s['neck_half'] * leg, s['strap_out'] * leg
@@ -451,8 +494,6 @@ def tanktop():
     drop(bm, lambda p: (scoop.past(p) and sides[0].past(p) and sides[1].past(p) and corners[0].past(p)
                         and corners[1].past(p))
          or (low.past(p) and (armholes[0].past(p) or armholes[1].past(p))))
-    keep_largest(bm)
-    return bm
 
 def bra():
     s = BRA
@@ -509,8 +550,9 @@ def loincloth():
     return brief(LOIN_BRIEF)
 
 MAKERS = {'Panties': panties, 'Boxers': boxers, 'LongJohns': long_johns, 'Tanktop': tanktop, 'Bra': bra,
-          'Chestwrap': chestwrap, 'Loincloth': loincloth}
-OFFSETS = {'Chestwrap': WRAP_OFFSET}
+          'Chestwrap': chestwrap, 'Loincloth': loincloth, 'Leotard': leotard, 'Stockings': stockings, 'Tights': tights}
+# Hosiery a little closer to the skin than the rest, so the shoes (make_from_groups.py's, at about 0.012) and socks go over it.
+OFFSETS = {'Chestwrap': WRAP_OFFSET, 'Stockings': 0.006, 'Tights': 0.006}
 
 # The skin's smooth normals, out of the body (the body may be written inside out: its top vertex's says which way).
 _vn = [(bw.to_3x3() @ v.normal).normalized() for v in body.data.vertices]

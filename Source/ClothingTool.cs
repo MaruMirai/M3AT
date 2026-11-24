@@ -186,7 +186,7 @@ namespace M3AT
             float at = 0f;
             for (int i = 0; i < apparel.Count; i++)
             {
-                at = Row(figure, apparel[i].def, view.width, at);
+                at = Row(figure, apparel[i], view.width, at);
             }
             viewHeight = at;
             Widgets.EndScrollView();
@@ -199,12 +199,14 @@ namespace M3AT
         }
 
         // One apparel's row: its name and mod, what it is drawn as now, and the buttons. Returns the height used to.
-        private float Row(SkinnedFigure figure, ThingDef def, float width, float y)
+        // A skirt or dress shows the length its picture comes to on this pawn (HemLengths.cs), as drawn.
+        private float Row(SkinnedFigure figure, Apparel apparel, float width, float y)
         {
+            ThingDef def = apparel.def;
             Dictionary<string, string> choices = SettingsMod.Settings.clothingChoices;
             bool own = choices.ContainsKey(def.defName);
-            int[] now = figure.StandInsFor(def);
-            int[] auto = figure.AutoStandInsFor(def);
+            int[] now = figure.StandInsOn(apparel, pawn);
+            int[] auto = figure.AutoStandInsOn(apparel, pawn);
 
             Rect box = new Rect(0f, y, width, 96f);
             Widgets.DrawBoxSolidWithOutline(box, new Color(0.13f, 0.13f, 0.13f), new Color(0.3f, 0.3f, 0.3f));

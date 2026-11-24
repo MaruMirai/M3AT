@@ -579,7 +579,7 @@ namespace M3AT
             if (o != null)
             {
                 s.AppendLine("Options: fewerPoses " + fewerWas + ", gpuSkinning " + o.gpuSkinning + ", hairDetail " + o.hairDetail + ", beardMode " + o.beardMode
-                    + ", outlines " + o.outlines + ", silhouetteOutlines " + o.silhouetteOutlines + ", clothesOcclusion " + o.clothesOcclusion + ", freecam " + Freecam.On);
+                    + ", outlines " + o.outlines + ", outlineMode " + o.outlineMode + ", clothesOcclusion " + o.clothesOcclusion + ", freecam " + Freecam.On);
             }
             s.AppendLine("```");
             report = s.ToString();

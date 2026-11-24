@@ -41,7 +41,9 @@
   <M3AT_RaceModels>热门种族的专属耳朵和尾巴模型</M3AT_RaceModels>
   <M3AT_RaceModelsTip>鼠族（Ratkin）和狼族（Wolfein）使用专门制作的耳朵和尾巴模型，会像基因耳朵和尾巴一样摆动，取代根据其图片生成的形状。</M3AT_RaceModelsTip>
   <M3AT_RaceMouthInk>更清晰的嘴巴</M3AT_RaceMouthInk>
-  <M3AT_RaceMouthInkTip>柔和的手绘嘴巴（Facial Animation - Experimentals 自带的以及模组种族的）会重新绘制为深色轮廓，去掉浅色光晕和嘴唇阴影，种族的嘴巴也会调整到接近人类的大小，使其在较大的3D脸上更清楚。已经是硬线条的面部（如 Facial Animation - Retexture）保持不变。</M3AT_RaceMouthInkTip>
+  <M3AT_RaceMouthInkTip>柔和的手绘嘴巴（Facial Animation - Experimentals 自带的以及模组种族的）会重新绘制为深色轮廓，去掉浅色光晕和嘴唇阴影，种族的嘴巴也会调整到接近人类的大小，使其在较大的3D脸上更清楚。已经是硬线条的面部（如 Facial Animation - Retexture）保留其线条。比平常宽得多的嘴型也会按其超出的程度相应画窄一些。</M3AT_RaceMouthInkTip>
+  <M3AT_SharpFaceArt>更锐利的面部图案</M3AT_SharpFaceArt>
+  <M3AT_SharpFaceArtTip>Facial Animation 的眼睛、眉毛和嘴巴（以及其他种族面部模组的）在3D脸上绘制得更锐利：在常用视角下稍微清晰一些，近景时模糊的柔和边缘会重新绘制为干净的线条。关闭后将按面部模组原本的样子显示图案。</M3AT_SharpFaceArtTip>
   <M3AT_BodyShapeStrength>体型强度</M3AT_BodyShapeStrength>
   <M3AT_BodyShapeStrengthTip>瘦弱、肥胖和魁梧体型的明显程度（默认 100%）。调低则更接近标准体格，调高则更夸张；超过 100% 时衣物可能穿入身体。也会缩放“体格差异”产生的体格。男性和女性体型不受影响。</M3AT_BodyShapeStrengthTip>
   <M3AT_VariedBodies>体格差异</M3AT_VariedBodies>
@@ -65,10 +67,18 @@
   <M3AT_EarHidingTip>是否在小人头戴物品时隐藏猫耳、猪耳或垂耳，否则耳朵会穿模。\n\n任意头饰（默认）：头盔，以及盖住头顶的帽子。\n\n仅头盔：护甲头盔（简易、高级、动力装甲、侦察、重装甲等）；耳朵会从其他帽子中穿出。\n\n从不：始终显示耳朵。</M3AT_EarHidingTip>
   <M3AT_WornGear>穿戴的背包、腰带和头戴装备</M3AT_WornGear>
   <M3AT_WornGearTip>小人穿戴的跳跃背包、护盾腰带以及其他背包、腰带和长矛显示在背上或腰间，耳机、面具、王冠、眼罩和奴隶项圈显示在头部和颈部，使用 IsoRim 的模型。关闭：不显示。</M3AT_WornGearTip>
+  <M3AT_SpriteClothes>用服装自身贴图绘制替代服装</M3AT_SpriteClothes>
+  <M3AT_SpriteClothesTip>其他模组中没有专属 3D 模型的服装，会以 M3AT 最接近的服装代替（连衣裙、半身裙、夹克等）。开启后，该服装会用这件衣物自身的正面、侧面和背面贴图上色，保留其颜色、饰边和图案。关闭：使用该服装的素色纹理并染成衣物的颜色。</M3AT_SpriteClothesTip>
   <M3AT_GroundGarments>地上的服装使用 M3AT 模型</M3AT_GroundGarments>
   <M3AT_GroundGarmentsTip>地图上的服装绘制为小人身上所穿的同款 3D 服装，并压平摆放。关闭（默认）：使用 IsoRim 的 3D 模型。关闭此窗口后生效。</M3AT_GroundGarmentsTip>
   <M3AT_BedBlankets>床上盖被子</M3AT_BedBlankets>
   <M3AT_BedBlanketsTip>在只露出睡觉者头部的床上，IsoRim 的被子盖在身体上，随身体隆起。其他床（如睡眠点和睡袋）没有被子。关闭（默认）：小人躺在所有床的上面。</M3AT_BedBlanketsTip>
+  <M3AT_HelmetStow>殖民者头盔</M3AT_HelmetStow>
+  <M3AT_HelmetStowTip>殖民者护甲头盔的显示方式。只影响外观：游戏中头盔仍然戴着，仍有防护作用。\n\n始终戴着（默认）：一直戴在头上。\n\n未征召时背在背上：解除征召时摘下并背在背上，略微缩小；征召时重新戴上。\n\n未征召时隐藏：未征召时不显示，没有动画。\n\n始终隐藏：无论是否征召都不显示。</M3AT_HelmetStowTip>
+  <M3AT_HelmetsWorn>始终戴着</M3AT_HelmetsWorn>
+  <M3AT_HelmetsOnBack>未征召时背在背上</M3AT_HelmetsOnBack>
+  <M3AT_HelmetsHidden>未征召时隐藏</M3AT_HelmetsHidden>
+  <M3AT_HelmetsAlwaysHidden>始终隐藏</M3AT_HelmetsAlwaysHidden>
   <M3AT_SleepWear>床上的穿着</M3AT_SleepWear>
   <M3AT_SleepWearTip>躺在床上的小人在身体露出时（没有被子的床，或关闭了被子）穿什么。只影响外观：游戏中并不会脱下或穿上任何东西。\n\n日常服装：平时穿的衣服。\n\n不带装备（默认）：不穿护甲、头盔和帽子、外套、腰带、背包或盾牌；衬衫、裤子等保留。\n\n睡衣：淡色睡衣；婴儿穿连体衣。\n\n不穿衣服：不穿衣服；婴儿仍穿连体衣。</M3AT_SleepWearTip>
   <M3AT_VatClothes>舱内穿衣</M3AT_VatClothes>
@@ -87,8 +97,21 @@
   <M3AT_Drawing>绘制</M3AT_Drawing>
   <M3AT_Outlines>描边</M3AT_Outlines>
   <M3AT_OutlinesTip>小人的身体、衣服和头发周围绘制深色描边，与 IsoRim 绘制模型的方式一样。关闭：无描边。武器和工具保留 IsoRim 自己的描边。</M3AT_OutlinesTip>
-  <M3AT_SilhouetteOutlines>禁用自身内描边</M3AT_SilhouetteOutlines>
-  <M3AT_SilhouetteOutlinesTip>描边只围绕小人的外轮廓，不会画在身体上。关闭：与 IsoRim 的描边方式一样，当手臂等部位明显位于身体前方时，身体上也会出现线条。</M3AT_SilhouetteOutlinesTip>
+  <M3AT_OutlineMode>描边样式</M3AT_OutlineMode>
+  <M3AT_OutlineModeTip>轮廓：描边只围绕小人的外轮廓，不会画在身体上。身体上的线条：与 IsoRim 的描边方式一样，当手臂等部位明显位于身体前方时，身体上也会出现线条。屏幕空间：根据屏幕上每个部件的边缘绘制描边，因此也会围绕肩甲等薄而开放的部件，以及身体前方手持的武器，小人和武器的描边宽度可分别设置。屏幕空间需要 IsoRim 的场景深度；在 IsoRim 的照片中按轮廓样式绘制。</M3AT_OutlineModeTip>
+  <M3AT_OutlineSilhouette>轮廓</M3AT_OutlineSilhouette>
+  <M3AT_OutlineLines>身体上的线条</M3AT_OutlineLines>
+  <M3AT_OutlineScreen>屏幕空间</M3AT_OutlineScreen>
+  <M3AT_PawnOutlineWidth>小人描边宽度</M3AT_PawnOutlineWidth>
+  <M3AT_PawnOutlineWidthTip>屏幕空间描边围绕小人的宽度，单位为百分之一格，因此缩小视野时会变细。默认：{0}。</M3AT_PawnOutlineWidthTip>
+  <M3AT_WeaponOutlineWidth>武器描边宽度</M3AT_WeaponOutlineWidth>
+  <M3AT_WeaponOutlineWidthTip>屏幕空间描边围绕手持武器的宽度，以及武器与握持它的手或身体之间的描边宽度，单位为百分之一格。默认：{0}。</M3AT_WeaponOutlineWidthTip>
+  <M3AT_OutlineWidthValue>{0}</M3AT_OutlineWidthValue>
+  <M3AT_SelfOutlines>自身内描边</M3AT_SelfOutlines>
+  <M3AT_SelfOutlinesTip>屏幕空间描边也绘制在小人自己的身体上，当手臂或手等部位明显位于身体前方时。关闭：只围绕小人外轮廓，以及小人与手持物品之间。</M3AT_SelfOutlinesTip>
+  <M3AT_SelfOutlineStep>自身内描边深度</M3AT_SelfOutlineStep>
+  <M3AT_SelfOutlineStepTip>部位需要比身体其余部分靠前多少才会绘制线条，单位为百分之一格。越小：线条越多，直至褶皱处。默认：{0}。</M3AT_SelfOutlineStepTip>
+  <M3AT_ScreenOutlinesUnavailable>本次游戏无法绘制屏幕空间描边（IsoRim 无法读取场景深度，或缺少着色器），因此改为绘制轮廓。</M3AT_ScreenOutlinesUnavailable>
   <M3AT_FirstPersonEye>从小人眼睛处第一人称</M3AT_FirstPersonEye>
   <M3AT_FirstPersonEyeTip>IsoRim 的第一人称从小人眼睛绘制的位置看出去：儿童更低，高个子成人更高，坐下、躺下或游泳时也会更低。关闭：所有人都使用 IsoRim 自己的视线高度设置。需要较新版本的 IsoRim。</M3AT_FirstPersonEyeTip>
   <M3AT_ClothesOcclusion>衣服上的环境光遮蔽与阴影</M3AT_ClothesOcclusion>
@@ -120,6 +143,18 @@
   <M3AT_Performance>性能</M3AT_Performance>
   <M3AT_GpuSkinning>在显卡上计算动画</M3AT_GpuSkinning>
   <M3AT_GpuSkinningTip>在显卡上把每个小人的身体、衣服和头发摆成当前姿势，画面中小人多时快得多。如果小人看起来破碎或被拉伸，请关闭此项，改用旧方式计算动画。</M3AT_GpuSkinningTip>
+  <M3AT_OutlineDetailHeader>屏幕空间描边精度</M3AT_OutlineDetailHeader>
+  <M3AT_OutlineDetailIntro>仅限屏幕空间描边样式。每条线是通过在小人附近的每个像素周围查找更靠前的部位得到的。这些设置决定查找的仔细程度：越高，近距离时线条越平滑、越宽，但小人占满屏幕时开销越大。在通常的游戏距离下几乎没有区别。</M3AT_OutlineDetailIntro>
+  <M3AT_OutlineReach>最宽线条（像素）</M3AT_OutlineReach>
+  <M3AT_OutlineReachTip>近距离时线条最宽可绘制的像素数，以1080行屏幕计（更高的屏幕相应更多）。越低：放大时线条越细，开销越小。默认：{0}。</M3AT_OutlineReachTip>
+  <M3AT_OutlineProbeDirs>快速检查点数</M3AT_OutlineProbeDirs>
+  <M3AT_OutlineProbeDirsTip>完整查找之前，先检查每个像素周围的少数像素，看那里是否可能有线条。点越多：细小部位和转角处的缺口越少，但更慢。默认：{0}。</M3AT_OutlineProbeDirsTip>
+  <M3AT_OutlineProbeRings>快速检查圈数</M3AT_OutlineProbeRings>
+  <M3AT_OutlineProbeRingsTip>这些检查点的圈数，从最宽线条处向像素内收。越多：越能发现小部位，但更慢。默认：{0}。</M3AT_OutlineProbeRingsTip>
+  <M3AT_OutlineRings>查找圈数</M3AT_OutlineRings>
+  <M3AT_OutlineRingsTip>完整查找在像素周围最多查看的圈数。越多：近距离的宽线条边缘越平滑，转角处不再有阶梯和缺口，但开销最大。默认：{0}。</M3AT_OutlineRingsTip>
+  <M3AT_OutlineDetailFast>快速（默认）</M3AT_OutlineDetailFast>
+  <M3AT_OutlineDetailDetailed>精细</M3AT_OutlineDetailDetailed>
   <M3AT_FewerPoses>小人多时减少更新</M3AT_FewerPoses>
   <M3AT_FewerPosesTip>画面中小人很多时降低其动画更新频率，产生类似定格动画的效果。可将 M3AT 的性能开销降低约 6–9%。关闭：小人正常播放动画。（默认）</M3AT_FewerPosesTip>
   <M3AT_BenchmarkButton>测试 M3AT 的性能影响</M3AT_BenchmarkButton>
@@ -300,7 +335,7 @@
   <M3AT_PowerArmourBulk>动力装甲使穿戴者变大</M3AT_PowerArmourBulk>
   <M3AT_PowerArmourBulkTip>穿着动力装甲（覆盖躯干、手臂和腿部的太空科技装甲，例如海军陆战队装甲、重装甲和侦察装甲）的小人会被画得更高大、更魁梧，头部相对更小，像一位全副武装的巨人。默认关闭，因为游戏本身的装甲是普通人穿的。</M3AT_PowerArmourBulkTip>
   <M3AT_ArmourBulk>装甲体型</M3AT_ArmourBulk>
-  <M3AT_ArmourBulkTip>动力装甲使穿戴者变大多少，同时用于 GrimWorld 40,000 的星际战士（模组兼容）。默认：{0}（星际战士约 2.2 米，常人约 1.75 米）。</M3AT_ArmourBulkTip>
+  <M3AT_ArmourBulkTip>GrimWorld 40,000 的星际战士与禁军装甲使穿戴者变大多少。默认：{0}（星际战士约 2.2 米，常人约 1.75 米）。</M3AT_ArmourBulkTip>
   <M3AT_CeilingCrouch>高于天花板时</M3AT_CeilingCrouch>
   <M3AT_CeilingCrouchTip>被画得比头顶天花板还高的小人在室内的表现：蹲下并弯腰。
 
@@ -318,4 +353,14 @@
   <M3AT_ArmourDrawScaleTip>其他模组在穿戴时放大绘制的身体装甲（例如 GrimWorld 40,000 的禁军装甲，110%）会让穿戴者按同样比例变大。</M3AT_ArmourDrawScaleTip>
   <M3AT_MarineBulk>GrimWorld 40,000：星际战士是巨人</M3AT_MarineBulk>
   <M3AT_MarineBulkTip>穿着 GrimWorld 40,000 星际战士或禁军动力装甲的小人会按“小人”下的装甲体型被画得更高大、更魁梧，头部相对更小。GrimWorld 的星际战士是靠装甲成为星际战士的普通小人，所以由装甲决定体型。侦察兵装甲、寂静修女和马卡多的长袍不受影响。</M3AT_MarineBulkTip>
+  <M3AT_SizeLabel>M3AT 尺寸</M3AT_SizeLabel>
+  <M3AT_SizeValue>{0}（{1} 格）</M3AT_SizeValue>
+  <M3AT_SizeDesc>M3AT 绘制此角色的大小（相对于标准尺寸的成年角色），以及按模组选项中的角色身高换算的高度（地图格）。这只影响角色的外观，不改变其游戏中的体型。</M3AT_SizeDesc>
+  <M3AT_SizeStandard>标准尺寸的成年角色：{0} 格</M3AT_SizeStandard>
+  <M3AT_SizeGrowth>年龄成长：x{0}</M3AT_SizeGrowth>
+  <M3AT_SizeGender>性别：x{0}</M3AT_SizeGender>
+  <M3AT_SizeOwnHeight>个人身高：x{0}</M3AT_SizeOwnHeight>
+  <M3AT_SizeOldAge>衰老：x{0}</M3AT_SizeOldAge>
+  <M3AT_SizeArmour>护甲：x{0}</M3AT_SizeArmour>
+  <M3AT_SizeTotal>最终：{0}（{1} 格）</M3AT_SizeTotal>
 </LanguageData>

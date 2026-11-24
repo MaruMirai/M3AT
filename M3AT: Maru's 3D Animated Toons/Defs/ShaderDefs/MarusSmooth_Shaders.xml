@@ -270,4 +270,97 @@
       <renderQueue>3000</renderQueue>
     </shaderProgram>
   </ShaderDef>
+
+  <!-- The screen-space outline (Source/ScreenOutlines.cs). First each part of a figure (its body, clothes and hair, and
+       IsoRim's models of the weapons it holds) is drawn again over its own faces, at the depth they have, multiplying the
+       picture by (1, 1, 1, the part's code) (MarusSmooth.frag.glsl's _OutlineId): the colour is left as it is and the
+       alpha, 1 there after IsoRim's occlusion and shadow passes, becomes the code. Stencil bit 64 (clear by now, each
+       figure's slot having cleared it) is set where a code goes down and tested first, so a pixel takes one code only.
+       Queue 2455: after the redraw past IsoRim's occlusion (2454). It names IsoRim's own depth grab (IsoRimAO, 2450),
+       only so the engine makes that grab, at which IsoRim copies the scene depth (DepthGrab), on frames with IsoRim's
+       ambient occlusion off too; it doesn't read it. -->
+  <ShaderDef>
+    <defName>MarusOutlineId</defName>
+    <shaderProgram>
+      <vertexShaderFileName>MarusSmooth.vert.glsl</vertexShaderFileName>
+      <fragmentShaderFileName>MarusSmooth.frag.glsl</fragmentShaderFileName>
+      <useTexture>false</useTexture>
+      <blendMode>Custom</blendMode>
+      <blendSrcFactor>Zero</blendSrcFactor>
+      <blendDstFactor>SrcColor</blendDstFactor>
+      <depthWrite>false</depthWrite>
+      <cullMode>None</cullMode>
+      <stencilEnabled>true</stencilEnabled>
+      <stencilCompare>NotEqual</stencilCompare>
+      <stencilPassOp>Replace</stencilPassOp>
+      <stencilRef>64</stencilRef>
+      <stencilReadMask>64</stencilReadMask>
+      <stencilWriteMask>64</stencilWriteMask>
+      <renderQueue>2455</renderQueue>
+      <sceneGrab>
+        <name>IsoRimAO</name>
+        <queue>2450</queue>
+      </sceneGrab>
+    </shaderProgram>
+  </ShaderDef>
+
+  <!-- The same for a textured part (hair, textured garments): cut out below alpha 0.5 as it is drawn. -->
+  <ShaderDef>
+    <defName>MarusOutlineIdTex</defName>
+    <shaderProgram>
+      <vertexShaderFileName>MarusSmoothTex.vert.glsl</vertexShaderFileName>
+      <fragmentShaderFileName>MarusSmooth.frag.glsl</fragmentShaderFileName>
+      <useTexture>true</useTexture>
+      <blendMode>Custom</blendMode>
+      <blendSrcFactor>Zero</blendSrcFactor>
+      <blendDstFactor>SrcColor</blendDstFactor>
+      <depthWrite>false</depthWrite>
+      <cullMode>None</cullMode>
+      <stencilEnabled>true</stencilEnabled>
+      <stencilCompare>NotEqual</stencilCompare>
+      <stencilPassOp>Replace</stencilPassOp>
+      <stencilRef>64</stencilRef>
+      <stencilReadMask>64</stencilReadMask>
+      <stencilWriteMask>64</stencilWriteMask>
+      <renderQueue>2455</renderQueue>
+      <textureWrapOverrides>
+        <li>
+          <key>_MainTex</key>
+          <value>Clamp</value>
+        </li>
+      </textureWrapOverrides>
+      <sceneGrab>
+        <name>IsoRimAO</name>
+        <queue>2450</queue>
+      </sceneGrab>
+    </shaderProgram>
+  </ShaderDef>
+
+  <!-- Then the lines (MarusEdge.*.glsl): over the back faces of a box round each figure and weapon, reading the picture
+       with the codes in it (its own grab, MarusEdge, at 2456) and the scene depth. Every pixel it covers is written: the
+       line, at the depth of the part it outlines, or the picture as it was, alpha 1 again, at its own depth (so the depth
+       test, greater or equal with the engine's reverse-Z, always passes). It also clears stencil bit 64 again. -->
+  <ShaderDef>
+    <defName>MarusEdge</defName>
+    <shaderProgram>
+      <vertexShaderFileName>MarusEdge.vert.glsl</vertexShaderFileName>
+      <fragmentShaderFileName>MarusEdge.frag.glsl</fragmentShaderFileName>
+      <useTexture>false</useTexture>
+      <flipTextureST>false</flipTextureST>
+      <blendMode>Opaque</blendMode>
+      <cullMode>Front</cullMode>
+      <stencilEnabled>true</stencilEnabled>
+      <stencilCompare>Always</stencilCompare>
+      <stencilPassOp>Replace</stencilPassOp>
+      <stencilRef>0</stencilRef>
+      <stencilReadMask>64</stencilReadMask>
+      <stencilWriteMask>64</stencilWriteMask>
+      <renderQueue>2456</renderQueue>
+      <sceneGrab>
+        <name>MarusEdge</name>
+        <queue>2456</queue>
+      </sceneGrab>
+    </shaderProgram>
+  </ShaderDef>
+
 </Defs>

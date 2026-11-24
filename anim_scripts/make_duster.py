@@ -35,9 +35,16 @@ Written to <out.glb> as export_frames.py's import_garments takes it (Models/garm
 Apparel_Duster; Robe.glb the Robe, Burka.glb the Burka, LabCoat.glb the LabCoat): the mesh at rest with its keys, its weights and own_weights. out.blend also saves the
 .blend with it on the rig; it never saves over the .blend it opened.
 
+With --skirt [length] or --dress [length] (LENGTHS: short, medium, midi, long; --skirtlong and --dresslong the long ones)
+it makes a skirt or a dress for other mods' (SKIRT_NAMES, DRESS_NAMES; output in Models/garments/, the shirt layer's
+offset): a dress is the T-shirt's group (-BasicShirt, short sleeves) closed to the neck with the skirt hung from its hem;
+a skirt the same cut across at the narrow of the waist (SKIRT_WAIST). Vented front and back a little above the hem, as
+a closed skirt between two legs. A new length is an entry in LENGTHS and a name in each table. ./make_skirts.sh makes
+them all.
+
 With --low (alongside any of them) the skirt is lower poly: LOW's fewer rings and every SKIRT_EVERY-th column.
 
-blender -b Models/pawnHumanRig.blend --python anim_scripts/make_duster.py -- <out.glb> [out.blend] [--robe | --burka | --labcoat] [--low]
+blender -b Models/pawnHumanRig.blend --python anim_scripts/make_duster.py -- <out.glb> [out.blend] [--robe | --burka | --labcoat | --skirt [length] | --dress [length] | --skirtlong | --dresslong] [--low]
 """
 import bpy, os, sys
 from mathutils import Vector
@@ -72,9 +79,20 @@ LIMB_BONES = ('upper_arm', 'forearm', 'hand', 'thumb', 'f_')   # the body's arms
 
 SKIRT_EVERY = 1         # the skirt keeps every this many of the bottom edge's columns (its ends and vents always); the first
                         # row of faces fans from the edge's vertices between two kept columns to the first ring
+VENT_CLEAR = 0.6        # Blender units: the bottom edge's vertices this near a vent's column hang no column of their own (a
+                        # closed front is cut down the middle, which puts one on the middle of the body edge between two
+                        # vertices about 0.43 either side of it, three columns in a narrow strip; thin_front_strip.py
+                        # takes them out of a .glb made before)
 CLOSED = False          # the front closed below OPEN_LOW (the robe), not open all the way down (the duster)
 VENTS = {'back': 9.0}   # each vent's top height, the back's ('front' too, closed)
 HOOD = None            # a head piece to join on (a .glb from make_hats.py, from the repository's root), or none
+ABOVE = None           # only the group's faces wholly above this height, or all of them
+WAIST = None           # the group's faces cut across at this height and only their parts under it kept (a skirt's top at
+                        # the narrow of the waist), or all of them
+WAIST_SNAP = 0.35      # a vertex this near over the cut is kept whole, so the cut leaves no slivers
+WAIST_DIP = 0.0        # the cut dipping this much lower at the front's middle, in a V
+WAIST_DIP_WIDTH = 1.5  # out to this far either side of the middle
+RING_STEP = 1.2        # with RINGS None, a ring about this far down each column
 
 # The robe: open in a V at the neck, closed below, to the ankle and fuller, vented back and front from the shin down.
 ROBE = dict(NAME='Robe', CLOSED=True, OPEN_WIDTH=0.8, OPEN_LOW=17.9, HEM=1.9, RINGS=10, EASE=0.7, FLARE=1.1,
@@ -93,6 +111,28 @@ BURKA = dict(ROBE, NAME='Burka', OPEN_WIDTH=0.0, HEM=1.3, RINGS=11, EASE=0.8, FL
 LABCOAT = dict(NAME='LabCoat', OPEN_WIDTH=1.2, HEM=5.6, RINGS=5, EASE=0.3, FLARE=0.4, VENTS={'back': 8.2},
                FRONT_SHIN=0.3, BACK_SHIN=0.2)
 
+# Skirts and dresses for other mods' (Ratkin's, Kiiro's, Milira's, Wolfein's), in LENGTHS: the T-shirt's group
+# (-BasicShirt, short sleeves) closed to the neck at the shirt layer's offset (0.1), with the skirt hung from its hem; a
+# skirt is the same cut across at the narrow of the waist (SKIRT_WAIST, as Maru cut SkirtMedium out of the dress by hand),
+# so the two of a length hang alike. As dense as the duster's and robe's skirts (every column, a ring about every
+# RING_STEP down, so a longer one has more), vented front and back a little above the hem, as a closed skirt between two
+# legs; the longer, the higher the vents and the more the shins take.
+SKIRT_DRESS = dict(GROUP='-BasicShirt', ABOVE=None, WAIST=None, OFFSET=0.1, CLOSED=True, OPEN_WIDTH=0.0, OPEN_LOW=17.9,
+                   SKIRT_EVERY=1, RINGS=None)
+SKIRT_WAIST = dict(WAIST=14.95, WAIST_DIP=0.3, WAIST_SNAP=0.15)  # as Maru's cut: level round the sides and back, a shallow V at the front
+LENGTHS = {
+    'short': dict(HEM=8.4, EASE=0.35, FLARE=0.7, VENTS={'back': 9.0, 'front': 8.9}, FRONT_THIGH=0.9, BACK_THIGH=0.6,
+                  FRONT_SHIN=0.05, BACK_SHIN=0.0),                       # mid thigh
+    'medium': dict(HEM=6.4, EASE=0.4, FLARE=0.8, VENTS={'back': 7.4, 'front': 7.2}, FRONT_THIGH=0.9, BACK_THIGH=0.6,
+                   FRONT_SHIN=0.2, BACK_SHIN=0.1),                       # to the knee (6.5)
+    'midi': dict(HEM=4.2, EASE=0.45, FLARE=0.85, VENTS={'back': 5.9, 'front': 5.5}, FRONT_THIGH=0.85, BACK_THIGH=0.55,
+                 FRONT_SHIN=0.4, BACK_SHIN=0.25),                        # mid calf
+    'long': dict(HEM=2.0, EASE=0.5, FLARE=0.9, VENTS={'back': 4.6, 'front': 4.0}, FRONT_THIGH=0.8, BACK_THIGH=0.5,
+                 FRONT_SHIN=0.6, BACK_SHIN=0.4),                         # to the ankle
+}
+SKIRT_NAMES = {'short': 'Skirt', 'medium': 'SkirtMedium', 'midi': 'SkirtMidi', 'long': 'SkirtLong'}
+DRESS_NAMES = {'short': 'DressShort', 'medium': 'Dress', 'midi': 'DressMidi', 'long': 'DressLong'}
+
 # A lower poly skirt, with any of them: fewer rings and every other column.
 LOW = dict(RINGS=3, SKIRT_EVERY=2)
 
@@ -106,6 +146,29 @@ if '--burka' in argv:
 if '--labcoat' in argv:
     argv.remove('--labcoat')
     globals().update(LABCOAT)
+# --skirt [length] (short by default, the Skirt) and --dress [length] (medium by default, the Dress); --skirtlong and
+# --dresslong are the long ones.
+for flag, names, default in (('--skirt', SKIRT_NAMES, 'short'), ('--dress', DRESS_NAMES, 'medium'),
+                             ('--skirtlong', SKIRT_NAMES, 'long'), ('--dresslong', DRESS_NAMES, 'long')):
+    if flag in argv:
+        k = argv.index(flag)
+        length = default
+        if k + 1 < len(argv) and argv[k + 1] in LENGTHS and flag in ('--skirt', '--dress'):
+            length = argv.pop(k + 1)
+        argv.remove(flag)
+        globals().update(SKIRT_DRESS)
+        globals().update(LENGTHS[length])
+        globals().update(NAME=names[length])
+        if names is SKIRT_NAMES:
+            globals().update(SKIRT_WAIST)
+# --hem z sets the hem's height (a reference skirt as long as a hand-made one, for reweight_skirt.py), --no-vents closes it.
+if '--hem' in argv:
+    k = argv.index('--hem')
+    HEM = float(argv[k + 1])
+    del argv[k:k + 2]
+if '--no-vents' in argv:
+    argv.remove('--no-vents')
+    VENTS = {}
 if '--low' in argv:
     argv.remove('--low')
     globals().update(LOW)
@@ -131,21 +194,54 @@ def weights_of(i):
 
 group = next(vg.index for vg in body.vertex_groups if GROUP in vg.name.split())
 inside = {v.index for v in me.vertices if any(g.group == group and g.weight > 0 for g in v.groups)}
-polygons = [list(p.vertices) for p in me.polygons if all(i in inside for i in p.vertices)]
+polygons = [list(p.vertices) for p in me.polygons if all(i in inside for i in p.vertices)
+            and (ABOVE is None or all(me.vertices[i].co.z > ABOVE for i in p.vertices))]
+
+# A polygon's corner is a body vertex, or (with WAIST) a place (lo, hi, t) on a body edge, t of the way from lo to hi.
+def co(x):
+    if isinstance(x, tuple):
+        a, b, t = x
+        return me.vertices[a].co.lerp(me.vertices[b].co, t)
+    return me.vertices[x].co
+
+if WAIST is not None:
+    # Each face's part under the cut (its corners within WAIST_SNAP over it whole), the edges it crosses cut where they
+    # meet it.
+    def cut_at(c):
+        return WAIST - (WAIST_DIP * max(0.0, 1 - abs(c.x) / WAIST_DIP_WIDTH) if c.y < 0 else 0.0)
+    def under(i):
+        return me.vertices[i].co.z <= cut_at(me.vertices[i].co) + WAIST_SNAP
+    cut = []
+    for vs in polygons:
+        kept = []
+        for k, a in enumerate(vs):
+            b = vs[(k + 1) % len(vs)]
+            if under(a):
+                kept.append(a)
+            if under(a) != under(b):
+                lo, hi = sorted((a, b))
+                cl, ch = me.vertices[lo].co, me.vertices[hi].co
+                t = 0.5
+                for _ in range(4):   # the cut's height where the edge meets it
+                    t = min(1.0, max(0.0, (cut_at(cl.lerp(ch, t)) - cl.z) / (ch.z - cl.z)))
+                kept.append((lo, hi, t))
+        if len(kept) >= 3:
+            cut.append(kept)
+    polygons = cut
 
 # The opening. Its top is the neck's V, the group's lowest vertex round the neck on the figure's middle.
 counts = {}
 for f in polygons:
     for k in range(len(f)):
-        e = tuple(sorted((f[k], f[(k + 1) % len(f)])))
+        e = tuple(sorted((f[k], f[(k + 1) % len(f)]), key=str))
         counts[e] = counts.get(e, 0) + 1
 rim = {i for e, c in counts.items() if c == 1 for i in e}
-apex = max((i for i in rim if abs(me.vertices[i].co.x) < 1e-3 and me.vertices[i].co.y < 0), key=lambda i: me.vertices[i].co.z)
-apex_z = me.vertices[apex].co.z
+apex = max((i for i in rim if abs(co(i).x) < 1e-3 and co(i).y < 0), key=lambda i: co(i).z)
+apex_z = co(apex).z
 
 def beside(i, sign):
     """How far body vertex i is out of the opening on the side sign (+1 is +x, -1 is -x), by its rest place."""
-    c = me.vertices[i].co
+    c = co(i)
     d = sign * c.x - half_width(c.z)
     return 0.0 if abs(d) < OPEN_SNAP else d
 
@@ -160,6 +256,8 @@ def half_width(z):
 places = []
 cuts = {}
 def place_of(a, b=None, t=0.0):
+    if isinstance(a, tuple):   # a place on a body edge already
+        a, b, t = a
     key = (a, a, 0.0) if b is None else (a, b, t)
     if key not in cuts:
         cuts[key] = len(places)
@@ -172,6 +270,8 @@ def clip(f, sign):
     for k, a in enumerate(f):
         b = f[(k + 1) % len(f)]
         da, db = beside(a, sign), beside(b, sign)
+        if ((da > 0 and db < 0) or (da < 0 and db > 0)) and (isinstance(a, tuple) or isinstance(b, tuple)):
+            sys.exit('make_duster.py: the opening cuts a face the waist cut made')
         if da >= 0:
             kept.append(place_of(a))
         if (da > 0 and db < 0) or (da < 0 and db > 0):
@@ -182,7 +282,7 @@ def clip(f, sign):
 
 faces = []
 for f in polygons:
-    centre = sum((me.vertices[i].co for i in f), Vector()) / len(f)
+    centre = sum((co(i) for i in f), Vector()) / len(f)
     if centre.y >= 0 or all(beside(i, 1) >= 0 for i in f) or all(beside(i, -1) >= 0 for i in f):
         faces.append([place_of(i) for i in f])
     else:
@@ -254,7 +354,12 @@ def normals(pos):
 def column_of(back):
     return min(range(n_chain), key=lambda j: abs(rest_of(chain[j]).x) + (0 if (rest_of(chain[j]).y > 0) == back else 100))
 vent_cols = {which: 0 if CLOSED and which == 'back' else column_of(which == 'back') for which in VENTS}
-cols = sorted(set(range(0, n_chain, SKIRT_EVERY)) | {0, n_chain - 1} | set(vent_cols.values()))
+def by_vent(j):
+    """Whether column j is within VENT_CLEAR of a vent's column on the same side (front or back) and not one itself."""
+    p = rest_of(chain[j])
+    return any(j != v and (p - rest_of(chain[v])).length < VENT_CLEAR and (p.y > 0) == (rest_of(chain[v]).y > 0)
+               for v in vent_cols.values())
+cols = sorted({j for j in range(0, n_chain, SKIRT_EVERY) if not by_vent(j)} | {0, n_chain - 1} | set(vent_cols.values()))
 n_cols = len(cols)
 col = {j: c for c, j in enumerate(cols)}
 def ring_at(sk, k, j):
@@ -264,6 +369,8 @@ def ring_at(sk, k, j):
 floor_rest = min(v.co.z for v in me.vertices)
 top_rest = sum(rest_of(q).z for q in chain) / n_chain
 hem_share = (HEM - floor_rest) / (top_rest - floor_rest)
+if RINGS is None:
+    RINGS = max(2, round((top_rest - HEM) / RING_STEP))
 
 def build(pos):
     """The garment's vertices for the body's vertices at pos: the upper part's, then the skirt's ring by ring."""
@@ -325,7 +432,7 @@ vent_rings = {}
 for which, top in VENTS.items():
     j = vent_cols[which]
     vent_rings[j] = next((k for k in range(1, RINGS + 1) if ring_at(skirt, k, j).z <= top), RINGS + 1)
-vent_ring = min(vent_rings.values())
+vent_ring = min(vent_rings.values(), default=RINGS + 1)
 
 def key_of(k, j, side):
     """The vertex at ring k (0 the bottom edge) of column j, for a face on its side side ('after' is the face to j + 1)."""
@@ -454,7 +561,7 @@ add_uvs()
 # gives a garment taking the body's weights; the Head's own keys it leaves to export_frames.py, which fits every key the
 # garment has none of from the body. It gets UVs of its own, packed in with the rest.
 n_coat = len(mesh.vertices)
-hood_points = []
+hood_points, hood_under = [], []
 if HOOD:
     path = os.path.abspath(HOOD)
     if not os.path.exists(path):

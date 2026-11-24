@@ -41,7 +41,9 @@
   <M3AT_RaceModels>Modelled ears and tails for popular races</M3AT_RaceModels>
   <M3AT_RaceModelsTip>Ratkin and Wolfein get ears and tails modelled for them, which move like the gene ears and tails, in place of the shapes made from their pictures.</M3AT_RaceModelsTip>
   <M3AT_RaceMouthInk>Crisper mouths</M3AT_RaceMouthInk>
-  <M3AT_RaceMouthInkTip>Soft, painted mouths (Facial Animation - Experimentals' own and modded races') are redrawn with dark outlines and without their pale glow and lip shading, and a race's mouths drawn at about a human's size, so they read on the large 3D face. Faces already drawn with hard lines, such as Facial Animation - Retexture's, are left as they are.</M3AT_RaceMouthInkTip>
+  <M3AT_RaceMouthInkTip>Soft, painted mouths (Facial Animation - Experimentals' own and modded races') are redrawn with dark outlines and without their pale glow and lip shading, and a race's mouths drawn at about a human's size, so they read on the large 3D face. Faces already drawn with hard lines, such as Facial Animation - Retexture's, keep their lines. Any mouth shape much wider than usual is also drawn narrower, in proportion to how much too wide it is.</M3AT_RaceMouthInkTip>
+  <M3AT_SharpFaceArt>Sharper face art</M3AT_SharpFaceArt>
+  <M3AT_SharpFaceArtTip>Facial Animation's eyes, brows and mouths (and those of face mods for other races) are drawn sharper on the 3D face: a little crisper from the usual camera, and in close-ups their soft, blurred edges are redrawn as clean lines. Turn it off to see the art exactly as the face mod draws it.</M3AT_SharpFaceArtTip>
   <M3AT_BodyShapeStrength>Body shape strength</M3AT_BodyShapeStrength>
   <M3AT_BodyShapeStrengthTip>How strongly thin, fat and hulk bodies are shaped (default 100%). Lower makes them closer to an average build, higher exaggerates them; past 100% clothes may clip into the body. Also scales the builds from Varied bodies. Male and female shapes are unchanged.</M3AT_BodyShapeStrengthTip>
   <M3AT_VariedBodies>Varied bodies</M3AT_VariedBodies>
@@ -65,10 +67,18 @@
   <M3AT_EarHidingTip>Whether cat, pig or floppy ears are hidden under what a pawn wears on its head, as they would otherwise go through it.\n\nAny headgear (default): helmets, and hats that cover the top of the head.\n\nHelmets only: armour helmets (simple, advanced, power armour, recon, cataphract and the like); the ears poke through other hats.\n\nNever: the ears are always shown.</M3AT_EarHidingTip>
   <M3AT_WornGear>Worn packs, belts and headwear</M3AT_WornGear>
   <M3AT_WornGearTip>Jump packs, shield belts and the other packs, belts and lances a pawn wears are shown on its back or waist, and headsets, masks, crowns, blindfolds and slave collars on its head and neck, with IsoRim's models of them. Off: they are not shown.</M3AT_WornGearTip>
+  <M3AT_SpriteClothes>Paint stand-in clothes with their own art</M3AT_SpriteClothes>
+  <M3AT_SpriteClothesTip>Clothes from other mods that have no 3D garment of their own are drawn as the nearest one M3AT has (a dress, a skirt, a jacket). With this on, that garment is painted with the clothing's own sprites, front, sides and back, so it keeps its colours, trim and patterns. Off: the garment's plain texture in the clothing's colour.</M3AT_SpriteClothesTip>
   <M3AT_GroundGarments>M3AT apparel on the ground</M3AT_GroundGarments>
   <M3AT_GroundGarmentsTip>Clothes on the map will be drawn as the same 3D garment a pawn wears, squashed flat. Off (default): IsoRim's 3D models are used. Takes effect when this window closes.</M3AT_GroundGarmentsTip>
   <M3AT_BedBlankets>Blankets in bed</M3AT_BedBlankets>
   <M3AT_BedBlanketsTip>In beds that show only the sleeper's head, IsoRim's blanket is drawn over the body, raised by it. Other beds, such as sleeping spots and bedrolls, have no blanket. Off (default): pawns lie on top of every bed.</M3AT_BedBlanketsTip>
+  <M3AT_HelmetStow>Colonist helmets</M3AT_HelmetStow>
+  <M3AT_HelmetStowTip>How colonists' armour helmets are shown. Only how they look: the helmet stays worn in the game and still protects.\n\nAlways worn (default): always on the head.\n\nOn the back when undrafted: taken off when undrafted and carried on the back, a little smaller; put back on when drafted.\n\nHidden when undrafted: not drawn while undrafted, with no animation.\n\nAlways hidden: never drawn, drafted or not.</M3AT_HelmetStowTip>
+  <M3AT_HelmetsWorn>Always worn</M3AT_HelmetsWorn>
+  <M3AT_HelmetsOnBack>On the back when undrafted</M3AT_HelmetsOnBack>
+  <M3AT_HelmetsHidden>Hidden when undrafted</M3AT_HelmetsHidden>
+  <M3AT_HelmetsAlwaysHidden>Always hidden</M3AT_HelmetsAlwaysHidden>
   <M3AT_SleepWear>Clothes in bed</M3AT_SleepWear>
   <M3AT_SleepWearTip>What pawns lying in a bed are drawn wearing, wherever their body shows (a bed with no blanket, or with blankets off). Only how they look: nothing is taken off or put on in the game.\n\nNormal clothes: what they wear.\n\nNo equipment (default): without armour, helmets and hats, coats, belts, packs or shields; shirts, trousers and the like stay on.\n\nPajamas: pastel pajamas; babies in their romper.\n\nNo clothes: no clothes; babies keep their romper.</M3AT_SleepWearTip>
   <M3AT_VatClothes>Clothes in vats</M3AT_VatClothes>
@@ -87,8 +97,21 @@
   <M3AT_Drawing>Drawing</M3AT_Drawing>
   <M3AT_Outlines>Outlines</M3AT_Outlines>
   <M3AT_OutlinesTip>Pawns are drawn with a dark outline round the body, clothes and hair, as IsoRim draws its models. Off: no outline. Weapons and tools keep IsoRim's own.</M3AT_OutlinesTip>
-  <M3AT_SilhouetteOutlines>Disable self-outlines</M3AT_SilhouetteOutlines>
-  <M3AT_SilhouetteOutlinesTip>The outline goes only round the outside of the pawn, never over its own body. Off: as IsoRim draws its outlines, with lines over the body too where a part such as an arm is well in front of the rest.</M3AT_SilhouetteOutlinesTip>
+  <M3AT_OutlineMode>Outline style</M3AT_OutlineMode>
+  <M3AT_OutlineModeTip>Silhouette: the outline goes only round the outside of the pawn, never over its own body. Lines over the body: as IsoRim draws its outlines, with lines over the body too where a part such as an arm is well in front of the rest. Screen-space: the outline is found on screen from the edges of each part, so it also goes round thin and open parts such as shoulder pads, and round a held weapon in front of the body, with its own width for pawns and weapons. Screen-space needs IsoRim's scene depth; in IsoRim's photos it is drawn as the silhouette.</M3AT_OutlineModeTip>
+  <M3AT_OutlineSilhouette>Silhouette</M3AT_OutlineSilhouette>
+  <M3AT_OutlineLines>Lines over the body</M3AT_OutlineLines>
+  <M3AT_OutlineScreen>Screen-space</M3AT_OutlineScreen>
+  <M3AT_PawnOutlineWidth>Pawn outline width</M3AT_PawnOutlineWidth>
+  <M3AT_PawnOutlineWidthTip>How wide the screen-space outline round a pawn is, in hundredths of a cell, so it is thinner when zoomed out. Default: {0}.</M3AT_PawnOutlineWidthTip>
+  <M3AT_WeaponOutlineWidth>Weapon outline width</M3AT_WeaponOutlineWidth>
+  <M3AT_WeaponOutlineWidthTip>How wide the screen-space outline round a held weapon is, and between a weapon and the hands or body holding it, in hundredths of a cell. Default: {0}.</M3AT_WeaponOutlineWidthTip>
+  <M3AT_OutlineWidthValue>{0}</M3AT_OutlineWidthValue>
+  <M3AT_SelfOutlines>Self-outlines</M3AT_SelfOutlines>
+  <M3AT_SelfOutlinesTip>Screen-space outlines also over the pawn's own body, where a part such as an arm or a hand is well in front of the rest. Off: only round the outside of the pawn and between it and what it holds.</M3AT_SelfOutlinesTip>
+  <M3AT_SelfOutlineStep>Self-outline depth</M3AT_SelfOutlineStep>
+  <M3AT_SelfOutlineStepTip>How far in front of the rest of the body a part must be for a line over it, in hundredths of a cell. Smaller: more lines, down to creases. Default: {0}.</M3AT_SelfOutlineStepTip>
+  <M3AT_ScreenOutlinesUnavailable>Screen-space outlines can't be drawn this session (IsoRim can't read the scene depth, or a shader is missing), so the silhouette is drawn.</M3AT_ScreenOutlinesUnavailable>
   <M3AT_FirstPersonEye>First person from the pawn's eyes</M3AT_FirstPersonEye>
   <M3AT_FirstPersonEyeTip>IsoRim's first person looks out from where the pawn's eyes are drawn, so lower for a child and higher for a tall adult, and lower when sitting, lying or swimming. Off: IsoRim's own eye height setting is used for everyone. Needs a recent IsoRim.</M3AT_FirstPersonEyeTip>
   <M3AT_ClothesOcclusion>Occlusion and shadows on clothes</M3AT_ClothesOcclusion>
@@ -120,6 +143,18 @@
   <M3AT_Performance>Performance</M3AT_Performance>
   <M3AT_GpuSkinning>Animate on the graphics card</M3AT_GpuSkinning>
   <M3AT_GpuSkinningTip>Moves each pawn's body, clothes and hair into its pose on the graphics card, which is much faster with many pawns in view. Turn it off if pawns look broken or stretched, to animate them the old way.</M3AT_GpuSkinningTip>
+  <M3AT_OutlineDetailHeader>Screen-space outline detail</M3AT_OutlineDetailHeader>
+  <M3AT_OutlineDetailIntro>Only for the screen-space outline style. Each line is found by looking round every pixel near a pawn for a nearer part. These set how hard it looks: more is smoother and wider lines close up but costs more frame time when a pawn fills the screen. At the usual play distance they make little difference.</M3AT_OutlineDetailIntro>
+  <M3AT_OutlineReach>Widest line (pixels)</M3AT_OutlineReach>
+  <M3AT_OutlineReachTip>The widest a line can be drawn close up, in pixels on a 1080-row screen (more on a taller one). Lower: thinner lines when zoomed right in, and cheaper. Default: {0}.</M3AT_OutlineReachTip>
+  <M3AT_OutlineProbeDirs>Quick look points</M3AT_OutlineProbeDirs>
+  <M3AT_OutlineProbeDirsTip>Before the full search, a few pixels round each one are checked to see whether a line could be there at all. More points: fewer gaps at thin parts and corners, but slower. Default: {0}.</M3AT_OutlineProbeDirsTip>
+  <M3AT_OutlineProbeRings>Quick look rings</M3AT_OutlineProbeRings>
+  <M3AT_OutlineProbeRingsTip>How many rings of those points, from the widest line in toward the pixel. More: catches small parts better, but slower. Default: {0}.</M3AT_OutlineProbeRingsTip>
+  <M3AT_OutlineRings>Search rings</M3AT_OutlineRings>
+  <M3AT_OutlineRingsTip>The most rings the full search looks at round a pixel. More: wide lines close up have smooth edges rather than steps and notches at corners, but cost the most. Default: {0}.</M3AT_OutlineRingsTip>
+  <M3AT_OutlineDetailFast>Fast (default)</M3AT_OutlineDetailFast>
+  <M3AT_OutlineDetailDetailed>Detailed</M3AT_OutlineDetailDetailed>
   <M3AT_FewerPoses>Fewer updates with many pawns</M3AT_FewerPoses>
   <M3AT_FewerPosesTip>When many pawns are in view they are animated less often, giving a stop-motion like effect. Reduces M3AT's performance overhead around 6–9%. Off: Pawn animated as normal. (Default)</M3AT_FewerPosesTip>
   <M3AT_BenchmarkButton>Benchmark M3AT impact</M3AT_BenchmarkButton>
@@ -300,17 +335,17 @@ Before you start, point the camera at your colonists the way you usually play an
   <M3AT_PowerArmourBulk>Power armour makes the wearer bigger</M3AT_PowerArmourBulk>
   <M3AT_PowerArmourBulkTip>A pawn in power armour (Spacer-tech armour over the body, arms and legs, such as marine, cataphract and recon armour) is drawn bigger and broader, with a smaller head for its size, as the armoured giant it is. Off by default, as the game's own armour is worn by ordinary people.</M3AT_PowerArmourBulkTip>
   <M3AT_ArmourBulk>Armoured size</M3AT_ArmourBulk>
-  <M3AT_ArmourBulkTip>How much bigger power armour draws its wearer, here and for GrimWorld 40,000's Space Marines (Mod compatibility). Default: {0} (a Space Marine of about 2.2 m to a person's 1.75).</M3AT_ArmourBulkTip>
-  <M3AT_CeilingCrouch>Taller than the ceiling</M3AT_CeilingCrouch>
+  <M3AT_ArmourBulkTip>How much bigger GrimWorld 40,000's Space Marine and Custodes armour draws its wearer. Default: {0} (a Space Marine of about 2.2 m to a person's 1.75).</M3AT_ArmourBulkTip>
+  <M3AT_CeilingCrouch>Crouch for ceilings</M3AT_CeilingCrouch>
   <M3AT_CeilingCrouchTip>What a pawn drawn taller than the ceiling over it does indoors: crouch and stoop under it.
 
 Always: under any roof.
 
-When the floor above is shown (default): only while IsoRimZ draws the upper floor over it, as otherwise no ceiling is drawn for its head to go through.
+Upper floor shown (default): only while IsoRimZ draws the upper floor over it, as otherwise no ceiling is drawn for its head to go through.
 
 Never: it stands at its full height.</M3AT_CeilingCrouchTip>
   <M3AT_CeilingAlways>Always crouch</M3AT_CeilingAlways>
-  <M3AT_CeilingFloorShown>When the floor above is shown</M3AT_CeilingFloorShown>
+  <M3AT_CeilingFloorShown>Upper floor shown</M3AT_CeilingFloorShown>
   <M3AT_CeilingNever>Never crouch</M3AT_CeilingNever>
   <M3AT_Compatibility>Mod compatibility</M3AT_Compatibility>
   <M3AT_CompatibilityTip>Click to show or hide options for other mods' things.</M3AT_CompatibilityTip>
@@ -318,4 +353,14 @@ Never: it stands at its full height.</M3AT_CeilingCrouchTip>
   <M3AT_ArmourDrawScaleTip>Body armour another mod draws scaled up when worn (such as GrimWorld 40,000's Custodes armour, 110%) draws its wearer that much bigger.</M3AT_ArmourDrawScaleTip>
   <M3AT_MarineBulk>GrimWorld 40,000: Space Marines are giants</M3AT_MarineBulk>
   <M3AT_MarineBulkTip>A pawn in GrimWorld 40,000's Space Marine or Custodes power armour is drawn bigger and broader, with a smaller head for its size, by the armoured size under Pawns. GrimWorld's Marines are ordinary pawns made Marines by their armour, so it is the armour that makes them big. Scout armour, the Sisters of Silence and Malcador's robes are left as they are.</M3AT_MarineBulkTip>
+  <M3AT_SizeLabel>M3AT size</M3AT_SizeLabel>
+  <M3AT_SizeValue>{0} ({1} cells)</M3AT_SizeValue>
+  <M3AT_SizeDesc>How big M3AT draws this pawn, against a grown pawn of the standard size, and how tall that is in map cells with the mod options' pawn height. This only changes how the pawn looks, not its body size in the game.</M3AT_SizeDesc>
+  <M3AT_SizeStandard>Grown pawn of the standard size: {0} cells</M3AT_SizeStandard>
+  <M3AT_SizeGrowth>Growth by age: x{0}</M3AT_SizeGrowth>
+  <M3AT_SizeGender>Gender: x{0}</M3AT_SizeGender>
+  <M3AT_SizeOwnHeight>Own height: x{0}</M3AT_SizeOwnHeight>
+  <M3AT_SizeOldAge>Old age: x{0}</M3AT_SizeOldAge>
+  <M3AT_SizeArmour>Armour: x{0}</M3AT_SizeArmour>
+  <M3AT_SizeTotal>Final: {0} ({1} cells)</M3AT_SizeTotal>
 </LanguageData>

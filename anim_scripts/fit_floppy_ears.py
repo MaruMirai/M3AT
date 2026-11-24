@@ -1,6 +1,6 @@
 # Fits the rig's floppy ear bones (Floppy_Ears_Rig) to their mesh (Floppy_Ears_Gene) as it stands, in place of wherever they are,
 # bones placed by hand included. weight_floppy_ears.py is the other way round, the weights to the bones. Run it in the open session (the Text Editor's Run Script, then save yourself), or on a copy:
-#   blender -b <copy of the rig .blend> --python anim_scripts/fit_floppy_ears.py -- <out.blend>
+#   blender -b <copy of the rig .blend> --python anim_scripts/fit_floppy_ears.py -- [--ears <mesh> --rig <armature>] <out.blend>
 #
 # Each ear's line is found from its surface, so the two needn't have the same vertices:
 #   - the distance over the surface from where the ear comes out of the skull (its vertices inside the Head) gives every point
@@ -17,7 +17,16 @@ import bpy
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 
-EARS, EARS_RIG = 'Floppy_Ears_Gene', 'Floppy_Ears_Rig'
+EARS, EARS_RIG = 'Floppy_Ears_Gene', 'Floppy_Ears_Rig'   # or as --ears <mesh> --rig <armature> give them (a race's, import_race_parts.py)
+ARGS = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
+for flag in ('--ears', '--rig'):
+    if flag in ARGS:
+        at = ARGS.index(flag)
+        if flag == '--ears':
+            EARS = ARGS[at + 1]
+        else:
+            EARS_RIG = ARGS[at + 1]
+        del ARGS[at:at + 2]
 HEAD = 'Head'
 ROOT_RING = 0.03            # of the ear's length past the skull, the ring the root joint is put in
 FRONT = Vector((0.0, -1.0, 0.0))   # each bone's z is kept as near this as it can be, the same on both sides
@@ -227,5 +236,5 @@ def main():
 
 
 main()
-if '--' in sys.argv and len(sys.argv) > sys.argv.index('--') + 1:
-    bpy.ops.wm.save_as_mainfile(filepath=sys.argv[sys.argv.index('--') + 1], copy=True)
+if ARGS:
+    bpy.ops.wm.save_as_mainfile(filepath=ARGS[0], copy=True)

@@ -56,6 +56,7 @@ layout(set = 2, binding = 0) uniform MaterialUniforms
     float _Smooth;    // @default = 0.0   1: shade by vSmoothNormal (the skinned chibi)
     float _ShadeBands; // @default = 0.0  as MarusSmooth.frag.glsl
     float _IsoFlash;   // @default = 0.0   per draw (FaceLayers.Flash): how red a hit figure is now
+    float _MarusFaceSharp;   // global, no default (FaceLayers.SetSharpness): 1 reads the art sharper (FaceArt), 0 as it was, the sharpFaceArt mod option
 } uMaterial;
 
 layout(set = 2, binding = 1) uniform sampler2D _T0; // @default = black
@@ -106,6 +107,14 @@ vec2 TuneOf(int layer, vec2 place)
         return place;
     vec4 t = faceShift[6 + layer];
     return place * (1.0 + t.x) + t.yz;
+}
+
+// How much the player's tuning scales the layer's places (TuneOf's 1 + x).
+float TuneScale(int layer)
+{
+    if (faceShift.length() <= 6 + layer)
+        return 1.0;
+    return 1.0 + faceShift[6 + layer].x;
 }
 
 // Another race's eyes set as far apart as a human's (FaceGaze.RaceEyeSpread): the layer's left half read further right
@@ -176,8 +185,80 @@ vec3 ToEye(vec3 p)
     return uMaterial._IsoView.xyz;
 }
 
+// Reading the face art (keep in step with MarusFace.frag.glsl). Facial Animation's art is 512 px for a 2D head, and
+// the chibi's face spans three head heights of it, so in play a face is drawn smaller than its texture, seen slanted at
+// IsoRim's camera, and in a close-up (the freecam, a still) magnified up to four times or more.
+//   - Slanted, the GPU picks a blurrier mip than the art needs, so it is read ArtMipBias mips sharper (the gradients
+//     scaled by 2^bias, as textureGrad takes no bias).
+//   - Magnified, bilinear filtering draws its soft, stair-stepped edges several screen pixels wide. Nearly every set
+//     draws its lines as a solid core with an anti-aliased edge, so from SharpFrom texels a pixel the alpha is read as a
+//     cubic B-spline (smooth contours, no overshoot; four bilinear taps) and stretched about half its local peak (the
+//     most of it a texel round) so the edge is about a screen pixel wide, SharpEdge of the way, at most as at SharpMost.
+//     About the local peak rather than 0.5, so a thin or faint line (a mouth a texel or two thick, Kiiro's faint brows)
+//     keeps its strength and shape instead of thinning to a dot. Art fainter than SharpFaint is left as it is.
+//   Both only with _MarusFaceSharp (the sharpFaceArt mod option); without it the art is read as it always was.
+const float ArtMipBias = -0.5;
+const float SharpFrom = 1.25;   // screen pixels a texel from which edges start being sharpened
+const float SharpFull = 2.0;    // and are wholly
+const float SharpEdge = 0.9;
+const float SharpMost = 6.0;
+const float SharpFaint = 0.04;
+
+// A cubic B-spline read of the top mip at uv (size: the texture's texels), from four bilinear taps.
+vec4 BSpline(sampler2D tex, vec2 uv, vec2 size)
+{
+    vec2 st = uv * size - 0.5;
+    vec2 i = floor(st);
+    vec2 f = st - i;
+    vec2 f2 = f * f;
+    vec2 f3 = f2 * f;
+    vec2 w0 = (1.0 - 3.0 * f + 3.0 * f2 - f3) / 6.0;
+    vec2 w1 = (4.0 - 6.0 * f2 + 3.0 * f3) / 6.0;
+    vec2 w2 = (1.0 + 3.0 * f + 3.0 * f2 - 3.0 * f3) / 6.0;
+    vec2 w3 = f3 / 6.0;
+    vec2 g0 = w0 + w1;
+    vec2 g1 = w2 + w3;
+    vec2 p0 = (i - 0.5 + w1 / g0) / size;   // between texels i - 1 and i (their middles at i - 0.5 and i + 0.5)
+    vec2 p1 = (i + 1.5 + w3 / g1) / size;   // between i + 1 and i + 2
+    return g0.y * (g0.x * textureLod(tex, vec2(p0.x, p0.y), 0.0) + g1.x * textureLod(tex, vec2(p1.x, p0.y), 0.0))
+        + g1.y * (g0.x * textureLod(tex, vec2(p0.x, p1.y), 0.0) + g1.x * textureLod(tex, vec2(p1.x, p1.y), 0.0));
+}
+
+// The art at uv, dx and dy its texture places' change a screen pixel across and down.
+vec4 FaceArt(sampler2D tex, vec2 uv, vec2 dx, vec2 dy)
+{
+    float on = clamp(uMaterial._MarusFaceSharp, 0.0, 1.0);
+    float bias = exp2(ArtMipBias * on);
+    vec4 t = textureGrad(tex, uv, dx * bias, dy * bias);
+    vec2 size = vec2(textureSize(tex, 0));
+    float texels = max(length(dx * size), length(dy * size));
+    float strength = on * smoothstep(SharpFrom, SharpFull, 1.0 / max(texels, 1e-4));
+    if (strength > 0.0)
+    {
+        float b = BSpline(tex, uv, size).a;
+        vec2 o = 1.0 / size;
+        float peak = max(max(t.a, b), max(max(textureLod(tex, uv + vec2(o.x, 0.0), 0.0).a, textureLod(tex, uv - vec2(o.x, 0.0), 0.0).a),
+            max(textureLod(tex, uv + vec2(0.0, o.y), 0.0).a, textureLod(tex, uv - vec2(0.0, o.y), 0.0).a)));
+        if (peak > SharpFaint)
+        {
+            float k = min(1.0 / max(texels, 1e-4), SharpMost) * SharpEdge;
+            float sharp = clamp((b - 0.5 * peak) * k / peak + 0.5, 0.0, 1.0) * peak;
+            t.a = mix(t.a, sharp, strength);
+        }
+    }
+    return t;
+}
+
+// A mask read at the art's sharper mip.
+vec4 FaceMask(sampler2D tex, vec2 uv, vec2 dx, vec2 dy)
+{
+    float bias = exp2(ArtMipBias * clamp(uMaterial._MarusFaceSharp, 0.0, 1.0));
+    return textureGrad(tex, uv, dx * bias, dy * bias);
+}
+
 // One layer's colour (MarusFace.frag.glsl's modes 0, 1, 3 and 5), false where it draws nothing (cut away or discarded).
-bool LayerColour(sampler2D tex, vec4 texST, sampler2D mask, vec4 maskST, vec4 colour, float code, int layer, out vec4 c)
+// dx, dy: the face's texture places' (vUv's) change a screen pixel across and down, taken in main in uniform control flow.
+bool LayerColour(sampler2D tex, vec4 texST, sampler2D mask, vec4 maskST, vec4 colour, float code, int layer, vec2 dx, vec2 dy, out vec4 c)
 {
     c = vec4(0.0);
     int packed = int(code + 0.5);
@@ -193,7 +274,11 @@ bool LayerColour(sampler2D tex, vec4 texST, sampler2D mask, vec4 maskST, vec4 co
     float across = place.x;
     place -= ShiftOf(layer);
     place.x += SpreadAt(across, SpreadOf(layer));
-    vec4 t = texture(tex, place * texST.zw + texST.xy);
+    // The layer's places are vUv's scaled (the mouth's zoom, the player's tuning, the texture's tile; the spread's
+    // stretch about the middle left out), so their derivatives are vUv's scaled as much.
+    vec2 scale = (mouth ? uMaterial._MouthMap.xy : vec2(1.0)) * TuneScale(layer);
+    vec2 uv = place * texST.zw + texST.xy;
+    vec4 t = FaceArt(tex, uv, dx * scale * texST.zw, dy * scale * texST.zw);
     vec4 tint = colour * vColor;
     if (mode == 1)
     {
@@ -203,11 +288,11 @@ bool LayerColour(sampler2D tex, vec4 texST, sampler2D mask, vec4 maskST, vec4 co
     }
     else if (mode == 3)
     {
-        c = t * tint * texture(mask, place * maskST.zw + maskST.xy);
+        c = t * tint * FaceMask(mask, place * maskST.zw + maskST.xy, dx * scale * maskST.zw, dy * scale * maskST.zw);
     }
     else if (mode == 5)
     {
-        c = vec4(tint.rgb, tint.a * t.a) * texture(mask, place * maskST.zw + maskST.xy);
+        c = vec4(tint.rgb, tint.a * t.a) * FaceMask(mask, place * maskST.zw + maskST.xy, dx * scale * maskST.zw, dy * scale * maskST.zw);
     }
     else
     {
@@ -232,46 +317,49 @@ void main()
     bool smoothed = uMaterial._Smooth > 0.5 && snLen > 1e-6;
     float smoothShade = Banded(ModelShade(smoothed ? sn / snLen : n, uMaterial._IsoSun.xyz), uMaterial._ShadeBands);
 
+    vec2 uvDx = dFdx(vUv);
+    vec2 uvDy = dFdy(vUv);
+
     // Laid one over another in order, premultiplied: what the separate draws' SrcAlpha, OneMinusSrcAlpha blending gave.
     vec3 rgb = vec3(0.0);
     float alpha = 0.0;
     vec4 c;
-    if (LayerColour(_T0, uMaterial._T0_ST, _M0, uMaterial._M0_ST, uMaterial._C0, uMaterial._Q0.x, 0, c))
+    if (LayerColour(_T0, uMaterial._T0_ST, _M0, uMaterial._M0_ST, uMaterial._C0, uMaterial._Q0.x, 0, uvDx, uvDy, c))
     {
         rgb = c.rgb * c.a + rgb * (1.0 - c.a);
         alpha = c.a + alpha * (1.0 - c.a);
     }
-    if (LayerColour(_T1, uMaterial._T1_ST, _M1, uMaterial._M1_ST, uMaterial._C1, uMaterial._Q0.y, 1, c))
+    if (LayerColour(_T1, uMaterial._T1_ST, _M1, uMaterial._M1_ST, uMaterial._C1, uMaterial._Q0.y, 1, uvDx, uvDy, c))
     {
         rgb = c.rgb * c.a + rgb * (1.0 - c.a);
         alpha = c.a + alpha * (1.0 - c.a);
     }
-    if (LayerColour(_T2, uMaterial._T2_ST, _M2, uMaterial._M2_ST, uMaterial._C2, uMaterial._Q0.z, 2, c))
+    if (LayerColour(_T2, uMaterial._T2_ST, _M2, uMaterial._M2_ST, uMaterial._C2, uMaterial._Q0.z, 2, uvDx, uvDy, c))
     {
         rgb = c.rgb * c.a + rgb * (1.0 - c.a);
         alpha = c.a + alpha * (1.0 - c.a);
     }
-    if (LayerColour(_T3, uMaterial._T3_ST, _M3, uMaterial._M3_ST, uMaterial._C3, uMaterial._Q0.w, 3, c))
+    if (LayerColour(_T3, uMaterial._T3_ST, _M3, uMaterial._M3_ST, uMaterial._C3, uMaterial._Q0.w, 3, uvDx, uvDy, c))
     {
         rgb = c.rgb * c.a + rgb * (1.0 - c.a);
         alpha = c.a + alpha * (1.0 - c.a);
     }
-    if (LayerColour(_T4, uMaterial._T4_ST, _M4, uMaterial._M4_ST, uMaterial._C4, uMaterial._Q1.x, 4, c))
+    if (LayerColour(_T4, uMaterial._T4_ST, _M4, uMaterial._M4_ST, uMaterial._C4, uMaterial._Q1.x, 4, uvDx, uvDy, c))
     {
         rgb = c.rgb * c.a + rgb * (1.0 - c.a);
         alpha = c.a + alpha * (1.0 - c.a);
     }
-    if (LayerColour(_T5, uMaterial._T5_ST, _M5, uMaterial._M5_ST, uMaterial._C5, uMaterial._Q1.y, 5, c))
+    if (LayerColour(_T5, uMaterial._T5_ST, _M5, uMaterial._M5_ST, uMaterial._C5, uMaterial._Q1.y, 5, uvDx, uvDy, c))
     {
         rgb = c.rgb * c.a + rgb * (1.0 - c.a);
         alpha = c.a + alpha * (1.0 - c.a);
     }
-    if (LayerColour(_T6, uMaterial._T6_ST, _M6, uMaterial._M6_ST, uMaterial._C6, uMaterial._Q1.z, 6, c))
+    if (LayerColour(_T6, uMaterial._T6_ST, _M6, uMaterial._M6_ST, uMaterial._C6, uMaterial._Q1.z, 6, uvDx, uvDy, c))
     {
         rgb = c.rgb * c.a + rgb * (1.0 - c.a);
         alpha = c.a + alpha * (1.0 - c.a);
     }
-    if (LayerColour(_T7, uMaterial._T7_ST, _M7, uMaterial._M7_ST, uMaterial._C7, uMaterial._Q1.w, 7, c))
+    if (LayerColour(_T7, uMaterial._T7_ST, _M7, uMaterial._M7_ST, uMaterial._C7, uMaterial._Q1.w, 7, uvDx, uvDy, c))
     {
         rgb = c.rgb * c.a + rgb * (1.0 - c.a);
         alpha = c.a + alpha * (1.0 - c.a);

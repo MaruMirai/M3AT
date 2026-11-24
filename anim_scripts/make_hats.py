@@ -2135,6 +2135,283 @@ def ce_advanced_night_vision():
     beam(s, middle, plate - up * h * 0.2 * R, NV_QUAD_MOUNT[0], NV_QUAD_MOUNT[1], 'housing')
     return made(s, 'CE_AdvancedNightVision')
 
+GOGGLE_LENS = 0.25       # head radii, the glass's radius: big enough to frame Facial Animation's large eyes, the cups nearly meeting
+GOGGLE_FRAME = 0.09      # head radii the leather frame stands out round the glass
+GOGGLE_CLEAR = 0.04      # head radii in front of the most skin round the eye the frame's back edge stands
+GOGGLE_DEPTH = 0.15      # head radii from the frame's back edge to the glass
+GOGGLE_RIM = 0.03        # head radii the metal rim round the glass stands proud of the frame's front
+GOGGLE_SPLAY = 12        # degrees each cup is turned out from straight ahead, as the face curves away
+GOGGLE_OVER = 14         # degrees each way the skin is looked at round the eye, so the cup clears the brow and the nose
+GOGGLE_BAND = by_azimuth((48, EYE_EL + 2), (75, -6), (100, 2), (180, -6))   # the strap's middle: from the cups over the ears' tops
+GOGGLE_BAND_WIDE = 8     # degrees across the strap
+GOGGLE_STRAP_OFF = 0.12  # head radii it stands off the skin, over the hair, which it leaves on
+GOGGLE_BRIDGE = (0.14, 0.08)   # head radii across and deep, the bridge over the nose between the cups
+GOGGLE_SIDES = 8         # points round each cup: low-poly, as an accessory a few pixels across in play
+GOGGLE_STRAP_PIECES = 8  # pieces of the strap round the back of the head
+
+# Goggles, for other mods' (the game has none: this stands in only for apparel named goggles, StandIns.cs), after GrimWorld
+# 40,000's Tallarn desert goggles: two round cups of brown leather over the eyes, joined by a bridge over the nose, each
+# with a steel rim round a lens of glass (GLASS: the Visor material, as the gas mask's, so the pawn's eyes show behind
+# it), on a dark strap round the head over the ears' tops, standing off over the hair, which it leaves on. Coloured, as
+# the goggles are not made from stuff. Low-poly (GOGGLE_SIDES round each cup, no rivets): about 100 faces.
+def goggles():
+    s = Shape()
+    s.palette = {'leather': (0.42, 0.26, 0.12), 'rim': (0.66, 0.66, 0.68), 'strap': (0.2, 0.15, 0.1),
+                 'rivet': (0.78, 0.78, 0.8)}
+    up = Vector((0, 0, 1))
+    outer = GOGGLE_LENS + GOGGLE_FRAME
+    edges = []
+    for side in (1, -1):
+        az = side * EYE_AZ
+        a = math.radians(side * GOGGLE_SPLAY)
+        axis = Vector((math.sin(a), -math.cos(a), 0))
+        base = CENTRE + way(az, EYE_EL) * (over_skin(az, EYE_EL, GOGGLE_OVER) + GOGGLE_CLEAR * R)
+        # The leather cup, its back open on the face; a lip over the front; the steel rim; the glass a flat fan.
+        lathe(s, base, axis, [(0.0, outer * 0.92), (GOGGLE_DEPTH, outer), (GOGGLE_DEPTH + GOGGLE_RIM, GOGGLE_LENS + 0.02),
+                              (GOGGLE_DEPTH + GOGGLE_RIM, GOGGLE_LENS)],
+              ['leather', 'rim', 'rim'], GLASS, n=GOGGLE_SIDES)
+        ring_side = axis.cross(up).normalized()
+        # Where the bridge and the strap meet the cup: its inner and outer sides, halfway along it.
+        mid = base + axis * GOGGLE_DEPTH * 0.5 * R
+        a_side, b_side = mid + ring_side * outer * 0.9 * R, mid - ring_side * outer * 0.9 * R
+        edges.append(tuple(sorted((a_side, b_side), key=lambda p: abs(p.x - CENTRE.x))))   # (toward the nose, outer)
+    (l_in, l_out), (r_in, r_out) = edges
+    beam(s, l_in, r_in, GOGGLE_BRIDGE[0], GOGGLE_BRIDGE[1], 'leather')
+    strap(s, 48, GOGGLE_BAND, GOGGLE_BAND_WIDE, GOGGLE_STRAP_OFF, n=GOGGLE_STRAP_PIECES, colour='strap')
+    for cup_out, az in ((l_out, 48), (r_out, -48)):   # from each cup's outer side back to where the strap starts
+        beam(s, cup_out, snug(az, GOGGLE_BAND(az), GOGGLE_STRAP_OFF), 0.12, 0.04, 'strap', up=way(az, 0))
+    print('GOGGLES cups at %s and %s' % (tuple(round(c, 3) for c in edges[0][0]), tuple(round(c, 3) for c in edges[1][0])))
+    return made(s, 'Goggles')
+
+GORGET_HALF = 0.42       # head radii across (half) the plate, tip to tip
+GORGET_TOP = 0.2         # head radii below the neck's joint its top edge is at the middle
+GORGET_TIPS = 0.1        # head radii its tips rise above the top edge's middle
+GORGET_DEEP = 0.3        # head radii from its top edge to its bottom at the middle, the crescent's depth
+GORGET_OFF = 0.05        # head radii its back stands off the skin
+GORGET_THICK = 0.035     # head radii thick
+GORGET_COLUMNS = 8       # columns across it
+GORGET_ROWS = 2          # rows down it
+GORGET_EDGE_SIDES = 4    # sides round the rolled edge
+GORGET_BADGE_SIDES = 6   # sides round the badge
+GORGET_CORD_STEP = 40    # degrees between the chain's points round the back of the neck
+GORGET_EDGE = 0.04       # head radii the rolled edge stands proud of the plate, along its bottom
+GORGET_BADGE = 0.13      # head radii across the badge in its middle
+GORGET_CORD = (0.04, 0.03)   # head radii across and deep, the chain from each tip round the neck
+GORGET_CORD_GAP = 0.04   # head radii the chain round the back of the neck stands off the skin
+GORGET_CORD_HIGH = 0.02  # head radii above the neck's joint it goes round the back
+
+# A gorget (GrimWorld 40,000's Cadian officer's and commissar's, worn on its Belt layer: stands_for in export_frames.py),
+# as their sprites: a steel crescent hung at the throat over the top of the chest, curved round it, a rolled edge along
+# its bottom and a badge in its middle, from a chain from each tip up and round the back of the neck. Built on the body's
+# front as the scarf's ends are, and taking the body's weights, so it rides the chest; let out over a coat or armour
+# (SkinnedFigure.LetOutDefs). Coloured, as it is not made from stuff: steel with a pale badge, for both.
+def gorget(name='Gorget', palette=None):
+    s = Shape()
+    s.palette = palette or {'plate': (0.7, 0.71, 0.73), 'edge': (0.55, 0.56, 0.58), 'badge': (0.88, 0.88, 0.86),
+                            'cord': (0.3, 0.3, 0.32)}
+    up = Vector((0, 0, 1))
+    joint = rig.matrix_world @ rig.data.bones[walk.NECK].tail_local
+    top = joint.z - GORGET_TOP * R
+    nx, ny = GORGET_COLUMNS + 1, GORGET_ROWS + 1
+    places, outs = [], []
+    for j in range(ny):
+        for i in range(nx):
+            u = -1 + 2 * i / GORGET_COLUMNS
+            t = j / GORGET_ROWS
+            z_top = top + GORGET_TIPS * u * u * R
+            z_bottom = top - GORGET_DEEP * (1 - u * u) * R + 0.02 * R   # the tips come to a point
+            z = z_top + (z_bottom - z_top) * t
+            p, n = chest_skin(u * GORGET_HALF * R, z)
+            n = Vector((n.x, min(n.y, -0.3), n.z)).normalized()   # off the skin, never back into the neck's hollow
+            places.append(p + n * (GORGET_OFF + GORGET_THICK) * R)
+            outs.append(n)
+    faces = [[j * nx + i, j * nx + i + 1, (j + 1) * nx + i + 1, (j + 1) * nx + i]
+             for j in range(GORGET_ROWS) for i in range(GORGET_COLUMNS)]
+    m = len(places)
+    s.part(places, faces, 'plate')   # one surface, as the hats are: the game draws both its sides
+    # The rolled edge along the bottom, a little tube from tip to tip.
+    bottom = [places[GORGET_ROWS * nx + i] for i in range(nx)]
+    bottom_out = [outs[GORGET_ROWS * nx + i] for i in range(nx)]
+    ES = GORGET_EDGE_SIDES
+    ring = []
+    for p, n in zip(bottom, bottom_out):
+        c = p + n * GORGET_EDGE * 0.5 * R
+        ring.append([c + (n * math.cos(2 * math.pi * k / ES) + up * math.sin(2 * math.pi * k / ES)) * GORGET_EDGE * 0.6 * R
+                     for k in range(ES)])
+    s.part([p for r in ring for p in r], [[a * ES + k, a * ES + (k + 1) % ES, (a + 1) * ES + (k + 1) % ES, (a + 1) * ES + k]
+                                         for a in range(nx - 1) for k in range(ES)], 'edge')
+    # The badge: a low boss in its middle.
+    mid = GORGET_COLUMNS // 2 + (GORGET_ROWS // 2) * nx
+    c, n = places[mid], outs[mid]
+    lathe(s, c - n * 0.01 * R, n, [(0.0, GORGET_BADGE * 0.5), (0.03, GORGET_BADGE * 0.5), (0.045, GORGET_BADGE * 0.35)],
+          ['badge', 'badge'], 'badge', n=GORGET_BADGE_SIDES)
+    # The chain: from each tip up to the side of the neck, then round the back of it.
+    neck_y = joint.y
+    probe = Vector((0, neck_y, 0))
+    ahead, behind = neck_skin(0, joint.z, probe), neck_skin(180, joint.z, probe)
+    axis = Vector((0, neck_y + (behind - ahead) / 2, 0))
+    z = joint.z + GORGET_CORD_HIGH * R
+    back = []
+    for az in range(60, 301, GORGET_CORD_STEP):
+        back.append(Vector((axis.x, axis.y, z)) + way(az, 0) * (neck_skin(az, z, axis) + GORGET_CORD_GAP * R))
+    for a, b in zip(back, back[1:]):
+        beam(s, a, b, GORGET_CORD[1], GORGET_CORD[0], 'cord', up=(a - axis).normalized())
+    for tip, end in ((places[0], back[-1]), (places[nx - 1], back[0])):
+        beam(s, tip, end, GORGET_CORD[0], GORGET_CORD[1], 'cord', up=Vector((0, -1, 0)))
+    print('GORGET %s top %.3f, neck joint %.3f, %d plate points' % (name, top, joint.z, m))
+    return made(s, name)
+
+GLASSES_LENS = 0.2       # head radii, each lens's radius: round Facial Animation's large eyes
+GLASSES_FRAME = 0.04     # head radii the frame's rim is wide round the lens
+GLASSES_DEEP = 0.03      # head radii the rim is deep
+GLASSES_CLEAR = 0.1      # head radii in front of the most skin round the eye the lenses stand
+GLASSES_SIDES = 8        # points round each lens
+GLASSES_WIDE = 1.0       # each lens's width over its height (the sunglasses' wider)
+GLASSES_TEMPLE = (90, -16)   # (azimuth, elevation) each arm runs back to, over the ear
+GLASSES_ARM = 0.04       # head radii across each arm and the bridge
+
+def glasses_frame(s, lens, frame_colour, wide=GLASSES_WIDE, radius=GLASSES_LENS):
+    """A pair of glasses as parts of s: a rim round each lens (lens: its colour, GLASS to see the eyes through it), a
+    bridge over the nose and an arm back from each to over the ear. Low-poly: GLASSES_SIDES round each lens."""
+    up = Vector((0, 0, 1))
+    inner_sides = []
+    for side in (1, -1):
+        az = side * EYE_AZ
+        a = math.radians(side * GOGGLE_SPLAY)
+        axis = Vector((math.sin(a), -math.cos(a), 0))
+        across = axis.cross(up).normalized()
+        if across.x * side < 0:
+            across = -across   # outward, away from the nose
+        rise = across.cross(axis).normalized()
+        if rise.z < 0:
+            rise = -rise
+        base = CENTRE + way(az, EYE_EL) * (over_skin(az, EYE_EL, GOGGLE_OVER) + GLASSES_CLEAR * R)
+        n = GLASSES_SIDES
+        def ring(r, ahead):
+            return [base + axis * ahead * R + (across * math.cos(2 * math.pi * (k + 0.5) / n) * wide
+                                                + rise * math.sin(2 * math.pi * (k + 0.5) / n)) * r * R for k in range(n)]
+        inner, outer = ring(radius, GLASSES_DEEP), ring(radius + GLASSES_FRAME, GLASSES_DEEP)
+        back = ring(radius + GLASSES_FRAME, 0.0)
+        pts = inner + outer + back
+        s.part(pts, [[k, (k + 1) % n, n + (k + 1) % n, n + k] for k in range(n)]
+               + [[n + k, n + (k + 1) % n, 2 * n + (k + 1) % n, 2 * n + k] for k in range(n)], frame_colour)
+        s.part(inner + [base + axis * GLASSES_DEEP * R], [[k, (k + 1) % n, n] for k in range(n)], lens)
+        edge_in = base + axis * GLASSES_DEEP * 0.5 * R - across * (radius + GLASSES_FRAME * 0.5) * wide * R
+        edge_out = base + axis * GLASSES_DEEP * 0.5 * R + across * (radius + GLASSES_FRAME * 0.5) * wide * R
+        inner_sides.append(edge_in)
+        taz, tel = GLASSES_TEMPLE
+        beam(s, edge_out, snug(side * taz, tel, 0.04), GLASSES_ARM, GLASSES_ARM, frame_colour)
+    beam(s, inner_sides[0], inner_sides[1], GLASSES_ARM, GLASSES_ARM, frame_colour)
+
+# Glasses, for other mods' (the game has none: they stand in only for apparel named glasses or spectacles, or a single
+# glass): a thin dark frame round two round lenses of glass (GLASS, the Visor material, so the eyes show through), a
+# bridge and an arm back over each ear. They leave the hair and the face on. About 70 faces.
+def glasses():
+    s = Shape()
+    s.palette = {'frame': (0.16, 0.15, 0.15)}
+    glasses_frame(s, GLASS, 'frame')
+    return made(s, 'Glasses')
+
+# Sunglasses: the same, the lenses a little wider and dark, not glass, so the eyes are hidden behind them.
+def sunglasses():
+    s = Shape()
+    s.palette = {'frame': (0.12, 0.12, 0.12), 'lens': (0.05, 0.05, 0.06)}
+    glasses_frame(s, 'lens', 'frame', wide=1.2, radius=GLASSES_LENS + 0.02)
+    return made(s, 'Sunglasses')
+
+HAIRBAND_OFF = 0.06      # head radii its inside stands off the skin: on the bare head, as the game pushes it out past the
+                         # hair worn (export_frames.py's over_hair, Source/HatOverHair.cs), which it leaves on
+HAIRBAND_TILT = 28       # degrees its arc over the head is tipped forward from upright, as a band is worn behind the fringe
+HAIRBAND_REACH = 100     # degrees round from the top either way it goes: down behind each ear
+HAIRBAND_WIDE = 0.12     # head radii across
+HAIRBAND_THICK = 0.04    # head radii thick
+HAIRBAND_PIECES = 10     # pieces along it
+
+def hairband_stations(off=HAIRBAND_OFF):
+    """The band's middle line over the head, from behind one ear over the top to the other (in its tipped plane)."""
+    tilt = math.radians(HAIRBAND_TILT)
+    out = []
+    for i in range(HAIRBAND_PIECES + 1):
+        a = math.radians(-HAIRBAND_REACH + 2 * HAIRBAND_REACH * i / HAIRBAND_PIECES)
+        d = Vector((math.sin(a), -math.cos(a) * math.sin(tilt), math.cos(a) * math.cos(tilt)))
+        az = math.degrees(math.atan2(d.x, -d.y))
+        el = math.degrees(math.asin(max(-1.0, min(1.0, d.z))))
+        out.append(snug(az, el, off))
+    return out
+
+def hairband_on(s, colour=None):
+    stations = hairband_stations()
+    bar(s, stations, lambda i: HAIRBAND_WIDE, HAIRBAND_THICK, colour)
+    return stations
+
+# A hairband (other mods' hairbands and headbands, an alice band): a plain band over the top of the head from behind one
+# ear to the other, tipped forward, laid on the bare head and pushed out over the hair in the game, which it leaves on.
+# Drawn in the apparel's colour. About 40 faces.
+def hairband():
+    s = Shape()
+    hairband_on(s)
+    return made(s, 'Hairband')
+
+RIBBON_AT = 0.3          # of the way along the band (from the figure's right ear) the bow is tied: high on its left
+RIBBON_LOOP = (0.42, 0.3)   # head radii each loop reaches out along the band and stands across it at its end
+RIBBON_KNOT = 0.12       # head radii across the knot
+RIBBON_TAIL = 0.28       # head radii each tail hangs
+RIBBON_LIFT = 0.04       # head radii the bow stands out off the band
+
+# A ribbon (other mods' ribbons, bows, hair ties and corsages): the hairband with a bow tied on it high on the left, two
+# flat loops out along the band from a knot and two short tails hanging from it, in the apparel's colour. About 70 faces.
+def ribbon():
+    s = Shape()
+    stations = hairband_on(s)
+    k = RIBBON_AT * HAIRBAND_PIECES
+    i = int(k)
+    at = stations[i].lerp(stations[i + 1], k - i)
+    along = (stations[i + 1] - stations[i]).normalized()
+    out = (at - CENTRE).normalized()
+    across = along.cross(out).normalized()
+    knot = at + out * (HAIRBAND_THICK + RIBBON_LIFT) * R
+    slab(knot, along * RIBBON_KNOT / 2 * R, across * RIBBON_KNOT / 2 * R, out * RIBBON_KNOT / 2 * R, None, s)
+    reach, stand = RIBBON_LOOP
+    for side in (1, -1):
+        tip = knot + along * side * reach * R
+        corners = [knot + across * RIBBON_KNOT * 0.4 * R, tip + across * stand * R, tip - across * stand * R,
+                   knot - across * RIBBON_KNOT * 0.4 * R]
+        lift = out * 0.06 * R
+        s.part(corners + [c + lift for c in corners], [[0, 1, 2, 3], [7, 6, 5, 4], [1, 5, 6, 2], [0, 4, 5, 1], [2, 6, 7, 3]])
+    down = (Vector((0, 0, -1)) - out * out.dot(Vector((0, 0, -1)))).normalized()
+    for side in (1, -1):
+        root = knot + along * side * RIBBON_KNOT * 0.3 * R
+        end = root + (down + along * side * 0.4).normalized() * RIBBON_TAIL * R
+        w = across * 0.05 * R
+        s.part([root - w, root + w, end + w * 1.3, end - w * 1.3], [[0, 1, 2, 3]])
+    return made(s, 'Ribbon')
+
+MAID_FRILL = 0.28        # head radii the frill stands up off the band, at its middle
+MAID_FRILL_REACH = 0.55  # of the band's length round the front of it the frill runs, centred on its top
+MAID_PLEATS = 10         # pleats along the frill, each a point up
+
+# A maid's headdress (other mods' maid caps and headbands): the hairband with a pleated frill standing up along its top
+# middle, its edge in points, in the apparel's colour. About 70 faces.
+def maid_headdress():
+    s = Shape()
+    stations = hairband_on(s)
+    n = len(stations)
+    first = (1 - MAID_FRILL_REACH) / 2 * (n - 1)
+    points = []
+    for k in range(MAID_PLEATS * 2 + 1):
+        f = first + MAID_FRILL_REACH * (n - 1) * k / (MAID_PLEATS * 2)
+        i = min(int(f), n - 2)
+        p = stations[i].lerp(stations[i + 1], f - i)
+        out = (p - CENTRE).normalized()
+        foot = p + out * HAIRBAND_THICK * 0.5 * R
+        bow = math.sin(math.pi * k / (MAID_PLEATS * 2))
+        high = MAID_FRILL * (0.6 + 0.4 * bow) * (1.0 if k % 2 == 0 else 0.7)
+        # Up off the band and leant forward a little, as a frill stands.
+        rise = (out + Vector((0, -0.25, 0))).normalized()
+        points += [foot, foot + rise * high * R]
+    s.part(points, [[2 * k, 2 * k + 2, 2 * k + 3, 2 * k + 1] for k in range(MAID_PLEATS * 2)])
+    return made(s, 'MaidHeaddress')
+
 HATS = {'SimpleHelmet': simple_helmet, 'AdvancedHelmet': advanced_helmet, 'Tuque': tuque, 'CowboyHat': cowboy_hat,
         'BowlerHat': bowler_hat, 'HatHood': hat_hood, 'TribalHeaddress': tribal_headdress, 'PsychicFoilHelmet': psychic_foil_helmet,
         'WarMask': war_mask, 'WarVeil': war_veil, 'ClothMask': cloth_mask, 'Blindfold': blindfold,
@@ -2147,7 +2424,9 @@ HATS = {'SimpleHelmet': simple_helmet, 'AdvancedHelmet': advanced_helmet, 'Tuque
         'ArrayHeadset': array_headset, 'IntegratorHeadset': integrator_headset,
         'VisageMask': visage_mask, 'GasMask': gas_mask, 'Broadwrap': broadwrap, 'Collar': slave_collar, 'Scarf': scarf,
         'CultistMask': cultist_mask, 'CeremonialCultistMask': ceremonial_cultist_mask,
-        'CE_SimpleNightVision': ce_simple_night_vision, 'CE_AdvancedNightVision': ce_advanced_night_vision}
+        'CE_SimpleNightVision': ce_simple_night_vision, 'CE_AdvancedNightVision': ce_advanced_night_vision,
+        'Goggles': goggles, 'Gorget': gorget, 'Glasses': glasses, 'Sunglasses': sunglasses,
+        'Hairband': hairband, 'Ribbon': ribbon, 'MaidHeaddress': maid_headdress}
 
 # Pieces of other garments, made only when named (they are not garments of their own, so not for Models/garments).
 PARTS = {'BurkaHood': burka_hood}

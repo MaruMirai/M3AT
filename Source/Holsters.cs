@@ -98,8 +98,9 @@ namespace M3AT
         // Webbing that holsters, packs and gear lie over rather than are pushed out by: the heavy bandolier and Combat
         // Extended's tactical vest are thin straps and pouches, and pushing a weapon or pack out past their pouches left it
         // standing well off the back. The scarf too: a pack's top comes up to the back of the neck, where it is wound thin,
-        // and a pack pushed off the back by it would hang away from the shoulders.
-        private static readonly string[] NoClearanceDefs = { "Apparel_Bandolier", "CE_Apparel_TacVest", "Apparel_Scarf" };
+        // and a pack pushed off the back by it would hang away from the shoulders. And the gorgets, hung on a chain round it.
+        private static readonly string[] NoClearanceDefs = { "Apparel_Bandolier", "CE_Apparel_TacVest", "Apparel_Scarf",
+            "Apparel_Gorget" };
 
         // The worn-garment bits of the garments in no clearance: packs (placed by it), shields (they go with the hand) and
         // the NoClearanceDefs webbing.
@@ -288,6 +289,7 @@ namespace M3AT
         private bool chestFrontLooked;
         private const int ChestKey = 300;   // holsterPush's key for it, past the gear's
         private const float ArmsOutMost = 0.12f;   // model units: the hands are pushed out no further than this
+        internal float armsOutSeen;   // the chest's clearance the last ArmsOut found (before ArmsOutMost), for the autotest
         private static readonly Vector3[] StanceSpots =
         {
             Vector3.zero, new Vector3(0.06f, 0f, 0f), new Vector3(-0.06f, 0f, 0f),
@@ -340,6 +342,9 @@ namespace M3AT
                 return false;
             }
             float push = Mathf.Min(Clearance(p.shape, p.wornMask, h, ChestKey), ArmsOutMost) * Mathf.Clamp01(w);
+#if AUTOTEST
+            armsOutSeen = Clearance(p.shape, p.wornMask, h, ChestKey);
+#endif
             if (push < 1e-3f)
             {
                 return false;

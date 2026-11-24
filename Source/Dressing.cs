@@ -444,24 +444,7 @@ namespace M3AT
             Matrix4x4 place;
             if (hat)
             {
-                Vector3 fingers;
-                Vector3 grip = skin.JointOf(fig, "hand.R.001", out fingers) ? (wristR + fingers) * 0.5f : wristR;
-                float pitch = Keyed(HatAt, HatPitch, d.phase), roll = Keyed(HatAt, HatRoll, d.phase);
-                Quaternion tipped = Quaternion.Euler(pitch, 0f, roll);
-                Vector3 front = grip;
-                Quaternion turn = tipped;
-                Matrix4x4 head;
-                if (d.phase > HatRelease && skin.BoneOf(fig, "spine.006", out head))
-                {
-                    // Off the hand and onto the head: its front brim from the hand to where it is worn over an arc, its
-                    // turn from the last held to the head's.
-                    float k = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(HatRelease, HatLands, d.phase));
-                    Quaternion releasedTurn = Quaternion.Euler(HatPitch[HatPitch.Length - 1], 0f, HatRoll[HatRoll.Length - 1]);
-                    Quaternion worn = Quaternion.LookRotation(head.GetColumn(2), head.GetColumn(1));
-                    front = Vector3.Lerp(grip, head.MultiplyPoint3x4(hm.front), k) + Vector3.up * (HatArc * 4f * k * (1f - k));
-                    turn = Quaternion.Slerp(releasedTurn, worn, k);
-                }
-                place = Matrix4x4.TRS(front, turn, Vector3.one) * Matrix4x4.Translate(-hm.front);
+                HatPlace(fig, hm, d.phase, wristR, out place);
             }
             else
             {
@@ -476,6 +459,31 @@ namespace M3AT
             }
             Color colour = skin.Tinted(g, d.apparel) ? Api.ApparelColour(d.apparel) : Color.white;
             Api.DrawModel(hm.model, at, yaw, Matrix4x4.Scale(new Vector3(size, size, size)) * place, colour);
+            return true;
+        }
+
+        // Where a hat's rest model goes at this phase of dress_head: held by its front brim in the right hand (by its grip
+        // between the wrist and the knuckles), tipped up on edge, then from HatRelease off the hand and over an arc onto the
+        // head. Also HelmetStow.cs's, for a helmet taken off the back.
+        private static bool HatPlace(SkinnedFigure.Posed fig, DressModel hm, float phase, Vector3 wristR, out Matrix4x4 place)
+        {
+            Vector3 fingers;
+            Vector3 grip = skin.JointOf(fig, "hand.R.001", out fingers) ? (wristR + fingers) * 0.5f : wristR;
+            float pitch = Keyed(HatAt, HatPitch, phase), roll = Keyed(HatAt, HatRoll, phase);
+            Vector3 front = grip;
+            Quaternion turn = Quaternion.Euler(pitch, 0f, roll);
+            Matrix4x4 head;
+            if (phase > HatRelease && skin.BoneOf(fig, "spine.006", out head))
+            {
+                // Off the hand and onto the head: its front brim from the hand to where it is worn over an arc, its
+                // turn from the last held to the head's.
+                float k = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(HatRelease, HatLands, phase));
+                Quaternion releasedTurn = Quaternion.Euler(HatPitch[HatPitch.Length - 1], 0f, HatRoll[HatRoll.Length - 1]);
+                Quaternion worn = Quaternion.LookRotation(head.GetColumn(2), head.GetColumn(1));
+                front = Vector3.Lerp(grip, head.MultiplyPoint3x4(hm.front), k) + Vector3.up * (HatArc * 4f * k * (1f - k));
+                turn = Quaternion.Slerp(releasedTurn, worn, k);
+            }
+            place = Matrix4x4.TRS(front, turn, Vector3.one) * Matrix4x4.Translate(-hm.front);
             return true;
         }
 

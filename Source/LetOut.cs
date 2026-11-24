@@ -21,8 +21,8 @@ namespace M3AT
     {
         private static readonly string[] LetOutLayers = { "Webbing" };
         // Apparel let out though on no let-out layer: the slave collar, made close round the bare neck, over a shirt's collar
-        // or armour's neck ring; the scarf (no apparel of the game's: drawn for other mods'), over a coat's or armour's.
-        private static readonly string[] LetOutDefs = { "Apparel_Collar", "Apparel_Scarf" };
+        // or armour's neck ring; the scarf and the gorgets (no apparel of the game's: drawn for other mods'), over a coat's or armour's.
+        private static readonly string[] LetOutDefs = { "Apparel_Collar", "Apparel_Scarf", "Apparel_Gorget" };
         private const float LetOutClear = 0.006f;   // cells over what is under it (about the webbing's own offset off a shirt)
         private const float LetOutBack = 0.05f;     // cells: a surface this far under a place along its line still counts
         private const float LetOutFar = 0.2f;       // cells: and this far over it (armour stands up to about 0.11 off the skin)
@@ -33,6 +33,9 @@ namespace M3AT
         private const int LetOutSamples = 6;        // a triangle is looked at at points this many steps apart along each edge
         private const int LetOutRounds = 20;        // passes raising a triangle's corners until its points are clear
 
+#if AUTOTEST
+        internal static readonly List<string> LetOutNotes = new List<string>();   // each let-out worked out, for the autotest
+#endif
         private bool[] letsOut;              // by piece: drawn for apparel on a let-out layer
         private ApparelProperties[] pieceApparel;   // by piece: the apparel it is drawn for (its first def the game has)
 
@@ -148,6 +151,22 @@ namespace M3AT
             Vector3[] normal = Normals(rest, pieces[g].tris);
             shaped = new PieceShape { rest = rest, normal = normal, hull = SmoothHull(normal) };
             s.letOut[key] = shaped;
+#if AUTOTEST
+            float most = 0f;
+            for (int i = 0; i < rest.Length; i++)
+            {
+                most = Mathf.Max(most, (rest[i] - plain.rest[i]).magnitude);
+            }
+            List<string> underNames = new List<string>();
+            for (int h = 1; h < pieces.Length && h <= MaxHiding; h++)
+            {
+                if ((under & GarmentBit(h)) != 0)
+                {
+                    underNames.Add(pieces[h].name);
+                }
+            }
+            LetOutNotes.Add(pieces[g].name + " let out over " + string.Join("+", underNames) + ": at most " + most.ToString("F3") + " cells");
+#endif
             return shaped;
         }
 

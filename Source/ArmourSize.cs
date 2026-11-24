@@ -18,7 +18,66 @@ namespace M3AT
     // two is taken. A helmet's or pauldron's own scale is only its sprite's fit, so only body armour counts.
     public static partial class WalkFigures
     {
+        // The powerArmourBulk option, the game's own Spacer power armour bulking its wearer up as a Space Marine's does, is
+        // off and out of the options window for now (its setting is still saved): that armour lifts its wearer on its
+        // soles instead (SkinnedFigure.SoleOf).
+        internal static bool PowerArmourBulk = false;   // (not readonly: the armoured autotest turns it on to compare)
         private const float ArmourHulk = 0.8f;          // the Hulk key's least amount on a bulked wearer, of the body shape strength
+
+        // The Armoured key (anim_scripts/make_armoured.py): the frame a full suit of power armour gives its wearer, broader
+        // and thicker round the bones but no longer along them, so the clips still land. The body under such armour is
+        // never seen (the armour hides it), so the key is the suit's volume, and the armour garments are fitted to it at
+        // export as to any body key. By the suit: the recon armour and its family (the locust armour and mechlord suit are
+        // made from it) a little, the plate and marine armour half, the cataphract all; other armour none. Not on a child.
+        private const string ArmouredKey = "Armoured";
+        private const float FrameGrows = 0.05f;          // of the wearer's size, added at the whole key (ArmourSizeOf)
+        internal static bool ArmouredFrames = true;     // (not readonly: the armoured autotest turns it off to compare)
+        private static readonly Dictionary<string, float> FrameOf = new Dictionary<string, float>
+        {
+            { "Apparel_ArmorRecon", 0.25f }, { "Apparel_ArmorReconPrestige", 0.25f }, { "Apparel_ArmorLocust", 0.25f }, { "Apparel_MechlordSuit", 0.25f },
+            { "Apparel_PlateArmor", 0.5f },
+            { "Apparel_PowerArmor", 0.5f }, { "Apparel_ArmorMarinePrestige", 0.5f }, { "Apparel_ArmorMarineGrenadier", 0.5f },
+            { "Apparel_ArmorCataphract", 1f }, { "Apparel_ArmorCataphractPrestige", 1f }, { "Apparel_ArmorCataphractPhoenix", 1f },
+        };
+        // Power armour that keeps its wearer's own size, whatever powerArmourBulk says: light, close-fitting suits.
+        private static readonly HashSet<string> KeepsOwnFrame = new HashSet<string>
+        {
+            "Apparel_ArmorRecon", "Apparel_ArmorReconPrestige", "Apparel_ArmorLocust", "Apparel_MechlordSuit",
+        };
+
+        // How much of the Armoured key the pawn's armour gives it (0: none).
+        private static float ArmouredFrameOf(Pawn pawn)
+        {
+            List<Apparel> worn = pawn.apparel != null ? pawn.apparel.WornApparel : null;
+            float most = 0f;
+            for (int i = 0; ArmouredFrames && worn != null && i < worn.Count; i++)
+            {
+                float f;
+                if (FrameOf.TryGetValue(worn[i].def.defName, out f))
+                {
+                    most = Mathf.Max(most, f);
+                }
+            }
+            return most;
+        }
+
+        // builds with the Armoured key added at frame (a new list; builds itself when there is none to add).
+        private static List<KeyValuePair<string, float>> WithFrame(List<KeyValuePair<string, float>> builds, float frame)
+        {
+            if (frame <= 0f)
+            {
+                return builds;
+            }
+            List<KeyValuePair<string, float>> found = builds != null ? new List<KeyValuePair<string, float>>(builds) : new List<KeyValuePair<string, float>>();
+            found.Add(new KeyValuePair<string, float>(ArmouredKey, frame));
+            return found;
+        }
+
+        // Whether power armour bulks its wearer up by powerArmourBulk: not the suits that keep their wearer's frame.
+        private static bool PowerBulks(ThingDef def)
+        {
+            return PowerArmourBulk && !KeepsOwnFrame.Contains(def.defName);
+        }
 
         // What a worn apparel does to its wearer's size: its drawData scale if body armour, and whether it bulks it up.
         private enum Bulk { None, Marine, PowerArmour }
@@ -34,7 +93,9 @@ namespace M3AT
             {
                 return 1f;
             }
-            float size = 1f;
+            // The Armoured key's frame makes its wearer a little bigger too, FrameGrows of its own size at the whole key
+            // (the cataphract's), as the suit stands it up on its frame; a grown pawn only, as the key itself is.
+            float size = pawn.DevelopmentalStage.Adult() ? 1f + FrameGrows * ArmouredFrameOf(pawn) : 1f;
             for (int i = 0; i < worn.Count; i++)
             {
                 ThingDef def = worn[i].def;
@@ -43,7 +104,7 @@ namespace M3AT
                     size = Mathf.Max(size, def.apparel.drawData.ScaleFor(pawn));
                 }
                 Bulk bulk = BulkOf(def);
-                if ((bulk == Bulk.Marine && s.marineBulk) || (bulk != Bulk.None && s.powerArmourBulk))
+                if ((bulk == Bulk.Marine && s.marineBulk) || (bulk != Bulk.None && PowerBulks(def)))
                 {
                     size = Mathf.Max(size, s.armourBulk);
                 }
@@ -59,7 +120,7 @@ namespace M3AT
             for (int i = 0; s != null && worn != null && i < worn.Count; i++)
             {
                 Bulk bulk = BulkOf(worn[i].def);
-                if ((bulk == Bulk.Marine && s.marineBulk) || (bulk != Bulk.None && s.powerArmourBulk))
+                if ((bulk == Bulk.Marine && s.marineBulk) || (bulk != Bulk.None && PowerBulks(worn[i].def)))
                 {
                     return s.armourBulk > 1f;
                 }
@@ -212,15 +273,16 @@ namespace M3AT
         private const float BackShare = 0.5f;        // of the figure's height, from the hips to the head's top, which the stoop swings down
         private const float CeilingEase = 2f;        // how fast a pawn crouches under a ceiling or stands up again, of all the way per real second
 
-        // How far down the pawn needs to bring its head under the ceiling over it, cells; 0 for none.
-        private static float CeilingDrop(Pawn pawn, float size)
+        // How far down the pawn needs to bring its head under the ceiling over it, cells; 0 for none. raised: cells it stands
+        // on its armour's soles.
+        private static float CeilingDrop(Pawn pawn, float size, float raised)
         {
             Settings s = SettingsMod.Settings;
             if (s == null || s.ceilingCrouch == CeilingCrouch.Never || !pawn.Spawned)
             {
                 return 0f;
             }
-            float top = FigureTop * size;
+            float top = FigureTop * size + raised;   // (raised: cells it stands on its armour's soles, SoleOf)
             if (top <= Api.WallHeight - CeilingClear && Api.Floors == null)
             {
                 return 0f;   // (spares the roof lookup for everyone under the walls' height without stacked floors)
@@ -285,11 +347,24 @@ namespace M3AT
             }
         }
 
+        // The work kinds whose clips kneel or sit on the floor (the shins, knees or seat on the ground), which armour's soles
+        // don't lift (SoleOf).
+        private static readonly HashSet<string> onTheFloor = new HashSet<string>
+        {
+            "crouch", "pluck", "plant", "tend", "toys", "chalk", "tame_kneel", "meditate", "play", "research_floor", "visit",
+            "stir_campfire", "stir_crouch", "sow",
+        };
+
+        private static bool OnTheFloor(string workKind)
+        {
+            return workKind != null && onTheFloor.Contains(workKind);
+        }
+
         // Eases the pawn's crouch under a ceiling toward what it needs and gives the crouch (0 .. 1 of CrouchDepth) and the
         // stoop (degrees) that bring its head down that far.
-        private static void CeilingPose(Pawn pawn, Ease e, float size, bool upright, out float crouch, out float stoop)
+        private static void CeilingPose(Pawn pawn, Ease e, float size, float raised, bool upright, out float crouch, out float stoop)
         {
-            float need = upright ? CeilingDrop(pawn, size) : 0f;
+            float need = upright ? CeilingDrop(pawn, size, raised) : 0f;
             e.ceilingDrop = Mathf.MoveTowards(e.ceilingDrop, need, CeilingEase * FigureTop * size * Time.deltaTime);
             crouch = 0f;
             stoop = 0f;

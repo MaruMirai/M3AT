@@ -2,6 +2,9 @@
 # sprites (Source/AddonBuilder.cs), as low-poly meshes in the gene ears' and tail's own form (export_cat.py's header), so
 # the game moves them on the same springs (Source/RaceTails.cs, CatEars.cs, CatTail.cs):
 #   python3 anim_scripts/make_race_parts.py "M3AT: Maru's 3D Animated Toons/Models/chibi" [part ...]
+# These are first drafts: anim_scripts/import_race_parts.py puts them into the rig's .blend to edit, and export_cat.py
+# writes them from there after. A file written from the .blend (its first line names export_cat.py) is left alone here
+# unless --force is given, so this never throws hand edits away.
 # Each is shaped after the race's own sprites and placed from the chibi's head in skin.txt and the cat tail's root in
 # tail.txt, so run it again after the body changes. Written:
 #   race_ratkin_ears.txt   Ratkin (NewRatkinPlus): big round mouse ears, cupped forward, pink lining (inner)
@@ -393,12 +396,29 @@ def main():
     args = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else sys.argv[1:]
     if not args:
         raise SystemExit(__doc__ if __doc__ else 'give the chibi folder')
+    force = '--force' in args
+    args = [a for a in args if a != '--force']
     folder, wanted = args[0], set(args[1:])
     head, centre = read_skin(os.path.join(folder, 'skin.txt'))
     root = tail_root(os.path.join(folder, 'tail.txt'))
 
+    def from_blend(file):
+        path = os.path.join(folder, file)
+        if force or not os.path.exists(path):
+            return False
+        with open(path) as f:
+            first = f.readline()
+        if '(anim_scripts/export_cat.py)' in first:   # export_cat's header; this script's own only mentions it
+            print('KEPT %s: written from the .blend (edit it there, or --force)' % file)
+            return True
+        return False
+
+    files = {'race_ratkin_ears': ['race_ratkin_ears.txt'], 'race_wolfein_ears': ['race_wolfein_ears.txt'],
+             'race_ratkin_tail': ['race_ratkin_tail.txt'], 'race_wolfein_tail': ['race_wolfein_tail.txt'],
+             'race_milira_wings': ['race_milira_wing_L.txt', 'race_milira_wing_R.txt']}
+
     def want(name):
-        return not wanted or name in wanted
+        return (not wanted or name in wanted) and not any(from_blend(f) for f in files[name])
 
     if want('race_ratkin_ears'):
         s = dict(RATKIN_EAR, tall=2 * RATKIN_EAR['radius'])

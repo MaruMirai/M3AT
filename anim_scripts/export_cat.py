@@ -16,6 +16,8 @@
 #   tail b x y z           joint b's rest place, from the root down; the last is the tip
 #   tw i b w ...           vertex i's weights on the bones (b the joint it turns about)
 # tail_furry.txt:          as tail.txt, the same tail made shorter and tufted (fur_tail.py), for the Tail_Furry gene
+# race_*.txt:              the races' own ears (as the ears) and tails and wings (as the tail, with an inner group the tip and
+#                          bone, mirror and plain lines), from the meshes import_race_parts.py put in (m3at_race_file)
 # Both are untextured: the game colours them with the pawn's hair.
 import math
 import os
@@ -158,21 +160,46 @@ def write_fur_tail(path, scale):
             f.write('tw %d %s\n' % (i, ' '.join('%d %.5f' % bw for bw in w)))
 
 
-def write_tail(path, scale):
-    o, rig = bpy.data.objects.get(TAIL), bpy.data.objects.get(TAIL_RIG)
+def write_tail(path, scale, mesh=TAIL, rig_name=TAIL_RIG, title='the cat tail'):
+    o, rig = bpy.data.objects.get(mesh), bpy.data.objects.get(rig_name)
     if o is None or rig is None:
-        print('CAT no tail (%s on %s)' % (TAIL, TAIL_RIG))
+        print('CAT no tail (%s on %s)' % (mesh, rig_name))
         return
     joints, ws = tail_rig_of(o, rig)
     chain = joints[:-1]
+    inner = o.vertex_groups.get(LINING_GROUP)
+    tip = [v.index for v in o.data.vertices if inner and any(e.group == inner.index and e.weight > 0.5 for e in v.groups)]
     with open(path, 'w') as f:
-        f.write('# M3AT: the cat tail, from the rig\'s %s (anim_scripts/export_cat.py).\n' % TAIL)
+        f.write('# M3AT: %s, from the rig\'s %s (anim_scripts/export_cat.py).\n' % (title, mesh))
+        # A race part's: the bone it rides when not the hips (its rig's parent bone), its side swing turned round, no grain.
+        if rig.parent_type == 'BONE' and rig.parent_bone and rig.parent_bone != 'spine':
+            f.write('bone %s\n' % rig.parent_bone)
+        if o.get('m3at_mirror', 1) < 0:
+            f.write('mirror -1\n')
+        if o.get('m3at_plain', False):
+            f.write('plain\n')
         mesh_lines(o, scale, f)
         for k, p in enumerate(joints):
             f.write('tail %d %.5f %.5f %.5f\n' % ((k,) + tuple(game(p, scale))))
         for i, w in enumerate(ws):
             f.write('tw %d %s\n' % (i, ' '.join('%d %.5f' % bw for bw in w)))
-    print('CAT tail: %d vertices, %d triangles, %d bones' % (len(o.data.vertices), len(o.data.polygons), len(chain)))
+        for k in range(0, len(tip), 32):
+            f.write('inner %s\n' % ' '.join(str(i) for i in tip[k:k + 32]))
+    print('CAT %s: %d vertices, %d triangles, %d bones' % (mesh, len(o.data.vertices), len(o.data.polygons), len(chain)))
+
+
+def write_race_parts(out, scale):
+    """The race parts import_race_parts.py put in the .blend (a mesh with an m3at_race_file property, on its own rig):
+    ears where the rig has Ear.L, else a tail (or a wing, which is one on another bone)."""
+    for o in bpy.data.objects:
+        file = o.get('m3at_race_file') if o.type == 'MESH' else None
+        rig = o.parent if file else None
+        if rig is None or rig.type != 'ARMATURE':
+            continue
+        if 'Ear.L' in rig.data.bones:
+            write_ears(os.path.join(out, file), scale, o.name, rig.name, o.name)
+        else:
+            write_tail(os.path.join(out, file), scale, o.name, rig.name, o.name)
 
 
 def write(out, scale=None):
@@ -189,6 +216,7 @@ def write(out, scale=None):
             write_ears(os.path.join(out, file), scale, mesh, rig, gene)
         write_tail(os.path.join(out, 'tail.txt'), scale)
         write_fur_tail(os.path.join(out, 'tail_furry.txt'), scale)
+        write_race_parts(out, scale)
     finally:
         for o, p in was.items():
             o.data.pose_position = p

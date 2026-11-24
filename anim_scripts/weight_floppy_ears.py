@@ -1,7 +1,7 @@
 # Weights the rig's floppy ears (Floppy_Ears_Gene) to the bones of Floppy_Ears_Rig as they stand, however many there are: the chain
 # Ear.L, Ear.L.001, ... and the same for .R. Neither the bones nor the mesh's places change, and any old weights on Ear.* groups go.
 # Run it in the open session (the Text Editor's Run Script, then save yourself), or on a copy:
-#   blender -b <copy of the rig .blend> --python anim_scripts/weight_floppy_ears.py -- <out.blend>
+#   blender -b <copy of the rig .blend> --python anim_scripts/weight_floppy_ears.py -- [--ears <mesh> --rig <armature>] <out.blend>
 #
 # Each vertex goes by the nearest point on its own ear's chain of bones, as a distance along the chain: all on one bone in the
 # middle of it, and handing over to the next by a smooth step round each joint (BLEND). A few passes of smoothing over the mesh's
@@ -10,7 +10,16 @@ import sys
 
 import bpy
 
-EARS, EARS_RIG = 'Floppy_Ears_Gene', 'Floppy_Ears_Rig'
+EARS, EARS_RIG = 'Floppy_Ears_Gene', 'Floppy_Ears_Rig'   # or as --ears <mesh> --rig <armature> give them (a race's, import_race_parts.py)
+ARGS = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
+for flag in ('--ears', '--rig'):
+    if flag in ARGS:
+        at = ARGS.index(flag)
+        if flag == '--ears':
+            EARS = ARGS[at + 1]
+        else:
+            EARS_RIG = ARGS[at + 1]
+        del ARGS[at:at + 2]
 BLEND = 0.4          # how far either side of a joint the hand over reaches, as a share of the shorter bone there (below 0.5)
 SMOOTH = 2           # passes of smoothing the weights over the edges
 SMOOTH_SHARE = 0.5   # how far each pass moves a vertex's weights toward the mean of its neighbours'
@@ -115,5 +124,5 @@ def main():
 
 
 main()
-if '--' in sys.argv and len(sys.argv) > sys.argv.index('--') + 1:
-    bpy.ops.wm.save_as_mainfile(filepath=sys.argv[sys.argv.index('--') + 1], copy=True)
+if ARGS:
+    bpy.ops.wm.save_as_mainfile(filepath=ARGS[0], copy=True)

@@ -146,7 +146,7 @@ namespace M3AT
             Widgets.Label(new Rect(inRect.x, inRect.y, inRect.width, 34f), "All faces (dev)");
             Text.Font = GameFont.Small;
             Rect outer = new Rect(inRect.x, inRect.y + 38f, inRect.width, inRect.height - 38f);
-            Rect view = new Rect(0f, 0f, outer.width - 16f, 860f);
+            Rect view = new Rect(0f, 0f, outer.width - 16f, 1000f);
             Widgets.BeginScrollView(outer, ref scroll, view);
             Listing_Standard list = new Listing_Standard();
             list.Begin(view);
@@ -178,6 +178,9 @@ namespace M3AT
             {
                 list.CheckboxLabeled("Crisper race mouths (mod option)", ref s.raceMouthInk);
             }
+            list.Label("Wide mouth shapes (with crisper mouths): the width past a share of a human's kept at a share");
+            FaceLayers.MouthWideFrom = Row(list, "Narrowed from (of a human's width)", FaceLayers.MouthWideFrom, 0.6f, 2f, 0.01f);
+            FaceLayers.MouthWideKeep = Row(list, "Width past it kept", FaceLayers.MouthWideKeep, 0f, 1f, 0.01f);
             if (list.ButtonText("Reset these sliders"))
             {
                 FaceLayers.DevFace = FaceLayers.DevMouth = FaceLayers.DevEyes = new Vector3(0f, 0f, 1f);
@@ -186,7 +189,8 @@ namespace M3AT
             {
                 string text = "M3AT all-faces tuning: face across " + FaceLayers.DevFace.x.ToString("0.000") + ", up " + FaceLayers.DevFace.y.ToString("0.000") + ", size " + FaceLayers.DevFace.z.ToString("0.00")
                     + "; eyes up " + FaceLayers.DevEyes.x.ToString("0.000") + ", out " + FaceLayers.DevEyes.y.ToString("0.000") + ", size " + FaceLayers.DevEyes.z.ToString("0.00")
-                    + "; mouth across " + FaceLayers.DevMouth.x.ToString("0.000") + ", up " + FaceLayers.DevMouth.y.ToString("0.000") + ", size " + FaceLayers.DevMouth.z.ToString("0.00");
+                    + "; mouth across " + FaceLayers.DevMouth.x.ToString("0.000") + ", up " + FaceLayers.DevMouth.y.ToString("0.000") + ", size " + FaceLayers.DevMouth.z.ToString("0.00")
+                    + "; wide mouths narrowed from " + FaceLayers.MouthWideFrom.ToString("0.00") + ", keeping " + FaceLayers.MouthWideKeep.ToString("0.00");
                 GUIUtility.systemCopyBuffer = text;
                 Log.Message("[M3AT] " + text);
                 Messages.Message("M3AT: copied (and written to the log).", MessageTypeDefOf.NeutralEvent, false);

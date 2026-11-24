@@ -87,13 +87,19 @@ namespace M3AT
             "ArmorHelmetCataphractPrestige", "ArmorHelmetReconPrestige", "ArmorMarineHelmetPrestige",
             "ArmorHelmetMechCommander", "ArmorHelmetMechlordHelmet", "RobeRoyal", "ShirtRuffle", "Shadecone", "Tailcap",
             "TribalHeaddress", "PsychicFoilHelmet", "EltexSkullcap", "Headwrap", "WarVeil", "HatTop", "HatLadies",
-            "CE_SimpleNightVision", "CE_AdvancedNightVision", "Scarf",
+            "CE_SimpleNightVision", "CE_AdvancedNightVision", "Scarf", "Boots", "Sandals", "Socks", "Goggles", "Gorget",
+            "Glasses", "Sunglasses", "Hairband", "Ribbon", "MaidHeaddress", "Stockings", "Tights",
+            "Leotard", "ShoulderBag", "SkirtMini", "SkirtMedium", "SkirtMidi", "DressMini", "DressShort", "DressMidi",
+            "SleevelessDressMini", "SleevelessDressShort", "SleevelessDress", "SleevelessDressMidi", "SleevelessDressLong",
         };
         // Other words that name the same thing as a NoStandIn garment's name word, and phrases that don't though they hold
         // it (a headscarf is worn over the hair, not round the neck).
         private static readonly Dictionary<string, string[]> NameAlike = new Dictionary<string, string[]>
         {
             { "scarf", new[] { "neckerchief", "kerchief", "muffler", "shemagh", "keffiyeh", "snood" } },
+            { "goggles", new[] { "goggle" } },   // a mod's goggle (Kiiro's, Wolfein's)
+            { "glasses", new[] { "glass", "spectacle", "monocle" } },   // a mod's glasses, single glass or spectacles
+            { "sunglasses", new[] { "shades" } },
             { "short", new[] { "hotpant", "hot pant" } },   // hotpants are the short shorts, not the shorts
             { "crop", new[] { "halter", "tube top" } },
             { "tanktop", new[] { "tank top", "singlet", "camisole" } },   // a tank top is the tank top's, not the crop top's
@@ -102,12 +108,79 @@ namespace M3AT
             { "frame", new[] { "exoskelet", "exosuit" } },
             // CE's radio pack is any pack with a radio: GrimWorld's vox-caster backpacks.
             { "radio", new[] { "vox", "comms", "transceiver", "communicat" } },
+            // Footwear: the shoes are any footwear not named boots, sandals or socks (heels, sneakers, slippers).
+            { "boots", new[] { "boot" } },
+            { "sandals", new[] { "sandal", "flip flop", "flipflop" } },
+            { "socks", new[] { "sock", "feetwrap", "footwrap", "feet wrap", "foot wrap" } },
+            { "shoes", new[] { "shoe", "heel", "sneaker", "loafer", "slipper", "clog", "moccasin" } },
         };
         private static readonly Dictionary<string, string[]> NameNot = new Dictionary<string, string[]>
         {
             { "scarf", new[] { "headscarf", "head scarf" } },
             { "pants", new[] { "hotpant", "underpant" } },   // hotpants are shorts, underpants underwear
+            { "glasses", new[] { "sunglass", "hourglass", "glass armo", "glassworks" } },   // sunglasses are the sunglasses'
         };
+        // Words in an apparel's name or label saying it is a garment's kind, though not in the garment's own name words: the
+        // garment may stand in for it even if NoStandIn or a mask, its coverage at least HintCover and HintBonus ahead (less
+        // than a garment named outright, so Kiiro's airwire headset keeps the airwire headset's). Mostly the race mods'
+        // clothes (Ratkin, Kiiro, Milira, Wolfein): their dresses were drawn as a shirt and trousers, their headsets as the
+        // eltex helmet, their bows and hairbands as a tuque.
+        private static readonly Dictionary<string, string[]> Hints = new Dictionary<string, string[]>
+        {
+            { "IntegratorHeadset", new[] { "headset", "earpiece", "ear piece" } },
+            { "Vacsuit", new[] { "space suit", "spacesuit", "airtight suit", "pressure suit" } },
+            { "VacsuitHelmet", new[] { "space suit helmet", "spacesuit helmet", "airtight helmet" } },
+            { "HatLadies", new[] { "sun hat", "sunhat", "straw hat", "summer hat", "sun bonnet" } },
+            { "BowlerHat", new[] { "melonik", "pith", "explorer hat", "safari", "school cap" } },
+            { "Shadecone", new[] { "rain hat", "conical hat", "bamboo hat" } },
+            { "LabCoat", new[] { "lab gown", "labgown", "medical gown", "research gown", "white coat" } },
+            { "Parka", new[] { "winter coat", "wintercoat", "puffer", "down jacket" } },
+            { "SimpleHelmet", new[] { "miner hat", "minerhat", "hard hat", "hardhat", "safety helmet", "military helmet" } },
+            { "Coronet", new[] { "tiara", "diadem" } },
+            { "Hairband", new[] { "hairband", "hair band", "headband", "head band", "headbond", "alice band" } },
+            { "Ribbon", new[] { "ribbon", "bowknot", "hairtie", "hair tie", "hair bow", "corsage", "flower headwear", "hairclip",
+                                "hair clip", "scrunchie" } },
+            { "MaidHeaddress", new[] { "maid cap", "maid head", "maidcap", "maid hat" } },
+            { "Broadwrap", new[] { "nun ", "veil", "wimple", "sister hat" } },   // a nun's veil: the broadwrap, clear of the back
+            { "Stockings", new[] { "stocking", "thigh high", "thighhigh", "knee high", "suspender" } },
+            { "Tights", new[] { "pantyhose", "pantynose", "tights", "leggings" } },
+            { "Leotard", new[] { "leotard", "swimsuit", "swim suit", "bunny girl" } },
+            { "ShoulderBag", new[] { "messenger", "satchel", "shoulder bag" } },
+            { "Skirt", new[] { "skirt" } },
+            { "SkirtMini", new[] { "mini skirt", "miniskirt", "micro skirt", "microskirt" } },
+            { "SkirtMedium", new[] { "knee skirt", "knee length skirt", "knee-length skirt", "pencil skirt" } },
+            { "SkirtMidi", new[] { "midi skirt", "midiskirt", "calf skirt" } },
+            { "SkirtLong", new[] { "long skirt", "longskirt", "longuette", "maxi skirt" } },
+            { "DressMini", new[] { "mini dress", "minidress" } },
+            { "DressShort", new[] { "short dress", "cocktail dress" } },
+            { "Dress", new[] { "dress", "onepiece", "one piece", "frock", "maid outfit", "maid uniform" } },
+            { "SleevelessDress", new[] { "sleeveless dress", "sundress", "sun dress", "slip dress", "strapless dress", "camisole dress", "halter dress" } },
+            { "DressMidi", new[] { "midi dress", "mididress", "tea dress" } },
+            { "DressLong", new[] { "long dress", "gown", "nun outfit", "nun dress", "sister dress", "evening dress", "wedding dress",
+                                   "maxi dress" } },
+        };
+        // Phrases holding a hint that don't say it: a headdress is no dress, suspender trousers no stockings.
+        private static readonly Dictionary<string, string[]> HintNot = new Dictionary<string, string[]>
+        {
+            { "Dress", new[] { "headdress", "dressing", "long dress", "nun dress", "sister dress", "evening dress", "wedding dress",
+                               "maxi dress", "mini dress", "minidress", "short dress", "cocktail dress", "midi dress",
+                               "mididress", "tea dress", "sleeveless dress", "sundress", "sun dress", "slip dress", "strapless dress", "camisole dress", "halter dress" } },
+            { "DressLong", new[] { "lab gown", "labgown", "medical gown", "research gown", "graduation gown", "sleep gown" } },
+            { "Hairband", new[] { "bandage" } },
+            { "Skirt", new[] { "long skirt", "longskirt", "longuette", "maxi skirt", "knee skirt", "knee length skirt", "mini skirt",
+                               "miniskirt", "micro skirt", "microskirt",
+                               "knee-length skirt", "pencil skirt", "midi skirt", "midiskirt", "calf skirt" } },
+            { "Stockings", new[] { "suspender trouser", "suspender pant", "suspender skirt", "suspender short" } },
+            { "Broadwrap", new[] { "war veil", "warveil" } },
+        };
+        private const float HintCover = 0.5f;
+        private const float HintCoverHead = 0.8f;   // for headgear, which takes one garment: a nun's hat the broadwrap, which covers far more than a cap
+        private const float HintBonus = 0.6f;
+        // Headgear named a helmet or helm is matched as one even if not in an armour category (Wolfein's power armour
+        // helmets and Kiiro's military helmets were taken for hats and drawn as a tuque), unless its label says it is a hat.
+        private static readonly Regex HelmetWords = new Regex(@"\bhelm(et)?s?\b");
+        // Named a bag of some kind (Kiiro's back bag and messenger bag, on its own Kiiro_Bag layer and Middle): a pack.
+        private static readonly Regex BagWords = new Regex(@"\bbags?\b|satchel|rucksack|knapsack|oxygen tank");
         // A NoStandIn garment named by the apparel (all its name words) is the thing itself, whatever the groups say (a mod's
         // airwire headset over the eyes alone, a scarf pulled up over the chin given FullHead): its coverage is taken as at
         // least NamedCover, and it is ahead of any other by NamedBonus, though it must still share a layer.
@@ -126,7 +199,7 @@ namespace M3AT
         private static readonly HashSet<string> Generic = new HashSet<string>
         {
             "BasicShirt", "Pants", "Jacket", "Duster", "FlakVest", "SimpleHelmet", "AdvancedHelmet", "Tuque", "CollarShirt",
-            "PowerArmor", "Parka", "GasMask", "ClothMask", "CE_Backpack",
+            "PowerArmor", "Parka", "GasMask", "ClothMask", "CE_Backpack", "Shoes",
         };
 
         // Garments that are a narrower kind of a plain one (a crop top of a shirt, shorts of trousers): drawn for apparel
@@ -248,7 +321,8 @@ namespace M3AT
             Profile a = ProfileOf(def, 0);
             a.mask = IsMaskNamed(a.text);
             a.headNouns = HeadNouns(def.label);
-            if ((!a.armour || a.headNouns.Overlaps(HatNouns)) && !a.mask && a.groups.Contains("UpperHead"))
+            bool hatNamed = a.headNouns.Overlaps(HatNouns);
+            if ((!a.armour || hatNamed) && !a.mask && a.groups.Contains("UpperHead") && (hatNamed || !HelmetWords.IsMatch(a.text)))
             {
                 // A hat, however much of the head its groups say: matched as a hat, not as a mask or full helmet. Armour
                 // too if its label says it is a hat (HatNouns).
@@ -265,9 +339,11 @@ namespace M3AT
             {
                 // A garment over the skull (not a mask, which FullHead only says is, nor one the apparel is named as) only
                 // for apparel over it: a scarf over the mouth or neck scored just enough for the power armour helmet.
-                bool skull = !all[i].mask && !all[i].namedOnly && all[i].groups.Contains("UpperHead") && !a.groups.Contains("UpperHead");
+                bool hint = Hinted(a.text, all[i].name);
+                bool skull = !all[i].mask && !all[i].namedOnly && !hint && all[i].groups.Contains("UpperHead") && !a.groups.Contains("UpperHead");
                 // An open-fronted garment only for apparel drawn open down the front (OpenFronts.cs).
-                if ((!all[i].namedOnly || NameShare(a.text, all[i].tokens) >= 1f) && (!all[i].mask || a.mask) && !skull && FrontFits(all[i], def))
+                if ((!all[i].namedOnly || hint || NameShare(a.text, all[i].tokens) >= 1f) && (!all[i].mask || a.mask || hint) && !skull
+                    && FrontFits(all[i], def))
                 {
                     pool.Add(all[i]);
                 }
@@ -303,6 +379,28 @@ namespace M3AT
             return best;
         }
 
+#if AUTOTEST
+        // The scoring laid out for the autotest: the apparel's profile and every garment named in names with its score, or
+        // why it isn't in the pool.
+        internal string StandInScores(ThingDef def, string[] names)
+        {
+            Profile a = ProfileOf(def, 0);
+            a.mask = IsMaskNamed(a.text);
+            a.headNouns = HeadNouns(def.label);
+            List<string> parts = new List<string> { "text '" + a.text + "' layers " + string.Join(" ", a.layers) + " groups "
+                + string.Join(" ", a.groups) + " never " + NeverStoodIn(def) };
+            foreach (Profile g in StandInProfiles())
+            {
+                if (Array.IndexOf(names, g.name) >= 0)
+                {
+                    parts.Add(g.name + ": layers " + string.Join(" ", g.layers) + " groups " + string.Join(" ", g.groups)
+                        + " namedOnly " + g.namedOnly + " hint " + Hinted(a.text, g.name) + " score " + Score(a, g).ToString("F2"));
+                }
+            }
+            return string.Join("; ", parts);
+        }
+#endif
+
         // A garment's score for apparel a: how much of the groups they cover is covered by both, times the layers'
         // closeness and the kinds' (Factors), plus the kinds' small amounts.
         private static float Score(Profile a, Profile g)
@@ -313,6 +411,15 @@ namespace M3AT
             if (named)
             {
                 covered = Math.Max(covered, NamedCover);
+            }
+            if (Hinted(a.text, g.name))
+            {
+                bool head = a.layers.Count > 0 && a.layers.TrueForAll(x => Array.IndexOf(HeadLayers, x) >= 0);
+                covered = Math.Max(covered, head ? HintCoverHead : HintCover);
+                if (head && layer > 0f)
+                {
+                    layer = 1f;   // another head layer is no matter for headgear named as the garment (CE puts the broadwrap on OnHead)
+                }
             }
             if (layer <= 0f || covered <= 0f)
             {
@@ -335,7 +442,10 @@ namespace M3AT
             float tg, pg, th, ph;
             Factors(a, g, out tg, out pg);
             Factors(a, h, out th, out ph);
-            return Coverage(a.groups, g.groups, h.groups) * layer * (tg + th) / 2f + (pg + ph) / 2f - PairCost;
+            // A hinted garment's bonus counts whole, not halved with the other's: a shirt with a skirt (Wolfein's (Skirt)
+            // uniforms) is the collared shirt and the skirt, not the skirt alone.
+            float hint = HintBonus / 2f * ((Hinted(a.text, g.name) ? 1 : 0) + (Hinted(a.text, h.name) ? 1 : 0));
+            return Coverage(a.groups, g.groups, h.groups) * layer * (tg + th) / 2f + (pg + ph) / 2f + hint - PairCost;
         }
 
         // The weighted share of the groups either side covers that both do (with, if not null, joined to covered).
@@ -375,6 +485,10 @@ namespace M3AT
         {
             times = 1f;
             plus = 0f;
+            if (Hinted(a.text, g.name))
+            {
+                plus += HintBonus;
+            }
             if (a.armour != g.armour)
             {
                 times *= NotArmour;
@@ -455,7 +569,27 @@ namespace M3AT
         private static bool SharesMain(HashSet<string> a, HashSet<string> b)
         {
             return (a.Contains("Torso") && b.Contains("Torso")) || (a.Contains("Legs") && b.Contains("Legs"))
-                || (a.Contains("Arms") && b.Contains("Arms")) || (a.Contains("UpperHead") && b.Contains("UpperHead"));
+                || (a.Contains("Arms") && b.Contains("Arms")) || (a.Contains("UpperHead") && b.Contains("UpperHead"))
+                || (a.Contains(PackGroup) && b.Contains(PackGroup));   // (never two packs)
+        }
+
+        // Whether the apparel's name or label has one of the garment's Hints.
+        private static bool Hinted(string text, string garment)
+        {
+            string[] words;
+            if (text == null || garment == null || !Hints.TryGetValue(garment, out words))
+            {
+                return false;
+            }
+            string[] not;
+            if (HintNot.TryGetValue(garment, out not))
+            {
+                for (int k = 0; k < not.Length; k++)
+                {
+                    text = text.Replace(not[k], " ");
+                }
+            }
+            return Array.Exists(words, w => text.Contains(w));
         }
 
         // The share of a garment's name words found in the apparel's name or label.
@@ -592,7 +726,7 @@ namespace M3AT
 
         private static bool IsPack(string text, bool packLayers)
         {
-            return (packLayers || text.Contains("backpack")) && !Array.Exists(NotPackWords, w => text.Contains(w));
+            return (packLayers || text.Contains("backpack") || BagWords.IsMatch(text)) && !Array.Exists(NotPackWords, w => text.Contains(w));
         }
 
         // Worn on a backpack layer and nothing else but the belt (a jump pack is on both).
@@ -668,6 +802,7 @@ namespace M3AT
         // WornGears.cs; but GrimWorld's Terminator armour lists the belt and its Custodes plate has a shield in it, while
         // Biotech's heavy shield unit, Middle over the torso, is a shield); power armour's packs (ArmourPack): never drawn
         // as clothes. A pack or webbing on the belt (AsWhatItIs) takes a pack or webbing garment.
+        private static readonly Regex Jewellery = new Regex(@"\b(rings?|psyrings?|bracelets?|anklets?|bangles?)\b");
         private static bool NeverStoodIn(ThingDef def)
         {
             ApparelProperties ap = def.apparel;
@@ -675,6 +810,11 @@ namespace M3AT
             List<string> names, labels;
             LayerNames(ap, out names, out labels);
             bool packLayers = PackLayers(names, labels);
+            // Jewellery (a ring, bracelet or anklet) worn on the hands or feet is not a glove or a boot.
+            if (Jewellery.IsMatch(text))
+            {
+                return true;
+            }
             if (IsWebbing(text))
             {
                 return false;
@@ -780,7 +920,7 @@ namespace M3AT
         }
 
         // Every garment that can stand in: by the first of its defs the game has, else by its own layer and groups lines.
-        // Not a held one (a shield), the shoes, the baby romper nor the fur; those in NoStandIn only by name (namedOnly).
+        // Not a held one (a shield), the baby romper nor the fur; those in NoStandIn only by name (namedOnly).
         private List<Profile> StandInProfiles()
         {
             if (standInProfiles != null)
@@ -791,7 +931,7 @@ namespace M3AT
             for (int g = 1; g < pieces.Length; g++)
             {
                 Piece piece = pieces[g];
-                if (piece.held || piece.withLegwear || piece.forBaby || piece.genes != null)
+                if (piece.held || piece.forBaby || piece.genes != null)
                 {
                     continue;
                 }

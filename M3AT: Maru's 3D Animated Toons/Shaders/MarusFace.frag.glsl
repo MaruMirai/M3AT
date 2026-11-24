@@ -57,6 +57,7 @@ layout(set = 2, binding = 0) uniform MaterialUniforms
     float _EyeCut;    // @default = 0.0   set per draw (FaceLayers.EyeCut): 1 leaves out the texture's left half, 2 its right
     float _IsoFlash;   // @default = 0.0   per draw (FaceLayers.Flash): how red a hit figure is now, as MarusSmooth.frag.glsl; not on wounds (modes 6, 7)
     float _Recolour;   // @default = 0.0   mode 7: 1 redraws the iris under it (_MaskTex) in its cell's colours rather than drawing the cell's art
+    float _MarusFaceSharp;   // global, no default (FaceLayers.SetSharpness): 1 reads the art sharper (FaceArt), 0 as it was, the sharpFaceArt mod option
 } uMaterial;
 
 layout(set = 2, binding = 1) uniform sampler2D _MainTex;
@@ -167,6 +168,77 @@ vec2 Strip(vec4 cell, float across, float up)
     return vec2(at.x, 1.0 - at.y);
 }
 
+// Reading the face art (keep in step with MarusFaceStack.frag.glsl). Facial Animation's art is 512 px for a 2D head, and
+// the chibi's face spans three head heights of it, so in play a face is drawn smaller than its texture, seen slanted at
+// IsoRim's camera, and in a close-up (the freecam, a still) magnified up to four times or more.
+//   - Slanted, the GPU picks a blurrier mip than the art needs, so it is read ArtMipBias mips sharper (the gradients
+//     scaled by 2^bias, as textureGrad takes no bias).
+//   - Magnified, bilinear filtering draws its soft, stair-stepped edges several screen pixels wide. Nearly every set
+//     draws its lines as a solid core with an anti-aliased edge, so from SharpFrom texels a pixel the alpha is read as a
+//     cubic B-spline (smooth contours, no overshoot; four bilinear taps) and stretched about half its local peak (the
+//     most of it a texel round) so the edge is about a screen pixel wide, SharpEdge of the way, at most as at SharpMost.
+//     About the local peak rather than 0.5, so a thin or faint line (a mouth a texel or two thick, Kiiro's faint brows)
+//     keeps its strength and shape instead of thinning to a dot. Art fainter than SharpFaint is left as it is.
+//   Both only with _MarusFaceSharp (the sharpFaceArt mod option); without it the art is read as it always was.
+const float ArtMipBias = -0.5;
+const float SharpFrom = 1.25;   // screen pixels a texel from which edges start being sharpened
+const float SharpFull = 2.0;    // and are wholly
+const float SharpEdge = 0.9;
+const float SharpMost = 6.0;
+const float SharpFaint = 0.04;
+
+// A cubic B-spline read of the top mip at uv (size: the texture's texels), from four bilinear taps.
+vec4 BSpline(sampler2D tex, vec2 uv, vec2 size)
+{
+    vec2 st = uv * size - 0.5;
+    vec2 i = floor(st);
+    vec2 f = st - i;
+    vec2 f2 = f * f;
+    vec2 f3 = f2 * f;
+    vec2 w0 = (1.0 - 3.0 * f + 3.0 * f2 - f3) / 6.0;
+    vec2 w1 = (4.0 - 6.0 * f2 + 3.0 * f3) / 6.0;
+    vec2 w2 = (1.0 + 3.0 * f + 3.0 * f2 - 3.0 * f3) / 6.0;
+    vec2 w3 = f3 / 6.0;
+    vec2 g0 = w0 + w1;
+    vec2 g1 = w2 + w3;
+    vec2 p0 = (i - 0.5 + w1 / g0) / size;   // between texels i - 1 and i (their middles at i - 0.5 and i + 0.5)
+    vec2 p1 = (i + 1.5 + w3 / g1) / size;   // between i + 1 and i + 2
+    return g0.y * (g0.x * textureLod(tex, vec2(p0.x, p0.y), 0.0) + g1.x * textureLod(tex, vec2(p1.x, p0.y), 0.0))
+        + g1.y * (g0.x * textureLod(tex, vec2(p0.x, p1.y), 0.0) + g1.x * textureLod(tex, vec2(p1.x, p1.y), 0.0));
+}
+
+// The art at uv, dx and dy its texture places' change a screen pixel across and down.
+vec4 FaceArt(sampler2D tex, vec2 uv, vec2 dx, vec2 dy)
+{
+    float on = clamp(uMaterial._MarusFaceSharp, 0.0, 1.0);
+    float bias = exp2(ArtMipBias * on);
+    vec4 t = textureGrad(tex, uv, dx * bias, dy * bias);
+    vec2 size = vec2(textureSize(tex, 0));
+    float texels = max(length(dx * size), length(dy * size));
+    float strength = on * smoothstep(SharpFrom, SharpFull, 1.0 / max(texels, 1e-4));
+    if (strength > 0.0)
+    {
+        float b = BSpline(tex, uv, size).a;
+        vec2 o = 1.0 / size;
+        float peak = max(max(t.a, b), max(max(textureLod(tex, uv + vec2(o.x, 0.0), 0.0).a, textureLod(tex, uv - vec2(o.x, 0.0), 0.0).a),
+            max(textureLod(tex, uv + vec2(0.0, o.y), 0.0).a, textureLod(tex, uv - vec2(0.0, o.y), 0.0).a)));
+        if (peak > SharpFaint)
+        {
+            float k = min(1.0 / max(texels, 1e-4), SharpMost) * SharpEdge;
+            float sharp = clamp((b - 0.5 * peak) * k / peak + 0.5, 0.0, 1.0) * peak;
+            t.a = mix(t.a, sharp, strength);
+        }
+    }
+    return t;
+}
+
+// A mask read at the art's sharper mip.
+vec4 FaceMask(sampler2D tex, vec2 uv, vec2 dx, vec2 dy)
+{
+    float bias = exp2(ArtMipBias * clamp(uMaterial._MarusFaceSharp, 0.0, 1.0));
+    return textureGrad(tex, uv, dx * bias, dy * bias);
+}
+
 void main()
 {
     // Derivatives first, in uniform control flow (before any discard).
@@ -186,19 +258,24 @@ void main()
     // scaled by 1 + x and moved by yz, all zero (the wounds, ridges and flat beard, SetNoShift) leaving them as they are.
     vec2 tuned = faceShift.length() > 1 ? vUv * (1.0 + faceShift[1].x) + faceShift[1].yz : vUv;
 
+    // Where the layer is read: moved by Facial Animation's offset (where its eyes look, its brows and mouth shift). Its
+    // derivatives here too, before the discard below.
+    vec2 place = faceShift.length() > 0 ? tuned - faceShift[0].xy : tuned;
+    if (faceShift.length() > 0)
+        place.x += SpreadAt(tuned.x, faceShift[0].z);
+    vec2 uv = place * uMaterial._MainTex_ST.zw + uMaterial._MainTex_ST.xy;
+    vec2 uvDx = dFdx(uv);
+    vec2 uvDy = dFdy(uv);
+
     // A missing eye: Facial Animation's face is split down the middle, one eye to each half (0.5 across).
     int cut = int(uMaterial._EyeCut + 0.5);
     if (((cut & 1) != 0 && tuned.x < 0.5) || ((cut & 2) != 0 && tuned.x >= 0.5))
         discard;
 
-    // Where the layer is read: moved by Facial Animation's offset (where its eyes look, its brows and mouth shift).
-    vec2 place = faceShift.length() > 0 ? tuned - faceShift[0].xy : tuned;
-    if (faceShift.length() > 0)
-        place.x += SpreadAt(tuned.x, faceShift[0].z);
-    vec2 uv = place * uMaterial._MainTex_ST.zw + uMaterial._MainTex_ST.xy;
-    vec4 t = texture(_MainTex, uv);
-    vec4 tint = uMaterial._Color * vColor;
     int mode = int(uMaterial._FaceMode + 0.5);
+    // The wounds' sheet (modes 6 and 7) is read as it was; Facial Animation's art by FaceArt.
+    vec4 t = mode == 6 || mode == 7 ? texture(_MainTex, uv) : FaceArt(_MainTex, uv, uvDx, uvDy);
+    vec4 tint = uMaterial._Color * vColor;
     vec4 c;
     if (mode == 1)
     {
@@ -208,7 +285,7 @@ void main()
     }
     else if (mode == 2)
     {
-        vec4 m = texture(_MaskTex, uv);
+        vec4 m = FaceMask(_MaskTex, uv, uvDx, uvDy);
         m.rg *= clamp(m.a * 255.0, 0.0, 1.0);   // the game's MaskGate
         c = t * (m.r * tint + (1.0 - m.r)) * (m.g * uMaterial._ColorTwo + (1.0 - m.g));
         if (c.a < 0.5)
@@ -216,11 +293,11 @@ void main()
     }
     else if (mode == 3)
     {
-        c = t * tint * texture(_MaskTex, uv);
+        c = t * tint * FaceMask(_MaskTex, uv, uvDx, uvDy);
     }
     else if (mode == 5)
     {
-        c = vec4(tint.rgb, tint.a * t.a) * texture(_MaskTex, uv);
+        c = vec4(tint.rgb, tint.a * t.a) * FaceMask(_MaskTex, uv, uvDx, uvDy);
     }
     else if (mode == 6)
     {

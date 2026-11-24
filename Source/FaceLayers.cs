@@ -767,10 +767,13 @@ namespace M3AT
         {
             TakeEyeFit(pawn);   // its eyes' layers fitted to a human's (FaceGaze.cs), whichever comes first
             drawMouthScale = 1f;
+            drawMouthShape = 1f;
+            mouthShaped = false;
             if (patch == null || !Available || !Api.ViewReady)
             {
                 return;
             }
+            SetSharpness();
             Face f = FaceOf(pawn);
             if (f == null || f.parts.Count == 0)
             {
@@ -966,6 +969,11 @@ namespace M3AT
         // One layer: drawn now, or kept for DrawStacked.
         private static void Layer(bool stacking, Graphic g, string kind, string layer, int cut, Vector2 shift, Patch patch, Mesh mouth, Matrix4x4 placed, ref int place)
         {
+            if (kind == "MouthControllerComp" && !mouthShaped)
+            {
+                drawMouthShape = MouthShapeScale(g);   // a wide shape drawn narrower, by its first layer (FaceRestyle.cs)
+                mouthShaped = true;                    // so the others go with it
+            }
             Vector3 tune = WithEyeFit(TuneOf(g, kind, mouth == patch.mouthLow ? MouthRaisePig : MouthRaise), kind);   // a race's eyes at a human's size (FaceGaze.cs)
             if (stacking)
             {
@@ -1503,6 +1511,17 @@ namespace M3AT
         public static float Flash;
         private const int FlashSteps = 16;   // the flash in sixteenths, as IsoRim rounds it: one block each
         private static readonly int flashId = Shader.PropertyToID("_IsoFlash");
+        private static readonly int sharpId = Shader.PropertyToID("_MarusFaceSharp");
+
+        // Whether the face shaders read the art sharper (the sharpFaceArt mod option, "Sharper face art"; MarusFace.frag.glsl's
+        // FaceArt: a sharper mip, and the edges re-sharpened when magnified), as a global value: the face materials' blocks
+        // are cached, and a global takes a change of the option at once. 0 reads the art as before.
+        internal static bool SharpFaceArt { get { return SettingsMod.Settings == null || SettingsMod.Settings.sharpFaceArt; } }
+
+        internal static void SetSharpness()
+        {
+            Shader.SetGlobalFloat(sharpId, SharpFaceArt ? 1f : 0f);
+        }
 
         // The per-draw settings: smooth shading (the skinned chibi), the halves left out and the hit flash (Flash, which
         // MarusFace.frag.glsl leaves off the wounds that share these blocks). Null for none of them.
@@ -1627,6 +1646,7 @@ namespace M3AT
             {
                 return;
             }
+            SetSharpness();
             // Grown as the layers are (DrawLayer), so it stands just off the patch.
             float grow = 1.003f;
             Matrix4x4 local = Matrix4x4.Translate(patch.centre)

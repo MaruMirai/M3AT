@@ -25,6 +25,10 @@ namespace M3AT
             {
                 return apiDress.Value;   // a poser's choice (ExpansionApi), in or out of bed
             }
+            if (!pawn.Dead && (Washing(pawn) || InPool(pawn)))
+            {
+                return SleepWear.Nothing;   // washing in Dubs Bad Hygiene's bath, shower, hot tub or pool (Hygiene.cs)
+            }
             SleepWear wear = SleepWearSetting;
             if (wear == SleepWear.Dressed || pawn.Dead || !pawn.Spawned || !pawn.InBed())
             {
@@ -44,6 +48,7 @@ namespace M3AT
             }
             // (a pawn dressing: with what it puts on once that is on the body, without what it takes off once that is off)
             List<Apparel> all = DressingApparel(pawn, pawn.apparel.WornApparel);
+            all = WithoutStowedHelmet(pawn, all);   // (a helmet off the head while undrafted, HelmetStow.cs)
             if (sleep != SleepWear.NoEquipment)
             {
                 return all;

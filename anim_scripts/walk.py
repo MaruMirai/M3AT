@@ -467,6 +467,18 @@ GEAR = {
     'hip': dict(bone='upper_arm.R', at=(-0.138, -0.0172, 0.2701), out=(-1.0, 0.0, 0.0), turn=(3.0302, 60.9007, -8.2747), scale=0.622),
 }
 
+# A helmet carried on the back while its wearer isn't drafted (the helmetStow option, Source/HelmetStow.cs), by kind: 'open'
+# (a simple or flak helmet: its opening against the back, its top out and its front up) and 'full' (one covering the whole
+# head, power armour, plate or recon: upright, facing the side). Each turned 'turn' degrees about x, y and z (rig axes,
+# about its middle, from upright facing forward: -90 about x lays its top out of the back, 90 about z faces the figure's
+# left), its middle at 'at' (model units from the hips, x left, y back, z up, on the bare body: the game pushes it out past
+# what is worn), on the bone 'bone', drawn 'scale' times the size it would be at half way from the head shrink to a fully
+# shrunk head. Written as helmet_back lines; the preview's Helmet on the back adjusts them.
+HELMET_BACK = {
+    'open': dict(bone='spine.002', at=(0.0, 0.116, 0.174), turn=(-90.0, 0.0, 0.0), scale=0.8),
+    'full': dict(bone='spine.002', at=(0.0, 0.168, 0.155), turn=(0.0, 0.0, 90.0), scale=0.8),
+}
+
 # Aiming and firing (aim_at): while the game aims the weapon (FigureWeapons.AimOf: the warm-up, the burst and the
 # cool-down) it is brought up out of the drafted stance and pointed along the aim, laid over whatever the legs do from
 # the waist up (AIM_UPPER). The poses are generic, one per kind of weapon (AIMED: where the hands go and how the trunk
@@ -2427,6 +2439,67 @@ DRESS = dict(
         )),
 )
 DRESS_UPPER = {'spine.001': 1.0}   # its over line, from the waist up (the game plays it whole, standing)
+
+# Climbing out of a raised pool over its wall (pool_climb: climb_at; Dubs Bad Hygiene's swimming pool as the IsoRim pack
+# for it draws it, its wall 0.8 cells high and 0.32 thick, its water 0.7 up, its floor 0.09: shoulder high on the chibi). From standing on the pool's floor at the
+# wall, as a pool's swimmer wades there (WalkFigures.PoolFloor), the hands on the rim; the knees bent to spring, pushed
+# up on straight arms with the right knee onto the rim, knelt on it, sat on its edge with the legs forward along its
+# top, the legs over the outer edge and slid off outside (too high to step down from on the chibi's legs). The game plays it forward to get out and backwards to get in, facing out either
+# way (lowered in backwards holding the rim, as off a ladder), on its own clock from when the pawn crosses the pool's
+# edge (WalkFigures.PoolClimb). Keyed as DRESS is (keyed_at), and with the 'floor' landmark: a place fixed under the
+# figure's standing place (the origin, the ground), so the hands stay put on the rim. Lengths in leg lengths (a grown
+# chibi's leg is 0.54 cells): the figure ends standing at the origin facing -y, the wall's outer face CLIMB_WALL[0]
+# behind it and its inner face CLIMB_WALL[1], its top CLIMB_WALL[2] up (the game puts the origin CLIMB_WALL[0] in cells,
+# WalkFigures.ClimbOut, outside the pool's edge).
+CLIMB_WALL = (0.35, 0.94, 1.49)   # (the wall 0.8 cells high: IsoRim draws a model at its own heights)
+CLIMB_FLOOR = 0.17   # the pool's floor over the ground outside (0.091 cells, WalkFigures.PoolFloor): it starts stood on it
+CLIMB_RIM = (0.38, 0.98, 1.56)   # where each palm holds the rim from the water (x out, y back, z up)
+CLIMB_FPS = 20
+# Vaulting the same wall in passing (pool_vault: vault_at), for a pawn the game walks across a pool on its way somewhere
+# (Dubs Bad Hygiene's pool is passable at no cost): a crouch, a tucked hop over with the hands on the rim and a landing,
+# from standing VAULT_REACH behind the wall's middle (the origin) to standing VAULT_REACH past it, the hips going across
+# about evenly, as the game plays it by where the pawn is across that stretch (WalkFigures.PoolVault), facing the way it
+# goes; the pool's floor is taken as the ground. Lengths in leg lengths, as CLIMB's.
+VAULT_REACH = 0.9
+VAULT = dict(
+    seconds=0.8,   # (its own length: the game plays it by place, not time)
+    # standing, crouched with the hands on the rim, sprung up with the feet coming over the near edge, tucked over the top,
+    # the feet past the far face still up, landed, stood
+    at=(0.0, 0.2, 0.33, 0.45, 0.62, 0.8, 1.0),
+    keys=dict(
+        hips=((0, 0.9, 0), (0, 0.7, -0.215), (0, 0.42, 0.535), (0, 0.09, 0.835), (0, -0.31, 0.435), (0, -0.63, -0.215), (0, -0.9, 0)),
+        pitch=(0.0, 25.0, 45.0, 62.0, 35.0, 20.0, 0.0),
+        lean=(0.0, 8.0, 10.0, 12.0, 8.0, 6.0, 0.0),
+        look=(0.0, 10.0, 12.0, 15.0, 12.0, 10.0, 0.0),
+        foot_R=((0, 0.83, 0), (0, 0.73, 0), (0, 0.6, 1.3), (0, 0.23, 1.72), (0, -0.52, 1.3), (0, -0.69, 0), (0, -0.97, 0)),
+        foot_L=((0, 0.83, 0), (0, 0.76, 0), (0, 0.63, 1.3), (0, 0.26, 1.72), (0, -0.49, 1.35), (0, -0.64, 0), (0, -0.97, 0)),
+        hands=(None, ('floor', (0.38, 0.3, 1.56)), ('floor', (0.38, 0.2, 1.56)), ('floor', (0.38, 0.0, 1.56)), None, None, None),
+        palm=(DRESS_HANG[0], (0.0, 0.0, -1.0), (0.0, 0.0, -1.0), (0.0, 0.0, -1.0), DRESS_HANG[0], DRESS_HANG[0], DRESS_HANG[0]),
+        fingers=(DRESS_HANG[1], (0.0, -1.0, 0.0), (0.0, -1.0, 0.0), (0.0, -1.0, 0.0), DRESS_HANG[1], DRESS_HANG[1], DRESS_HANG[1]),
+        curl=(0.2, 0.35, 0.35, 0.35, 0.2, 0.2, 0.2),
+    ))
+CLIMB = dict(
+    seconds=3.2,
+    # stood on the pool's floor at the wall, crouched to spring, pushed up on straight arms with the right knee on the rim,
+    # knelt on it, the legs swung round in front, sat on its edge with them along its top, over the outer edge, slid off,
+    # stood
+    at=(0.0, 0.14, 0.3, 0.41, 0.49, 0.57, 0.68, 0.83, 1.0),
+    keys=dict(
+        hips=((0, 1.308, CLIMB_FLOOR), (0, 1.42, -0.065), (0, 1.0, 0.885), (0, 0.8, 0.985), (0, 0.8, 0.85), (0, 0.788, 0.62),
+              (0, 0.43, 0.535), (0, -0.01, -0.215), (0, 0, 0)),
+        pitch=(5.0, 15.0, 70.0, 45.0, 20.0, 5.0, 10.0, 15.0, 0.0),
+        lean=(0.0, 6.0, 15.0, 10.0, 4.0, 0.0, 4.0, 6.0, 0.0),
+        look=(-10.0, -5.0, 10.0, 10.0, 12.0, 10.0, 15.0, 12.0, 0.0),
+        foot_R=((0, 1.25, CLIMB_FLOOR), (0, 1.42, CLIMB_FLOOR), (0, 1.25, 1.72), (0, 1.12, 1.72), (0, 0.65, 1.75), (0, -0.17, 1.6),
+                (0, 0.18, 0.70), (0, 0, 0), (0, 0, 0)),
+        foot_L=((0, 1.23, CLIMB_FLOOR), (0, 1.4, CLIMB_FLOOR), (0, 1.25, 0.85), (0, 1.1, 1.72), (0, 0.67, 1.75), (0, -0.15, 1.6),
+                (0, 0.2, 0.70), (0, 0.02, 0), (0, 0, 0)),
+        hands=(('floor', CLIMB_RIM), ('floor', CLIMB_RIM), ('floor', (0.4, 0.75, 1.56)), None, None,
+               ('floor', (0.45, 0.85, 1.56)), ('floor', (0.45, 0.6, 1.56)), None, None),
+        palm=((0.0, 0.0, -1.0),) * 3 + (DRESS_HANG[0],) * 2 + ((0.0, 0.0, -1.0),) * 2 + (DRESS_HANG[0],) * 2,
+        fingers=((0.0, -1.0, 0.0),) * 3 + (DRESS_HANG[1],) * 2 + ((0.0, -1.0, 0.0),) * 2 + (DRESS_HANG[1],) * 2,
+        curl=(0.35, 0.35, 0.35, 0.2, 0.2, 0.3, 0.3, 0.2, 0.2),
+    ))
 
 # Kissing (kiss_at: Romance on the Rim's kiss, RomanceOnTheRim_InitiateKiss and _ReceiveKiss, the two a cell apart east
 # and west, facing each other; the game draws each KissCloser toward the other, WalkFigures.KissOf). Both play it: leant
@@ -6074,10 +6147,32 @@ def dress_frames(kind):
     """How many frames the dress_<kind> clip has (DRESS_FPS of its own length)."""
     return max(8, int(round(DRESS[kind]['seconds'] * DRESS_FPS)))
 
+def vault_frames():
+    """How many frames pool_vault has (CLIMB_FPS of its own length)."""
+    return max(8, int(round(VAULT['seconds'] * CLIMB_FPS)))
+
+def vault_at(t):
+    """Vaulting a raised pool's wall in passing at t (0 standing behind it .. 1 standing past it; see VAULT). Returns the
+    pose and the worst overreach."""
+    return keyed_at(t, VAULT)
+
+def climb_frames():
+    """How many frames pool_climb has (CLIMB_FPS of its own length)."""
+    return max(8, int(round(CLIMB['seconds'] * CLIMB_FPS)))
+
+def climb_at(t):
+    """Climbing out of a raised pool at t (0 stood on its floor at its wall .. 1 standing outside; see CLIMB). Returns
+    the pose and the worst overreach."""
+    return keyed_at(t, CLIMB)
+
 def dress_at(t, kind):
     """Putting on apparel of this DRESS kind at t (0 standing .. 1 standing; see DRESS), from the idle's first frame.
     Returns the pose and the worst overreach."""
-    d = DRESS[kind]
+    return keyed_at(t, DRESS[kind])
+
+def keyed_at(t, d):
+    """A whole-figure pose keyed as DRESS's are (d: its 'at' and 'keys') at t, from the idle's first frame. Returns the
+    pose and the worst overreach."""
     at, K = d['at'], d['keys']
     m = lambda v, sign: Vector((sign * v[0], v[1], v[2]))
     def k(name, default):
@@ -6127,6 +6222,8 @@ def dress_at(t, kind):
             return X[HIPS] @ head[HIPS]
         if name == 'head':
             return X[HEAD] @ head[HEAD]
+        if name == 'floor':
+            return Vector((0.0, 0.0, 0.0))   # fixed under the standing figure, on the ground (CLIMB's rim)
         raise KeyError(name)
     for side, sign in (('L', 1), ('R', -1)):
         line = K.get(side, K.get('hands'))

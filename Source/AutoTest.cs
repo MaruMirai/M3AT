@@ -8,6 +8,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using HarmonyLib;
+using IsoRim;
 using RimWorld;
 using UnityEngine;
 using Verse;
@@ -312,15 +313,20 @@ namespace M3AT
         {
             public string name;
             public int mode, chibis = -1;
-            public bool fewer, unstacked;
+            public bool fewer, unstacked, screenOutline, selfOutline, fullSearch, partsOnly, weaponBoxes, anyNear;
+            public int probeDirs = 8, probeRings = 2, rings = 10, most = 16;
             public List<float> frames = new List<float>();
             public double drawerMs;
             public long draws;
             public long faces, faceChanges, layers;
         }
 
-        // -m3atPerfCounts=0,5,10,20f: the chibi on that many colonists (f: with fewerPoses on); else the chibi, IsoRim's figures
-        // and none.
+        // -m3atPerfCounts=0,5,10,20f: the chibi on that many colonists (f: with fewerPoses on; n: a draw per face layer; s: the
+        // screen-space outline, else the silhouette; t: with its self-outlines; x: its edge pass's full search everywhere,
+        // SkinnedFigure.EdgeFullSearch; i: its parts' codes but no edge pass, EdgePartsOnly; b: a weapon's own edge box even
+        // inside its figure's, EdgeWeaponBoxes; a: any other part or none near starts the full search, as before,
+        // EdgeNearerOnly off; @d.r.R: the quick look's points a ring, its rings and the full search's most
+        // rings, EdgeProbeDirs, EdgeProbeRings, EdgeRings, 8.2.10 by default); else the chibi, IsoRim's figures and none.
         private static List<PerfCondition> PerfConditions()
         {
             List<PerfCondition> list = new List<PerfCondition>();
@@ -330,11 +336,31 @@ namespace M3AT
                 foreach (string raw in counts.Split(','))
                 {
                     string t = raw.Trim();
-                    bool fewer = t.Contains("f"), unstacked = t.Contains("n");
-                    int n;
-                    if (int.TryParse(t.TrimEnd('f', 'n'), out n))
+                    string shape = null;
+                    if (t.Contains("@"))
                     {
-                        list.Add(new PerfCondition { name = n + " chibis" + (fewer ? ", fewer poses" : "") + (unstacked ? ", a draw per face layer" : ""), mode = 0, chibis = n, fewer = fewer, unstacked = unstacked });
+                        shape = t.Substring(t.IndexOf('@') + 1);
+                        t = t.Substring(0, t.IndexOf('@'));
+                    }
+                    bool fewer = t.Contains("f"), unstacked = t.Contains("n"), screen = t.Contains("s"), self = t.Contains("t"), full = t.Contains("x");
+                    bool partsOnly = t.Contains("i"), weaponBoxes = t.Contains("b"), anyNear = t.Contains("a");
+                    int[] dims = { 8, 2, 10, 16 };
+                    if (shape != null)
+                    {
+                        string[] bits = shape.Split('.');
+                        for (int b = 0; b < bits.Length && b < 4; b++)
+                        {
+                            int.TryParse(bits[b], out dims[b]);
+                        }
+                    }
+                    int n;
+                    if (int.TryParse(t.TrimEnd('f', 'n', 's', 't', 'x', 'i', 'b', 'a'), out n))
+                    {
+                        list.Add(new PerfCondition { name = n + " chibis" + (fewer ? ", fewer poses" : "") + (unstacked ? ", a draw per face layer" : "")
+                            + (screen ? ", screen-space outline" + (self ? " with self-outlines" : "") + (full ? ", full search" : "") + (partsOnly ? ", parts only" : "")
+                                + (weaponBoxes ? ", weapon boxes" : "") + (anyNear ? ", any part starts the search" : "") + (shape != null ? ", shape " + dims[0] + "." + dims[1] + "." + dims[2] + "." + dims[3] : "") : ""),
+                            mode = 0, chibis = n, fewer = fewer, unstacked = unstacked, screenOutline = screen, selfOutline = self, fullSearch = full,
+                            partsOnly = partsOnly, weaponBoxes = weaponBoxes, anyNear = anyNear, probeDirs = dims[0], probeRings = dims[1], rings = dims[2], most = dims[3] });
                     }
                 }
                 return list;
@@ -350,6 +376,17 @@ namespace M3AT
         {
             WalkFigures.PerfMode = c.mode;
             SettingsMod.Settings.fewerPoses = c.fewer;
+            SettingsMod.Settings.outlineMode = c.screenOutline ? OutlineMode.ScreenSpace : OutlineMode.Silhouette;
+            SettingsMod.Settings.screenSelfOutlines = c.selfOutline;
+            SkinnedFigure.EdgeFullSearch = c.fullSearch;
+            SkinnedFigure.EdgePartsOnly = c.partsOnly;
+            SkinnedFigure.EdgeWeaponBoxes = c.weaponBoxes;
+            SkinnedFigure.EdgeNearerOnly = !c.anyNear;
+            SkinnedFigure.EdgeProbeDirs = c.probeDirs;
+            SkinnedFigure.EdgeProbeRings = c.probeRings;
+            SkinnedFigure.EdgeRings = c.rings;
+            SkinnedFigure.EdgeShapeForced = true;
+            SkinnedFigure.EdgeMostPixels = c.most;
             FaceLayers.StackLayers = !c.unstacked;
             if (c.chibis < 0)
             {
@@ -377,35 +414,100 @@ namespace M3AT
             List<Pawn> colonists = new List<Pawn>(map.mapPawns.FreeColonistsSpawned);
             List<PerfCondition> conditions = PerfConditions();
             bool fewerWas = SettingsMod.Settings.fewerPoses;
+            OutlineMode outlineWas = SettingsMod.Settings.outlineMode;
+            bool selfWas = SettingsMod.Settings.screenSelfOutlines;
+            // Uncapped (no vsync, no frame cap) unless -m3atPerfCapped=1, so a cost under the monitor's frame time still shows.
+            bool capped = IntArg("m3atPerfCapped", 0) > 0;
+            if (!capped)
+            {
+                Waylith.EngineWindow.TargetFrameRateOverride = 0;
+                Waylith.EngineWindow.SetVSyncMode(Waylith.Graphics.VSyncMode.Off);
+            }
             lookPitch = 40f;
             lookYaw = 0f;
             lookHeight = 0f;
             lookAt = Centroid(colonists, out float spread);
             lookDistance = Mathf.Clamp(spread * 2.4f, 10f, 40f);
+            if (IntArg("m3atPerfDistance", 0) > 0)
+            {
+                lookDistance = IntArg("m3atPerfDistance", 0);
+            }
+            // -m3atPerfFocus=k: the camera kept on one colonist, followed closely, rather than drifting after the whole group,
+            // which close up left the screen empty: the one with the most others within FocusReach (k or more if any has),
+            // so the others near it are in view too. (Their average wandered off between colonists working apart.)
+            List<Pawn> followed = colonists;
+            int focus = IntArg("m3atPerfFocus", 0);
+            if (focus > 0 && colonists.Count > 0)
+            {
+                const float FocusReach = 4f;
+                Pawn anchor = null;
+                int most = -1;
+                foreach (Pawn c in colonists)
+                {
+                    if (!c.Spawned || c.Map != map)
+                    {
+                        continue;
+                    }
+                    int near = colonists.Count(o => o != c && o.Spawned && o.Map == map && (o.DrawPos - c.DrawPos).MagnitudeHorizontal() < FocusReach);
+                    if (near > most)
+                    {
+                        most = near;
+                        anchor = c;
+                    }
+                }
+                if (anchor != null)
+                {
+                    followed = new List<Pawn> { anchor };
+                    report.AppendLine("- " + (most + 1) + " colonists within " + FocusReach + " cells of the one followed at the start (" + focus + " asked)");
+                    lookAt = Centroid(followed, out float unused);
+                    lookHeight = 0.6f;
+                    followClosely = true;
+                }
+            }
             pose = IsoRim.Api.PushViewPose(PoseOwner, Pose, new IsoRim.ViewPoseOptions { Priority = 1000 });
             Find.TickManager.CurTimeSpeed = TimeSpeed.Normal;
             report.AppendLine("## perf").AppendLine();
             report.AppendLine("- " + colonists.Count + " colonists followed by the camera (" + map.mapPawns.AllPawnsSpawned.Count + " pawns on the map), "
-                + lookDistance.ToString("F0") + " cells off, pitched " + lookPitch + "°; normal speed; " + rounds + " rounds of " + seconds + " s per condition, after 3 s to settle each");
+                + lookDistance.ToString("F0") + " cells off, pitched " + lookPitch + "°; " + (IntArg("m3atPerfPaused", 0) > 0 ? "paused after the warm-up, the same frame for every condition" : "normal speed") + "; " + rounds + " rounds of " + seconds + " s per condition, after 3 s to settle each");
             // Warmed up first in each: hair built, IsoRim's figure looks made.
             for (int c = 0; c < conditions.Count; c++)
             {
                 SetPerf(conditions[c], colonists, fewerWas);
-                yield return FollowFor(colonists, c == 0 ? 15f : 5f, null);
+                yield return FollowFor(followed, c == 0 ? 15f : 5f, null);
+            }
+            if (followed != colonists)
+            {
+                // What the camera sees, to check the followed colonists are on screen.
+                bool oneWas = oneView;
+                oneView = true;
+                yield return Shot("perf_view");
+                oneView = oneWas;
+            }
+            // -m3atPerfPaused=1: the game paused from here, so every condition draws the very same scene (colonists walking about
+            // left one condition with twice the pawns on screen of another); the figures are still drawn every frame.
+            if (IntArg("m3atPerfPaused", 0) > 0)
+            {
+                Find.TickManager.CurTimeSpeed = TimeSpeed.Paused;
+                perfPaused = true;
             }
             // (Asked once the chibi has been drawn: GPU skinning also wants our materials, made at the first draw.)
-            report.AppendLine("- screen " + Screen.width + "x" + Screen.height + ", GPU skinning " + SkinnedFigure.GpuSkinning);
+            if (followed != colonists)
+            {
+                report.AppendLine("- the camera on " + string.Join(", ", followed.Select(p => p.LabelShort)) + " (" + followed.Count + " colonists), followed closely");
+            }
+            report.AppendLine("- screen " + Screen.width + "x" + Screen.height + ", GPU skinning " + SkinnedFigure.GpuSkinning
+                + ", frame cap " + (capped ? "the game's" : "off (vsync off)"));
             for (int r = 0; r < rounds; r++)
             {
                 foreach (PerfCondition c in conditions)
                 {
                     SetPerf(c, colonists, fewerWas);
-                    yield return FollowFor(colonists, 3f, null);
+                    yield return FollowFor(followed, 3f, null);
                     WalkFigures.PerfTicks = 0;
                     WalkFigures.PerfDraws = 0;
                     long faces = FaceLayers.PerfFaces, changes = FaceLayers.PerfFaceChanges, layers = FaceLayers.PerfLayers;
                     int before = c.frames.Count;
-                    yield return FollowFor(colonists, seconds, c.frames);
+                    yield return FollowFor(followed, seconds, c.frames);
                     c.drawerMs += WalkFigures.PerfTicks * 1000.0 / Stopwatch.Frequency;
                     c.draws += WalkFigures.PerfDraws;
                     c.faces += FaceLayers.PerfFaces - faces;
@@ -418,6 +520,22 @@ namespace M3AT
             WalkFigures.PerfAllowed = null;
             FaceLayers.StackLayers = true;
             SettingsMod.Settings.fewerPoses = fewerWas;
+            SettingsMod.Settings.outlineMode = outlineWas;
+            SettingsMod.Settings.screenSelfOutlines = selfWas;
+            SkinnedFigure.EdgeFullSearch = false;
+            SkinnedFigure.EdgePartsOnly = false;
+            SkinnedFigure.EdgeWeaponBoxes = false;
+            SkinnedFigure.EdgeNearerOnly = true;
+            SkinnedFigure.EdgeProbeDirs = 8;
+            SkinnedFigure.EdgeProbeRings = 2;
+            SkinnedFigure.EdgeRings = 10;
+            SkinnedFigure.EdgeMostPixels = 16f;
+            SkinnedFigure.EdgeShapeForced = false;
+            if (!capped)
+            {
+                Waylith.EngineWindow.TargetFrameRateOverride = null;
+                Waylith.EngineWindow.SetVSyncMode(Waylith.Graphics.VSyncMode.VSync);
+            }
             Pause();
             report.AppendLine().AppendLine("| condition | frames | mean ms | median ms | p95 ms | p99 ms | FPS (mean) | in our drawer, ms per frame | chibis drawn per frame |");
             report.AppendLine("|---|---|---|---|---|---|---|---|---|");
@@ -554,13 +672,19 @@ namespace M3AT
         }
 
         // Runs for seconds of real time with the camera on the colonists' middle, each frame's time (ms) into frames if given.
+        private static bool followClosely, perfPaused;
+
         private static IEnumerator FollowFor(List<Pawn> colonists, float seconds, List<float> frames)
         {
             float until = Time.realtimeSinceStartup + seconds;
             while (Time.realtimeSinceStartup < until)
             {
                 Vector3 to = Centroid(colonists, out float spread);
-                lookAt = Vector3.Lerp(lookAt, to, 0.02f);   // drifting after them slowly, not jumping with each step
+                lookAt = Vector3.Lerp(lookAt, to, followClosely ? 0.2f : 0.02f);   // drifting after them slowly, not jumping with each step (closely when focused)
+                if (perfPaused && Find.TickManager.CurTimeSpeed != TimeSpeed.Paused)
+                {
+                    Find.TickManager.CurTimeSpeed = TimeSpeed.Paused;   // kept paused (something in the save unpaused it part way)
+                }
                 if (frames != null)
                 {
                     frames.Add(Time.unscaledDeltaTime * 1000f);
@@ -673,6 +797,13 @@ namespace M3AT
                 case "hunker": return HunkerTest();
                 case "cuddle": return CuddleTest();
                 case "read": return ReadTest();
+                case "hygiene": return HygieneTest(null);
+                case "hygiene_toilet": return HygieneTest("toilet");
+                case "hygiene_latrine": return HygieneTest("latrine");
+                case "hygiene_bath": return HygieneTest("bath");
+                case "hygiene_hottub": return HygieneTest("hottub");
+                case "hygiene_pool": return HygieneTest("pool");
+                case "hygiene_vault": return VaultTest();
                 case "pray": return PrayTest();
                 case "eat": return EatTest();
                 case "drugs": return DrugsTest();
@@ -687,6 +818,8 @@ namespace M3AT
                 case "socialfight": return SocialFightTest();
                 case "dress": return DressTest();
                 case "shields": return ShieldTest();
+                case "helmetstow": return HelmetStowTest();
+                case "helmetback": return HelmetBackTest();
                 case "cook": return CookTest();
                 case "teach": return TeachTest();
                 case "floordraw": return FloordrawTest();
@@ -718,6 +851,8 @@ namespace M3AT
                 case "slicecap": return SlicecapTest();
                 case "hats": return HatsTest();
                 case "garmenttex": return GarmentTexTest();
+                case "soles": return SolesTest();
+                case "outlines": return OutlinesTest();
                 case "prosthetics": return ProstheticsTest();
                 case "aging": return AgingTest();
                 case "agingstrip": return AgingStripTest("Decent", -15f, 6f);
@@ -725,11 +860,18 @@ namespace M3AT
                 case "furskin": return FurskinTest();
                 case "facefur": return FaceFurTest();
                 case "fatseam": return FatSeamTest();
+                case "footwear": return FootwearTest();
                 case "openfront": return OpenFrontTest();
+                case "dmsvest": return DmsVestTest();
                 case "sleeve": return SleeveTest();
                 case "underwear": return UnderwearTest();
+                case "raceclothes": return RaceClothesTest();
+                case "hemlengths": return HemLengthsTest();
                 case "grimworld": return GrimWorldTest();
+                case "armoured": return ArmouredTest();
                 case "builds": return BuildsTest(null);
+                case "hulkarms": return HulkArmsTest();
+                case "armourgrip": return ArmourGripTest();
                 case "faceab": return FaceAbTest();
                 case "beard": return BeardTest();
                 case "fringe": return FringeTest();
@@ -2572,6 +2714,157 @@ namespace M3AT
                 + " coming round the left side; _guard in the left fist out in front; _stow_60 on its way back the same way.");
         }
 
+        // Every armour helmet loaded (the ArmorHeadgear category) carried on the back by the helmetStow option at OnBack:
+        // one colonist in a flak vest with an assault rifle (slung on the back), each helmet in turn, undrafted, pictured
+        // from behind (_a) and the side (_b). Each one's garment noted (none: not drawn on the back).
+        private static IEnumerator HelmetBackTest()
+        {
+            ClearPatch();
+            HelmetStow was = SettingsMod.Settings.helmetStow;
+            SettingsMod.Settings.helmetStow = HelmetStow.OnBack;
+            Pawn pawn = NewPawn(middle, "Gun_AssaultRifle");
+            pawn.apparel.DestroyAll();
+            foreach (string defName in new[] { "Apparel_Pants", "Apparel_CollarShirt", "Apparel_FlakVest" })
+            {
+                ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail(defName);
+                if (def != null)
+                {
+                    pawn.apparel.Wear((Apparel)ThingMaker.MakeThing(def, def.MadeFromStuff ? GenStuff.DefaultStuffFor(def) : null), false);
+                }
+            }
+            Hold(pawn);
+            List<ThingDef> helmets = DefDatabase<ThingDef>.AllDefsListForReading.FindAll(d => d.IsApparel && SkinnedFigure.IsHelmet(d));
+            helmets.SortBy(d => d.modContentPack != null ? d.modContentPack.loadOrder : 0, d => d.defName);
+            Note("helmetback: " + helmets.Count + " helmets");
+            Apparel last = null;
+            foreach (ThingDef def in helmets)
+            {
+                if (last != null)
+                {
+                    pawn.apparel.Remove(last);
+                    last.Destroy();
+                }
+                last = (Apparel)ThingMaker.MakeThing(def, def.MadeFromStuff ? GenStuff.DefaultStuffFor(def) : null);
+                pawn.apparel.Wear(last, false);
+                Look(pawn, 180f);
+                yield return Ticks(3, "helmetback", pawn);
+                WalkFigures.HelmetToBack(pawn);
+                yield return Ticks(3, "helmetback", pawn);
+                Note(def.defName + " (" + (def.modContentPack != null ? def.modContentPack.Name : "?") + "): " + WalkFigures.HelmetReport(pawn));
+                yield return Shot("helmetback_" + def.defName);
+            }
+            SettingsMod.Settings.helmetStow = was;
+            pawn.DeSpawn();
+        }
+
+        // The helmetStow option (HelmetStow.cs): a colonist in a flak vest and helmet with an assault rifle, with the option
+        // at OnBack, undrafted (the helmet on the back, smaller), drafted (taken off the back and put on, then the rifle
+        // drawn), undrafted again standing (the rifle away, then the helmet off onto the back) and drafted and undrafted
+        // walking off; then the option at Hidden (no helmet, none on the back) and Worn. Pictures at stages.
+        private static IEnumerator HelmetStowTest()
+        {
+            ClearPatch();
+            HelmetStow was = SettingsMod.Settings.helmetStow;
+            SettingsMod.Settings.helmetStow = HelmetStow.OnBack;
+            Pawn pawn = NewPawn(middle, "Gun_AssaultRifle");
+            pawn.apparel.DestroyAll();
+            foreach (string defName in new[] { "Apparel_Pants", "Apparel_CollarShirt", "Apparel_FlakVest", "Apparel_AdvancedHelmet" })
+            {
+                ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail(defName);
+                if (def != null)
+                {
+                    pawn.apparel.Wear((Apparel)ThingMaker.MakeThing(def, def.MadeFromStuff ? GenStuff.DefaultStuffFor(def) : null), false);
+                }
+            }
+            Hold(pawn);
+            Look(pawn, 0f);
+            yield return Ticks(30, "helmet", pawn);
+            yield return WaitReal(2f);
+            Note("helmetstow: " + WalkFigures.HelmetReport(pawn));
+            Check("undrafted: helmet on the back", Field<float>(pawn, "helmOut") <= 0f && !WalkFigures.HelmetDrawnWorn(pawn),
+                "helmOut " + Field<float>(pawn, "helmOut").ToString("F2"));
+            yield return Shot("helmet_back");
+            Look(pawn, 180f);
+            yield return Ticks(2, "helmet", pawn);
+            yield return Shot("helmet_back_behind");
+            Look(pawn, 0f);
+
+            pawn.drafter.Drafted = true;
+            bool weaponFirst = false;
+            foreach (float stop in new[] { 0.07f, 0.3f, 0.55f, 1f })
+            {
+                yield return Unpaused(pawn, () =>
+                {
+                    weaponFirst |= Field<float>(pawn, "helmOut") < 1f && (Field<bool>(pawn, "handHeld") || Field<float>(pawn, "drawAt") >= 0f);
+                    return Field<float>(pawn, "helmOut") >= stop;
+                }, 4f);
+                if (stop < 1f)
+                {
+                    yield return Shot("helmet_on_" + (int)(stop * 100f));
+                }
+            }
+            Check("drafted: helmet put on", Field<float>(pawn, "helmOut") >= 1f && WalkFigures.HelmetDrawnWorn(pawn), "helmOut " + Field<float>(pawn, "helmOut").ToString("F2"));
+            Check("drafted: the rifle waits for the helmet", !weaponFirst, weaponFirst ? "drawn while the helmet was going on" : "after it");
+            yield return Unpaused(pawn, () => Field<float>(pawn, "drafted") >= 0.99f, 4f);
+            yield return Shot("helmet_drafted");
+
+            pawn.drafter.Drafted = false;
+            Hold(pawn);
+            bool helmFirst = false;
+            foreach (float stop in new[] { 0.5f, 0.2f, 0.05f, 0f })
+            {
+                yield return Unpaused(pawn, () =>
+                {
+                    helmFirst |= Field<float>(pawn, "helmOut") < 1f && Field<bool>(pawn, "handHeld");
+                    return Field<float>(pawn, "helmOut") <= stop;
+                }, 6f);
+                if (stop > 0f)
+                {
+                    yield return Shot("helmet_off_" + (int)(stop * 100f));
+                }
+            }
+            Check("undrafted: helmet taken off onto the back", Field<float>(pawn, "helmOut") <= 0f && !WalkFigures.HelmetDrawnWorn(pawn),
+                "helmOut " + Field<float>(pawn, "helmOut").ToString("F2"));
+            Check("undrafted: the rifle away first", !helmFirst, helmFirst ? "the helmet came off with the rifle in hand" : "it was");
+            yield return Shot("helmet_back_again");
+
+            // Walking: drafted, then undrafted and sent off, the helmet coming off on the move.
+            pawn.drafter.Drafted = true;
+            yield return Unpaused(pawn, () => Field<float>(pawn, "helmOut") >= 1f && Field<float>(pawn, "drafted") >= 0.99f, 6f);
+            pawn.drafter.Drafted = false;
+            Job walk = JobMaker.MakeJob(JobDefOf.Goto, middle + IntVec3.North * 6);
+            walk.playerForced = true;
+            pawn.jobs.StartJob(walk, JobCondition.InterruptForced);
+            yield return Unpaused(pawn, () => Field<float>(pawn, "helmOut") <= 0.35f, 6f);
+            yield return Shot("helmet_walk_off");
+            yield return Unpaused(pawn, () => Field<float>(pawn, "helmOut") <= 0f, 6f);
+            Check("walking: helmet taken off on the move", Field<float>(pawn, "helmOut") <= 0f, "helmOut " + Field<float>(pawn, "helmOut").ToString("F2"));
+            Hold(pawn);
+            yield return Ticks(10, "helmet", pawn);
+            yield return Shot("helmet_walked");
+
+            SettingsMod.Settings.helmetStow = HelmetStow.Hidden;
+            yield return Ticks(5, "helmet", pawn);
+            Check("hidden: not drawn undrafted", !WalkFigures.HelmetDrawnWorn(pawn), WalkFigures.HelmetReport(pawn));
+            yield return Shot("helmet_hidden");
+            pawn.drafter.Drafted = true;
+            yield return Ticks(5, "helmet", pawn);
+            Check("hidden: worn drafted at once", WalkFigures.HelmetDrawnWorn(pawn), WalkFigures.HelmetReport(pawn));
+            SettingsMod.Settings.helmetStow = HelmetStow.AlwaysHidden;
+            yield return Ticks(5, "helmet", pawn);
+            Check("always hidden: not drawn drafted", !WalkFigures.HelmetDrawnWorn(pawn), WalkFigures.HelmetReport(pawn));
+            yield return Shot("helmet_always_hidden");
+            pawn.drafter.Drafted = false;
+            SettingsMod.Settings.helmetStow = HelmetStow.Worn;
+            yield return Ticks(5, "helmet", pawn);
+            Check("worn: worn undrafted", WalkFigures.HelmetDrawnWorn(pawn), WalkFigures.HelmetReport(pawn));
+            SettingsMod.Settings.helmetStow = was;
+            pawn.DeSpawn();
+            Note("Look: _back the helmet on the upper back, smaller, its top out and front up, clear of the rifle on the back;"
+                + " _on_07 sliding from the back to the right hand; _on_30 held by the brim in front of the face; _on_55 flying"
+                + " onto the head; _off_ the same backwards; _walk_off taken off while walking.");
+        }
+
         // Putting clothes on and taking them off (Dressing.cs): a stripped colonist puts on trousers, a shirt, a duster and a
         // cowboy hat in turn from the ground beside it (dress_legs, dress_over, dress_coat, dress_head), then power armour
         // (Royalty's; taking off the duster, trousers and shirt it replaces first, then dress_legs and dress_coat, the
@@ -3677,6 +3970,240 @@ namespace M3AT
             lookYaw = 0f;
         }
 
+        // The arms of a drafted stance on a Hulk: the stances were posed on the base body, and the Hulk key widens the chest
+        // and shoulders, so the arms holding a weapon go into it. A plain Male (to compare), a Hulk man and a Hulk woman, bare,
+        // the varied builds off, at body shape strengths 1 and 1.5, drafted with an assault rifle, an autopistol and a
+        // knife, each close from the front, three quarters, the side and above.
+        private static IEnumerator HulkArmsTest()
+        {
+            BodyTypeDef[] bodies = { BodyTypeDefOf.Male, BodyTypeDefOf.Hulk, BodyTypeDefOf.Hulk };
+            Gender[] genders = { Gender.Male, Gender.Male, Gender.Female };
+            string[] names = { "male", "hulk_m", "hulk_f" };
+            string[] weapons = { "Gun_AssaultRifle", "Gun_Autopistol", "MeleeWeapon_Knife" };
+            float strength = SettingsMod.Settings.bodyShapeStrength;
+            bool varied = SettingsMod.Settings.variedBodies;
+            SettingsMod.Settings.variedBodies = false;
+            oneView = true;
+            ClearPatch();
+            foreach (Pawn other in new List<Pawn>(map.mapPawns.FreeColonistsSpawned))
+            {
+                if (other.Position.InHorDistOf(middle, Clear + 10))
+                {
+                    other.Position = CellFinder.RandomClosewalkCellNear(middle + new IntVec3(0, 0, Clear + 14), map, 4);
+                    other.Notify_Teleported();
+                }
+                Hold(other);
+            }
+            Pawn[] pawns = new Pawn[3];
+            Rand.PushState(20261123);
+            try
+            {
+                for (int k = 0; k < 3; k++)
+                {
+                    for (int tries = 0; tries < 20; tries++)
+                    {
+                        PawnGenerationRequest request = new PawnGenerationRequest(PawnKindDefOf.Colonist, Faction.OfPlayer,
+                            fixedBiologicalAge: 30f, fixedChronologicalAge: 30f, fixedGender: genders[k],
+                            developmentalStages: DevelopmentalStage.Adult, forcedXenotype: XenotypeDefOf.Baseliner);
+                        pawns[k] = PawnGenerator.GeneratePawn(request);
+                        if (!pawns[k].WorkTagIsDisabled(WorkTags.Violent))
+                        {
+                            break;
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                Rand.PopState();
+            }
+            for (int k = 0; k < 3; k++)
+            {
+                Pawn p = pawns[k];
+                p.story.bodyType = bodies[k];
+                p.equipment.DestroyAllEquipment();
+                p.apparel.DestroyAll();
+                p.inventory.innerContainer.ClearAndDestroyContents();
+                Spawn(p, new IntVec3(middle.x + 3 * k - 3, 0, middle.z));
+                p.Rotation = Rot4.South;
+                p.Drawer.renderer.SetAllGraphicsDirty();
+                Hold(p);
+            }
+            foreach (float s in new[] { 1f, 1.5f })
+            {
+                SettingsMod.Settings.bodyShapeStrength = s;
+                foreach (string weapon in weapons)
+                {
+                    string run = "s" + Mathf.RoundToInt(s * 100f) + "_" + weapon + "_";
+                    foreach (Pawn p in pawns)
+                    {
+                        p.drafter.Drafted = false;
+                        p.jobs.StopAll();
+                        p.equipment.DestroyAllEquipment();
+                        p.inventory.innerContainer.ClearAndDestroyContents();
+                        p.equipment.AddEquipment((ThingWithComps)ThingMaker.MakeThing(ThingDef.Named(weapon),
+                            ThingDef.Named(weapon).MadeFromStuff ? ThingDefOf.Steel : null));
+                        GiveAmmo(p);
+                    }
+                    yield return Ticks(10, "hulkarms_swap", null);
+                    foreach (Pawn p in pawns)
+                    {
+                        p.drafter.Drafted = true;
+                        p.Rotation = Rot4.South;
+                    }
+                    yield return Unpaused(null, () => false, 3f);
+                    for (int i = 0; i < 60 && pawns.Any(p => p.CurJobDef?.defName == "ReloadWeapon"); i++)
+                    {
+                        yield return Ticks(10, "hulkarms_reload", null);
+                    }
+                    foreach (Pawn p in pawns)
+                    {
+                        p.Rotation = Rot4.South;
+                    }
+                    yield return Ticks(90, "hulkarms_drafted", null);
+                    yield return WaitReal(0.5f);
+                    lookDistance = 2f;
+                    lookHeight = 0.75f;
+                    for (int k = 0; k < 3; k++)
+                    {
+                        Probe(run + names[k], pawns[k]);
+                        Note(run + names[k] + ": " + Field<string>(pawns[k], "armsClear"));
+                        lookAt = pawns[k].DrawPos;
+                        foreach (float yaw in new[] { 0f, 35f, 90f, -35f })
+                        {
+                            lookPitch = 10f;
+                            lookYaw = yaw;
+                            yield return Shot(run + names[k] + "_y" + Mathf.RoundToInt(yaw));
+                        }
+                        lookPitch = 60f;
+                        lookYaw = 20f;
+                        yield return Shot(run + names[k] + "_above");
+                    }
+                }
+            }
+            foreach (Pawn p in pawns)
+            {
+                p.drafter.Drafted = false;
+            }
+            SettingsMod.Settings.bodyShapeStrength = strength;
+            SettingsMod.Settings.variedBodies = varied;
+            lookPitch = LookPitch;
+            Note("Look: the Hulks' upper arms, elbows and forearms against the chest's sides and front, beside the plain Male's.");
+        }
+
+        // The rifle's grip in armour: a bare Male, a bare Hulk and a bare Fat man (body shape strength 1.5) and the
+        // Male in power, cataphract and recon armour, drafted with an assault rifle: ArmsClear by the old rule (the wrists
+        // moved for the upper arm too, out from the chest's line), without the upper arm, moved only forward too, and ArmsOut
+        // alone, close from the front, three quarters, the side and
+        // at the game's pitch, noting the chest's clearance ArmsOut found and what ArmsClear moved.
+        private static IEnumerator ArmourGripTest()
+        {
+            string[] armours = { null, null, null, "Apparel_PowerArmor", "Apparel_ArmorCataphract", "Apparel_ArmorRecon" };
+            string[] names = { "bare", "hulk", "fat", "power", "cataphract", "recon" };
+            bool varied = SettingsMod.Settings.variedBodies;
+            float strength = SettingsMod.Settings.bodyShapeStrength;
+            SettingsMod.Settings.variedBodies = false;
+            SettingsMod.Settings.bodyShapeStrength = 1.5f;
+            oneView = true;
+            ClearPatch();
+            foreach (Pawn other in new List<Pawn>(map.mapPawns.FreeColonistsSpawned))
+            {
+                if (other.Position.InHorDistOf(middle, Clear + 10))
+                {
+                    other.Position = CellFinder.RandomClosewalkCellNear(middle + new IntVec3(0, 0, Clear + 14), map, 4);
+                    other.Notify_Teleported();
+                }
+                Hold(other);
+            }
+            Pawn[] pawns = new Pawn[armours.Length];
+            for (int k = 0; k < pawns.Length; k++)
+            {
+                Rand.PushState(20261123);
+                try
+                {
+                    PawnGenerationRequest request = new PawnGenerationRequest(PawnKindDefOf.Colonist, Faction.OfPlayer,
+                        fixedBiologicalAge: 30f, fixedChronologicalAge: 30f, fixedGender: Gender.Male,
+                        developmentalStages: DevelopmentalStage.Adult, forcedXenotype: XenotypeDefOf.Baseliner);
+                    pawns[k] = PawnGenerator.GeneratePawn(request);
+                }
+                finally
+                {
+                    Rand.PopState();
+                }
+                Pawn p = pawns[k];
+                p.story.bodyType = names[k] == "hulk" ? BodyTypeDefOf.Hulk : names[k] == "fat" ? BodyTypeDefOf.Fat : BodyTypeDefOf.Male;
+                p.story.traits.allTraits.RemoveAll(t => t.def.disabledWorkTags.HasFlag(WorkTags.Violent));
+                p.equipment.DestroyAllEquipment();
+                p.apparel.DestroyAll();
+                p.inventory.innerContainer.ClearAndDestroyContents();
+                Spawn(p, new IntVec3(middle.x + 3 * k - 7, 0, middle.z));
+                ThingDef def = armours[k] != null ? DefDatabase<ThingDef>.GetNamedSilentFail(armours[k]) : null;
+                if (def != null)
+                {
+                    p.apparel.Wear((Apparel)ThingMaker.MakeThing(def, GenStuff.DefaultStuffFor(def)), false);
+                }
+                p.equipment.AddEquipment((ThingWithComps)ThingMaker.MakeThing(ThingDef.Named("Gun_AssaultRifle")));
+                GiveAmmo(p);
+                p.Rotation = Rot4.South;
+                p.Drawer.renderer.SetAllGraphicsDirty();
+                Hold(p);
+            }
+            yield return Ticks(10, "armourgrip_spawn", null);
+            foreach (Pawn p in pawns)
+            {
+                p.drafter.Drafted = true;
+                p.Rotation = Rot4.South;
+            }
+            yield return Unpaused(null, () => false, 3f);
+            for (int i = 0; i < 60 && pawns.Any(p => p.CurJobDef?.defName == "ReloadWeapon"); i++)
+            {
+                yield return Ticks(10, "armourgrip_reload", null);
+            }
+            bool clearWas = WalkFigures.ArmsClearOn, upperWas = WalkFigures.WristsByUpperArm, forwardWas = WalkFigures.WristsForwardOnly;
+            string[] configs = { "forward", "outonly" };
+            foreach (string run0 in configs)
+            {
+                WalkFigures.ArmsClearOn = run0 != "outonly";
+                WalkFigures.WristsByUpperArm = run0 == "old";
+                WalkFigures.WristsForwardOnly = run0 == "forward";
+                string run = run0 + "_";
+                foreach (Pawn p in pawns)
+                {
+                    p.Rotation = Rot4.South;
+                }
+                yield return Ticks(30, "armourgrip_settle", null);
+                yield return WaitReal(0.3f);
+                lookDistance = 2f;
+                lookHeight = 0.75f;
+                for (int k = 0; k < pawns.Length; k++)
+                {
+                    Probe(run + names[k], pawns[k]);
+                    Note(run + names[k] + ": " + Field<string>(pawns[k], "armsClear"));
+                    lookAt = pawns[k].DrawPos;
+                    foreach (float yaw in new[] { 0f, 35f, 90f })
+                    {
+                        lookPitch = 10f;
+                        lookYaw = yaw;
+                        yield return Shot(run + names[k] + "_y" + Mathf.RoundToInt(yaw));
+                    }
+                    lookPitch = 55f;
+                    lookYaw = 0f;
+                    yield return Shot(run + names[k] + "_game");
+                }
+            }
+            WalkFigures.ArmsClearOn = clearWas;
+            WalkFigures.WristsByUpperArm = upperWas;
+            WalkFigures.WristsForwardOnly = forwardWas;
+            SettingsMod.Settings.bodyShapeStrength = strength;
+            foreach (Pawn p in pawns)
+            {
+                p.drafter.Drafted = false;
+            }
+            SettingsMod.Settings.variedBodies = varied;
+            lookPitch = LookPitch;
+            Note("Look: where each armoured pawn's fists sit on the rifle against the bare one's, and the Hulk's arms kept out of its chest, by each rule.");
+        }
+
         // A Fat woman in a basic shirt and trousers, alone, under a jacket and under a duster, then in tribalwear, at body shape strengths 1 and
         // 1.5, from the front and the back: nothing under a garment should come out through it (the shirt through the
         // jacket or duster, the trousers through the duster, the body through any), as when the garments kept their own
@@ -3733,6 +4260,168 @@ namespace M3AT
             lookHeight = LookHeight;
             lookPitch = LookPitch;
             Note("Look: nothing under a garment showing through it: no shirt through the jacket or duster, no trousers through the duster, no skin on the back.");
+        }
+
+        // Footwear and gloves (Boots and Stuff, Techmago.BootsnStuff): a pawn in a shirt and trousers with each of its shoes,
+        // boots, sandals, socks, feet wraps and gloves in turn, close on the feet and hands from the front and the side, noting
+        // what each is drawn as and checking the shoes, boots, sandals and socks each go to their own garment.
+        private static IEnumerator FootwearTest()
+        {
+            Rand.PushState(20261122);
+            Pawn pawn;
+            try
+            {
+                pawn = NewPawn(middle, null);
+            }
+            finally
+            {
+                Rand.PopState();
+            }
+            string[][] sets =
+            {
+                new[] { null, "plain" },
+                new[] { "Apparel_shoes", "Shoes" }, new[] { "Apparel_fancy_heels", "Shoes" }, new[] { "Apparel_boots", "Boots" },
+                new[] { "Apparel_military_Boots", "Boots" }, new[] { "Apparel_sandals", "Sandals" }, new[] { "Apparel_Socks", "Socks" },
+                new[] { "Apparel_feetwraps", "Socks" }, new[] { "Apparel_work_gloves", "Gloves" }, new[] { "Apparel_handwraps", "Gloves" },
+            };
+            foreach (string[] set in sets)
+            {
+                ThingDef def = set[0] == null ? null : DefDatabase<ThingDef>.GetNamedSilentFail(set[0]);
+                if (set[0] != null && def == null)
+                {
+                    Note(set[0] + ": not loaded (Boots and Stuff inactive?)");
+                    continue;
+                }
+                pawn.apparel.DestroyAll();
+                foreach (string name in new[] { "Apparel_Pants", "Apparel_BasicShirt" })
+                {
+                    ThingDef d = DefDatabase<ThingDef>.GetNamed(name);
+                    pawn.apparel.Wear((Apparel)ThingMaker.MakeThing(d, GenStuff.DefaultStuffFor(d)), false);
+                }
+                if (def != null)
+                {
+                    pawn.apparel.Wear((Apparel)ThingMaker.MakeThing(def, GenStuff.DefaultStuffFor(def)), false);
+                    string drawn = WalkFigures.AutoStandIns(def);
+                    Check("footwear_" + set[0], drawn.Contains(set[1]), drawn);
+                }
+                Hold(pawn);
+                string tag = set[0] == null ? "plain" : set[0].Substring("Apparel_".Length).ToLowerInvariant();
+                bool hands = set[1] == "Gloves";
+                lookDistance = hands ? 1.0f : 1.1f;
+                lookHeight = hands ? 0.45f : 0.15f;
+                lookPitch = 15f;
+                foreach (float yaw in new[] { 0f, 90f })
+                {
+                    Look(pawn, yaw);
+                    yield return Ticks(5, "footwear", pawn);
+                    yield return Shot(tag + "_" + Mathf.RoundToInt(yaw));
+                }
+            }
+            lookDistance = LookDistance;
+            lookHeight = LookHeight;
+            lookPitch = LookPitch;
+            Note("Look: the shoes in the apparel's colour, the boots up over the trousers' cuffs, the sandals' straps on bare feet, the gloves' cuff past the wrist, no skin poking through.");
+        }
+
+        // Combat Extended's tactical vest (Webbing, let out over what is under it, LetOut.cs) over The Dead Man's Switch's
+        // apparel, each alone and with the vest, front, back and side: a report had the vest pushed far out over some
+        // of it (the uniform?). Notes what each is drawn as and every let-out worked out with how far it went.
+        private static IEnumerator DmsVestTest()
+        {
+            Rand.PushState(20261122);
+            Pawn pawn;
+            try
+            {
+                pawn = NewPawn(middle, null);
+            }
+            finally
+            {
+                Rand.PopState();
+            }
+            pawn.gender = Gender.Male;
+            pawn.story.bodyType = BodyTypeDefOf.Male;
+            bool varied = SettingsMod.Settings.variedBodies;
+            SettingsMod.Settings.variedBodies = false;
+            Hold(pawn);
+            Look(pawn, 0f);
+            for (int k = 0; k < 20 && WalkFigures.Skin == null; k++)
+            {
+                yield return Ticks(5, "dmsvest", pawn);
+            }
+            SkinnedFigure fig = WalkFigures.Skin;
+            ThingDef vest = DefDatabase<ThingDef>.GetNamedSilentFail("CE_Apparel_TacVest");
+            if (fig == null || vest == null)
+            {
+                Check("chibi and CE's tactical vest loaded", false, fig == null ? "no skinned figure" : "no CE_Apparel_TacVest");
+                yield break;
+            }
+            string[][] outfits =
+            {
+                new[] { "DMS_Apparel_UnitSuit" },
+                new[] { "DMS_Apparel_UnitSuit", "DMS_Apparel_TacticalVest" },
+                new[] { "DMS_Apparel_BionicSuit" },
+                new[] { "DMS_Apparel_BionicSuitHeavy" },
+                new[] { "DMS_Apparel_UnitSuit", "DMS_Apparel_TacticalCloak" },
+                new[] { "DMS_Apparel_UnitSuit", "DMS_Apparel_GarrisonCoat" },
+                new[] { "DMS_Apparel_HazardSuit" },
+                new[] { "DMS_Apparel_UnitSuit", "DMS_Apparel_PowerSkeleton" },
+            };
+            lookDistance = 1.8f;
+            lookHeight = 0.6f;
+            lookPitch = 10f;
+            foreach (string[] outfit in outfits)
+            {
+                List<string> drawnAs = new List<string>();
+                foreach (string name in outfit)
+                {
+                    ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail(name);
+                    if (def == null)
+                    {
+                        drawnAs.Add(name + " not loaded");
+                        continue;
+                    }
+                    List<string> names = new List<string>();
+                    foreach (int g in fig.GarmentOf(def) >= 0 ? new[] { fig.GarmentOf(def) } : fig.StandInsFor(def))
+                    {
+                        names.Add(fig.PieceName(g));
+                    }
+                    drawnAs.Add(name + " (" + string.Join(", ", def.apparel.layers.ConvertAll(l => l.defName)) + ") as " + (names.Count > 0 ? string.Join("+", names) : "none"));
+                }
+                Note(string.Join("; ", drawnAs));
+                string tag = string.Join("_", System.Array.ConvertAll(outfit, n => n.Replace("DMS_Apparel_", "")));
+                foreach (bool withVest in new[] { false, true })
+                {
+                    pawn.apparel.DestroyAll();
+                    foreach (string name in outfit)
+                    {
+                        ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail(name);
+                        if (def != null)
+                        {
+                            pawn.apparel.Wear((Apparel)ThingMaker.MakeThing(def, GenStuff.DefaultStuffFor(def)), false);
+                        }
+                    }
+                    if (withVest)
+                    {
+                        pawn.apparel.Wear((Apparel)ThingMaker.MakeThing(vest, GenStuff.DefaultStuffFor(vest)), false);
+                    }
+                    SkinnedFigure.LetOutNotes.Clear();
+                    foreach (float yaw in new[] { 0f, 180f, 90f })
+                    {
+                        Look(pawn, yaw);
+                        yield return Ticks(3, "dmsvest", pawn);
+                        yield return Shot(tag + (withVest ? "_vest_" : "_") + Mathf.RoundToInt(yaw));
+                    }
+                    foreach (string line in SkinnedFigure.LetOutNotes)
+                    {
+                        Note("  " + line);
+                    }
+                }
+            }
+            SettingsMod.Settings.variedBodies = varied;
+            lookDistance = LookDistance;
+            lookHeight = LookHeight;
+            lookPitch = LookPitch;
+            Note("Look: the tactical vest lying on what is under it, not stood off it.");
         }
 
         // Open-fronted garments stand in only for apparel drawn open down the front (OpenFronts.cs): the game's own duster
@@ -3908,8 +4597,8 @@ namespace M3AT
                 new[] { "UnderWhere_Loincloth", null, "UnderWhere_Tanktop", null, "Apparel_BasicShirt", null, "Apparel_Pants", null },
                 new[] { "Kiiro_Underwear_Normal", "stand-in Bra+Underwear" },
                 new[] { "Kiiro_SimpleUnderwear", "stand-in Chestwrap+Underwear" },
-                new[] { "Kiiro_Stocking_Black", "stand-in Bra+Underwear+Pants" },
-                new[] { "Kiiro_Pantynose_White", "stand-in Bra+Pants" },
+                new[] { "Kiiro_Stocking_Black", "stand-in Bra+Underwear+Stockings" },
+                new[] { "Kiiro_Pantynose_White", "stand-in Bra+Tights" },
                 new[] { "Kiiro_HotPant", "stand-in ShortShorts", "Kiiro_RunningShirt", "stand-in CropTop" },
                 new[] { "Kiiro_Shorts", null, "Kiiro_TShirtShort", "stand-in CropTop" },
                 new[] { "Kiiro_ShortDressII", "stand-in ShortShorts", "Kiiro_TShirt", "stand-in BasicShirt" },
@@ -3983,12 +4672,457 @@ namespace M3AT
             Note("Look: each set drawn alone (sets 0-3, 6-12); under the shirt and trousers (sets 4, 5) and under Kiiro's hotpants and T-shirt (set 13) none of the underwear showing through, the long johns' waffle knit, placket and ribbed cuffs at the wrists and ankles.");
         }
 
+        // The race mods' clothes (Ratkin, Kiiro, Milira, Wolfein) on the garments made for them (skirts and dresses, glasses
+        // and sunglasses, the goggles, a hairband, ribbon and maid's headdress pushed out over the hair,
+        // stockings, tights, a leotard, a shoulder bag) and the matcher's rules for them (StandIns.cs's Hints, HelmetWords,
+        // BagWords): rows of four women of the outfits' race (the race mods take their clothes off anyone else), each in an outfit, pictured from the front, three quarters
+        // and behind. Each apparel worn is noted with what it is drawn as, and the ones the rules were made for checked.
+        // An outfit whose mod isn't active is passed over. (Wear, not the game's checks: the race mods keep their clothes
+        // to their own race.)
+        // A pawn kind of the race whose clothes these are, by the defName's prefix (RK_ Ratkin, Kiiro, Milira and Milian,
+        // Wolfein), else the colonist.
+        private static PawnKindDef RaceKindFor(string apparel)
+        {
+            string race = apparel.StartsWith("RK_") ? "Ratkin" : apparel.StartsWith("Kiiro") ? "Kiiro_Race"
+                : apparel.StartsWith("Mili") ? "Milira_Race" : apparel.StartsWith("Wolfein") ? "Wolfein_Race" : null;
+            ThingDef def = race == null ? null : DefDatabase<ThingDef>.GetNamedSilentFail(race);
+            return (def == null ? null : DefDatabase<PawnKindDef>.AllDefs.FirstOrDefault(k => k.race == def)) ?? PawnKindDefOf.Colonist;
+        }
+
+        // Skirts and dresses drawn at the length of their own art (HemLengths.cs): the race mods' skirts and dresses on
+        // women of their race, a row of four at a time (a top with a skirt), each one's hem noted as a share down the
+        // body with the garment drawn, the clear ones checked (a mini skirt short, a gown long), pictured from the front and
+        // the side. Wants any of Ratkin, Kiiro, Milira or Wolfein active.
+        // Dresses whose art is plainly sleeveless, and plainly sleeved (or covering the arms).
+        private static readonly string[] SleevelessArt = { "Kiiro_CasualDress", "Kiiro_HighWaistedDress", "Milira_DelicateDressB",
+            "Milira_DelicateDressC", "Milira_BasicDressI", "RK_SummerDress" };
+        private static readonly string[] SleevedArt = { "Kiiro_MaidDressV", "Kiiro_DressUniform", "Kiiro_MintDress", "Wolfein_MaidOutfit",
+            "RK_FrillOnepiece", "Milira_SisterDressI" };
+
+        private static IEnumerator HemLengthsTest()
+        {
+            string[][] outfits =
+            {
+                new[] { "Kiiro_ShortDress", "Kiiro_TShirt" }, new[] { "Kiiro_MaidDressV" }, new[] { "Kiiro_CasualDress" },
+                new[] { "Kiiro_LongSkirt", "Kiiro_TShirt" }, new[] { "Kiiro_LaceDressShort" }, new[] { "Kiiro_LaceDress" },
+                new[] { "Kiiro_DarkSkirt", "Kiiro_TShirt" }, new[] { "Kiiro_MintDress" },
+                new[] { "Milira_DelicateDressA" }, new[] { "Milira_DelicateDressE" }, new[] { "Milira_DelicateDressB" },
+                new[] { "Milira_BasicDressI" },
+                new[] { "Wolfein_Shirt_Skirt" }, new[] { "Wolfein_LonguetteStaffUniform" }, new[] { "Wolfein_NunOutfit" },
+                new[] { "Wolfein_SleepGown" },
+                new[] { "RK_SummerDress" }, new[] { "RK_ApronSkirt" }, new[] { "RK_FrillOnepiece" }, new[] { "RK_SistersDerss" },
+                new[] { "Kiiro_HighWaistedDress" }, new[] { "Kiiro_DressUniform" }, new[] { "Kiiro_GraduationGown" },
+                new[] { "Wolfein_MaidOutfit" },
+                new[] { "Milira_DelicateDressD" }, new[] { "Milira_DelicateDressG" }, new[] { "Milira_SisterDressI" },
+                new[] { "Milira_DelicateDressC" },
+            };
+            // The clear ones: a mini skirt is the short skirt, a gown down to the feet the long dress.
+            Dictionary<string, string> want = new Dictionary<string, string>
+            {
+                { "Wolfein_Shirt_Skirt", "Skirt" }, { "Kiiro_LaceDress", "DressLong" },
+                { "Milira_DelicateDressB", "SleevelessDressLong" },
+            };
+            List<string[]> loaded = outfits.Where(o => DefDatabase<ThingDef>.GetNamedSilentFail(o[0]) != null).ToList();
+            if (loaded.Count == 0)
+            {
+                Check("a race mod active", false, "none of Ratkin, Kiiro, Milira or Wolfein is active");
+                yield break;
+            }
+            const int Row = 4;
+            lookDistance = 9f;
+            lookHeight = 0.6f;
+            lookPitch = 12f;
+            List<Pawn> pawns = new List<Pawn>();
+            for (int row = 0; row * Row < loaded.Count; row++)
+            {
+                foreach (Pawn old in pawns)
+                {
+                    old.Destroy();
+                }
+                pawns.Clear();
+                Rand.PushState(20261123 + row);
+                try
+                {
+                    for (int k = 0; k < Row && row * Row + k < loaded.Count; k++)
+                    {
+                        PawnKindDef kind = RaceKindFor(loaded[row * Row + k][0]);   // (each its own race: they keep their clothes to it)
+                        Pawn pawn = PawnGenerator.GeneratePawn(new PawnGenerationRequest(kind, Faction.OfPlayer, forceGenerateNewPawn: true,
+                            fixedGender: Gender.Female));
+                        pawn.equipment.DestroyAllEquipment();
+                        Spawn(pawn, middle + IntVec3.East * (2 * k - Row + 1));
+                        pawn.Rotation = Rot4.South;
+                        pawns.Add(pawn);
+                    }
+                }
+                finally
+                {
+                    Rand.PopState();
+                }
+                List<string> order = new List<string>();
+                for (int k = 0; k < pawns.Count; k++)
+                {
+                    Pawn pawn = pawns[k];
+                    pawn.apparel.DestroyAll();
+                    Apparel main = null;
+                    foreach (string name in loaded[row * Row + k])
+                    {
+                        ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail(name);
+                        if (def == null)
+                        {
+                            continue;
+                        }
+                        Apparel a = (Apparel)ThingMaker.MakeThing(def, GenStuff.DefaultStuffFor(def));
+                        pawn.apparel.Wear(a, false);
+                        main = main ?? a;
+                    }
+                    Hold(pawn);
+                    if (main == null)
+                    {
+                        order.Add("?");
+                        continue;
+                    }
+                    string got = WalkFigures.AutoStandInsOn(main, pawn);
+                    string label = main.def.defName;
+                    order.Add(label);
+                    Note(label + " (" + main.def.label + ", " + pawn.def.defName + "): " + got + " (scoring alone: "
+                        + WalkFigures.AutoStandIns(main.def) + ")");
+                }
+                Note("row" + row + ", left to right: " + string.Join(", ", order));
+                Pawn[] shown = pawns.ToArray();
+                foreach (float yaw in new[] { 0f, 90f })
+                {
+                    lookAt = Centre(shown);
+                    lookYaw = yaw;
+                    yield return Ticks(5, "hemlengths", shown[0]);
+                    if (yaw == 0f)
+                    {
+                        // Again once drawn, as the body's picture is made with the pawn's render tree.
+                        foreach (Pawn pawn in shown)
+                        {
+                            Apparel main = pawn.apparel.WornApparel.FirstOrDefault(a => a.def.defName == order[pawns.IndexOf(pawn)]);
+                            if (main == null)
+                            {
+                                Check(order[pawns.IndexOf(pawn)] + " still worn", false, "taken off");
+                                continue;
+                            }
+                            string got = WalkFigures.AutoStandInsOn(main, pawn);
+                            Note(main.def.defName + " once drawn: " + got + "; sleeves stand out "
+                                + SkinnedFigure.SleeveOverhangOn(main, pawn).ToString("0.000") + "; " + SkinnedFigure.HemDiagnosis(main, pawn));
+                            // Sleeved or sleeveless as their art is (HemLengths.cs's SleeveOverhangOn).
+                            bool sleeveless = got.StartsWith("SleevelessDress");
+                            if (Array.IndexOf(SleevelessArt, main.def.defName) >= 0 || Array.IndexOf(SleevedArt, main.def.defName) >= 0)
+                            {
+                                bool wanted3 = Array.IndexOf(SleevelessArt, main.def.defName) >= 0;
+                                Check(main.def.defName + (wanted3 ? " sleeveless" : " sleeved"), sleeveless == wanted3, got);
+                            }
+                            Check(main.def.defName + " hem measured once drawn", !got.EndsWith("NaN"), got);
+                            string drawn = WalkFigures.AutoDrawnReport(pawn);
+                            string first = got.Split('@')[0].Split('+')[0];
+                            Check(main.def.defName + " drawn as measured (" + first + ")", drawn.Contains(" " + first + " (stand-in)"), drawn.Trim());
+                            Note(main.def.defName + " hiding: " + WalkFigures.AutoHidingReport(pawn));
+                            string wanted2;
+                            if (want.TryGetValue(main.def.defName, out wanted2))
+                            {
+                                Check(main.def.defName + " once drawn: " + wanted2, got.Split('@')[0].Split('+').Contains(wanted2), got);
+                            }
+                        }
+                    }
+                    yield return Shot("row" + row + "_" + Mathf.RoundToInt(yaw));
+                }
+                // Each close from the front, to set beside its sprite (pawn_<apparel>).
+                lookDistance = 3.2f;
+                lookPitch = 6f;
+                lookYaw = 0f;
+                for (int k = 0; k < shown.Length; k++)
+                {
+                    lookAt = Centre(new[] { shown[k] });
+                    yield return Ticks(3, "hemlengths", shown[k]);
+                    yield return Shot("pawn_" + order[k]);
+                }
+                lookDistance = 9f;
+                lookPitch = 12f;
+            }
+            lookDistance = LookDistance;
+            lookHeight = LookHeight;
+            lookPitch = LookPitch;
+            lookYaw = 0f;
+            Note("Look: each skirt and dress about as long on the chibi as in its own art (the notes give each one's hem as a share down the body: about 0.62 the crotch, 0.81 the knee, 1 the feet).");
+        }
+
+        private static IEnumerator RaceClothesTest()
+        {
+            string[][] outfits =
+            {
+                new[] { "RK_FrillOnepiece", "RK_RibbonHairBand" },
+                new[] { "RK_SummerDress", "RK_StrawHat" },
+                new[] { "RK_SistersDerss", "RK_SistersVeil" },
+                new[] { "RK_ResearchGown", "RK_ResearchGlasses", "RK_ExplorerHat" },
+                new[] { "Kiiro_LaceDress", "Kiiro_BowHairtieFront", "Kiiro_Stocking_White" },
+                new[] { "Kiiro_DarkSkirt", "Kiiro_WorkerShirt", "Kiiro_Glasses", "Kiiro_HairBand" },
+                new[] { "Kiiro_MaidDressII", "Kiiro_MaidCapII", "Kiiro_Pantynose_Black" },
+                new[] { "Kiiro_LongSkirt", "Kiiro_TShirt", "Kiiro_Goggle", "Kiiro_MessengerBag", "Kiiro_MilitaryHelmet" },
+                new[] { "Milira_SisterDressI", "Milira_SisterHatI" },
+                new[] { "Milira_DelicateDressA", "Milira_SunHat", "Milira_Sunglasses" },
+                new[] { "Milira_BasicDressI", "Milian_KnightHeadset", "Milira_Glasses" },
+                new[] { "Milira_ValkyrArmor", "Milira_ValkyrHelmet" },
+                new[] { "Wolfein_NunOutfit", "Wolfein_NunHeaddress" },
+                new[] { "Wolfein_Swimsuit", "Wolfein_RoundGlasses" },
+                new[] { "Wolfein_Shirt_Skirt", "Wolfein_Black_Stocking" },
+                new[] { "Wolfein_HeavyPowerArmor", "Wolfein_HeavyPowerArmorHelmet" },
+                new[] { "Wolfein_MaidOutfit", "Wolfein_MaidHeadband", "Wolfein_White_Pantynose" },
+                new[] { "Wolfein_BunnyGirlOutfit", "Wolfein_BunnyHeadband" },
+                new[] { "Wolfein_Sweater", "Wolfein_SquareGlasses", "Wolfein_SafetyHelmet" },
+                new[] { "Wolfein_Wintercoat", "Wolfein_Shirt_Trousers", "Wolfein_MilitaryBackpack" },
+            };
+            // What the rules were made for: the apparel and the garments it should be drawn as.
+            Dictionary<string, string> want = new Dictionary<string, string>
+            {
+                { "RK_RibbonHairBand", "Ribbon|Hairband" }, { "RK_SummerDress", "Dress" }, { "RK_StrawHat", "HatLadies" },
+                { "RK_SistersVeil", "Broadwrap" }, { "RK_ResearchGlasses", "Glasses" }, { "RK_ExplorerHat", "BowlerHat" },
+                { "Kiiro_BowHairtieFront", "Ribbon" }, { "Kiiro_DarkSkirt", "Skirt" }, { "Kiiro_Glasses", "Glasses" },
+                { "Kiiro_HairBand", "Hairband" }, { "Kiiro_MaidCapII", "MaidHeaddress" }, { "Kiiro_LongSkirt", "SkirtLong" },
+                { "Kiiro_Goggle", "Goggles" }, { "Kiiro_MessengerBag", "ShoulderBag" }, { "Kiiro_MilitaryHelmet", "SimpleHelmet" },
+                { "Kiiro_Stocking_White", "Bra+Underwear+Stockings" }, { "Kiiro_Pantynose_Black", "Bra+Tights" },
+                { "Milira_SisterHatI", "Broadwrap" }, { "Milira_SunHat", "HatLadies" }, { "Milira_Sunglasses", "Sunglasses" },
+                { "Milian_KnightHeadset", "IntegratorHeadset" }, { "Milira_Glasses", "Glasses" },
+                { "Wolfein_NunHeaddress", "Broadwrap" }, { "Wolfein_Swimsuit", "Leotard" }, { "Wolfein_RoundGlasses", "Glasses" },
+                { "Wolfein_Black_Stocking", "Stockings+Bra" }, { "Wolfein_HeavyPowerArmorHelmet", "PowerArmorHelmet" },
+                { "Wolfein_MaidHeadband", "MaidHeaddress" }, { "Wolfein_White_Pantynose", "Tights+Bra" },
+                { "Wolfein_BunnyGirlOutfit", "Leotard" }, { "Wolfein_BunnyHeadband", "Hairband" },
+                { "Wolfein_SquareGlasses", "Glasses" }, { "Wolfein_SafetyHelmet", "SimpleHelmet" },
+                { "Wolfein_Wintercoat", "Parka" },
+            };
+            List<string[]> loaded = new List<string[]>();
+            foreach (string[] outfit in outfits)
+            {
+                if (DefDatabase<ThingDef>.GetNamedSilentFail(outfit[0]) == null)
+                {
+                    Note(outfit[0] + ": not loaded (its mod isn't active), passed over");
+                    continue;
+                }
+                loaded.Add(outfit);
+            }
+            if (loaded.Count == 0)
+            {
+                Check("a race mod active", false, "none of Ratkin, Kiiro, Milira or Wolfein is active");
+                yield break;
+            }
+            const int Row = 4;
+            lookDistance = 9f;
+            lookHeight = 0.6f;
+            lookPitch = 12f;
+            List<Pawn> pawns = new List<Pawn>();
+            for (int row = 0; row * Row < loaded.Count; row++)
+            {
+                foreach (Pawn old in pawns)
+                {
+                    old.Destroy();
+                }
+                pawns.Clear();
+                // The row's pawns of its outfits' race, as the race mods take their clothes off anyone else.
+                PawnKindDef kind = RaceKindFor(loaded[row * Row][0]);
+                Note("row" + row + ": " + kind.defName + " (" + kind.race.defName + ")");
+                Rand.PushState(20261123 + row);
+                try
+                {
+                    for (int k = 0; k < Row && row * Row + k < loaded.Count; k++)
+                    {
+                        Pawn pawn = PawnGenerator.GeneratePawn(new PawnGenerationRequest(kind, Faction.OfPlayer, forceGenerateNewPawn: true,
+                            fixedGender: Gender.Female));
+                        pawn.equipment.DestroyAllEquipment();
+                        Spawn(pawn, middle + IntVec3.East * (2 * k - Row + 1));
+                        pawn.Rotation = Rot4.South;
+                        pawns.Add(pawn);
+                    }
+                }
+                finally
+                {
+                    Rand.PopState();
+                }
+                for (int k = 0; k < pawns.Count; k++)
+                {
+                    Pawn pawn = pawns[k];
+                    pawn.apparel.DestroyAll();
+                    foreach (string name in loaded[row * Row + k])
+                    {
+                        ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail(name);
+                        if (def == null)
+                        {
+                            Note(name + ": not loaded");
+                            continue;
+                        }
+                        pawn.apparel.Wear((Apparel)ThingMaker.MakeThing(def, GenStuff.DefaultStuffFor(def)), false);
+                        string got = WalkFigures.AutoStandIns(def);
+                        string wanted;
+                        if (want.TryGetValue(name, out wanted))
+                        {
+                            bool ok = Array.Exists(wanted.Split('|'), w => SameGarments(got, "stand-in " + w));
+                            Check(name + ": " + wanted, ok, got);
+                            if (!ok)
+                            {
+                                Note(name + " scores: " + WalkFigures.AutoStandInScores(def, (wanted + "|Tuque|Beret").Split('|')));
+                            }
+                        }
+                        else
+                        {
+                            Note(name + " (" + def.label + "): " + got);
+                        }
+                    }
+                    Hold(pawn);
+                }
+                Pawn[] shown = pawns.ToArray();
+                // Each way with the stand-ins plain and then painted with their apparel's own art (SpriteClothes.cs,
+                // made one a frame, so given the frames to make them all).
+                bool artWas = SettingsMod.Settings.spriteClothes;
+                foreach (float yaw in new[] { 0f, 35f, 180f })
+                {
+                    lookAt = Centre(shown);
+                    lookYaw = yaw;
+                    foreach (bool art in new[] { false, true })
+                    {
+                        SettingsMod.Settings.spriteClothes = art;
+                        yield return Ticks(art ? 30 : 5, "raceclothes", shown[0]);
+                        yield return Shot("row" + row + "_" + Mathf.RoundToInt(yaw) + (art ? "_art" : "_plain"));
+                    }
+                }
+                SettingsMod.Settings.spriteClothes = artWas;
+                foreach (Pawn pawn in shown)
+                {
+                    Check("row" + row + " " + pawn.LabelShort + " still dressed", pawn.apparel.WornApparelCount > 0,
+                        pawn.apparel.WornApparelCount + " worn");
+                }
+            }
+            lookDistance = LookDistance;
+            lookHeight = LookHeight;
+            lookPitch = LookPitch;
+            lookYaw = 0f;
+            Note("Look: each dress and skirt hangs from the waist or the shirt's hem, clear of the legs; the hairband, ribbon and maid's headdress lie on the hair, not in it; the glasses and goggles over the eyes; the broadwrap round a nun's face; no skin through a garment.");
+        }
+
         // GrimWorld 40,000 (its 1.7 uploads active): a row of grown men, a plain colonist, a Cadian, a Death Korps of Krieg
         // guardsman, a Space Marine, an Astartes scout, a Custodian and Valdor, each checked for what its apparel is drawn as
         // (its stands_for lines and the matcher's rules) and for its size against its own before it was dressed (the
         // marineBulk and armourDrawScale options, ArmourSize.cs); pictured as a row from the front, three quarters and the
         // side, then each close, then the Marine drafted with its storm shield up; then a roof put over the Marine and Valdor
         // with ceilingCrouch Always, checking both crouch under it (Ease.ceilingDrop) and stand again with it Never.
+        // Power armour's frame: a man in a shirt and trousers, then in the plate, recon, marine and cataphract armour with
+        // their helmets, side by side, in four ways: as now, bulked up by powerArmourBulk alone, with the Armoured key alone
+        // (the recon a quarter of it, the plate and marine half, the cataphract all) and with both. Each way the row at about IsoRim's
+        // play camera and close, standing and drafted with a charge rifle, so the silhouettes and the hands on the rifle
+        // can be compared.
+        private static IEnumerator ArmouredTest()
+        {
+            string[] names = { "plain", "plate", "recon", "marine", "cataphract" };
+            string[][] outfits =
+            {
+                new[] { "Apparel_BasicShirt", "Apparel_Pants" },
+                new[] { "Apparel_BasicShirt", "Apparel_Pants", "Apparel_PlateArmor", "Apparel_SimpleHelmet" },
+                new[] { "Apparel_ArmorRecon", "Apparel_ArmorHelmetRecon" },
+                new[] { "Apparel_PowerArmor", "Apparel_PowerArmorHelmet" },
+                new[] { "Apparel_ArmorCataphract", "Apparel_ArmorHelmetCataphract" },
+            };
+            Pawn[] pawns = new Pawn[names.Length];
+            Rand.PushState(20261122);
+            try
+            {
+                for (int k = 0; k < pawns.Length; k++)
+                {
+                    pawns[k] = NewPawn(middle + IntVec3.East * (2 * k - pawns.Length + 1), "Gun_ChargeRifle");
+                    pawns[k].gender = Gender.Male;
+                    pawns[k].story.bodyType = BodyTypeDefOf.Male;
+                    pawns[k].apparel.DestroyAll();
+                    foreach (string a in outfits[k])
+                    {
+                        ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail(a);
+                        if (def == null)
+                        {
+                            Check(names[k] + ": " + a + " loaded", false, "not loaded (Royalty for the cataphract armour)");
+                            continue;
+                        }
+                        pawns[k].apparel.Wear((Apparel)ThingMaker.MakeThing(def, GenStuff.DefaultStuffFor(def)), false);
+                    }
+                }
+            }
+            finally
+            {
+                Rand.PopState();
+            }
+            HoldOthersAway(pawns);
+            foreach (Pawn p in pawns)
+            {
+                Hold(p);
+                p.Rotation = Rot4.South;
+            }
+            bool frames = WalkFigures.ArmouredFrames, bulk = WalkFigures.PowerArmourBulk;
+            Note("armourBulk " + SettingsMod.Settings.armourBulk.ToString("F2") + " (the bulk ways' size)");
+            object[][] ways =
+            {
+                new object[] { "now", false, false }, new object[] { "bulk", false, true },
+                new object[] { "key", true, false }, new object[] { "both", true, true },
+            };
+            try
+            {
+                foreach (object[] way in ways)
+                {
+                    WalkFigures.ArmouredFrames = (bool)way[1];
+                    WalkFigures.PowerArmourBulk = (bool)way[2];
+                    string w = (string)way[0];
+                    for (int drafted = 0; drafted < 2; drafted++)
+                    {
+                        foreach (Pawn p in pawns)
+                        {
+                            p.drafter.Drafted = drafted == 1;
+                            if (drafted == 0)
+                            {
+                                Hold(p);
+                            }
+                            p.Rotation = Rot4.South;
+                        }
+                        string state = drafted == 1 ? "drafted" : "standing";
+                        lookAt = Centre(pawns);
+                        yield return Unpaused(pawns[3], () => false, 2.5f);   // (the draw from the holster and back runs on frame time)
+                        foreach (Pawn p in pawns)
+                        {
+                            p.Rotation = Rot4.South;
+                        }
+                        yield return Ticks(10, "armoured", pawns[3]);
+                        for (int k = 0; k < pawns.Length; k++)
+                        {
+                            Note(w + " " + state + " " + names[k] + ": size " + WalkFigures.SizeOfForTest(pawns[k]).ToString("F3"));
+                        }
+                        // About IsoRim's play camera: well above, looking down.
+                        lookAt = Centre(pawns);
+                        lookDistance = 12f;
+                        lookHeight = 0.5f;
+                        lookPitch = 50f;
+                        lookYaw = 0f;
+                        oneView = true;
+                        yield return Shot(w + "_" + state + "_play");
+                        lookDistance = 10f;
+                        lookHeight = 0.7f;
+                        lookPitch = 8f;
+                        yield return Shot(w + "_" + state + "_front");
+                        lookYaw = 30f;
+                        yield return Shot(w + "_" + state + "_three");
+                        oneView = false;
+                    }
+                    foreach (Pawn p in pawns)
+                    {
+                        p.drafter.Drafted = false;
+                        Hold(p);
+                    }
+                }
+            }
+            finally
+            {
+                WalkFigures.ArmouredFrames = frames;
+                WalkFigures.PowerArmourBulk = bulk;
+            }
+            Note("Look: the four ways side by side (now, bulk, key, both), each standing and drafted: whether the marine and "
+                + "cataphract read as heavier than the recon and the plain man; the armour whole over the broader frame, nothing "
+                + "of the body through it; the hands still on the charge rifle drafted.");
+        }
+
         private static IEnumerator GrimWorldTest()
         {
             if (DefDatabase<ThingDef>.GetNamedSilentFail("GW_SM_TacticusArmor") == null)
@@ -4014,6 +5148,18 @@ namespace M3AT
                     "GW_TotE_CustodesGuardHelmet", "stand-in PowerArmorHelmet", "GW_TotE_CustodesGuardShoulder", "stand-in Pauldrons" }, 1.25f },
                 new object[] { "valdor", new[] { "GW_Rulers_ValdorArmor", "stand-in PowerArmor", "GW_Rulers_ValdorHelmet", "stand-in PowerArmorHelmet",
                     "GW_Rulers_ValdorShoulder", "stand-in Pauldrons" }, 1.4f },
+                // After the rest, so the Marine and Valdor keep their places: the Cadian officer's and commissar's gorgets
+                // (on GrimWorld's Belt layer, by stands_for), the Tallarn desert goggles alone and with their headwrap, and
+                // the Tanith monocular.
+                new object[] { "officer", new[] { "GW_HOI_Cadian_Fatigues", "stand-in CollarShirt+Pants", "GW_HOI_Cadian_FlakArmor", "stand-in FlakVest",
+                    "GW_HOI_Cadian_OfficerGorget", "stand-in Gorget" }, 1f },
+                new object[] { "commissar", new[] { "GW_HOI_Cadian_Fatigues", "stand-in CollarShirt+Pants",
+                    "GW_HOI_Cadian_CommissarGorget", "stand-in Gorget" }, 1f },
+                new object[] { "tallarn", new[] { "GW_AM_TDR_Goggles", "stand-in Goggles", "Apparel_BasicShirt", null, "Apparel_Pants", null }, 1f },
+                new object[] { "tallarnwrap", new[] { "GW_AM_TDR_GogglesHeadwrap", "stand-in ClothMask+Goggles+Headwrap",
+                    "Apparel_BasicShirt", null, "Apparel_Pants", null }, 1f },
+                new object[] { "tanith", new[] { "GW_HOI_ROR_Tanith1stGoggle", "stand-in CE_SimpleNightVision",
+                    "Apparel_BasicShirt", null, "Apparel_Pants", null }, 1f },
             };
             Pawn[] pawns = new Pawn[outfits.Length];
             float[] before = new float[outfits.Length];
@@ -4074,7 +5220,7 @@ namespace M3AT
                     (after / before[k]).ToString("F3") + " (" + before[k].ToString("F3") + " to " + after.ToString("F3") + ")");
                 Hold(pawns[k]);
             }
-            lookDistance = 11f;
+            lookDistance = 16f;   // a row of twelve
             lookHeight = 0.9f;
             lookPitch = 12f;
             foreach (float yaw in new[] { 0f, 35f, 90f })
@@ -4782,6 +5928,265 @@ namespace M3AT
             }
             lookDistance = LookDistance;
             lookYaw = 0f;
+        }
+
+        // Armour on thick soles (SoleOf): a plain pawn beside one in each of the cataphract, marine and recon armour, standing
+        // and then walking, checking each armoured one is drawn its garment's sole times its size above the plain one's
+        // height, and none lifted kneeling or lying. Pictured low from the side and the front, to see the soles on the ground.
+        // The outline modes side by side: a rifleman, one in power armour (its pauldrons, made as one open sheet each) and
+        // one with a pistol, drafted, pictured from the front and close up in each mode, and the screen-space mode at two
+        // width settings. Stills only: IsoRim's photos (the videos) make no scene grabs, so they keep the shell outline.
+        private static IEnumerator OutlinesTest()
+        {
+            Settings st = SettingsMod.Settings;
+            OutlineMode modeWas = st.outlineMode;
+            float pawnWas = st.pawnOutlineWidth, weaponWas = st.weaponOutlineWidth, stepWas = st.selfOutlineStep;
+            bool outlinesWas = st.outlines, selfWas = st.screenSelfOutlines;
+            string[] guns = { "Gun_AssaultRifle", "Gun_AssaultRifle", "Gun_Autopistol" };
+            Pawn[] pawns = new Pawn[guns.Length];
+            Rand.PushState(20261122);
+            try
+            {
+                for (int k = 0; k < pawns.Length; k++)
+                {
+                    pawns[k] = NewPawn(middle + IntVec3.East * (2 * k - pawns.Length + 1), guns[k]);
+                }
+            }
+            finally
+            {
+                Rand.PopState();
+            }
+            ThingDef armour = DefDatabase<ThingDef>.GetNamedSilentFail("Apparel_PowerArmor");
+            if (armour != null)
+            {
+                pawns[1].apparel.Wear((Apparel)ThingMaker.MakeThing(armour, GenStuff.DefaultStuffFor(armour)), false);
+                pawns[1].Drawer.renderer.SetAllGraphicsDirty();
+            }
+            HoldOthersAway(pawns);
+            for (int k = 0; k < pawns.Length; k++)
+            {
+                pawns[k].drafter.Drafted = true;
+            }
+            yield return Unpaused(pawns[0], () => Field<float>(pawns[0], "drafted") >= 0.99f && Field<float>(pawns[2], "drafted") >= 0.99f, 6f);
+            Check("screen-space outline available", SkinnedFigure.ScreenOutlinesAvailable, SkinnedFigure.ScreenOutlinesAvailable ? "yes" : "no");
+            st.outlines = true;
+            try
+            {
+                OutlineMode[] modes = { OutlineMode.Silhouette, OutlineMode.Lines, OutlineMode.ScreenSpace };
+                foreach (OutlineMode mode in modes)
+                {
+                    st.outlineMode = mode;
+                    st.pawnOutlineWidth = Settings.DefaultPawnOutlineWidth;
+                    st.weaponOutlineWidth = Settings.DefaultWeaponOutlineWidth;
+                    int covers = SkinnedFigure.ScreenCovers;
+                    yield return OutlineShots(pawns, mode.ToString(), mode == OutlineMode.ScreenSpace);
+                    int drawn = SkinnedFigure.ScreenCovers - covers;
+                    if (mode == OutlineMode.ScreenSpace)
+                    {
+                        Check("screen-space: edge pass drawn", drawn > 0, drawn + " boxes over the shots");
+                    }
+                    else
+                    {
+                        Check(mode + ": no edge pass", drawn == 0, drawn + " boxes");
+                    }
+                }
+                st.outlineMode = OutlineMode.ScreenSpace;
+                st.pawnOutlineWidth = 0.05f;
+                st.weaponOutlineWidth = 0.005f;
+                yield return OutlineShots(pawns, "wide_pawn_thin_weapon");
+                st.pawnOutlineWidth = 0.015f;
+                st.weaponOutlineWidth = 0.03f;
+                yield return OutlineShots(pawns, "thin_pawn_wide_weapon");
+                st.pawnOutlineWidth = Settings.DefaultPawnOutlineWidth;
+                st.weaponOutlineWidth = Settings.DefaultWeaponOutlineWidth;
+                st.screenSelfOutlines = true;
+                st.selfOutlineStep = Settings.DefaultSelfOutlineStep;
+                yield return OutlineShots(pawns, "self", true);
+                st.selfOutlineStep = 0.04f;
+                yield return OutlineShots(pawns, "self_shallow");
+            }
+            finally
+            {
+                st.outlineMode = modeWas;
+                st.pawnOutlineWidth = pawnWas;
+                st.weaponOutlineWidth = weaponWas;
+                st.outlines = outlinesWas;
+                st.screenSelfOutlines = selfWas;
+                st.selfOutlineStep = stepWas;
+                SkinnedFigure.EdgeFullSearch = false;
+            }
+            lookDistance = LookDistance;
+            lookHeight = LookHeight;
+            lookPitch = LookPitch;
+            lookYaw = 0f;
+            Note("Look: in ScreenSpace, a line round the rifles and pistol where they cross the body (none in Silhouette), round the "
+                + "power armour's pauldrons at their outer edges (broken in Silhouette), and the two width shots each changing only its kind.");
+        }
+
+        // -m3atEdgeShapes=8.2.10,6.2.6 (autotest.sh --edgeshapes): the same picture again with each such edge pass shape (the quick look's points a ring
+        // and rings, the full search's most rings: SkinnedFigure.EdgeProbeDirs, EdgeProbeRings, EdgeRings), to diff with the
+        // full search.
+        private static IEnumerator EdgeShapeShots(string name)
+        {
+            string shapes;
+            GenCommandLine.TryGetCommandLineArg("m3atEdgeShapes", out shapes);
+            if (string.IsNullOrEmpty(shapes))
+            {
+                yield break;
+            }
+            foreach (string shape in shapes.Split(','))
+            {
+                string[] bits = shape.Trim().Split('.');
+                int dirs, rings, full, most = 16;
+                if (bits.Length < 3 || !int.TryParse(bits[0], out dirs) || !int.TryParse(bits[1], out rings) || !int.TryParse(bits[2], out full))
+                {
+                    continue;
+                }
+                if (bits.Length > 3)
+                {
+                    int.TryParse(bits[3], out most);
+                }
+                SkinnedFigure.EdgeProbeDirs = dirs;
+                SkinnedFigure.EdgeProbeRings = rings;
+                SkinnedFigure.EdgeRings = full;
+                SkinnedFigure.EdgeShapeForced = true;
+                SkinnedFigure.EdgeMostPixels = most;
+                yield return Shot(name + "_shape_" + dirs + "_" + rings + "_" + full + "_" + most);
+            }
+            SkinnedFigure.EdgeMostPixels = 16f;
+            SkinnedFigure.EdgeProbeDirs = 8;
+            SkinnedFigure.EdgeProbeRings = 2;
+            SkinnedFigure.EdgeRings = 10;
+            SkinnedFigure.EdgeShapeForced = false;
+        }
+
+        // The three pawns from the front, then close on the rifle across the body and on the pauldrons. compare: each picture
+        // again with the edge pass's full search everywhere (SkinnedFigure.EdgeFullSearch), at the same tick, to diff with
+        // its quick look first.
+        private static IEnumerator OutlineShots(Pawn[] pawns, string name, bool compare = false)
+        {
+            lookAt = Centre(pawns);
+            lookDistance = 7f;
+            lookHeight = 0.6f;
+            lookPitch = 20f;
+            lookYaw = 0f;
+            yield return Ticks(3, "outlines", pawns[0]);
+            yield return Shot(name + "_all");
+            if (compare)
+            {
+                SkinnedFigure.EdgeFullSearch = true;
+                yield return Shot(name + "_all_full");
+                SkinnedFigure.EdgeFullSearch = false;
+                yield return EdgeShapeShots(name + "_all");
+            }
+            lookDistance = 2.2f;
+            lookHeight = 0.7f;
+            lookPitch = 25f;
+            Look(pawns[0], 0f);
+            yield return Ticks(2, "outlines", pawns[0]);
+            yield return Shot(name + "_rifle");
+            if (compare)
+            {
+                SkinnedFigure.EdgeFullSearch = true;
+                yield return Shot(name + "_rifle_full");
+                SkinnedFigure.EdgeFullSearch = false;
+                yield return EdgeShapeShots(name + "_rifle");
+            }
+            Look(pawns[1], 20f);
+            yield return Ticks(2, "outlines", pawns[1]);
+            yield return Shot(name + "_pauldrons");
+            if (compare)
+            {
+                SkinnedFigure.EdgeFullSearch = true;
+                yield return Shot(name + "_pauldrons_full");
+                SkinnedFigure.EdgeFullSearch = false;
+                yield return EdgeShapeShots(name + "_pauldrons");
+            }
+        }
+
+        private static IEnumerator SolesTest()
+        {
+            string[] armour = { null, "Apparel_ArmorCataphract", "Apparel_PowerArmor", "Apparel_ArmorRecon" };
+            Pawn[] pawns = new Pawn[armour.Length];
+            Rand.PushState(20261122);
+            try
+            {
+                for (int k = 0; k < armour.Length; k++)
+                {
+                    pawns[k] = NewPawn(middle + IntVec3.East * (2 * k - armour.Length + 1), null);
+                    pawns[k].apparel.DestroyAll();
+                    ThingDef def = armour[k] != null ? DefDatabase<ThingDef>.GetNamedSilentFail(armour[k]) : null;
+                    if (def != null)
+                    {
+                        pawns[k].apparel.Wear((Apparel)ThingMaker.MakeThing(def, GenStuff.DefaultStuffFor(def)), false);
+                    }
+                    pawns[k].Drawer.renderer.SetAllGraphicsDirty();
+                }
+            }
+            finally
+            {
+                Rand.PopState();
+            }
+            HoldOthersAway(pawns);
+            for (int k = 0; k < pawns.Length; k++)
+            {
+                Hold(pawns[k]);
+            }
+            lookAt = Centre(pawns);
+            lookDistance = 8f;
+            lookHeight = 0.3f;
+            lookPitch = 4f;
+            lookYaw = 0f;
+            yield return Ticks(10, "soles", pawns[1]);
+            float plain = Field<Vector3>(pawns[0], "drawnAt").y;
+            for (int k = 1; k < armour.Length; k++)
+            {
+                ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail(armour[k]);
+                float sole = def != null ? WalkFigures.AutoSole(def) : -1f;
+                float size = WalkFigures.SizeOfForTest(pawns[k]);
+                float drawn = Field<Vector3>(pawns[k], "drawnAt").y - plain;
+                Check(armour[k] + ": stood on its soles", sole > 0f && Mathf.Abs(drawn - sole * size) < 0.004f,
+                    "sole " + sole.ToString("F4") + " x size " + size.ToString("F3") + " = " + (sole * size).ToString("F4") + ", drawn " + drawn.ToString("F4") + " over the plain pawn");
+            }
+            foreach (float yaw in new[] { 0f, 90f })
+            {
+                lookYaw = yaw;
+                yield return Ticks(3, "soles", pawns[1]);
+                yield return Shot("stand_" + Mathf.RoundToInt(yaw));
+            }
+            lookDistance = 2.4f;
+            lookHeight = 0.15f;
+            lookPitch = 2f;
+            for (int k = 0; k < armour.Length; k++)
+            {
+                Look(pawns[k], 70f);
+                yield return Ticks(3, "soles", pawns[k]);
+                yield return Shot("feet_" + k);
+            }
+            // Walking north side by side: the soles on the ground through the stride.
+            for (int k = 0; k < pawns.Length; k++)
+            {
+                Job walk = JobMaker.MakeJob(JobDefOf.Goto, pawns[k].Position + IntVec3.North * 5);
+                walk.playerForced = true;
+                pawns[k].jobs.StartJob(walk, JobCondition.InterruptForced);
+            }
+            lookDistance = 8f;
+            lookHeight = 0.3f;
+            lookYaw = 90f;
+            for (int i = 0; i < 12; i++)
+            {
+                yield return Ticks(8, "soles_walk", pawns[1]);
+                lookAt = Centre(pawns);
+                if (i == 6)
+                {
+                    yield return Shot("walk_side");
+                }
+            }
+            lookDistance = LookDistance;
+            lookHeight = LookHeight;
+            lookPitch = LookPitch;
+            lookYaw = 0f;
+            Note("Look: the armoured soles on the ground, not sunk into it or floating, standing (feet_1..3) and walking (walk_side).");
         }
 
         private static IEnumerator HatsTest()
@@ -5886,6 +7291,205 @@ namespace M3AT
                 }
             }
             Note("Look: the open book on the left palm under the chin, tipped up to the face, the head bowed to it; the right hand on the right page, once a loop lifted over to the left and back. Seated the same over the sit.");
+        }
+
+        // Dubs Bad Hygiene (Dubwise.DubsBadHygiene): a colonist on a toilet, a pit latrine, in a bath, a hot tub and a swimming
+        // pool, through the mod's own jobs, each fixture filled with water by reflection where it would wait on plumbing.
+        // Checks the chibi draws the pawn throughout (WalkFigures.DrawnAs: never IsoRim's figure), and notes how (the chibi's
+        // rules, or plainly) with the posture and job, and any drawing error.
+        private static IEnumerator HygieneTest(string only)
+        {
+            if (!ModsConfig.IsActive("Dubwise.DubsBadHygiene"))
+            {
+                Check("hygiene: Dubs Bad Hygiene active", false, "not active (M3AT_ADD_MODS=Dubwise.DubsBadHygiene)");
+                yield break;
+            }
+            string[][] cases =
+            {
+                new[] { "toilet", "ToiletStuff", "UseToilet" },
+                new[] { "latrine", "PitLatrine", "UseToilet" },
+                new[] { "bath", "BathtubStuff", "takeBath" },
+                new[] { "hottub", "HotTub", "UseHotTub" },
+                new[] { "pool", "DBHSwimmingPool", "DBHGoSwimming" },
+            };
+            foreach (string[] c in cases)
+            {
+                if (only != null && c[0] != only)
+                {
+                    continue;
+                }
+                string name = c[0];
+                ClearPatch();
+                ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail(c[1]);
+                JobDef jobDef = DefDatabase<JobDef>.GetNamedSilentFail(c[2]);
+                if (def == null || jobDef == null)
+                {
+                    Check(name + ": defs", false, "no " + (def == null ? "ThingDef " + c[1] : "JobDef " + c[2]));
+                    continue;
+                }
+                Thing fixture = ThingMaker.MakeThing(def, def.MadeFromStuff ? GenStuff.DefaultStuffFor(def) : null);
+                fixture.SetFaction(Faction.OfPlayer);
+                Spawn(fixture, middle, Rot4.South);
+                FillTub(fixture);
+                // (outside the pool, which is 9 by 5 cells about the middle, so it climbs in)
+                IntVec3 outside = middle + (name == "pool" ? new IntVec3(0, 0, -5) : new IntVec3(-2, 0, -2));
+                Pawn pawn = NewPawn(outside, null);
+                foreach (Need need in pawn.needs.AllNeeds)
+                {
+                    if (need.def.defName == "Bladder" || need.def.defName == "Hygiene")
+                    {
+                        need.CurLevel = 0.05f;
+                    }
+                }
+                if (pawn.needs.joy != null)
+                {
+                    pawn.needs.joy.CurLevel = 0.1f;
+                }
+                int failuresBefore = WalkFigures.DrawFailures;
+                Job job = JobMaker.MakeJob(jobDef, fixture);
+                job.playerForced = true;
+                job.ignoreJoyTimeAssignment = true;
+                pawn.jobs.StartJob(job, JobCondition.InterruptForced);
+                Dictionary<string, int> seen = new Dictionary<string, int>();
+                HashSet<string> postures = new HashSet<string>();
+                int steps = 0;
+                int vaultsIn = 0, vaultsOut = 0;
+                bool wasVault = false;
+                int most = name == "pool" ? 300 : 90;
+                int swum = 0;
+                for (int i = 0; i < most; i++)
+                {
+                    // The pool: after a while swimming, ordered back out to where it came from, so it climbs out too.
+                    if (name == "pool" && pawn.CurJobDef == jobDef && Api.AttachmentOf(pawn).HasValue && ++swum == 60)
+                    {
+                        Job leave = JobMaker.MakeJob(JobDefOf.Goto, outside);
+                        leave.playerForced = true;
+                        pawn.jobs.StartJob(leave, JobCondition.InterruptForced);
+                    }
+                    FillTub(fixture);
+                    yield return Ticks(10, "hygiene_" + name, pawn);
+                    string how;
+                    if (!WalkFigures.DrawnAs.TryGetValue(pawn.thingIDNumber, out how))
+                    {
+                        how = "not offered";
+                    }
+                    Attachment? on = Api.AttachmentOf(pawn);
+                    string key = how + " (" + pawn.GetPosture() + ", " + (pawn.CurJobDef != null ? pawn.CurJobDef.defName : "none")
+                        + (on.HasValue ? ", attached " + on.Value.pose : "")
+                        + (pawn.Spawned ? "" : ", not spawned") + ")";
+                    int n;
+                    seen.TryGetValue(key, out n);
+                    seen[key] = n + 1;
+                    postures.Add(pawn.GetPosture().ToString());
+                    bool vaulting = how == "vault";
+                    if (vaulting && !wasVault)
+                    {
+                        vaultsIn += swum < 60 ? 1 : 0;   // (before or after it was ordered out)
+                        vaultsOut += swum >= 60 ? 1 : 0;
+                    }
+                    wasVault = vaulting;
+                    if (pawn.CurJobDef == jobDef && steps++ % 15 == 5)
+                    {
+                        Look(pawn, 30f);
+                        yield return Shot(name + "_" + steps / 15);
+                    }
+                    if (pawn.CurJobDef != jobDef && i > 10 && WalkFigures.ClimbPhase(pawn) < 0f && (name != "pool" || swum >= 60 && !pawn.pather.Moving))
+                    {
+                        break;
+                    }
+                }
+                bool isorim = false;
+                foreach (string key in seen.Keys)
+                {
+                    isorim |= key.StartsWith("isorim", StringComparison.Ordinal);
+                }
+                Check(name + ": never IsoRim's figure", !isorim, string.Join("; ", seen.Select(kv => kv.Key + " x" + kv.Value)));
+                if (name == "pool")
+                {
+                    Check(name + ": vaulted in over the wall", vaultsIn >= 1, vaultsIn + " vaults in");
+                    Check(name + ": vaulted out over the wall", vaultsOut >= 1, vaultsOut + " vaults out");
+                }
+                Check(name + ": no drawing errors", WalkFigures.DrawFailures == failuresBefore,
+                    (WalkFigures.DrawFailures - failuresBefore) + " errors, last " + (WalkFigures.LastDrawFailure ?? "none"));
+                Note(name + ": the job ran " + steps + " steps of 10 ticks, postures " + string.Join(", ", postures) + ", the pawn at " + pawn.Position
+                    + " (the fixture at " + fixture.Position + ")");
+            }
+            Note("Look: the pawn drawn as the chibi on the toilet and latrine, in the bath and hot tub, and in the pool, never as IsoRim's figure.");
+        }
+
+        // Dubs Bad Hygiene's swimming pool crossed in passing: a colonist ordered from one side of it to the other, straight
+        // across (the pool is passable at no cost), checking it is drawn vaulting the wall on the way in and out
+        // (WalkFigures.DrawnAs "vault", sampled every two ticks), and never IsoRim's figure.
+        private static IEnumerator VaultTest()
+        {
+            if (!ModsConfig.IsActive("Dubwise.DubsBadHygiene"))
+            {
+                Check("vault: Dubs Bad Hygiene active", false, "not active (M3AT_ADD_MODS=dubwise.dubsbadhygiene james.isorimwaylith.dbhmodels)");
+                yield break;
+            }
+            ClearPatch();
+            ThingDef def = DefDatabase<ThingDef>.GetNamed("DBHSwimmingPool");
+            Thing pool = ThingMaker.MakeThing(def, def.MadeFromStuff ? GenStuff.DefaultStuffFor(def) : null);
+            pool.SetFaction(Faction.OfPlayer);
+            Spawn(pool, middle, Rot4.South);
+            FillTub(pool);
+            IntVec3 from = middle + new IntVec3(0, 0, -5), to = middle + new IntVec3(0, 0, 5);
+            Pawn pawn = NewPawn(from, null);
+            // From the side, close and low, so the hop over the wall shows (put back at the end).
+            lookDistance = 4.5f;
+            lookPitch = 12f;
+            Look(pawn, 90f);
+            Job job = JobMaker.MakeJob(JobDefOf.Goto, to);
+            job.playerForced = true;
+            pawn.jobs.StartJob(job, JobCondition.InterruptForced);
+            int vaults = 0, runs = 0;
+            bool was = false, isorim = false;
+            Dictionary<string, int> seen = new Dictionary<string, int>();
+            for (int i = 0; i < 400 && (pawn.Position != to || pawn.pather.Moving); i++)
+            {
+                yield return Ticks(2, "hygiene_vault", pawn);
+                string how;
+                WalkFigures.DrawnAs.TryGetValue(pawn.thingIDNumber, out how);
+                how = how ?? "not offered";
+                int n;
+                seen.TryGetValue(how, out n);
+                seen[how] = n + 1;
+                isorim |= how.StartsWith("isorim", StringComparison.Ordinal);
+                bool vaulting = how == "vault";
+                vaults += vaulting ? 1 : 0;
+                runs += vaulting && !was ? 1 : 0;
+                was = vaulting;
+            }
+            yield return Ticks(30, "hygiene_vault", pawn);
+            lookDistance = LookDistance;
+            lookPitch = LookPitch;
+            Check("vault: over the wall in and out", runs >= 2, runs + " vaults, " + vaults + " samples vaulting; " + string.Join("; ", seen.Select(kv => kv.Key + " x" + kv.Value)));
+            Check("vault: never IsoRim's figure", !isorim, string.Join("; ", seen.Select(kv => kv.Key + " x" + kv.Value)));
+            Note("vault: walked from " + from + " to " + pawn.Position + " across the pool at " + pool.Position + ". Look: a crouch, the hands on the rim, a tucked hop over and a landing, going in and coming out, wading across between.");
+        }
+
+        // A Dubs Bad Hygiene bath or hot tub filled, so the job doesn't wait on plumbing (WaterInTub, by reflection).
+        private static void FillTub(Thing fixture)
+        {
+            FieldInfo water = AccessTools.Field(fixture.GetType(), "WaterInTub");
+            if (water != null && water.FieldType == typeof(float))
+            {
+                FieldInfo usage = AccessTools.Field(fixture.GetType(), "usage");
+                water.SetValue(fixture, Mathf.Max(500f, usage != null && usage.FieldType == typeof(float) ? (float)usage.GetValue(fixture) : 0f));
+            }
+            // A pool's water (Building_FillableThing.fuel, out of its capacity).
+            FieldInfo fuel = AccessTools.Field(fixture.GetType(), "fuel");
+            PropertyInfo capacity = AccessTools.Property(fixture.GetType(), "capacity");
+            if (fuel != null && fuel.FieldType == typeof(float) && capacity != null)
+            {
+                fuel.SetValue(fixture, (float)capacity.GetValue(fixture));
+            }
+            // With no pipe a fixture counts as working (Building_AssignableFixture.Working), so a toilet doesn't need plumbing.
+            FieldInfo pipe = AccessTools.Field(fixture.GetType(), "pipe");
+            if (pipe != null && !pipe.FieldType.IsValueType)
+            {
+                pipe.SetValue(fixture, null);
+            }
         }
 
         // Praying (Ideology's MeditatePray) on the bare floor, sat cross-legged (work_meditate, as meditating), then on a
@@ -8777,6 +10381,39 @@ namespace M3AT
 
     public sealed partial class SkinnedFigure
     {
+        // The sole line of the garment for this apparel (model units below the body's soles), -1 with no garment.
+        internal float SoleReport(ThingDef def)
+        {
+            int g = GarmentOf(def);
+            return g < 0 ? -1f : pieces[g].sole;
+        }
+
+        // Each worn garment, the garments over it (OverOf) and how many of its triangles they hide.
+        internal string HidingReport(GarmentMask mask, Apparel[] worn)
+        {
+            List<string> parts = new List<string>();
+            for (int g = 1; g < pieces.Length && g <= MaxHiding; g++)
+            {
+                if ((mask & GarmentBit(g)) == 0 || worn[g] == null)
+                {
+                    continue;
+                }
+                GarmentMask over = OverOf(g, mask, worn);
+                List<string> overs = new List<string>();
+                for (int h = 1; h < pieces.Length && h <= MaxHiding; h++)
+                {
+                    if ((over & GarmentBit(h)) != 0)
+                    {
+                        overs.Add(pieces[h].name);
+                    }
+                }
+                bool[] hidden = over == 0 ? null : GarmentHidden(g, over);
+                int n = hidden == null ? 0 : hidden.Count(x => x);
+                parts.Add(pieces[g].name + " (" + worn[g].def.defName + ") under [" + string.Join(",", overs) + "] hides " + n + "/" + pieces[g].tris.Length / 3);
+            }
+            return string.Join("; ", parts);
+        }
+
         internal string TextureReport(ThingDef def)
         {
             int g = GarmentOf(def);
@@ -9315,6 +10952,45 @@ namespace M3AT
             return "stand-in " + string.Join("+", names);
         }
 
+        // The garments drawn for apparel on this pawn (a skirt or dress at its art's length, HemLengths.cs), "+" joined,
+        // and the hem's share down the body: "SkirtMidi@0.88".
+        internal static string AutoStandInsOn(Apparel apparel, Pawn pawn)
+        {
+            if (!Ready() || skin == null)
+            {
+                return "no model";
+            }
+            int[] all = skin.StandInsOn(apparel, pawn);
+            List<string> names = new List<string>();
+            for (int i = 0; i < all.Length; i++)
+            {
+                names.Add(skin.PieceName(all[i]));
+            }
+            return string.Join("+", names) + "@" + SkinnedFigure.HemShareOn(apparel, pawn).ToString("0.00");
+        }
+
+        internal static string AutoHidingReport(Pawn pawn)
+        {
+            if (!Ready() || skin == null)
+            {
+                return "no model";
+            }
+            Apparel[] worn = new Apparel[skin.Pieces];
+            GarmentMask mask = WornGarments(pawn, worn);
+            return skin.HidingReport(mask, worn);
+        }
+
+        // The bug report's apparel lines for a pawn: what each worn apparel is drawn as (WornGarments, cache and all).
+        internal static string AutoDrawnReport(Pawn pawn)
+        {
+            return Ready() && skin != null ? ApparelReport(pawn) : "no model";
+        }
+
+        internal static string AutoStandInScores(ThingDef def, string[] names)
+        {
+            return Ready() && skin != null ? skin.StandInScores(def, names) : "no model";
+        }
+
         // Whether a garment's stands_for line names this apparel, which draws it even on the Belt layer.
         internal static bool AutoNamedOutright(ThingDef def)
         {
@@ -9327,6 +11003,11 @@ namespace M3AT
         }
 
         // The garment for this apparel's image: "<file> (<texture name> <id>)", "none" without one.
+        internal static float AutoSole(ThingDef def)
+        {
+            return skin != null ? skin.SoleReport(def) : -1f;
+        }
+
         internal static string AutoGarmentTexture(ThingDef def)
         {
             return skin != null ? skin.TextureReport(def) : "no figure";

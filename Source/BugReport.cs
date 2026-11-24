@@ -108,6 +108,12 @@ namespace M3AT
                             : SettingsMod.Settings != null && SettingsMod.Settings.clothingChoices.ContainsKey(a.def.defName) ? " (player's choice)" : " (stand-in)"));
                     }
                 }
+                // A skirt or dress drawn at the length its art comes to (HemLengths.cs): how far down the body that is.
+                float hem = skin.GarmentOf(a.def) < 0 ? SkinnedFigure.HemShareOn(a, pawn) : float.NaN;
+                if (!float.IsNaN(hem))
+                {
+                    drawn.Add("hem at " + hem.ToString("0.00") + " of the body");
+                }
                 string layers = a.def.apparel?.layers == null ? "" : string.Join("/", a.def.apparel.layers.Select(l => l.defName));
                 parts.Add(a.def.defName + " [" + layers + "] -> " + (drawn.Count > 0 ? string.Join(", ", drawn) : "not drawn"));
             }

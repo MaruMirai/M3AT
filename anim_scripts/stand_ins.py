@@ -59,20 +59,86 @@ NO_STAND_IN = {
     'ArmorHelmetCataphractPrestige', 'ArmorHelmetReconPrestige', 'ArmorMarineHelmetPrestige',
     'ArmorHelmetMechCommander', 'ArmorHelmetMechlordHelmet', 'RobeRoyal', 'ShirtRuffle', 'Shadecone', 'Tailcap',
     'TribalHeaddress', 'PsychicFoilHelmet', 'EltexSkullcap', 'Headwrap', 'WarVeil', 'HatTop', 'HatLadies',
-    'CE_SimpleNightVision', 'CE_AdvancedNightVision', 'Scarf'}
+    'CE_SimpleNightVision', 'CE_AdvancedNightVision', 'Scarf', 'Boots', 'Sandals', 'Socks', 'Goggles', 'Gorget',
+    'Glasses', 'Sunglasses', 'Hairband', 'Ribbon', 'MaidHeaddress', 'Stockings', 'Tights',
+    'Leotard', 'ShoulderBag', 'SkirtMini', 'SkirtMedium', 'SkirtMidi', 'DressMini', 'DressShort', 'DressMidi',
+    'SleevelessDressMini', 'SleevelessDressShort', 'SleevelessDress', 'SleevelessDressMidi', 'SleevelessDressLong'}
 # Other words naming the same thing as a NO_STAND_IN garment's name word, and phrases holding it that don't (StandIns.cs).
 NAME_ALIKE = {'frame': ('exoskelet', 'exosuit'),   # CE's exoframe is any exoskeleton (StandIns.cs)
               'radio': ('vox', 'comms', 'transceiver', 'communicat'),   # CE's radio pack is any pack with a radio
               'scarf': ('neckerchief', 'kerchief', 'muffler', 'shemagh', 'keffiyeh', 'snood'),
+              'goggles': ('goggle',),   # a mod's goggle (StandIns.cs)
+              'glasses': ('glass', 'spectacle', 'monocle'),   # a mod's glasses, single glass or spectacles
+              'sunglasses': ('shades',),
               'short': ('hotpant', 'hot pant'),   # hotpants are the short shorts, not the shorts
               'crop': ('halter', 'tube top'),
-              'tanktop': ('tank top', 'singlet', 'camisole')}   # a tank top is the tank top's, not the crop top's
-NAME_NOT = {'scarf': ('headscarf', 'head scarf'), 'pants': ('hotpant', 'underpant')}
+              'tanktop': ('tank top', 'singlet', 'camisole'),   # a tank top is the tank top's, not the crop top's
+              # footwear: the shoes are any not named boots, sandals or socks (StandIns.cs)
+              'boots': ('boot',), 'sandals': ('sandal', 'flip flop', 'flipflop'),
+              'socks': ('sock', 'feetwrap', 'footwrap', 'feet wrap', 'foot wrap'),
+              'shoes': ('shoe', 'heel', 'sneaker', 'loafer', 'slipper', 'clog', 'moccasin')}   # a tank top is the tank top's, not the crop top's
+NAME_NOT = {'scarf': ('headscarf', 'head scarf'), 'pants': ('hotpant', 'underpant'),
+            'glasses': ('sunglass', 'hourglass', 'glass armo', 'glassworks')}
 # A NO_STAND_IN garment named by the apparel is the thing itself: coverage at least NAMED_COVER, NAMED_BONUS ahead.
 NAMED_COVER = 0.5
 NAMED_BONUS = 1.0
+# Words in an apparel's name or label saying it is a garment's kind, though not in the garment's own name words (StandIns.cs's
+# Hints): the garment may stand in for it even if NO_STAND_IN or a mask, its coverage at least HINT_COVER and HINT_BONUS
+# ahead (less than a garment named outright, so Kiiro's airwire headset keeps the airwire headset's). Mostly the race mods'
+# clothes (Ratkin, Kiiro, Milira, Wolfein): their dresses were drawn as a shirt and trousers, their headsets as the eltex
+# helmet, their bows and hairbands as a tuque.
+HINTS = {
+    'IntegratorHeadset': ('headset', 'earpiece', 'ear piece'),
+    'Vacsuit': ('space suit', 'spacesuit', 'airtight suit', 'pressure suit'),
+    'VacsuitHelmet': ('space suit helmet', 'spacesuit helmet', 'airtight helmet'),
+    'HatLadies': ('sun hat', 'sunhat', 'straw hat', 'summer hat', 'sun bonnet'),
+    'BowlerHat': ('melonik', 'pith', 'explorer hat', 'safari', 'school cap'),
+    'Shadecone': ('rain hat', 'conical hat', 'bamboo hat'),
+    'LabCoat': ('lab gown', 'labgown', 'medical gown', 'research gown', 'white coat'),
+    'Parka': ('winter coat', 'wintercoat', 'puffer', 'down jacket'),
+    'SimpleHelmet': ('miner hat', 'minerhat', 'hard hat', 'hardhat', 'safety helmet', 'military helmet'),
+    'Coronet': ('tiara', 'diadem'),
+    'Hairband': ('hairband', 'hair band', 'headband', 'head band', 'headbond', 'alice band'),
+    'Ribbon': ('ribbon', 'bowknot', 'hairtie', 'hair tie', 'hair bow', 'corsage', 'flower headwear', 'hairclip', 'hair clip',
+               'scrunchie'),
+    'MaidHeaddress': ('maid cap', 'maid head', 'maidcap', 'maid hat'),
+    'Broadwrap': ('nun ', 'veil', 'wimple', 'sister hat'),   # a nun's veil: the broadwrap, which hangs clear of the back
+    'Stockings': ('stocking', 'thigh high', 'thighhigh', 'knee high', 'suspender'),
+    'Tights': ('pantyhose', 'pantynose', 'tights', 'leggings'),
+    'Leotard': ('leotard', 'swimsuit', 'swim suit', 'bunny girl'),
+    'ShoulderBag': ('messenger', 'satchel', 'shoulder bag'),
+    'Skirt': ('skirt',),
+    'SkirtMini': ('mini skirt', 'miniskirt', 'micro skirt', 'microskirt'),
+    'SkirtMedium': ('knee skirt', 'knee length skirt', 'knee-length skirt', 'pencil skirt'),
+    'SkirtMidi': ('midi skirt', 'midiskirt', 'calf skirt'),
+    'SkirtLong': ('long skirt', 'longskirt', 'longuette', 'maxi skirt'),
+    'DressMini': ('mini dress', 'minidress'),
+    'DressShort': ('short dress', 'cocktail dress'),
+    'Dress': ('dress', 'onepiece', 'one piece', 'frock', 'maid outfit', 'maid uniform'),
+    'SleevelessDress': ('sleeveless dress', 'sundress', 'sun dress', 'slip dress', 'strapless dress', 'camisole dress', 'halter dress'),
+    'DressMidi': ('midi dress', 'mididress', 'tea dress'),
+    'DressLong': ('long dress', 'gown', 'nun outfit', 'nun dress', 'sister dress', 'evening dress', 'wedding dress',
+                  'maxi dress'),
+}
+# Phrases holding a hint that don't say it: a headdress is no dress, suspender trousers no stockings.
+HINT_NOT = {'Dress': ('headdress', 'dressing', 'long dress', 'nun dress', 'sister dress', 'evening dress', 'wedding dress',
+                     'maxi dress', 'mini dress', 'minidress', 'short dress', 'cocktail dress', 'midi dress', 'mididress',
+                     'tea dress', 'sleeveless dress', 'sundress', 'sun dress', 'slip dress', 'strapless dress', 'camisole dress', 'halter dress'),
+            'DressLong': ('lab gown', 'labgown', 'medical gown', 'research gown', 'graduation gown', 'sleep gown'),
+            'Hairband': ('bandage',),
+            'Skirt': ('long skirt', 'longskirt', 'longuette', 'maxi skirt', 'knee skirt', 'knee length skirt', 'mini skirt',
+                      'miniskirt', 'micro skirt', 'microskirt',
+                      'knee-length skirt', 'pencil skirt', 'midi skirt', 'midiskirt', 'calf skirt'),
+            'Stockings': ('suspender trouser', 'suspender pant', 'suspender skirt', 'suspender short'),
+            'Broadwrap': ('war veil', 'warveil')}
+HINT_COVER = 0.5
+HINT_COVER_HEAD = 0.8   # for headgear, which takes one garment: a nun's hat the broadwrap, which covers far more than a cap
+HINT_BONUS = 0.6
+# Headgear named a helmet or helm is matched as one even if not in an armour category (Wolfein's power armour helmets and
+# Kiiro's military helmets were taken for hats and drawn as a tuque), unless its label says it is a hat (HAT_NOUNS).
+HELMET_WORDS = re.compile(r'\bhelm(et)?s?\b')
 GENERIC = {'BasicShirt', 'Pants', 'Jacket', 'Duster', 'FlakVest', 'SimpleHelmet', 'AdvancedHelmet', 'Tuque', 'CollarShirt',
-           'PowerArmor', 'Parka', 'GasMask', 'ClothMask', 'CE_Backpack'}
+           'PowerArmor', 'Parka', 'GasMask', 'ClothMask', 'CE_Backpack', 'Shoes'}
 # Garments over the face, standing in only for apparel named as one (MASK_WORDS): mods give plain hats FullHead.
 MASKS = {'GasMask', 'ClothMask', 'WarMask', 'VisageMask', 'WarVeil', 'CultistMask', 'CeremonialCultistMask'}
 MASK_WORDS = ('mask', 'respirator', 'balaclava', 'veil')
@@ -279,8 +345,13 @@ def text_of(d):
     return words_of(d['name']) + ' ' + d['label'].lower()
 
 
+# Named a bag of some kind (Kiiro's back bag and messenger bag, on its own Kiiro_Bag layer and Middle): a pack, not a shirt.
+BAG_WORDS = re.compile(r'\bbags?\b|satchel|rucksack|knapsack|oxygen tank')
+
+
 def is_pack(text, layers):
-    return (all_pack_layers(layers) or 'backpack' in text) and not any(w in text for w in NOT_PACK_WORDS)
+    return (all_pack_layers(layers) or 'backpack' in text or BAG_WORDS.search(text) is not None) \
+        and not any(w in text for w in NOT_PACK_WORDS)
 
 
 def armour_pack(d):
@@ -337,6 +408,8 @@ def never(d):
     it; Biotech's heavy shield unit, Middle over the torso, is a shield); power armour's packs (armour_pack). A pack or
     webbing on the belt (as_what_it_is) takes a pack or webbing garment."""
     text = text_of(d)
+    if re.search(r'\b(rings?|psyrings?|bracelets?|anklets?|bangles?)\b', text):   # jewellery is no glove or boot
+        return True
     if is_webbing(text):
         return False
     if is_pack(text, d['layers']):
@@ -363,9 +436,22 @@ def layer_share(a, g):
     return best
 
 
+def hinted(a, g):
+    """Whether a's name or label has one of the garment's HINTS."""
+    words = HINTS.get(g['garment'])
+    if not words:
+        return False
+    text = a['text']
+    for x in HINT_NOT.get(g['garment'], ()):
+        text = text.replace(x, ' ')
+    return any(w in text for w in words)
+
+
 def factors(a, g):
     """What a garment's kind makes of its score for a: (times, plus)."""
     times, plus = 1.0, 0.0
+    if hinted(a, g):
+        plus += HINT_BONUS
     if a['armour'] != g['armour']:
         times *= NOT_ARMOUR
     if g['vacsuit'] and not a['vacsuit']:
@@ -421,8 +507,9 @@ def usable(a, g):
     over the skull (not a mask, which FullHead only says is, nor one the apparel is named as) only for apparel over it: a
     scarf over the mouth or neck scored just enough for the power armour helmet. An open-fronted garment only for apparel
     drawn open down the front (OPEN_FRONTS)."""
-    return (not g['named_only'] or name_share(a, g) == 1) and (g['garment'] not in MASKS or a['mask']) \
-        and ('UpperHead' not in g['groups'] or 'UpperHead' in a['groups'] or g['garment'] in MASKS or g['named_only']) \
+    hint = hinted(a, g)
+    return (not g['named_only'] or name_share(a, g) == 1 or hint) and (g['garment'] not in MASKS or a['mask'] or hint) \
+        and ('UpperHead' not in g['groups'] or 'UpperHead' in a['groups'] or g['garment'] in MASKS or g['named_only'] or hint) \
         and (g['garment'] not in OPEN_FRONTS or open_front_share(a['def_']) >= OPEN_FRONT_LEAST)
 
 
@@ -434,7 +521,10 @@ HAT_NOUNS = {'hood', 'cap', 'hat', 'beret', 'bandana', 'headwrap', 'turban', 'bo
 def as_hat(a):
     """Unarmoured headgear not named as a mask, or headgear named a hat (HAT_NOUNS), is matched as a hat, whatever of
     the face its groups say."""
-    if (not a['armour'] or head_nouns(a['def_']['label']) & HAT_NOUNS) and not a['mask'] and 'UpperHead' in a['groups']:
+    hat_named = head_nouns(a['def_']['label']) & HAT_NOUNS
+    if HELMET_WORDS.search(a['text']) and not hat_named:
+        return a
+    if (not a['armour'] or hat_named) and not a['mask'] and 'UpperHead' in a['groups']:
         a['groups'] = a['groups'] - {'Eyes', 'Mouth'}
     return a
 
@@ -450,6 +540,11 @@ def score(a, groups, g):
     named = g['named_only'] and name_share(a, g) == 1
     if named:
         c = max(c, NAMED_COVER)
+    if hinted(a, g):
+        head = a['layers'] and all(x in HEAD for x in a['layers'])
+        c = max(c, HINT_COVER_HEAD if head else HINT_COVER)
+        if head and lf > 0:
+            lf = 1   # another head layer is no matter for headgear named as the garment (CE puts the broadwrap on OnHead)
     if lf == 0 or c == 0:
         return 0
     times, plus = factors(a, g)
@@ -462,11 +557,14 @@ def pair_score(a, g, h):
     if lf == 0 or not (a['groups'] & g['groups']) or not (a['groups'] & h['groups']):
         return 0
     (tg, pg), (th, ph) = factors(a, g), factors(a, h)
-    return coverage(a['groups'], g['groups'] | h['groups']) * lf * (tg + th) / 2 + (pg + ph) / 2 - PAIR_COST
+    # A hinted garment's bonus counts whole, not halved with the other's: a shirt with a skirt (Wolfein's (Skirt) uniforms)
+    # is the collared shirt and the skirt, not the skirt alone.
+    hint = HINT_BONUS / 2 * (hinted(a, g) + hinted(a, h))
+    return coverage(a['groups'], g['groups'] | h['groups']) * lf * (tg + th) / 2 + (pg + ph) / 2 + hint - PAIR_COST
 
 
 def main_shared(a, b):
-    return bool(a & b & {'Torso', 'Legs', 'Arms', 'UpperHead'})
+    return bool(a & b & {'Torso', 'Legs', 'Arms', 'UpperHead', PACK_GROUP})   # (never two packs)
 
 
 def stand_ins(a, garments, skip=None):
@@ -507,7 +605,7 @@ def main():
             own[x] = name
         for x in lines.get('stands_for', []):
             named.setdefault(x, []).append(name)
-        if set(lines) & {'held', 'with_legwear', 'baby_romper'}:
+        if set(lines) & {'held', 'baby_romper'}:
             continue
         d = next((defs[x] for x in lines.get('defs', []) if x in defs), None)
         if d:

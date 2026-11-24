@@ -16,7 +16,7 @@ It's an **early version**. A lot already works, but you'll find rough edges, and
 **Source code**: <https://github.com/MaruMirai/M3AT>
 
 **Where things go**
-- Something broken or looking wrong? Make a post in #issues-and-bugs
+- Something broken or looking wrong? Report it in #submit-bug-report
 - Questions, or "does it work with this other mod?" Ask in #help
 - Ideas, or a piece of clothing you'd love to see in 3D? Post in #suggestions
 - Chat and show off your colony in #general

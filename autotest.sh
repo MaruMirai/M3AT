@@ -8,7 +8,7 @@
 #       (--seed: IsoRim's -isorimseed (Api 72), so the quick test's world, colonists and every tick's random numbers are the
 #        same each run; 1 by default, none for a new world each time)
 #   ./autotest.sh shots --load <save> [--from tick] [--ticks n] [--every n] [--out folder]   (stills of a save run on, from its view)
-#   ./autotest.sh perf --load <save> [--seconds s] [--rounds n] [--counts 0,5,10,20f] [--switch frames] [--out folder]
+#   ./autotest.sh perf --load <save> [--seconds s] [--rounds n] [--counts 0,5,10,20f,20s,20st] [--distance cells] [--focus k] [--capped] [--paused] [--switch frames] [--out folder]
 #       (frame times with the chibi, IsoRim's figures and none; or with the chibi on that many colonists, f: fewer poses on,
 #        n: a draw per face layer, as before FaceLayers.DrawStacked)
 # Pictures, the probe log and report.md go to <out>/<date-time>/ (default: the game's config folder, M3AT/autotest), linked from autotest-latest.
@@ -37,6 +37,11 @@ while [ $# -gt 0 ]; do
         --rounds) args+=("-m3atPerfRounds=$2"); shift ;;
         --counts) args+=("-m3atPerfCounts=$2"); shift ;;
         --switch) args+=("-m3atPerfSwitch=$2"); shift ;;
+        --distance) args+=("-m3atPerfDistance=$2"); shift ;;
+        --focus) args+=("-m3atPerfFocus=$2"); shift ;;
+        --capped) args+=("-m3atPerfCapped=1") ;;
+        --paused) args+=("-m3atPerfPaused=1") ;;
+        --edgeshapes) args+=("-m3atEdgeShapes=$2"); shift ;;
         --stack) args+=("-m3atStackSize=$2"); shift ;;
     esac
     shift
@@ -71,7 +76,21 @@ if [ -f "$mods_kept" ]; then
 fi
 cp "$mods_config" "$mods_kept"
 for m in "${skip_mods[@]}"; do sed -i "/<li>$m<\/li>/d" "$mods_config"; done
-trap 'cp "$mods_kept" "$mods_config" && rm -f "$mods_kept"; dotnet build Source/M3AT.csproj -v q -nologo 9>&- | grep -E " error |Build succeeded" | sort -u' EXIT
+# M3AT_ADD_MODS: mods turned on for this run only, each a packageId (lower case) or packageId=folder (a mod not in the
+# Workshop or Mods/, e.g. a dependency fetched from GitHub, linked into Mods/ for the run), in load order, put just
+# before this mod; the links are taken away by the trap.
+mods_dir="$HOME/.local/share/Steam/steamapps/common/RimWorld/Mods"
+added_links=()
+read -r -a add_mods <<< "${M3AT_ADD_MODS:-}"
+for m in "${add_mods[@]}"; do
+    id="${m%%=*}"
+    if [[ "$m" == *=* ]]; then
+        link="$mods_dir/m3at-test-$(basename "${m#*=}")"
+        ln -sfn "$(realpath "${m#*=}")" "$link" && added_links+=("$link")
+    fi
+    grep -q "<li>$id</li>" "$mods_config" || sed -i "0,/<li>marumirai.m3at<\/li>/s//<li>$id<\/li>\n    <li>marumirai.m3at<\/li>/" "$mods_config"
+done
+trap 'cp "$mods_kept" "$mods_config" && rm -f "$mods_kept"; for l in "${added_links[@]}"; do rm -f "$l"; done; dotnet build Source/M3AT.csproj -v q -nologo 9>&- | grep -E " error |Build succeeded" | sort -u' EXIT
 log="$HOME/.config/unity3d/Ludeon Studios/RimWorld by Ludeon Studios/Logs/Player.log"
 start=(-quicktest); [ -n "$load" ] && start=("-m3atTestLoad=$load")
 # Through Steam (steam -applaunch, its own launch options added), when it is running: since the update of 2026-11-19 the

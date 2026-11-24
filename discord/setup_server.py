@@ -9,7 +9,10 @@ server's id from `discordServerId` (both gitignored), or from the environment
 variables DISCORD_TOKEN and DISCORD_SERVER_ID.
 
 It can be run again safely: a role or channel that already exists by name is left
-as it is, and messages are only posted into channels made in that run. Run it
+as it is, and messages are only posted into channels made in that run. With
+--update it also edits, in place, what it posted before in channels that were
+already there: a forum's guidelines and its pinned post (the bot can only edit its
+own messages), so changed texts need no new posts. Run it
 again after turning Community on (Server Settings > Enable Community) and it turns
 an ANNOUNCEMENT channel made as a text channel into one (only Community servers
 have them; the layout has none at the moment).
@@ -37,6 +40,7 @@ SEND = 1 << 11
 ADD_REACTIONS = 1 << 6
 SEND_IN_THREADS = 1 << 38
 CREATE_PUBLIC_THREADS = 1 << 35
+CREATE_PRIVATE_THREADS = 1 << 36
 KICK = 1 << 1
 BAN = 1 << 2
 MANAGE_MESSAGES = 1 << 13
@@ -57,7 +61,9 @@ ROLES = [
 ]
 
 # Who may do what in a channel. `read_only`: everyone reads, only moderators
-# write. `private`: only the named roles see it at all.
+# write. `private`: only the named roles see it at all. `private_threads`:
+# everyone sees it but can only start private threads in it (seen by those added
+# to them and those who may manage threads, the moderators).
 LAYOUT = [
     {"category": "INFO", "channels": [
         {"name": "welcome", "type": TEXT, "access": "read_only",
@@ -75,6 +81,9 @@ LAYOUT = [
                   ("Performance", "🐢"), ("Fixed", "✅"), ("Can't reproduce", "❓")],
          "moderated_tags": ["Fixed", "Can't reproduce"],
          "pinned_post": ("How to report a bug", "bug_howto.md")},
+        {"name": "submit-bug-report", "type": TEXT, "access": "private_threads",
+         "topic": "Report a bug: start a private thread here, seen only by you and Maru.",
+         "messages": ["bug_private.md"]},
         {"name": "help", "type": TEXT, "access": "open",
          "topic": "Questions about installing or using M3AT, and whether it works with other mods."},
     ]},
@@ -184,6 +193,12 @@ def overwrites(access, guild_id, role_ids, roles):
              "deny": str(SEND | CREATE_PUBLIC_THREADS | SEND_IN_THREADS)},
             {"id": mod, "type": 0, "allow": str(SEND | SEND_IN_THREADS), "deny": "0"},
         ]
+    if access == "private_threads":
+        return [
+            {"id": everyone, "type": 0, "allow": str(CREATE_PRIVATE_THREADS | SEND_IN_THREADS),
+             "deny": str(SEND | CREATE_PUBLIC_THREADS)},
+            {"id": mod, "type": 0, "allow": str(SEND | SEND_IN_THREADS), "deny": "0"},
+        ]
     if access == "private":
         result = [{"id": everyone, "type": 0, "allow": "0", "deny": str(VIEW)}]
         for name in roles:
@@ -195,6 +210,7 @@ def overwrites(access, guild_id, role_ids, roles):
 def main():
     args = sys.argv[1:]
     dry = "--dry-run" in args
+    update = "--update" in args
     workshop_id = None
     if "--workshop-id" in args:
         workshop_id = args[args.index("--workshop-id") + 1]
@@ -330,9 +346,58 @@ def main():
                           {"max_age": 0, "max_uses": 0, "unique": False})
         print(f"\nInvite link: https://discord.gg/{invite.get('code', '?')}")
 
+    if update:
+        update_posts(api, guild_id, by_name, made_now, linked, workshop_id)
+
     if not community:
         print("\nNext: Server Settings > Enable Community. Pick #welcome for the rules "
               "and #admin for community updates.")
+
+
+def update_posts(api, guild_id, by_name, made_now, linked, workshop_id):
+    """Edits the guidelines and pinned post of forums that were already there to
+    the texts as they are now."""
+    made_names = {s["name"] for s, m, k in made_now}
+    for group in LAYOUT:
+        for spec in group["channels"]:
+            have = by_name.get((spec["name"], False))
+            if not have or spec["name"] in made_names or have["type"] != FORUM:
+                continue
+            if "guidelines" in spec:
+                text = linked(message_text(spec["guidelines"], workshop_id))
+                if (have.get("topic") or "") != text:
+                    api.call("PATCH", f"/channels/{have['id']}", {"topic": text})
+                    print(f"  #{spec['name']}: guidelines updated")
+            if "pinned_post" not in spec:
+                continue
+            title, file_name = spec["pinned_post"]
+            thread = find_thread(api, guild_id, have["id"], title)
+            if not thread:
+                print(f"  #{spec['name']}: no post \"{title}\" found to update")
+                continue
+            # A forum post's first message has the thread's own id.
+            text = linked(message_text(file_name, workshop_id))
+            first = api.call("GET", f"/channels/{thread['id']}/messages/{thread['id']}", writes=False)
+            if first["content"] == text:
+                print(f"  #{spec['name']}: \"{title}\" already up to date")
+                continue
+            if thread.get("thread_metadata", {}).get("archived"):
+                api.call("PATCH", f"/channels/{thread['id']}", {"archived": False})
+            api.call("PATCH", f"/channels/{thread['id']}/messages/{thread['id']}",
+                     {"content": text, "allowed_mentions": {"parse": []}})
+            print(f"  #{spec['name']}: \"{title}\" edited in place")
+
+
+def find_thread(api, guild_id, forum_id, title):
+    active = api.call("GET", f"/guilds/{guild_id}/threads/active", writes=False)
+    for t in active.get("threads", []):
+        if t.get("parent_id") == forum_id and t["name"] == title:
+            return t
+    archived = api.call("GET", f"/channels/{forum_id}/threads/archived/public", writes=False)
+    for t in archived.get("threads", []):
+        if t["name"] == title:
+            return t
+    return None
 
 
 def pin(api, channel_id, message_id):

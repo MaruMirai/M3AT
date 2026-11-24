@@ -25,6 +25,17 @@ namespace M3AT
         Never
     }
 
+    // How the chibi's outline is drawn (SkinnedFigure.Mode): a shell round the figure shown only outside its silhouette
+    // (stencil bit 64), the same shell over the body too as IsoRim draws its figures', or found on screen from each part's
+    // edge (ScreenOutlines.cs), which also goes round open meshes and thin parts and round a held weapon over the body.
+    // Kept in this order, as the menu lists them.
+    public enum OutlineMode
+    {
+        Silhouette,
+        Lines,
+        ScreenSpace
+    }
+
     public enum BeardMode
     {
         Flat,
@@ -43,6 +54,17 @@ namespace M3AT
         Nothing
     }
 
+    // What a colonist's armour helmet does while it isn't drafted (WalkFigures.HelmetStowOf, HelmetStow.cs): worn as
+    // ever; taken off (the hat's dress_head clip backwards) and carried on the back, smaller, then put on again when
+    // drafted; simply not drawn; or never drawn, drafted or not. Kept in this order, as the menu lists them.
+    public enum HelmetStow
+    {
+        Worn,
+        OnBack,
+        Hidden,
+        AlwaysHidden
+    }
+
     // The player's choices, saved with the game's mod settings (Options > Mod settings > M3AT).
     public class Settings : ModSettings
     {
@@ -50,6 +72,20 @@ namespace M3AT
         public const float DefaultHeightSpread = 0.02f, DefaultBodySpread = 0.3f;   // the variety sliders' defaults
         public const float DefaultHairDetail = 0.3f;
         public const float DefaultGazeStrength = 1f;   // how far the eyes look about, of Facial Animation's own   // the share of its triangles a hairstyle keeps
+        // Cells: the screen-space outline's widths, the pawn's about as wide as the shell outline's (SkinnedFigure.OutlineWidth),
+        // a held weapon's half that, as a full line round a thin barrel read as heavy.
+        public const float DefaultPawnOutlineWidth = 0.03f, DefaultWeaponOutlineWidth = 0.015f;
+        // Cells a part of a pawn must stand in front of the rest of it for the screen-space self-outline: an arm across the
+        // chest is about 0.1 to 0.2 in front, a curve of the body seen side on gains far less over a line's width.
+        public const float DefaultSelfOutlineStep = 0.08f;
+        // The screen-space outline's edge pass (MarusEdge.frag.glsl's _EdgeShape and _EdgeTune.x): the widest line in pixels
+        // at 1080 rows, the quick look's points a ring and its rings, the full search's most rings. The defaults are the old
+        // high detail option's off, 6.2.6 at 8 pixels (a pawn filling the screen 2.7 ms a frame over the silhouette);
+        // DetailedOutline* its on, 8.2.10 at 16 (6.1 ms; at the usual distance both about 0.5 ms).
+        public const float DefaultOutlineReach = 8f;
+        public const int DefaultOutlineProbeDirs = 6, DefaultOutlineProbeRings = 2, DefaultOutlineRings = 6;
+        public const float DetailedOutlineReach = 16f;
+        public const int DetailedOutlineProbeDirs = 8, DetailedOutlineProbeRings = 2, DetailedOutlineRings = 10;
         // How tall a grown pawn is drawn, cells, before gender and height variety; -1 (the default, not saved) the export's
         // standard (WalkFigures.StandardHeight). Absolute, so a height chosen stays when the standard changes
         // (WalkFigures.PawnSize, in SizeOf).
@@ -61,6 +97,7 @@ namespace M3AT
         public float heightSpread = DefaultHeightSpread;   // the standard deviation of pawns' own heights about their gender's, of the standard size (WalkFigures.HeightSize)
         public bool agingLooks = true;   // old pawns drawn wrinkled, stooped and a little shorter, with cataracts clouding the eye (Aging.cs, WalkFigures.AgingLooks)
         public bool greyingHair = true;   // hair drawn greying with age, a dye or other new colour starting it again (GreyingHair.cs, WalkFigures.GreyingHair)
+        public bool sharpFaceArt = true;   // face art read a sharper mip and its edges re-sharpened when magnified (MarusFace.frag.glsl's FaceArt)
         public bool raceMouthInk = true;   // soft mouths (races', Experimentals') redrawn with the retexture's hard lines and races' sized (FaceRestyle.cs)
         public bool raceModels = true;  // the popular races' own ears and tails, modelled for them, in place of their built parts (RaceTails.cs)
         public bool raceParts = true;   // a race's ears, tails, horns and wings built in 3D from their sprites on the chibi (AddonParts.cs)
@@ -111,7 +148,9 @@ namespace M3AT
         public bool retexturedWeaponModels = true;   // the game's own weapons keep IsoRim's model though another mod redraws their art (WalkFigures.RetexturedWeaponModels)
         public bool vatClothes = false;    // a pawn in a growth vat or biosculpter pod drawn in its clothes (WalkFigures.VatClothes); off: without them
         public bool bedBlankets = false;   // IsoRim's blanket over the body in a bed that shows only the head (WalkFigures.BedBlankets); off: lying on top
+        public HelmetStow helmetStow = HelmetStow.Worn;   // a colonist's helmet while undrafted (WalkFigures.HelmetStowOf)
         public SleepWear sleepWear = SleepWear.NoEquipment;   // what a pawn in bed is drawn wearing (WalkFigures.SleepWearOf)
+        public bool spriteClothes = true;   // a garment standing in for another mod's apparel is painted with that apparel's own sprites (SpriteClothes.cs, WalkFigures.SpriteClothes)
         public bool groundGarments = false;   // apparel lying on the map is drawn as the chibi's own garment for it (WalkFigures.GroundGarments); off: IsoRim's look
         public bool injuryAnims = true;   // pawns limp on a bad leg and hold where they are hurt (WalkFigures.InjuryAnims); a missing leg hops regardless
         public bool prosthetics = true;   // a replaced limb is drawn as its prosthetic (WalkFigures.Prosthetics)
@@ -121,7 +160,15 @@ namespace M3AT
         public bool archotechProsthetics = true;   // and an archotech one too; off: as flesh (WalkFigures.ArchotechShows)
         public bool visibleWounds = true;   // injuries, blood, bandages and scars are drawn on the pawn (WalkFigures.VisibleWounds)
         public bool outlines = true;   // the chibi is drawn with its dark outline (SkinnedFigure.Outlines)
-        public bool silhouetteOutlines = true;   // only round the figure, never over its own body (SkinnedFigure.Silhouette); off: as IsoRim draws its figures' outlines
+        public OutlineMode outlineMode = OutlineMode.Silhouette;   // how the outline is drawn (SkinnedFigure.Mode); saved before as silhouetteOutlines, off being Lines
+        public float pawnOutlineWidth = DefaultPawnOutlineWidth;   // cells: the screen-space outline's width round a pawn (ScreenOutlines.cs)
+        public float weaponOutlineWidth = DefaultWeaponOutlineWidth;   // cells: and round a weapon it holds, and between the two
+        public float outlineReach = DefaultOutlineReach;   // pixels at 1080 rows: the widest a screen-space line is drawn close up (ScreenOutlines.cs)
+        public int outlineProbeDirs = DefaultOutlineProbeDirs;   // the edge pass's quick look: points on each ring
+        public int outlineProbeRings = DefaultOutlineProbeRings;   // and its rings
+        public int outlineRings = DefaultOutlineRings;   // the full search's most rings, finer steps across a wide line
+        public bool screenSelfOutlines = false;   // the screen-space outline also over the pawn's own body, where a part is well in front of the rest
+        public float selfOutlineStep = DefaultSelfOutlineStep;   // cells: how far in front a part must be for that line (ScreenOutlines.cs)
         public bool firstPersonEye = true;   // IsoRim's first person looks out from the chibi's eyes (WalkFigures.FirstPersonEye); off: IsoRim's eye height option
         public bool clothesOcclusion = true;    // IsoRim's ambient occlusion and screen-space shadows on clothes and hair too, never the skin (SkinnedFigure.ClothesOcclusion)
         public bool fewerPoses = false;   // with many pawns on screen, each one's limbs move every second or third frame (SkinnedFigure.FewerPoses)
@@ -157,6 +204,15 @@ namespace M3AT
         public float slabScale = DefaultSlabScale;
         public const float DefaultSlabScale = 0.7f;
 
+        // The edge pass's numbers set to the cheap defaults or the detailed ones (the options' two buttons, an old save).
+        public void SetDetailedOutlines(bool detailed)
+        {
+            outlineReach = detailed ? DetailedOutlineReach : DefaultOutlineReach;
+            outlineProbeDirs = detailed ? DetailedOutlineProbeDirs : DefaultOutlineProbeDirs;
+            outlineProbeRings = detailed ? DetailedOutlineProbeRings : DefaultOutlineProbeRings;
+            outlineRings = detailed ? DetailedOutlineRings : DefaultOutlineRings;
+        }
+
         public override void ExposeData()
         {
             base.ExposeData();
@@ -181,6 +237,7 @@ namespace M3AT
             Scribe_Values.Look(ref raceParts, "raceParts", true);
             Scribe_Values.Look(ref raceModels, "raceModels", true);
             Scribe_Values.Look(ref raceMouthInk, "raceMouthInk", true);
+            Scribe_Values.Look(ref sharpFaceArt, "sharpFaceArt", true);
             Scribe_Values.Look(ref variedBodies, "variedBodies", true);
             Scribe_Values.Look(ref bodySpread, "bodySpread", DefaultBodySpread);
             Scribe_Values.Look(ref bodyShapeStrength, "bodyShapeStrength", 1f);
@@ -203,9 +260,11 @@ namespace M3AT
             Scribe_Values.Look(ref armourDrawScale, "armourDrawScale", true);
             Scribe_Values.Look(ref retexturedWeaponModels, "retexturedWeaponModels", true);
             Scribe_Values.Look(ref autoGrips, "autoGrips", true);
+            Scribe_Values.Look(ref spriteClothes, "spriteClothes", true);
             Scribe_Values.Look(ref groundGarments, "groundGarments", false);
             Scribe_Values.Look(ref bedBlankets, "bedBlankets", false);
             Scribe_Values.Look(ref sleepWear, "bedClothes", SleepWear.NoEquipment);
+            Scribe_Values.Look(ref helmetStow, "helmetStow", HelmetStow.Worn);
             if (Scribe.mode == LoadSaveMode.LoadingVars)
             {
                 // The old one selector (no longer written), "sleepWear": Blankets, the old default, takes the new one (the blanket and NoEquipment); any
@@ -236,7 +295,37 @@ namespace M3AT
             Scribe_Values.Look(ref gazeStrength, "gazeStrength", DefaultGazeStrength);
             Scribe_Values.Look(ref talkingMouths, "talkingMouths", true);
             Scribe_Values.Look(ref outlines, "outlines", true);
-            Scribe_Values.Look(ref silhouetteOutlines, "silhouetteOutlines", true);
+            Scribe_Values.Look(ref outlineMode, "outlineMode", OutlineMode.Silhouette);
+            if (Scribe.mode == LoadSaveMode.LoadingVars)
+            {
+                // The old checkbox, no longer saved: off was the lines over the body.
+                bool silhouette = true;
+                Scribe_Values.Look(ref silhouette, "silhouetteOutlines", true);
+                if (!silhouette && outlineMode == OutlineMode.Silhouette)
+                {
+                    outlineMode = OutlineMode.Lines;
+                }
+            }
+            Scribe_Values.Look(ref pawnOutlineWidth, "pawnOutlineWidth", DefaultPawnOutlineWidth);
+            Scribe_Values.Look(ref weaponOutlineWidth, "weaponOutlineWidth", DefaultWeaponOutlineWidth);
+            Scribe_Values.Look(ref screenSelfOutlines, "screenSelfOutlines", false);
+            Scribe_Values.Look(ref outlineReach, "outlineReach", DefaultOutlineReach);
+            Scribe_Values.Look(ref outlineProbeDirs, "outlineProbeDirs", DefaultOutlineProbeDirs);
+            Scribe_Values.Look(ref outlineProbeRings, "outlineProbeRings", DefaultOutlineProbeRings);
+            Scribe_Values.Look(ref outlineRings, "outlineRings", DefaultOutlineRings);
+            if (Scribe.mode == LoadSaveMode.LoadingVars)
+            {
+                // An older save's high detail outlines on (the option these replaced) is the detailed numbers, read once:
+                // the old key isn't written again.
+                bool highDetail = false;
+                Scribe_Values.Look(ref highDetail, "highDetailOutlines", false);
+                if (highDetail && outlineReach == DefaultOutlineReach && outlineProbeDirs == DefaultOutlineProbeDirs
+                    && outlineProbeRings == DefaultOutlineProbeRings && outlineRings == DefaultOutlineRings)
+                {
+                    SetDetailedOutlines(true);
+                }
+            }
+            Scribe_Values.Look(ref selfOutlineStep, "selfOutlineStep", DefaultSelfOutlineStep);
             Scribe_Values.Look(ref clothesOcclusion, "clothesOcclusion", true);
             Scribe_Values.Look(ref fewerPoses, "fewerPoses", false);
             // Saved under a new key since the option moved to Advanced, so anyone who had turned it off has it back on once.
@@ -564,11 +653,31 @@ namespace M3AT
                 : mode == SleepWear.Pajamas ? "M3AT_SleepPajamas".Translate() : "M3AT_SleepNothing".Translate();
         }
 
+        private static string HelmetName(HelmetStow mode)
+        {
+            return mode == HelmetStow.Worn ? "M3AT_HelmetsWorn".Translate() : mode == HelmetStow.OnBack ? "M3AT_HelmetsOnBack".Translate()
+                : mode == HelmetStow.Hidden ? "M3AT_HelmetsHidden".Translate() : "M3AT_HelmetsAlwaysHidden".Translate();
+        }
+
         private static string CeilingName(CeilingCrouch mode)
         {
             return mode == CeilingCrouch.Always ? "M3AT_CeilingAlways".Translate() : mode == CeilingCrouch.FloorShown
                 ? "M3AT_CeilingFloorShown".Translate() : "M3AT_CeilingNever".Translate();
         }
+
+        private static string OutlineModeName(OutlineMode mode)
+        {
+            return mode == OutlineMode.Silhouette ? "M3AT_OutlineSilhouette".Translate() : mode == OutlineMode.Lines
+                ? "M3AT_OutlineLines".Translate() : "M3AT_OutlineScreen".Translate();
+        }
+
+        // An outline width, in cells, as hundredths of a cell.
+        private static string OutlineWidthName(float cells)
+        {
+            return "M3AT_OutlineWidthValue".Translate((cells * 100f).ToString("0.#"));
+        }
+
+        private const float OutlineWidthLeast = 0.005f, OutlineWidthMost = 0.08f, OutlineWidthStep = 0.0025f;
 
         private static string BeardName(BeardMode mode)
         {
@@ -621,15 +730,9 @@ namespace M3AT
                 }
                 Find.WindowStack.Add(new FloatMenu(modes));
             }
-            list.CheckboxLabeled("M3AT_PowerArmourBulk".Translate(), ref Settings.powerArmourBulk,
-                "M3AT_PowerArmourBulkTip".Translate());
-            if (Settings.powerArmourBulk || Settings.marineBulk)
-            {
-                BeginSubOptions(list);
-                Settings.armourBulk = Mathf.Round(Slider(list, "M3AT_ArmourBulk".Translate(), Settings.armourBulk.ToStringPercent(), Settings.armourBulk, 1f, 1.6f,
-                    "M3AT_ArmourBulkTip".Translate(Settings.DefaultArmourBulk.ToStringPercent())) * 20f) / 20f;
-                EndSubOptions(list);
-            }
+            // (The powerArmourBulk option, the game's own power armour bulking its wearer up, is taken out of the window for
+            // now, ArmourSize.PowerArmourBulk: its soles lift the wearer instead, SkinnedFigure.SoleOf. The armoured size,
+            // which only GrimWorld's Space Marines take now, is under marineBulk in Mod compatibility.)
             if (list.ButtonTextLabeledPct("M3AT_CeilingCrouch".Translate(), CeilingName(Settings.ceilingCrouch), SliderLabelShare, TextAnchor.MiddleLeft, null,
                 "M3AT_CeilingCrouchTip".Translate()))
             {
@@ -666,8 +769,21 @@ namespace M3AT
                 }
                 Find.WindowStack.Add(new FloatMenu(modes));
             }
+            if (list.ButtonTextLabeledPct("M3AT_HelmetStow".Translate(), HelmetName(Settings.helmetStow), SliderLabelShare, TextAnchor.MiddleLeft, null,
+                "M3AT_HelmetStowTip".Translate()))
+            {
+                List<FloatMenuOption> modes = new List<FloatMenuOption>();
+                foreach (HelmetStow mode in new[] { HelmetStow.Worn, HelmetStow.OnBack, HelmetStow.Hidden, HelmetStow.AlwaysHidden })
+                {
+                    HelmetStow picked = mode;
+                    modes.Add(new FloatMenuOption(HelmetName(mode), () => Settings.helmetStow = picked));
+                }
+                Find.WindowStack.Add(new FloatMenu(modes));
+            }
             list.CheckboxLabeled("M3AT_WornGear".Translate(), ref Settings.wornGear,
                 "M3AT_WornGearTip".Translate());
+            list.CheckboxLabeled("M3AT_SpriteClothes".Translate(), ref Settings.spriteClothes,
+                "M3AT_SpriteClothesTip".Translate());
             list.CheckboxLabeled("M3AT_GroundGarments".Translate(), ref Settings.groundGarments,
                 "M3AT_GroundGarmentsTip".Translate());
             list.CheckboxLabeled("M3AT_BedBlankets".Translate(), ref Settings.bedBlankets,
@@ -710,19 +826,41 @@ namespace M3AT
         private static void DrawingSection(Listing_Standard list)
         {
             Header(list, "M3AT_Drawing".Translate());
-            bool hadOutlines = Settings.outlines;
             list.CheckboxLabeled("M3AT_Outlines".Translate(), ref Settings.outlines,
                 "M3AT_OutlinesTip".Translate());
             if (Settings.outlines)
             {
-                // Ticking Outlines starts from the silhouette, whatever it was left at when they were last turned off.
-                if (!hadOutlines)
-                {
-                    Settings.silhouetteOutlines = true;
-                }
                 BeginSubOptions(list);
-                list.CheckboxLabeled("M3AT_SilhouetteOutlines".Translate(), ref Settings.silhouetteOutlines,
-                    "M3AT_SilhouetteOutlinesTip".Translate());
+                if (list.ButtonTextLabeledPct("M3AT_OutlineMode".Translate(), OutlineModeName(Settings.outlineMode), SliderLabelShare, TextAnchor.MiddleLeft, null,
+                    "M3AT_OutlineModeTip".Translate()))
+                {
+                    List<FloatMenuOption> modes = new List<FloatMenuOption>();
+                    foreach (OutlineMode mode in new[] { OutlineMode.Silhouette, OutlineMode.Lines, OutlineMode.ScreenSpace })
+                    {
+                        OutlineMode picked = mode;
+                        modes.Add(new FloatMenuOption(OutlineModeName(mode), () => Settings.outlineMode = picked));
+                    }
+                    Find.WindowStack.Add(new FloatMenu(modes));
+                }
+                if (Settings.outlineMode == OutlineMode.ScreenSpace)
+                {
+                    Settings.pawnOutlineWidth = Mathf.Round(Slider(list, "M3AT_PawnOutlineWidth".Translate(), OutlineWidthName(Settings.pawnOutlineWidth),
+                        Settings.pawnOutlineWidth, OutlineWidthLeast, OutlineWidthMost,
+                        "M3AT_PawnOutlineWidthTip".Translate(OutlineWidthName(Settings.DefaultPawnOutlineWidth))) / OutlineWidthStep) * OutlineWidthStep;
+                    Settings.weaponOutlineWidth = Mathf.Round(Slider(list, "M3AT_WeaponOutlineWidth".Translate(), OutlineWidthName(Settings.weaponOutlineWidth),
+                        Settings.weaponOutlineWidth, OutlineWidthLeast, OutlineWidthMost,
+                        "M3AT_WeaponOutlineWidthTip".Translate(OutlineWidthName(Settings.DefaultWeaponOutlineWidth))) / OutlineWidthStep) * OutlineWidthStep;
+                    list.CheckboxLabeled("M3AT_SelfOutlines".Translate(), ref Settings.screenSelfOutlines, "M3AT_SelfOutlinesTip".Translate());
+                    if (Settings.screenSelfOutlines)
+                    {
+                        Settings.selfOutlineStep = Mathf.Round(Slider(list, "M3AT_SelfOutlineStep".Translate(), OutlineWidthName(Settings.selfOutlineStep),
+                            Settings.selfOutlineStep, 0.04f, 0.3f, "M3AT_SelfOutlineStepTip".Translate(OutlineWidthName(Settings.DefaultSelfOutlineStep))) / 0.01f) * 0.01f;
+                    }
+                    if (!SkinnedFigure.ScreenOutlinesAvailable)
+                    {
+                        list.Label("M3AT_ScreenOutlinesUnavailable".Translate());
+                    }
+                }
                 EndSubOptions(list);
             }
             list.CheckboxLabeled("M3AT_FirstPersonEye".Translate(), ref Settings.firstPersonEye,
@@ -889,7 +1027,7 @@ namespace M3AT
         }
 
         // Options for other mods' things, folded away until its header is clicked: other races (OtherRaces.cs) and their parts
-        // (AddonParts.cs), and GrimWorld 40,000's armour sizes.
+        // (AddonParts.cs), and GrimWorld 40,000's armour sizes (its Space Marines' size slider under their checkbox).
         private static void CompatibilitySection(Listing_Standard list)
         {
             FoldHeader(list, "M3AT_Compatibility".Translate(), "M3AT_CompatibilityTip".Translate(), ref compatibilityOpen);
@@ -903,16 +1041,21 @@ namespace M3AT
                 "M3AT_RacePartsTip".Translate());
             list.CheckboxLabeled("M3AT_RaceModels".Translate(), ref Settings.raceModels,
                 "M3AT_RaceModelsTip".Translate());
-            list.CheckboxLabeled("M3AT_RaceMouthInk".Translate(), ref Settings.raceMouthInk,
-                "M3AT_RaceMouthInkTip".Translate());
             list.CheckboxLabeled("M3AT_ArmourDrawScale".Translate(), ref Settings.armourDrawScale,
                 "M3AT_ArmourDrawScaleTip".Translate());
             list.CheckboxLabeled("M3AT_MarineBulk".Translate(), ref Settings.marineBulk,
                 "M3AT_MarineBulkTip".Translate());
+            if (Settings.marineBulk)
+            {
+                BeginSubOptions(list);
+                Settings.armourBulk = Mathf.Round(Slider(list, "M3AT_ArmourBulk".Translate(), Settings.armourBulk.ToStringPercent(), Settings.armourBulk, 1f, 1.6f,
+                    "M3AT_ArmourBulkTip".Translate(Settings.DefaultArmourBulk.ToStringPercent())) * 20f) / 20f;
+                EndSubOptions(list);
+            }
         }
 
-        // Tools few players need, folded away until its header is clicked: so far the face tuning (FaceTuning.cs), opened
-        // over the map with the options closed so the face can be seen.
+        // Tools few players need, folded away until its header is clicked: the face tuning (FaceTuning.cs), opened over the
+        // map with the options closed so the face can be seen, and the face art's restyling (crisper mouths, sharper art).
         private static void AdvancedSection(Listing_Standard list)
         {
             FoldHeader(list, "M3AT_Advanced".Translate(), "M3AT_AdvancedTip".Translate(), ref advancedOpen);
@@ -953,16 +1096,49 @@ namespace M3AT
                     Settings.faceFitMouths.Clear();
                 }, true));
             }
+            // The face art's restyling, beside the face tuning: on by default and rarely worth turning off.
+            list.Gap(6f);
+            list.CheckboxLabeled("M3AT_RaceMouthInk".Translate(), ref Settings.raceMouthInk,
+                "M3AT_RaceMouthInkTip".Translate());
+            list.CheckboxLabeled("M3AT_SharpFaceArt".Translate(), ref Settings.sharpFaceArt,
+                "M3AT_SharpFaceArtTip".Translate());
             // Here, folded away, rather than under Performance: it is much faster and should stay on, kept only for a
             // graphics driver that poses pawns wrongly on the graphics card.
             list.Gap(6f);
             list.CheckboxLabeled("M3AT_GpuSkinning".Translate(), ref Settings.gpuSkinning,
                 "M3AT_GpuSkinningTip".Translate());
+            OutlineDetail(list);
             // The freecam's, here rather than in its own section, which is long enough: few will want it.
             list.CheckboxLabeled("M3AT_FreecamClickOffLooks".Translate(), ref Settings.freecamClickOffLooks,
                 "M3AT_FreecamClickOffLooksTip".Translate());
             list.CheckboxLabeled("M3AT_GripToolButton".Translate(), ref Settings.gripToolButton,
                 "M3AT_GripToolButtonTip".Translate());
+        }
+
+        // The screen-space outline's edge pass, here rather than with the outline style: the numbers trade the lines' look
+        // close up against the frame time, which few will want to set. Shown whatever the style, as only it reads them.
+        private static void OutlineDetail(Listing_Standard list)
+        {
+            list.Gap(6f);
+            list.Label("M3AT_OutlineDetailHeader".Translate(), -1f, "M3AT_OutlineDetailIntro".Translate());
+            Settings.outlineReach = Mathf.Round(Slider(list, "M3AT_OutlineReach".Translate(), Settings.outlineReach.ToString("0"),
+                Settings.outlineReach, 4f, 32f, "M3AT_OutlineReachTip".Translate(Settings.DefaultOutlineReach.ToString("0"))));
+            Settings.outlineProbeDirs = Mathf.RoundToInt(Slider(list, "M3AT_OutlineProbeDirs".Translate(), Settings.outlineProbeDirs.ToString(),
+                Settings.outlineProbeDirs, 4f, 16f, "M3AT_OutlineProbeDirsTip".Translate(Settings.DefaultOutlineProbeDirs)));
+            Settings.outlineProbeRings = Mathf.RoundToInt(Slider(list, "M3AT_OutlineProbeRings".Translate(), Settings.outlineProbeRings.ToString(),
+                Settings.outlineProbeRings, 1f, 4f, "M3AT_OutlineProbeRingsTip".Translate(Settings.DefaultOutlineProbeRings)));
+            Settings.outlineRings = Mathf.RoundToInt(Slider(list, "M3AT_OutlineRings".Translate(), Settings.outlineRings.ToString(),
+                Settings.outlineRings, 2f, 16f, "M3AT_OutlineRingsTip".Translate(Settings.DefaultOutlineRings)));
+            Rect row = list.GetRect(30f);
+            if (Widgets.ButtonText(row.LeftHalf().ContractedBy(2f, 0f), "M3AT_OutlineDetailFast".Translate()))
+            {
+                Settings.SetDetailedOutlines(false);
+            }
+            if (Widgets.ButtonText(row.RightHalf().ContractedBy(2f, 0f), "M3AT_OutlineDetailDetailed".Translate()))
+            {
+                Settings.SetDetailedOutlines(true);
+            }
+            list.Gap(6f);
         }
 
         // The freecam (Freecam.cs): its keys, pointer and flying.

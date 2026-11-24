@@ -2,7 +2,10 @@
 across the chest to the right hip and round the back, a row of rounds in its loops down the front, and a pouch where it
 meets the hip.
 
-    blender -b Models/pawnHumanRig.blend --python anim_scripts/make_bandolier.py -- <out.glb> [out.blend]
+    blender -b Models/pawnHumanRig.blend --python anim_scripts/make_bandolier.py -- <out.glb> [out.blend] [--bag]
+
+With --bag it makes the ShoulderBag instead (BAG's numbers, for other mods' messenger bags and satchels): the same strap,
+narrower, with no rounds, and an upright bag with a flap hung from it at the right hip in place of the pouch.
 
 The strap is laid on the skin along a loop: lines cast out from the trunk's middle in a slanted plane (through SHOULDER
 and HIP and the line from front to back) find the middle line, its distance out smoothed round the loop (SMOOTH passes)
@@ -24,6 +27,8 @@ from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 
 argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
+bag = '--bag' in argv
+argv = [a for a in argv if a != '--bag']
 if not argv:
     sys.exit('make_bandolier.py: give an out.glb')
 out_glb = os.path.abspath(argv[0])
@@ -56,6 +61,18 @@ FLAP = 0.12            # the flap's thickness over its top, and how far it hangs
 # The image: one flat colour per part, each a square of the image (the faces' UVs all at its middle). The strap's and the
 # pouch's are pale, so the apparel's colour shows; the rounds are brass and their points copper.
 COLOURS = {'strap': (0.92, 0.90, 0.86), 'pouch': (0.78, 0.76, 0.72), 'brass': (1.0, 0.80, 0.38), 'tip': (0.80, 0.50, 0.32)}
+NAME = 'Bandolier'
+BAG_SIZE = None        # the bag (--bag): across, high and deep, hung upright from the strap at POUCH_AT
+BAG_FLAP = 0.45        # of its height the flap covers down its front
+BAG_BACK = 0.0         # degrees the bag is turned round the body's upright axis from the strap's end toward the back
+
+# The shoulder bag: a plain strap, fewer points round, and an upright bag at the hip, both pale for the apparel's colour.
+# The bag is turned BAG_BACK round toward the back of the thigh, clear of the hip's holster slots.
+BAG = dict(NAME='ShoulderBag', WIDTH=0.8, THICK=0.15, SAMPLES=24, ROUNDS=0, POUCH_AT=0.93, BAG_SIZE=(3.0, 2.6, 1.2), BAG_BACK=55.0,
+           COLOURS={'strap': (0.86, 0.84, 0.80), 'pouch': (0.94, 0.92, 0.88), 'brass': (1.0, 0.80, 0.38),
+                    'tip': (0.80, 0.50, 0.32)})
+if bag:
+    globals().update(BAG)
 CELL = 16
 SQUARES = list(COLOURS)
 
@@ -225,13 +242,35 @@ def add_box(c, axes, half, part):
 for r in range(ROUNDS):
     add_round(ROUNDS_FROM + (ROUNDS_TO - ROUNDS_FROM) * r / max(1, ROUNDS - 1))
 
-# The pouch, on the strap's outside, its flap over the top (the side toward the shoulder) and down its front.
 p, n, t, w = front_at(POUCH_AT)
-c = p + n * (POUCH[2] / 2 - 0.05)
-add_box(c, (w, t, n), (POUCH[0] / 2, POUCH[1] / 2, POUCH[2] / 2), 'pouch')
-up = -t   # toward the shoulder
-add_box(c + up * (POUCH[1] / 2 - POUCH[1] * 0.2) + n * (FLAP / 2),
-        (w, t, n), (POUCH[0] / 2 + FLAP / 2, POUCH[1] * 0.22, POUCH[2] / 2 + FLAP / 2), 'strap')
+if BAG_SIZE:
+    # The bag: upright, its back on the strap's end at the hip, hanging down from it, its flap over the top and down its front.
+    # Turned round the trunk's upright axis toward the back (+y) by BAG_BACK, on whichever side the strap ends.
+    a = math.radians(BAG_BACK) * (1 if p.x > middle.x else -1)
+    def turned(v, about):
+        d = v - about
+        return about + Vector((d.x * math.cos(a) - d.y * math.sin(a), d.x * math.sin(a) + d.y * math.cos(a), d.z))
+    axis_point = Vector((middle.x, middle.y, p.z))
+    p = turned(p, axis_point)
+    n = turned(axis_point + n, axis_point) - axis_point
+    # Then laid back onto the skin there, as the hip bends in behind the thigh's side.
+    loc, sn = skin_at(p)
+    p = loc + sn * (INNER + THICK)
+    out = Vector((n.x, n.y, 0)).normalized()
+    upright = Vector((0, 0, 1))
+    side = upright.cross(out).normalized()
+    bw_, bh, bd = BAG_SIZE
+    c = p + out * (bd / 2 - 0.1) - upright * (bh / 2 - 0.4)
+    add_box(c, (side, upright, out), (bw_ / 2, bh / 2, bd / 2), 'pouch')
+    add_box(c + upright * (bh / 2 - bh * BAG_FLAP / 2 + FLAP / 2) + out * (FLAP / 2),
+            (side, upright, out), (bw_ / 2 + FLAP / 2, bh * BAG_FLAP / 2, bd / 2 + FLAP / 2), 'strap')
+else:
+    # The pouch, on the strap's outside, its flap over the top (the side toward the shoulder) and down its front.
+    c = p + n * (POUCH[2] / 2 - 0.05)
+    add_box(c, (w, t, n), (POUCH[0] / 2, POUCH[1] / 2, POUCH[2] / 2), 'pouch')
+    up = -t   # toward the shoulder
+    add_box(c + up * (POUCH[1] / 2 - POUCH[1] * 0.2) + n * (FLAP / 2),
+            (w, t, n), (POUCH[0] / 2 + FLAP / 2, POUCH[1] * 0.22, POUCH[2] / 2 + FLAP / 2), 'strap')
 
 # The faces' outward way: each the way its normal points from its own part's middle is set by the order given above;
 # recalc only flips what came out inward.
@@ -244,13 +283,13 @@ for f in bm.faces:
     for l in f.loops:
         l[uv_layer].uv = (u, 0.5)
 
-mesh = bpy.data.meshes.new('Bandolier')
+mesh = bpy.data.meshes.new(NAME)
 bm.to_mesh(mesh)
 bm.free()
 for poly in mesh.polygons:
     poly.use_smooth = False
 
-img = bpy.data.images.new('Bandolier', CELL * len(SQUARES), CELL, alpha=False)
+img = bpy.data.images.new(NAME, CELL * len(SQUARES), CELL, alpha=False)
 px = []
 for y in range(CELL):
     for x in range(CELL * len(SQUARES)):
@@ -260,7 +299,7 @@ img.pixels = px
 img.filepath_raw = os.path.splitext(out_glb)[0] + '.png'
 img.file_format = 'PNG'
 img.pack()
-mat = bpy.data.materials.new('Bandolier')
+mat = bpy.data.materials.new(NAME)
 mat.use_nodes = True
 bsdf = mat.node_tree.nodes['Principled BSDF']
 tex = mat.node_tree.nodes.new('ShaderNodeTexImage')
@@ -269,7 +308,7 @@ tex.interpolation = 'Closest'
 mat.node_tree.links.new(tex.outputs['Color'], bsdf.inputs['Base Color'])
 mesh.materials.append(mat)
 
-o = bpy.data.objects.new('Bandolier', mesh)
+o = bpy.data.objects.new(NAME, mesh)
 body.users_collection[0].objects.link(o)
 o.parent = rig
 o.matrix_parent_inverse = rig.matrix_world.inverted()   # left where it is: the vertices are in world space
@@ -299,7 +338,7 @@ for v in mesh.vertices:
         if w / whole > 1e-4:
             (o.vertex_groups.get(bone) or o.vertex_groups.new(name=bone)).add([v.index], w / whole, 'REPLACE')
 
-print('BANDOLIER: %d vertices, %d faces, %d triangles' % (len(mesh.vertices), len(mesh.polygons),
+print(NAME.upper() + ': %d vertices, %d faces, %d triangles' % (len(mesh.vertices), len(mesh.polygons),
       sum(len(p.vertices) - 2 for p in mesh.polygons)))
 
 bpy.ops.object.select_all(action='DESELECT')

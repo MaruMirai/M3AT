@@ -66,27 +66,27 @@ GARMENT_PROPS = {
     # --phoenix), the locust armour, a recon base, with boosters on its boots (make_locust.py), and Biotech's mechlord
     # suit, a recon base with fins, blades and a core (make_mechlord.py). Marine armour's helmet also stands in for
     # Odyssey's vacsuit helmet (its suit has a garment of its own, make_vacsuit.py).
-    'PowerArmor': {'hide_body': True, 'pads': True, 'hard': True, 'solid_parts': 'marine_backpack',
+    'PowerArmor': {'hide_body': True, 'sole': True, 'pads': True, 'hard': True, 'solid_parts': 'marine_backpack',
                    'defs': 'Apparel_PowerArmor'},
     # The grenadier armour (make_grenadier.py): the marine armour with a launcher tube over the left shoulder, weighted as
     # one piece to the chest in the file.
-    'ArmorMarineGrenadier': {'hide_body': True, 'pads': True, 'hard': True, 'part_weights': True, 'solid_parts': 'marine_backpack'},
+    'ArmorMarineGrenadier': {'hide_body': True, 'sole': True, 'pads': True, 'hard': True, 'part_weights': True, 'solid_parts': 'marine_backpack'},
     # Prestige marine armour: the marine armour's mesh with gold scrollwork painted on (prestige_paint.py), its own file.
-    'PowerArmorPrestige': {'hide_body': True, 'pads': True, 'hard': True, 'solid_parts': 'marine_backpack',
+    'PowerArmorPrestige': {'hide_body': True, 'sole': True, 'pads': True, 'hard': True, 'solid_parts': 'marine_backpack',
                            'defs': 'Apparel_ArmorMarinePrestige'},
     # The vacsuit helmet has a garment of its own (VacsuitHelmet), so this is the marine helmet's only.
     'PowerArmorHelmet': {'hard': True, 'defs': 'Apparel_PowerArmorHelmet'},
-    'ArmorRecon': {'hide_body': True, 'hard': True, 'solid_parts': 'recon_backpack',
+    'ArmorRecon': {'hide_body': True, 'sole': True, 'hard': True, 'solid_parts': 'recon_backpack',
                    'defs': 'Apparel_ArmorRecon'},
     # Prestige recon armour: the recon armour's mesh with gold scrollwork painted on (prestige_paint.py), its own file.
-    'ArmorReconPrestige': {'hide_body': True, 'hard': True, 'solid_parts': 'recon_backpack',
+    'ArmorReconPrestige': {'hide_body': True, 'sole': True, 'hard': True, 'solid_parts': 'recon_backpack',
                            'defs': 'Apparel_ArmorReconPrestige'},
     # The locust armour (make_locust.py): the recon armour with a booster on the outside of each boot, weighted whole to
     # its shin in the file.
-    'ArmorLocust': {'hide_body': True, 'hard': True, 'part_weights': True, 'solid_parts': 'recon_backpack'},
+    'ArmorLocust': {'hide_body': True, 'sole': True, 'hard': True, 'part_weights': True, 'solid_parts': 'recon_backpack'},
     # The mechlord suit (make_mechlord.py): the recon armour with a fin up from each shoulder, a blade from each side of
     # the waist, a core on the belly and a disc on the back, each weighted as one piece in the file.
-    'MechlordSuit': {'hide_body': True, 'hard': True, 'part_weights': True, 'solid_parts': 'recon_backpack'},
+    'MechlordSuit': {'hide_body': True, 'sole': True, 'hard': True, 'part_weights': True, 'solid_parts': 'recon_backpack'},
     # The recon helmet has a glass visor (VISOR), so the head is not hidden whole: the face shows through it.
     'ArmorHelmetRecon': {'hard': True, 'hide_hair': True, 'hide_face': False},
     # Biotech's mechanitor helmets, children of the recon helmet in the game (make_mech_helmets.py): the recon helmet with
@@ -94,14 +94,14 @@ GARMENT_PROPS = {
     # mechlord's), its visor kept.
     'ArmorHelmetMechCommander': {'hard': True, 'hide_hair': True, 'hide_face': False},
     'ArmorHelmetMechlordHelmet': {'hard': True, 'hide_hair': True, 'hide_face': False},
-    'ArmorCataphract': {'hide_body': True, 'pads': True, 'hard': True, 'solid_parts': 'cataphract_backpack',
+    'ArmorCataphract': {'hide_body': True, 'sole': True, 'pads': True, 'hard': True, 'solid_parts': 'cataphract_backpack',
                         'defs': 'Apparel_ArmorCataphract'},
     # Prestige cataphract armour: the cataphract armour's mesh with gold scrollwork painted on (prestige_paint.py).
-    'ArmorCataphractPrestige': {'hide_body': True, 'pads': True, 'hard': True, 'solid_parts': 'cataphract_backpack',
+    'ArmorCataphractPrestige': {'hide_body': True, 'sole': True, 'pads': True, 'hard': True, 'solid_parts': 'cataphract_backpack',
                                 'defs': 'Apparel_ArmorCataphractPrestige'},
     # The phoenix armour (make_grenadier.py --phoenix): the cataphract armour with a flamebolt launcher behind the left
     # shoulder, weighted as one piece to the chest in the file.
-    'ArmorCataphractPhoenix': {'hide_body': True, 'pads': True, 'hard': True, 'part_weights': True, 'solid_parts': 'cataphract_backpack'},
+    'ArmorCataphractPhoenix': {'hide_body': True, 'sole': True, 'pads': True, 'hard': True, 'part_weights': True, 'solid_parts': 'cataphract_backpack'},
     'ArmorHelmetCataphract': {'hide_head': True, 'hard': True},
     # The prestige helmets (make_prestige_helmets.py): the plain ones with gold added after the game's sprites, a crest
     # across the marine's, wings on the recon's, the cataphract's face gilded with a fin on top. Each is drawn for the
@@ -181,6 +181,30 @@ GARMENT_PROPS['Collar'] = {'hide_hair': False, 'hide_face': False}
 # palette is pale, so always tinted, as a mod's scarf may be neither made of stuff nor dyed.
 GARMENT_PROPS['Scarf'] = {'hide_hair': False, 'hide_face': False, 'tint': True}
 GARMENTS['Scarf'] = ('Overhead OnSkin Middle Shell', 'Neck')
+# Goggles (make_hats.py): two cups over the eyes, their lenses glass (VISOR), on a strap over the hair. The game has
+# none, so they stand in for other mods' named goggles (StandIns.cs's NoStandIn and NameAlike), worn over the eyes.
+GARMENT_PROPS['Goggles'] = {'bone': walk.HEAD, 'hard': True, 'hide_hair': False, 'hide_face': False, 'tint': False}
+GARMENTS['Goggles'] = ('EyeCover Overhead', 'Eyes')
+# Glasses and sunglasses (make_hats.py): a frame round two lenses, glass (VISOR) for the glasses so the eyes show,
+# dark for the sunglasses; arms back over the ears. The game has none: they stand in for other mods' named so (Ratkin's,
+# Kiiro's, Milira's, Wolfein's), as the goggles do. Coloured, never tinted.
+for _specs in ('Glasses', 'Sunglasses'):
+    GARMENT_PROPS[_specs] = {'bone': walk.HEAD, 'hard': True, 'hide_hair': False, 'hide_face': False, 'tint': False}
+    GARMENTS[_specs] = ('EyeCover Overhead', 'Eyes')
+# A hairband, a ribbon (the hairband with a bow) and a maid's headdress (the hairband with a frill), for other mods' (the
+# race mods' many bows and hairbands, drawn as a tuque before): laid on the bare head and pushed out past the hair worn
+# in the game, which they leave whole, as the slicecap is ('over_hair'), hiding nothing. In the apparel's colour.
+for _band in ('Hairband', 'Ribbon', 'MaidHeaddress'):
+    GARMENT_PROPS[_band] = {'bone': walk.HEAD, 'hard': True, 'hides': False, 'hide_hair': False, 'hide_face': False,
+                            'over_hair': True}
+    GARMENTS[_band] = ('Overhead', 'UpperHead')
+# Never tinted, as GrimWorld gives its goggles and gorgets an olive colour that buried the gorgets' steel and brass
+# against its fatigues. The gorget (make_hats.py): a crescent at the throat on a chain round the neck, taking the body's weights as the collar
+# does; let out over coats and armour (SkinnedFigure.LetOutDefs) and in no clearance (Holsters.cs's NoClearanceDefs).
+# GrimWorld's are on its Belt layer, which never takes a stand-in, so they are drawn by stands_for (below); the layer
+# line is what the gorget goes over as (LetOut.cs's FromLines).
+GARMENT_PROPS['Gorget'] = {'hide_hair': False, 'hide_face': False, 'tint': False}
+GARMENTS['Gorget'] = ('Belt', 'Neck')
 # Combat Extended's packs and tactical vest also stand in for other mods' packs and webbing without CE loaded, when no
 # def of theirs is there to describe them (StandIns.cs's AsWhatItIs matches any pack as on the Backpack layer, webbing
 # as on the Webbing layer over the Torso); without CE's defs the plain pack wins a tie (GENERIC).
@@ -196,6 +220,18 @@ GARMENTS['CE_TacVest'] = ('Webbing', 'Torso')
 # The marine and cataphract armour and their variants (their 'pads' property) are drawn with the Pauldrons too, without
 # GrimWorld (WalkFigures.ArmourPads), in the armour's colour.
 GARMENTS['Pauldrons'] = ('Shoulder', 'Shoulders')
+# Gloves, socks, boots and sandals (make_from_groups.py's cut garments) and the shoes stand in for apparel worn on the hands or
+# feet: the shoes for any footwear, boots, sandals and socks only for apparel named so (StandIns.cs's NoStandIn). The shoes
+# drawn with legwear are left off once other footwear is drawn (WalkFigures.WornGarmentsNow), and take the apparel's colour
+# when drawn for footwear (WalkFigures.DrawGarments).
+GARMENTS['Gloves'] = ('OnSkin', 'Hands')
+GARMENTS['Socks'] = ('OnSkin', 'Feet')
+GARMENTS['Boots'] = ('Middle', 'Feet')
+GARMENTS['Sandals'] = ('Middle', 'Feet')
+GARMENTS['Shoes'] = ('Middle', 'Feet')
+# The sandals' straps are narrower than the body's faces under them, so they hide none of the foot (a hidden face beside a
+# strap would be a hole).
+GARMENT_PROPS['Sandals'] = {'hides': False}
 GARMENT_PROPS['Pauldrons'] = {'hard': True, 'part_weights': True}
 GARMENT_PROPS['PauldronsBig'] = {'hard': True, 'part_weights': True, 'marine_of': 'Pauldrons'}
 # The Furskin gene's tufts (anim_scripts/make_fur_edges.py): drawn for the gene, not for apparel (its def is no apparel's, and
@@ -254,9 +290,39 @@ for _under, _def, _layers, _groups, _like in (('Underwear', 'UnderWhere_Panties'
         GARMENT_PROPS[_under]['defs'] = _def
     GARMENTS[_under] = (_layers, _groups)
 GARMENT_PROPS['Loincloth']['part_weights'] = True
+# Hosiery and a leotard (make_underwear.py, from the body), for other mods' stockings, tights and pantyhose, leotards,
+# swimsuits and bodysuits: on the underwear layer, so under everything, and as outer clothes too.
+for _under, _layers, _groups, _like in (('Stockings', 'Underwear OnSkin', 'Legs', 'Apparel_Pants'),
+                                        ('Tights', 'Underwear OnSkin', 'Legs', 'Apparel_Pants'),
+                                        ('Leotard', 'Underwear OnSkin', 'Torso,Legs', 'Apparel_BasicShirt')):
+    GARMENT_PROPS[_under] = {'like': _like}
+    GARMENTS[_under] = (_layers, _groups)
+# Skirts and dresses at each length (./make_skirts.sh: Maru's skirts in Models/bases/skirts/ weighted, and the dress top
+# joined on, by reweight_skirt.py), for other mods' (the race mods' dresses
+# were drawn as a collared shirt and trousers): on the skin layer, kinds of the trousers and the shirt.
+SKIRTS = ('SkirtMini', 'Skirt', 'SkirtMedium', 'SkirtMidi', 'SkirtLong')
+DRESSES = ('DressMini', 'DressShort', 'Dress', 'DressMidi', 'DressLong',
+           'SleevelessDressMini', 'SleevelessDressShort', 'SleevelessDress', 'SleevelessDressMidi', 'SleevelessDressLong')
+# A hem's height (rig units over the body's lowest point) to its share down the body from the top (0) to the feet (1), as
+# the game's body sprites and the race mods' have it: the crotch at about 0.62, the knee 0.81 (HemLengths.cs); straight
+# between, and on past the crotch at the thigh's rate.
+HEM_ANCHORS = ((9.2, 0.62), (6.5, 0.81), (1.0, 1.0))
+
+def hem_share(height):
+    (z0, s0), (z1, s1), (z2, s2) = HEM_ANCHORS
+    if height >= z1:
+        return s1 + (height - z1) * (s0 - s1) / (z0 - z1)
+    return s1 + (height - z1) * (s2 - s1) / (z2 - z1)
+for _skirt in SKIRTS + DRESSES:
+    _dress = _skirt in DRESSES
+    GARMENT_PROPS[_skirt] = {'like': 'Apparel_BasicShirt' if _dress else 'Apparel_Pants'}
+    GARMENTS[_skirt] = ('OnSkin', 'Torso,Legs' if _dress else 'Legs')
+# A shoulder bag (make_bandolier.py --bag), for other mods' messenger bags and satchels: a strap across the chest to a bag
+# at the hip, matched as a pack (StandIns.cs's AsWhatItIs), but only for apparel named one (its NoStandIn and Hints).
+GARMENTS['ShoulderBag'] = ('Backpack', 'Shoulders')
 # Apparel stood in for by name, whatever the scoring says (a "stands_for" line; every garment naming it is drawn): what
 # the defs can't tell apart. Kiiro's (Kiiro_Race) underwear is a bra and briefs, its simple underwear a bandeau and
-# briefs, its stockings a bra, briefs and thigh-high stockings and its pantyhose a bra and tights (the trousers), and
+# briefs, its stockings a bra, briefs and thigh-high stockings and its pantyhose a bra and tights, and
 # its short T-shirt and running shirt cropped tops (the running shirt took the crop top by its scores only while the crop
 # top was described by UnderWhere's tank top), by their sprites.
 STANDS_FOR = {
@@ -265,7 +331,8 @@ STANDS_FOR = {
     'CropTop': ('Kiiro_TShirtShort', 'Kiiro_RunningShirt'),
     'Chestwrap': ('Kiiro_SimpleUnderwear',),
     'Underwear': ('Kiiro_Underwear_Normal', 'Kiiro_SimpleUnderwear', 'Kiiro_Stocking_Black', 'Kiiro_Stocking_White'),
-    'Pants': ('Kiiro_Stocking_Black', 'Kiiro_Stocking_White', 'Kiiro_Pantynose_Black', 'Kiiro_Pantynose_White'),
+    'Stockings': ('Kiiro_Stocking_Black', 'Kiiro_Stocking_White'),
+    'Tights': ('Kiiro_Pantynose_Black', 'Kiiro_Pantynose_White'),
     # Vanilla Weapons Expanded - Heavy Weapons' exoskeleton frame, on the Belt layer, which is never otherwise stood in for.
     'CE_ExoFrame': ('VWE_Apparel_Exoframe',),
 }
@@ -283,11 +350,17 @@ for _name, _defs in {
         'CE_AdvancedNightVision': ('GW_SM_ScoutHelmet_E',),
         'Coronet': ('GW_Rulers_EmperorHelmet', 'GW_Rulers_EmperorHelmetW'),
         'VisageMask': ('GW_HOI_ROR_LuciferBlackMask',),
-        'ClothMask': ('GW_TotE_VenatariHelmet', 'GW_TotE_SoSHelmetB'),
+        'ClothMask': ('GW_TotE_VenatariHelmet', 'GW_TotE_SoSHelmetB', 'GW_AM_TDR_GogglesHeadwrap'),
         'GasMask': _GW_KRIEG + ('GW_HOI_DM_KriegCommissarHelmet', 'GW_HOI_CadianKasrkin_Helmet'),
         'AdvancedHelmet': _GW_KRIEG,
         'AuthorityCap': ('GW_HOI_DM_KriegCommissarHelmet',),
         'SimpleHelmet': ('GW_HOI_CadianKasrkin_Helmet',),
+        # The Cadian officer's and the commissar's gorgets, one garment (its Belt layer); the Tallarn desert goggles,
+        # also with the Tallarn headwrap (a wrap round the head, the face covered below the goggles); the Tanith monocular, a dark band with a scope over one eye, as CE's monocular.
+        'Gorget': ('GW_HOI_Cadian_OfficerGorget', 'GW_HOI_Cadian_CommissarGorget'),
+        'Goggles': ('GW_AM_TDR_Goggles', 'GW_AM_TDR_GogglesHeadwrap'),
+        'Headwrap': ('GW_AM_TDR_GogglesHeadwrap',),
+        'CE_SimpleNightVision': ('GW_HOI_ROR_Tanith1stGoggle',),
         # Its hand-held shields (the shield layer, which never takes a stand-in): the small combat shields as CE's melee
         # shield, the rest, storm shields and the tall plates of the Custodes and Primaris, as its ballistic shield.
         'CE_MeleeShield': ('GW_SM_CombatShieldA', 'GW_SM_CombatShieldB', 'GW_SM_CombatShieldC', 'GW_SM_CombatShieldD'),
@@ -300,12 +373,12 @@ for _name, _defs in STANDS_FOR.items():
     GARMENT_PROPS.setdefault(_name, {})['stands_for'] = ' '.join(_defs)
 # Garments that keep the weights on them: loose ones standing well off the skin, which on the body's weights stretch
 # badly (a long skirt would follow each thigh and tear between the legs). Every other garment's are ignored.
-KEEP_WEIGHTS = ('Duster', 'TribalA', 'Parka', 'Cape', 'Robe', 'RobeRoyal', 'Burka', 'LabCoat')
+KEEP_WEIGHTS = ('Duster', 'TribalA', 'Parka', 'Cape', 'Robe', 'RobeRoyal', 'Burka', 'LabCoat') + SKIRTS + DRESSES
 # Of those, the ones cut from the body's own faces (a tunic, a coat's top) with a skirt or hood of their own built on: the
 # faces on the skin always take the body's weights as they are now (body_cut_weights), so a re-weighted body can't leave
 # them bending as the skin used to (the tribalwear's bodice went with the raised arm and the chest came through it). On
 # the skin is within BODY_CUT_BAND of the distance off it most of the garment's vertices share (the make script's offset).
-BODY_CUT = ('Duster', 'TribalA', 'Robe', 'RobeRoyal', 'Burka', 'LabCoat')
+BODY_CUT = ('Duster', 'TribalA', 'Robe', 'RobeRoyal', 'Burka', 'LabCoat') + SKIRTS + DRESSES
 BODY_CUT_BAND = 1.25
 # Textured garments: a garment with a UV map and an image on its material's Base Color is drawn with that image. It is
 # written as garment_<name>.png, at most TEXTURE_SIZE pixels across, opaque unless the garment has the custom property
@@ -1184,6 +1257,20 @@ def write_garment(g, path):
         if props.get('marine_of'):
             f.write('# marine_of: drawn in place of that garment on a pawn in Space Marine armour.\n')
             f.write('marine_of %s\n' % props['marine_of'])
+        if props.get('sole', False):
+            # How far the garment reaches below the body's soles at rest (model units): armour built standing on
+            # thick soles under the feet, which lift the wearer by that much while it is on its feet (SkinnedFigure.SoleOf).
+            sole = max(0.0, (min(p.z for p in rest) - min(p.z for p in g_rest)) * scale)
+            f.write('# sole: how far it reaches below the body\'s soles at rest; the wearer is lifted by it on its feet.\n')
+            f.write('sole %.5f\n' % sole)
+            print('SOLE %s %.4f cells under the feet' % (g.name, sole))
+        if g.name in SKIRTS + DRESSES:
+            # How far down the body its hem comes, as the game measures an apparel's sprite down its body's (HemLengths.cs):
+            # from the body's top (0) to its feet (1), by HEM_ANCHORS (heights over the body's lowest point, the rig's units).
+            share = hem_share(min(p.z for p in g_rest) - min(p.z for p in rest))
+            f.write('# hem_share: how far down the body its hem comes (0 the top, 1 the feet), for picking a length by the art.\n')
+            f.write('hem_share %.3f\n' % share)
+            print('HEM %s %.3f of the body' % (g.name, share))
         if 'colour' in props:
             f.write('colour %.3f %.3f %.3f\n' % tuple(props['colour'])[:3])
         if props.get('held', False):
@@ -1431,6 +1518,15 @@ def write_anim(path, clips):
                     q = (axes @ Euler([math.radians(v) for v in g.get('turn', (0.0, 0.0, 0.0))], 'XYZ').to_matrix() @ axes.transposed()).to_quaternion()
                     nums = [p.x, p.y, p.z] + list(game_dir(g['out'])) + [g['scale'], g.get('depth', 1.0), q.x, q.y, q.z, q.w]
                     f.write('gear %s %s %s\n' % (mount, g['bone'], ' '.join('%.4f' % (v + 0.0) for v in nums)))
+            if hasattr(walk, 'HELMET_BACK'):
+                f.write('# helmet_back kind bone x y z scale qx qy qz qw: walk.HELMET_BACK, where a helmet is carried on the back while\n')
+                f.write('# undrafted (the helmetStow option), open or full (covering the whole head): its middle at rest (model space) before\n')
+                f.write('# the push past what is worn, its size on top of the half-shrunk head\'s, and its turn from upright facing forward.\n')
+                axes = Matrix(((-1, 0, 0), (0, 0, 1), (0, -1, 0)))   # as game_dir
+                for kind, hb in walk.HELMET_BACK.items():
+                    q = (axes @ Euler([math.radians(v) for v in hb['turn']], 'XYZ').to_matrix() @ axes.transposed()).to_quaternion()
+                    p = hips + Vector(game_dir(hb['at']))
+                    f.write('helmet_back %s %s %s\n' % (kind, hb['bone'], ' '.join('%.4f' % (v + 0.0) for v in [p.x, p.y, p.z, hb['scale'], q.x, q.y, q.z, q.w])))
             if hasattr(walk, 'PET_BACK'):
                 f.write('# cuddle_pet along lift back: a cuddled pet (carry_cuddle) sits with its trunk\'s middle walk.PET_ALONG of the way\n')
                 f.write('# from the left elbow to the wrist, walk.PET_LIFT (model units) over that line; the clips lay the right hand on\n')
@@ -1883,6 +1979,17 @@ if hasattr(walk, 'dress_at'):
         pose_worst = max(pose_worst, export_loop('dress_' + kind, lambda t, k=kind, n=n: walk.dress_at(t * n / (n - 1), k),
                                                  n, walk.DRESS[kind]['seconds']))
         masks['dress_' + kind] = upper_mask('LR', walk.DRESS_UPPER)
+# Climbing out of a raised pool over its wall (Dubs Bad Hygiene's, the IsoRim pack's model): once through, the whole
+# figure, from the water to standing outside; the game plays it backwards to get in (WalkFigures.PoolClimb).
+if hasattr(walk, 'climb_at'):
+    n = walk.climb_frames()
+    pose_worst = max(pose_worst, export_loop('pool_climb', lambda t, n=n: walk.climb_at(t * n / (n - 1)), n, walk.CLIMB['seconds']))
+    masks['pool_climb'] = upper_mask('LR', walk.DRESS_UPPER)
+if hasattr(walk, 'vault_at'):
+    # Vaulting the same wall in passing: the game plays it by where the pawn is across it (WalkFigures.PoolVault).
+    n = walk.vault_frames()
+    pose_worst = max(pose_worst, export_loop('pool_vault', lambda t, n=n: walk.vault_at(t * n / (n - 1)), n, walk.VAULT['seconds']))
+    masks['pool_vault'] = upper_mask('LR', walk.DRESS_UPPER)
 # Kissing (Romance on the Rim's kiss): a loop laid over the idle from the waist up.
 if hasattr(walk, 'kiss_at'):
     pose_worst = max(pose_worst, export_loop('kiss', walk.kiss_at, walk.loop_frames(walk.KISS_SECONDS), walk.KISS_SECONDS))

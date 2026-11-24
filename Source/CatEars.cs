@@ -81,6 +81,7 @@ namespace M3AT
             public int[] weightBone;    // side * EarMostBones + joint
             public float[] weight;
             public bool[] inner;        // the lining's vertices
+            public float[] liningShare; // with a lining texture, each vertex's share of the lining's colour (LiningShares), else null
             public Vector3[][] keyRest, keyNormal, keyHull;   // [up L, up R, down L, down R][vertex]: each key's whole move of them
             public PieceShape baseShape;   // its rest pose, normals and outline
             public Vector3 anchor;      // the top of the head's middle at rest, which they are scaled about for another shape
@@ -347,6 +348,16 @@ namespace M3AT
                 weights = raceEarWeights;
                 n = e.piece.rest.Length;
             }
+            // A paler, fluffy inside from a texture (EarLining.cs): the inside split from the outside along the rim.
+            string lining = LiningTextureOf(Path.GetFileName(path), race);
+            Texture2D liningTexture = lining != null ? EarTexture(lining) : null;
+            List<int> twins = null;
+            int unsplit = n;
+            if (liningTexture != null)
+            {
+                twins = SplitLining(e, ref bones, ref weights);
+                n = e.piece.rest.Length;
+            }
             e.share = SharesOf(boneCount);
             List<int> allBones = new List<int>();
             List<float> allWeights = new List<float>();
@@ -385,6 +396,24 @@ namespace M3AT
                 }
             }
             e.baseShape = plain;
+            if (liningTexture != null)
+            {
+                LinedHull(e, twins, unsplit);
+                LiningUvs(e);
+                if (lining == FluffyEars)
+                {
+                    LiningShares(e);
+                }
+                e.piece.texture = liningTexture;
+                e.piece.mean = Color.white;   // its outline stays in its own colour, as the grain's does
+                Shape lined = BaseShape();
+                MeasureHead(lined);
+                e.anchor = new Vector3(0f, lined.headHigh.y, (lined.headLow.z + lined.headHigh.z) / 2f);
+                e.width = lined.headHigh.x - lined.headLow.x;
+                Log.Message(Tag + "the ears in " + Path.GetFileName(path) + (race ? " (a race's)" : "") + " take " + lining + ": " + twins.Count + " vertices split along the rim, "
+                    + Array.FindAll(e.inner, x => x).Length + " of " + n + " inside.");
+                return e;
+            }
             // The hair's strand grain (StrandGrain.cs): each ear's places along its own chain, the right shifted off the left's.
             // Not on a pig's, which are bare skin.
             List<int>[] sideVerts = { new List<int>(), new List<int>() };
@@ -612,6 +641,13 @@ namespace M3AT
             PoseEars(p, p.ears, e, s, goneL, goneR);
             // The lining goes in the scalp's place: DrawMeshes shades that ScalpShade, which is taken back out here.
             Color inner = (file == RaceEarFile ? Color.Lerp(skin, RaceLining, RacePink) : Color.Lerp(skin, EarLining, EarPink)) / ScalpShade;
+            if (e.liningShare != null)
+            {
+                // Pale only in the cup's low middle, fading out to the hair's colour at the rim and toward the tip.
+                DrawMeshes(p, p.ears, piece.rest.Length, solid, position, yaw, size, tint, null, default(Color), null, default(Color), null,
+                    LiningPaint(p, e, tint, inner * ScalpShade));
+                return;
+            }
             DrawMeshes(p, p.ears, piece.rest.Length, solid, position, yaw, size, tint, null, default(Color), e.inner, inner);
         }
 
@@ -673,6 +709,7 @@ namespace M3AT
 
         private static void RetireEars(Posed p)
         {
+            p.earPaint = null;
             if (p.ears != null)
             {
                 Api.RetireMesh(p.ears.solid);

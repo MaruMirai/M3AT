@@ -390,6 +390,10 @@ namespace M3AT
         {
             get { return SettingsMod.Settings != null && SettingsMod.Settings.vatClothes; }
         }
+        public static bool SpriteClothes   // stand-in garments painted with the apparel's own sprites (SpriteClothes.cs)
+        {
+            get { return SettingsMod.Settings == null || SettingsMod.Settings.spriteClothes; }
+        }
         public static bool GroundGarments   // apparel on the map is baked as the chibi's garment (GroundClothes); false: IsoRim's look
         {
             get { return SettingsMod.Settings != null && SettingsMod.Settings.groundGarments; }
@@ -495,6 +499,7 @@ namespace M3AT
             public float run;   // 0 walking .. 1 running
             public float drafted;   // 0 at ease .. 1 in the drafted stance
             public string stance;   // the drafted clip for the weapon it holds (DraftedClip); null: the export has none
+            public string armsClear;   // what ArmsClear last did, for the autotest's notes
             public float armsOut;   // this draw: how much of the stance's hold is laid on, its hands pushed out past armour by (ArmsOut)
             public bool handHeld;   // the game shows its weapon in its hands (StepDraw)
             public List<HolsterSeen> holstered = new List<HolsterSeen>();   // the weapons drawn holstered last draw (HandsClear)
@@ -535,6 +540,8 @@ namespace M3AT
             public float shield;   // 0 .. 1: how far its left hand is up in the shield guard (ShieldUp)
             public float shieldOut;   // 0 .. 1: how far a shield carried on the back is through being taken into the guard (StepShield)
             public string shieldClip;   // its shield_draw clip while that plays it; null: none
+            public float helmOut = 1f;   // 0 .. 1: how far a stowed helmet is through dress_head, 1 on the head (HelmetStow.cs, StepHelm)
+            public int helmThing;        // the helmet's thing id that is for; 0 not seen yet, -1 none
             public float eat;   // 0 .. 1: how far into eating it is (EatOf)
             public string eatClip;   // eat_sit or eat_stand (kept while it eases out of it)
             public float pillAt;   // how far through the pill clip it is, 0 .. 1 (PillOf; kept as it eases out, so it stays down)
@@ -613,6 +620,9 @@ namespace M3AT
             public float depth;   // cells of water or marsh it is in (WaterOf), eased as it goes in or out
             public float swim;   // 0 walking or wading .. 1 swimming
             public float stroke;   // 0 treading water .. 1 laid down in the front crawl (StrokeOf)
+            public float poolPhase, poolYaw, poolGait;   // a swimmer in a pool another mod attaches (PoolStroke): its own stride, heading and pace
+            public Vector3 poolAt;
+            public int poolFrame = -10;
             public int strokeFrame = -99;   // when it was last moved on
             public bool lay;   // drawn lying on its back (downed, asleep, on a couch) at layFrame
             public int layFrame = -99;
@@ -1422,6 +1432,7 @@ namespace M3AT
                 {
                     harmony.Patch(held, prefix: new HarmonyMethod(typeof(WalkFigures), nameof(HeldPrefix)));
                 }
+                PatchSizeStat(harmony);   // the chibi's size on the info card (SizeStat.cs)
                 FaceLayers.PatchEyes(harmony);
                 FaceLayers.PatchBlush(harmony);
                 RomanceOnTheRim.PatchShareReading(harmony);
@@ -1661,18 +1672,26 @@ namespace M3AT
                 return corpse != null && (corpse.Spawned || corpse.ParentHolder is Pawn_CarryTracker || corpse.ParentHolder is Building_GibbetCage cage && cage.Spawned)
                     && RotOf(pawn) != RotDrawMode.Dessicated;
             }
-            if (pawn.ParentHolder is IThingHolderWithDrawnPawn)
+            return true;
+        }
+
+        // Whether the chibi is only drawn plainly (DrawPlain), standing, sitting or lying where IsoRim's placing puts it:
+        // somewhere IsoRim knows how to place that the map's rules don't reach (not spawned, nor carried, in mid-jump or in
+        // a building that shows who is inside), or on another mod's host (Api.AttachedPlace). It used to be left to
+        // IsoRim's own figure there, which showed as the pawn turning into another model.
+        private static bool PlainOnly(Pawn pawn)
+        {
+            if (pawn.Dead)
             {
-                // In a building that shows who is inside: on its couch (a vat that floats them upright is IsoRim's, by the
-                // placing's InVat).
+                return false;
             }
-            else if (!pawn.Spawned && !(pawn.ParentHolder is Pawn_CarryTracker) && !(pawn.ParentHolder is PawnFlyer))
+            if (!(pawn.ParentHolder is IThingHolderWithDrawnPawn) && !pawn.Spawned && !(pawn.ParentHolder is Pawn_CarryTracker) && !(pawn.ParentHolder is PawnFlyer))
             {
-                return false;   // somewhere else IsoRim knows how to place
+                return true;
             }
             Vector3 point;
-            float yaw;
-            return !Api.AttachedPlace(pawn, out point, out yaw);
+            float yaw, line;
+            return Api.AttachedPlace(pawn, out point, out yaw) && !PoolOf(pawn, out line);   // (a pool's swimmer swims, DrawSkinned)
         }
 
         // People who are invisible must stay so: IsoRim leaves them their sprite, which the game hides (as IsoRim tells them,
@@ -2034,6 +2053,7 @@ namespace M3AT
             string body = BodyKeyOf(pawn.story.bodyType, pawn.gender);   // a race's own body type by its name (OtherRaces.cs)
             // Bulked up by its armour (ArmourSize.cs): broader. Grown by it at all: its head shrunk to keep a normal pawn's size.
             bool bulky = body != "Child" && ArmourBulky(pawn);
+            float frame = body != "Child" ? ArmouredFrameOf(pawn) : 0f;   // its power armour's frame, the Armoured key (ArmourSize.cs)
             shrink = ArmouredHeadShrink(pawn, shrink);
             string gender = pawn.gender == Gender.Female ? "Female" : pawn.gender == Gender.Male ? "Male" : null;
             float spread = SettingsMod.Settings != null && SettingsMod.Settings.variedBodies ? SettingsMod.Settings.bodySpread : 0f;
@@ -2048,17 +2068,17 @@ namespace M3AT
                 // The gender's key whole, as a Male or Female body has it and a build is added on (GenderOnBuilds), and the
                 // builds on top; a child's on the base body, with no gender's.
                 string key = body == "Child" ? null : gender ?? (body == "Male" || body == "Female" ? body : null);
-                return skin.ShapeOf(key, null, 0f, shrink, 1f, PregnancyOf(pawn), limbs, bulky ? ArmouredBuild(builds, body, strength) : builds, genes);
+                return skin.ShapeOf(key, null, 0f, shrink, 1f, PregnancyOf(pawn), limbs, WithFrame(bulky ? ArmouredBuild(builds, body, strength) : builds, frame), genes);
             }
             if (bulky)
             {
                 // Its body type's own key (a Thin, Fat or Hulk one) as a build, under the armour's Hulk, on its gender's shape.
                 string key = gender ?? (body == "Male" || body == "Female" ? body : null);
-                return skin.ShapeOf(key, null, 0f, shrink, 1f, PregnancyOf(pawn), limbs, ArmouredBuild(null, body, strength), genes);
+                return skin.ShapeOf(key, null, 0f, shrink, 1f, PregnancyOf(pawn), limbs, WithFrame(ArmouredBuild(null, body, strength), frame), genes);
             }
             // A Thin, Fat or Hulk body's own key at the strength; a Male or Female one is a gender's shape, left whole.
             float bodyAmount = body != null && System.Array.IndexOf(BuildKeys, body) >= 0 ? strength : 1f;
-            return skin.ShapeOf(body, gender, GenderOnBuilds, shrink, bodyAmount, PregnancyOf(pawn), limbs, null, genes);
+            return skin.ShapeOf(body, gender, GenderOnBuilds, shrink, bodyAmount, PregnancyOf(pawn), limbs, WithFrame(null, frame), genes);
         }
 
         // Varied bodies (the mod options): the pawn's build as amounts of the Thin, Fat and Hulk keys, spread about its body
@@ -2203,7 +2223,7 @@ namespace M3AT
             float unused;
             Vector3? unusedBeside;
             bool handsWanted = strikeClip == null && !aiming && !Reloading(pawn)
-                && (wantedNow || (skin != null && WorkOf(pawn, out unused, out unusedBeside, true) != null));
+                && (wantedNow || (skin != null && WorkOf(pawn, out unused, out unusedBeside, true) != null) || (skin != null && HelmetFirst(pawn)));
             bool weaponShows = carryClip == null && !handsWanted && WeaponShows(pawn);
             float drafted = carryClip == null && !handsWanted && (weaponShows || pawn.Drafted && (armed || ThreatNear(pawn)) || strikeClip != null) ? 1f : 0f;
             float? castFace = null;
@@ -2280,6 +2300,7 @@ namespace M3AT
                 if (skin != null)
                 {
                     StepShield(pawn, e, false, shielding, false, 0f);   // and its shield where it would be
+                    StepHelm(pawn, e, false, false, false, 0f);   // and its helmet
                 }
                 e.frame = frame;
                 eases[pawn.thingIDNumber] = e;
@@ -2386,6 +2407,10 @@ namespace M3AT
                     // (shield_draw), and put back the same way.
                     StepShield(pawn, e, carryClip == null && swim <= 0f && !flying && pawn.GetPosture() == PawnPosture.Standing,
                         shielding, recent, game);
+                    // A helmet the helmetStow option takes off while undrafted goes between the head and the back
+                    // (dress_head) on its feet with its hands free; aiming or striking it goes on at once.
+                    StepHelm(pawn, e, carryClip == null && eatClip == null && workKind == null && tossing <= 0f && swim <= 0f && !flying
+                        && pawn.GetPosture() == PawnPosture.Standing, aiming || strikeClip != null, recent, game);
                 }
                 else
                 {
@@ -5892,7 +5917,9 @@ namespace M3AT
             public Apparel[] worn;   // the answer: the apparel each garment is drawn for
             public GarmentMask mask;
             public int version;   // new each time an answer is worked out (wornVersions), for HideGarments
+            public int hemTries;  // answers worked out again while a skirt's or dress's length couldn't be read yet
         }
+        private const int HemTriesMost = 30;   // draws a skirt's length is looked at again for, until the body's picture is made
         private static readonly Dictionary<int, WornCache> wornCaches = new Dictionary<int, WornCache>();
         private static int wornVersions;
         private const int WornCacheMost = 1000;   // pawns kept at most; past it all are let go, as it is only a cache
@@ -5920,13 +5947,19 @@ namespace M3AT
                 wornCaches[pawn.thingIDNumber] = c;
             }
             else if (c.skin == skin && c.shieldShows == shieldShows && c.shoes == shoes && c.romper == romper
-                && c.worn != null && c.worn.Length == worn.Length && SameApparel(c.apparel, all))
+                && c.worn != null && c.worn.Length == worn.Length && SameApparel(c.apparel, all)
+                && (c.hemTries == 0 || c.hemTries >= HemTriesMost))
             {
                 Array.Copy(c.worn, worn, worn.Length);
                 version = c.version;
                 return c.mask;
             }
+            bool sameApparel = c.worn != null && SameApparel(c.apparel, all);
+            SkinnedFigure.HemUnread = false;
             GarmentMask mask = WornGarmentsNow(pawn, all, worn, shieldShows, shoes, romper);
+            // A skirt or dress whose length waits on the pawn's body picture (not made until the game first resolves its
+            // render tree) is worked out again on the next draws, a few at most (HemLengths.cs).
+            c.hemTries = !SkinnedFigure.HemUnread ? 0 : sameApparel ? c.hemTries + 1 : 1;
             c.skin = skin;
             c.shieldShows = shieldShows;
             c.shoes = shoes;
@@ -5984,15 +6017,16 @@ namespace M3AT
                 }
             }
             // Apparel with no garment of its own takes the garments that stand in for it best (SkinnedFigure.StandInsFor,
-            // StandIns.cs), each one the first worn apparel's that wants it; not one IsoRim has a worn gear model for (a mod's
-            // pack on Combat Extended's Backpack layer), which DrawWornGear draws.
+            // StandIns.cs; a skirt or dress the length its art comes to on this pawn, StandInsOn, HemLengths.cs), each one
+            // the first worn apparel's that wants it; not one IsoRim has a worn gear model for (a mod's pack on Combat
+            // Extended's Backpack layer), which DrawWornGear draws.
             for (int i = 0; all != null && i < all.Count; i++)
             {
                 if (skin.GarmentOf(all[i].def) >= 0 || GearMountOf(all[i]) != null)
                 {
                     continue;
                 }
-                int[] standIns = skin.StandInsFor(all[i].def);
+                int[] standIns = skin.StandInsOn(all[i], pawn);
                 for (int k = 0; k < standIns.Length; k++)
                 {
                     if (worn[standIns[k]] == null)
@@ -6035,7 +6069,18 @@ namespace M3AT
                     torso = true;
                 }
             }
-            for (int g = 1; legs != null && torso && g < skin.Pieces; g++)
+            // Not once something worn on the feet is drawn (boots, socks, a mod's footwear): it is the footwear.
+            bool footwear = false;
+            for (int g = 1; legs != null && g < skin.Pieces; g++)
+            {
+                if (worn[g] != null && !skin.WithLegwear(g) && worn[g].def.apparel != null
+                    && worn[g].def.apparel.bodyPartGroups.Contains(FeetGroup)
+                    && !SkinnedFigure.IsUnderwear(worn[g].def.apparel))
+                {
+                    footwear = true;
+                }
+            }
+            for (int g = 1; legs != null && torso && !footwear && g < skin.Pieces; g++)
             {
                 if (worn[g] == null && skin.WithLegwear(g))
                 {
@@ -6072,6 +6117,12 @@ namespace M3AT
                 }
             }
             return mask;
+        }
+
+        private static BodyPartGroupDef feetGroup;
+        private static BodyPartGroupDef FeetGroup   // the game's Feet group (it has no BodyPartGroupDefOf entry)
+        {
+            get { return feetGroup ?? (feetGroup = DefDatabase<BodyPartGroupDef>.GetNamed("Feet")); }
         }
 
         public static bool ArmourHidesTail   // false: the gene tail is drawn through body armour (the mod's options set it)
@@ -6816,9 +6867,9 @@ namespace M3AT
                 {
                     Color colour = !skin.Tinted(g, worn[g]) ? Color.white : Api.ApparelColour(worn[g]);
                     Color? own = skin.ColourOf(g);
-                    if (own.HasValue)
+                    if (own.HasValue && !(worn[g].def.apparel != null && worn[g].def.apparel.bodyPartGroups.Contains(FeetGroup)))
                     {
-                        colour = own.Value;   // the shoes, worn with legwear of any colour
+                        colour = own.Value;   // the shoes, worn with legwear of any colour (but footwear's own colour when worn for it)
                     }
                     else if (IsPajamas(worn[g]))
                     {
@@ -6830,7 +6881,10 @@ namespace M3AT
                         // quarters a dark brown), which came out nearly black on the garment: drawn as it was worn instead.
                         colour = worn[g].GetColorIgnoringTainted();
                     }
-                    skin.Draw(fig, g, at, yaw, size, colour);
+                    // A stand-in painted with the apparel's own art (SpriteClothes.cs); until it is made, as before.
+                    SkinnedFigure.ClothImage cloth = SpriteClothes && skin.PaintsArt(g, worn[g]) && !IsPajamas(worn[g])
+                        ? skin.ClothImageOf(g, worn[g], pawn) : null;
+                    skin.Draw(fig, g, at, yaw, size, colour, false, cloth);
                 }
             }
         }
@@ -7413,9 +7467,7 @@ namespace M3AT
             }
             catch (Exception e)
             {
-                Log.Error(Tag + "drawing a carried chibi failed, IsoRim's figures are kept: " + e);
-                skin = null;
-                ready = false;
+                DrawFailed("drawing a carried chibi", pawn, e);
                 return false;
             }
             return true;
@@ -7463,12 +7515,140 @@ namespace M3AT
             }
             catch (Exception e)
             {
-                Log.Error(Tag + "drawing a chibi posed by another mod failed, IsoRim's figures are kept: " + e);
-                skin = null;
-                ready = false;
-                return false;
+                DrawFailed("drawing a chibi posed by another mod", pawn, e);
+                return DrawPlain(ctx);
             }
             return true;
+        }
+
+        // Something went wrong drawing one figure: said once for each place in the code it went wrong at, not every frame,
+        // and the figure is drawn plainly (DrawPlain) in its place. It used to turn the chibi off for every pawn for the rest
+        // of the session (and IsoRim switches off a figure drawer that throws), so one pawn doing something new to us (a
+        // modded toilet or bath) turned everyone back into IsoRim's figures.
+        private static void DrawFailed(string what, Pawn pawn, Exception e)
+        {
+            string trace = e.StackTrace ?? "";
+            int line = trace.IndexOf('\n');
+            int key = (what + e.GetType().FullName + (line > 0 ? trace.Substring(0, line) : trace)).GetHashCode();
+            Job job = pawn != null ? pawn.CurJob : null;
+#if AUTOTEST
+            DrawFailures++;
+            LastDrawFailure = what + ": " + e.GetType().Name + " " + e.Message + " at " + (line > 0 ? trace.Substring(0, line).Trim() : trace.Trim());
+#endif
+            Log.ErrorOnce(Tag + what + " failed for " + (pawn != null ? pawn.LabelShort : "?") + " (job " + (job != null ? job.def.defName : "none")
+                + "); it is drawn plainly instead. Please report this with the log: " + e, key);
+        }
+
+        // The chibi drawn as plainly as it can be, for anything the rules in DrawSkinned don't draw (or that went wrong
+        // there), so a pawn is never left to IsoRim's own figure: the idle standing, the sit seated (or on a host as a
+        // seat), the lie on its back lying, at IsoRim's placing (without one, where the game draws it, facing as it does),
+        // rested on its lowest point (the sit's seat on the seat), dressed as usual. False only if even that fails.
+        private const float HotTubSink = 0.15f;   // cells (at a grown pawn's size) a figure sat without legs on a building's anchor (a hot tub's water line) is let down into it
+
+        private static bool DrawPlain(FigureDrawContext ctx)
+        {
+            Pawn pawn = ctx.Pawn;
+            if (skin == null || pawn == null)
+            {
+                return false;
+            }
+            try
+            {
+                float size = SizeOf(pawn);
+                FigurePlacement placed;
+                bool hasPlace = ctx.ReadPlacement(new FigurePlacementOptions(), out placed);
+                if (hasPlace && placed.Bones)
+                {
+                    return false;
+                }
+                Vector3 at = hasPlace ? placed.Position : new Vector3(ctx.DrawLoc.x, 0f, ctx.DrawLoc.z);   // (DrawLoc's y is the game's altitude layer)
+                float yaw = hasPlace ? placed.Yaw : pawn.Rotation.AsAngle;
+                if (!ctx.ForOtherMod && !SkinnedFigure.MaybeOnScreen(at, size))
+                {
+                    return true;
+                }
+                bool lie, sit, tread = false, soak = false;
+                Vector3 anchor = Vector3.zero;
+                float anchorYaw = 0f;
+                bool attached = (!hasPlace || placed.Situation == FigureSituation.Attached) && Api.AttachedPlace(pawn, out anchor, out anchorYaw);
+                if (attached)
+                {
+                    // On another mod's host (Api.AddAttachments: a rider, or the IsoRim pack for Dubs Bad Hygiene's toilets,
+                    // baths, hot tubs and pools), by its anchor rather than IsoRim's placing, whose height is its own
+                    // figure's feet: the sit's seat on it (sitting without legs in a hot tub, sunk HotTubSink in), the lie's
+                    // back on it, or, in a pool (its host's class named so), treading water with the neck at it.
+                    Attachment? on = Api.AttachmentOf(pawn);
+                    AttachPose how = on.HasValue ? on.Value.pose : AttachPose.Stand;
+                    Thing host = on.HasValue ? on.Value.host : null;
+                    bool pool = host != null && !(host is Pawn) && host.GetType().Name.IndexOf("Pool", StringComparison.Ordinal) >= 0;
+                    lie = how == AttachPose.Lie;
+                    soak = lie && host != null && InTub(host);
+                    tread = how == AttachPose.SitNoLegs && pool;
+                    sit = !tread && (how == AttachPose.Sit || how == AttachPose.SitNoLegs);
+                    if (how == AttachPose.SitNoLegs && !tread && host != null && !(host is Pawn))
+                    {
+                        anchor.y -= HotTubSink * size;
+                    }
+                    at = anchor;
+                    yaw = anchorYaw;
+                }
+                else
+                {
+                    lie = pawn.Dead || (hasPlace ? placed.Situation == FigureSituation.LyingBack || placed.Situation == FigureSituation.InBed
+                        || placed.Situation == FigureSituation.OnCouch || placed.Situation == FigureSituation.Crawling
+                        || placed.Situation == FigureSituation.Prone || placed.Situation == FigureSituation.Corpse
+                        : pawn.GetPosture() != PawnPosture.Standing);
+                    sit = !lie && hasPlace && placed.Situation == FigureSituation.Seated;
+                }
+                string clip = lie && skin.Has("lie") ? "lie" : sit && skin.Has("sit") ? "sit" : tread && skin.Has("tread") ? "tread" : "idle";
+                lie = clip == "lie";
+                sit = clip == "sit";
+                tread = clip == "tread";
+                SkinnedFigure.Shape shape = ShapeFor(pawn);
+                SkinnedFigure.Posed fig = skin.For(pawn.thingIDNumber, shape);
+                skin.Begin(fig);
+                CutLimbs(pawn, fig);
+                skin.Add(fig, clip, pawn.Dead ? 0f : LoopPhase(pawn, clip), 1f);
+                Matrix4x4 whole = Matrix4x4.identity;
+                if (lie)
+                {
+                    // Laid on its back as the lying branch lays it (in a bed IsoRim's place is the head's, so moved along
+                    // by the head's height), the trunk bent up over the hips so the back is on the ground with the head.
+                    float along = hasPlace && placed.Situation == FigureSituation.InBed ? skin.HeadHeight(shape) : soak ? SoakAlong : 0f;
+                    whole = Matrix4x4.Translate(new Vector3(0f, 0f, along)) * Matrix4x4.Rotate(Quaternion.AngleAxis(-90f, Vector3.right));
+                    skin.Recline(fig, skin.ReclineOf(shape, clip) + (soak ? SoakRecline : 0f));
+                }
+                skin.End(fig, whole);
+                float lowest, bodyTop;
+                skin.Extent(fig, out lowest, out bodyTop);
+                Vector3 neck;
+                if (sit)
+                {
+                    float calfBack;
+                    at.y -= skin.SeatOf(fig, SeatSlab / size, out calfBack) * size;
+                }
+                else if (tread && skin.JointOf(fig, NeckBone, out neck))
+                {
+                    at.y += PoolFaceClear * size - neck.y * size;
+                }
+                else if (soak)
+                {
+                    at.y -= SoakDepth + lowest * size;   // on the tub's floor, under its water (the anchor), sat back against its end
+                }
+                else
+                {
+                    at.y -= lowest * size;
+                }
+                DrawDressed(pawn, fig, at, yaw, size);
+                drewPlain = true;
+                return true;
+            }
+            catch (Exception e)
+            {
+                Log.ErrorOnce(Tag + "drawing " + pawn.LabelShort + " plainly failed too, so IsoRim's figure is drawn for it: " + e,
+                    ("M3AT plain" + e.GetType().FullName + pawn.thingIDNumber).GetHashCode());
+                return false;
+            }
         }
 
         // A corpse hung in a gibbet cage, where IsoRim's placing puts it (the cage's middle, a yaw of its own, the cage floor):
@@ -7509,10 +7689,8 @@ namespace M3AT
             }
             catch (Exception e)
             {
-                Log.Error(Tag + "drawing a chibi in a gibbet cage failed, IsoRim's figures are kept: " + e);
-                skin = null;
-                ready = false;
-                return false;
+                DrawFailed("drawing a chibi in a gibbet cage", pawn, e);
+                return DrawPlain(ctx);
             }
             return true;
         }
@@ -7726,7 +7904,42 @@ namespace M3AT
             drawing = ctx;
             try
             {
-                return skin == null ? DrawBaked(ctx) : DrawSkinned(ctx);
+                if (skin == null)
+                {
+                    return DrawBaked(ctx);
+                }
+                // Somewhere IsoRim places by itself (not spawned, nor carried, in mid-jump or in a building that shows who
+                // is inside; on another mod's host): drawn plainly where IsoRim puts it, as the rules below go by the map.
+                drewPlain = false;
+                bool climbed;
+                if (PoolClimb(ctx, out climbed))
+                {
+#if AUTOTEST
+                    DrawnAs[pawn.thingIDNumber] = climbed ? "climb" : "isorim";
+#endif
+                    return climbed;   // over a pool's wall (Hygiene.cs)
+                }
+                if (PoolVault(ctx, out climbed))
+                {
+#if AUTOTEST
+                    DrawnAs[pawn.thingIDNumber] = climbed ? "vault" : "isorim";
+#endif
+                    return climbed;   // vaulting a pool's wall in passing (Hygiene.cs)
+                }
+                bool drawn = PlainOnly(pawn) ? DrawPlain(ctx) : DrawSkinned(ctx);
+#if AUTOTEST
+                DrawnAs[pawn.thingIDNumber] = !drawn ? "isorim" : drewPlain ? "plain" : "chibi";
+#endif
+                return drawn;
+            }
+            catch (Exception e)
+            {
+                DrawFailed("drawing the chibi", pawn, e);
+                bool drawn = DrawPlain(ctx);
+#if AUTOTEST
+                DrawnAs[pawn.thingIDNumber] = drawn ? "plain after an error" : "isorim after an error";
+#endif
+                return drawn;
             }
             finally
             {
@@ -7739,6 +7952,12 @@ namespace M3AT
         }
 
         private static FigureDrawContext drawing;   // the figure drawer's call being drawn, null outside it
+        private static bool drewPlain;   // DrawPlain drew the figure in this call (for AutoTest)
+#if AUTOTEST
+        internal static readonly Dictionary<int, string> DrawnAs = new Dictionary<int, string>();   // how each pawn was last drawn: chibi, plain, isorim
+        internal static int DrawFailures;
+        internal static string LastDrawFailure;
+#endif
 
         // The aim each pawn's placing last gave (FigurePlacement.Aiming, AimGame, AimDrawn), by thingIDNumber, for what goes
         // by it before this frame's placing is read (EaseOf, WeaponShows): IsoRim's aim, a frame behind at most, which the
@@ -8005,7 +8224,7 @@ namespace M3AT
             // its arms will do. (Carried, the carrier draws them itself, DrawLoad.)
             if (holds.TryGetValue(pawn.thingIDNumber, out hold) && (hold.frame == Time.frameCount || hold.released && hold.frame == Time.frameCount - 1))
             {
-                return DrawHeld(pawn, hold);
+                return DrawHeld(pawn, hold) || DrawPlain(ctx);
             }
             float size = SizeOf(pawn);
             bool dead = pawn.Dead;
@@ -8031,7 +8250,12 @@ namespace M3AT
             float wasDucked = ease.duck;
             float duck = canDrop && (hunkering || ease.duck > 0f) ? DuckOf(pawn, ease, hunkering) : 0f;
             ease.duck = duck;
-            float wade = skin.Has("wade") ? Mathf.Clamp01(ease.depth / Shallow) : 0f;
+            // In a pool another mod attaches it to (Dubs Bad Hygiene's, by the IsoRim pack for it): wading on the pool's
+            // floor, which is only about chest deep on the chibi (Hygiene.cs).
+            float poolAt = 0f;
+            bool poolAttached = PoolOf(pawn, out poolAt);
+            bool inPool = poolAttached || InRaisedPool(pawn);   // (any pawn in one wades on its floor, whatever its job)
+            float wade = inPool && skin.Has("wade") ? 1f : skin.Has("wade") ? Mathf.Clamp01(ease.depth / Shallow) : 0f;
             float limp = ease.limpClip != null && skin.Has(ease.limpClip) ? ease.limp : 0f;
             float ground = Mathf.Lerp(groundPerCycle[below], groundPerCycle[above], level - below);
             float favouring = limp > 0f && ease.limpClip.StartsWith("hop_", StringComparison.Ordinal) ? hopGround : limpGround;
@@ -8058,11 +8282,17 @@ namespace M3AT
             FigurePlacement placed;
             if (!ctx.ReadPlacement(new FigurePlacementOptions { Stride = ground * size, Face = face }, out placed))
             {
-                return false;
+                return DrawPlain(ctx);
             }
-            if (placed.Situation == FigureSituation.Attached || placed.Situation == FigureSituation.InVat || placed.Bones)
+            if (placed.Bones)
             {
-                return false;   // IsoRim's own: on a host, upright in a vat (no IsoRim model floats them so yet), gone to bones
+                return false;   // IsoRim's own: gone to bones (a skeleton, which the chibi has none of)
+            }
+            // (in a pool: wading on its floor, as above, rather than drawn plainly on its host)
+            poolAttached &= placed.Situation == FigureSituation.Attached;
+            if (!poolAttached && (placed.Situation == FigureSituation.Attached || placed.Situation == FigureSituation.InVat))
+            {
+                return DrawPlain(ctx);   // on another mod's host, or upright in a vat (no IsoRim model floats them so yet)
             }
             if (placed.Situation == FigureSituation.Gibbet)
             {
@@ -8199,6 +8429,10 @@ namespace M3AT
                 yaw = placed.Yaw;
                 phase = placed.StridePhase;
                 gait = placed.Gait;
+                if (poolAttached)
+                {
+                    PoolStroke(pawn, ease, wadeGround * size, out yaw, out phase, out gait);   // (IsoRim steps no stride for an attached figure)
+                }
                 float aimDrawn = placed.AimDrawn;
                 aiming = !lying && !ease.hipUsing && placed.Aiming;
                 if (aiming)
@@ -8261,7 +8495,7 @@ namespace M3AT
                     ? StoopOf(pawn) * Mathf.Lerp(1f, StoopDrafted, ease.drafted) * Mathf.Lerp(1f, StoopAiming, ease.aim) * (seated ? StoopSeated : 1f) : 0f;
                 // Under a ceiling it would stand taller than (ArmourSize.cs): crouched and, if need be, bent forward.
                 float ceilingCrouch, ceilingStoop;
-                CeilingPose(pawn, ease, size, !lying && !crawling && !seated && flight < 0f && swim <= 0f && duck <= 0f, out ceilingCrouch, out ceilingStoop);
+                CeilingPose(pawn, ease, size, skin.SoleOf(fig) * size, !lying && !crawling && !seated && flight < 0f && swim <= 0f && duck <= 0f, out ceilingCrouch, out ceilingStoop);
                 skin.Stoop(fig, Mathf.Max(stooped, ceilingStoop));
                 if (seated && ease.share > 0f && ease.shareWay.sqrMagnitude > 1e-4f)
                 {
@@ -8704,6 +8938,8 @@ namespace M3AT
                     // A shield carried on the back being taken into the guard (or put back): the left hand round to its
                     // edge and back, the trunk turning to meet it, over the same, giving way as the guard does.
                     LayShieldDraw(ease, fig, (1f - ease.carry) * (1f - bend) * land * (1f - daze) * (1f - ease.reload) * (1f - ease.cast) * (1f - ease.reel));
+                    // A helmet taken off when undrafted or put on when drafted (HelmetStow.cs), the same way.
+                    LayHelm(ease, fig, (1f - ease.carry) * (1f - bend) * land * (1f - daze) * (1f - ease.reload) * (1f - ease.cast) * (1f - ease.reel));
                     // The hip gear in the left hand (drafted or using it): taken from the shoulder, held ready, pointed at
                     // the target; over all of that (Top), giving way to a reload, a cast, a stagger and a daze.
                     LayHip(pawn, ease, fig, (1f - ease.carry) * (1f - bend) * land * (1f - daze) * (1f - ease.reload) * (1f - ease.cast) * (1f - ease.reel), size);
@@ -8772,10 +9008,17 @@ namespace M3AT
                     skin.Chain(fig, whole);
                     if (!lying && !crawling && flight < 0f)
                     {
-                        if (skin.ArmsOut(fig, whole, ease.stance, ease.armsOut))
+                        if (ArmsOutOn && skin.ArmsOut(fig, whole, ease.stance, ease.armsOut))
                         {
                             skin.Reached(fig, whole);
                         }
+                        if (ArmsClearOn && skin.ArmsClear(fig, whole, ease.stance, ease.armsOut))
+                        {
+                            skin.Reached(fig, whole);
+                        }
+#if AUTOTEST
+                        ease.armsClear = "out " + skin.armsOutSeen.ToString("F3") + "; " + skin.armsClearSeen;
+#endif
                         GripCarried(pawn, ease, fig, whole, size);
                         StrokePet(pawn, ease, fig, whole, size);
                         WedHands(pawn, ease, fig, whole, size);
@@ -8800,7 +9043,12 @@ namespace M3AT
                     // lies (not the head, bodyTop), never deeper than the water.
                     floor -= Mathf.Min(ease.depth, FloatSink * Mathf.Max(0f, bodyTop - lowest) * size);
                 }
-                float y = Lift * size;
+                // On thick armoured soles (SoleOf): lifted by them on its feet, not lying, crawling, swimming or in the air,
+                // and less the more it kneels or sits on the floor at work, as those clips have the shins or seat on the
+                // ground; seated, diving and getting up go from it to what they rest on below.
+                float sole = lying || crawling || swim > 0f || flight >= 0f ? 0f
+                    : skin.SoleOf(fig) * size * (1f - (OnTheFloor(ease.workKind) ? ease.shownWork : 0f));
+                float y = Lift * size + sole;
                 float seatSlide = 0f;   // cells forward on the seat, so the calves clear its front edge (SeatSlideOf)
                 Vector3 underGlass = Vector3.zero;   // cells, the move keeping a figure on a couch under its glass (UnderGlass)
                 if (lying && ease.doll != null)
@@ -8843,7 +9091,7 @@ namespace M3AT
                 {
                     y += seatLift;
                 }
-                else if (ease.depth > 0f || swim > 0f)
+                else if (!inPool && (ease.depth > 0f || swim > 0f))   // (a pool's water terrain: it wades on the floor, Hygiene.cs)
                 {
                     // Sunk into the water, which IsoRim draws as an opaque sheet, so what is under it is hidden: wading, by
                     // the water's depth (a child's neck kept out of it); swimming, to the neck.
@@ -8856,6 +9104,11 @@ namespace M3AT
                     y = Mathf.Lerp(wading, WaterLine - neck.y * size, swim);
                 }
                 Vector3 at = new Vector3(drawLoc.x, y + lift, drawLoc.z) + underGlass;
+                ClimbBack(pawn, ref at);   // just over a pool's wall: brought to the game's place (Hygiene.cs)
+                if (inPool)
+                {
+                    at.y += PoolFloor;   // on the pool's floor (Hygiene.cs)
+                }
                 if (bedding)
                 {
                     // Getting into bed: from where it stood (the game puts it on its place in the bed at once), its hips
@@ -9122,6 +9375,10 @@ namespace M3AT
                 {
                     DrawHolstered(pawn, inHands, mask, fig, at, yaw, size);
                     SeenHolstered(ease, mask);
+                    if (!forOther && flight < 0f)
+                    {
+                        DrawStowedHelmet(pawn, ease, fig, mask, at, yaw, size);   // a helmet off the head while undrafted (HelmetStow.cs)
+                    }
                     DrawWornGear(pawn, mask, fig, at, yaw, size, HipShare(ease));
                 }
                 else
@@ -9131,10 +9388,8 @@ namespace M3AT
             }
             catch (Exception e)
             {
-                Log.Error(Tag + "drawing the skinned chibi failed, IsoRim's figures are kept: " + e);
-                skin = null;
-                ready = false;   // the baked frames were not loaded
-                return false;
+                DrawFailed("drawing the skinned chibi", pawn, e);
+                return DrawPlain(ctx);
             }
             return true;
         }

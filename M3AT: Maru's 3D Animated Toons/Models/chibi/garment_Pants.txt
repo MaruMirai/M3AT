@@ -4,8 +4,6 @@
 defs Apparel_Pants
 layer OnSkin
 groups Legs
-# stands_for: apparel it is drawn for as a stand-in whatever the scoring says.
-stands_for Kiiro_Stocking_Black Kiiro_Stocking_White Kiiro_Pantynose_Black Kiiro_Pantynose_White
 # texture: its image (t lines, a place on it per vertex); tint: whether the apparel's colour tints it.
 texture garment_Pants.png
 # hide k ...: body triangles (skin.txt's f lines, from 0) left out while it is worn.
@@ -1479,10 +1477,10 @@ d 172 -0.00085 0.00093 -0.01874
 d 173 -0.00262 0.00030 -0.01899
 d 174 0.00082 -0.00534 -0.02206
 d 175 -0.00082 -0.00534 -0.02206
-d 176 -0.01215 -0.00311 -0.01178
+d 176 -0.01219 -0.00311 -0.01178
 d 177 -0.00841 -0.00112 -0.01760
 d 178 0.00841 -0.00112 -0.01760
-d 179 0.01215 -0.00311 -0.01178
+d 179 0.01219 -0.00311 -0.01178
 key Thin
 d 0 -0.00138 0.00332 0.00021
 d 1 -0.00138 0.00332 0.00021

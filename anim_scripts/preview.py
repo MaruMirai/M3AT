@@ -112,7 +112,7 @@ SECTIONS = [('FRAMES', 'Walk and run'), ('IDLE_SECONDS', 'Idle'), ('DRAFT_SECOND
             ('STRIKE_FRAMES', 'Striking'), ('DRAW_FRAMES', 'Drawing')]
 CLIP_SECTION = {'gait': 'Walk and run', 'still': 'Walk and run', 'idle': 'Idle', 'drafted': 'Drafted',
                 'carry': 'Carrying', 'carried': 'Carrying', 'sit': 'Sitting', 'lie': 'Lying', 'crawl': 'Crawling',
-                'bend': 'Bending', 'hurt': 'Hurt', 'cower': 'Cowering', 'hunker': 'Cowering', 'cover': 'Taking cover', 'lead': 'Leading', 'rub': 'Rubbing the hands', 'talk': 'Talking', 'teach': 'Teaching', 'wave': 'Waving', 'sad': 'Sad', 'drunk': 'Drunk', 'stir': 'Stirring', 'stir_crouch': 'Stirring', 'stir_campfire': 'Roasting', 'stir_campfire_sit': 'Roasting', 'burning': 'On fire', 'reach': 'Reaching', 'reload': 'Reloading', 'eat_sit': 'Eating', 'eat_stand': 'Eating', 'smoke': 'Taking drugs', 'pill': 'Taking drugs', 'read': 'Reading', 'research': 'Researching', 'research_stand': 'Researching', 'research_floor': 'Researching', 'crouch': 'Working by place', 'sow': 'Working by place', 'plant': 'Working by place', 'bench': 'Working by place', 'bench_sit': 'Working by place', 'chair': 'Working by place', 'tame': 'Taming', 'tame_kneel': 'Taming', 'stomp': 'Beating fires', 'pat': 'Beating fires', 'piano': 'Playing music', 'piano_sit': 'Playing music', 'harp': 'Playing music', 'harp_sit': 'Playing music', 'drum': 'Playing music', 'drum_sit': 'Playing music', 'cast': 'Casting', 'gear': 'Hip gear', 'shield': 'Shield', 'flinch': 'Flinching', 'reel': 'Staggered', 'toss': 'Tossing', 'snowball': 'Tossing', **{'dress_' + k: 'Dressing' for k in ('legs', 'over', 'coat', 'head', 'belt')}, 'kiss': 'Kissing', 'wed': 'Kissing', 'daze': 'Stunned', 'jump': 'Jumping', 'land': 'Jumping', 'work': 'Working', 'pluck': 'Kneeling at work', 'tend': 'Kneeling at work', 'toys': 'Kneeling at work', 'chalk': 'Kneeling at work', 'play_sit': 'Kneeling at work', 'visit_sit': 'Kneeling at work', 'meditate': 'Meditating', 'pray_sit': 'Meditating', 'vomit': 'Vomiting', 'getup': 'Getting up', 'dive': 'Diving', 'duck': 'Hunkering', 'roll': 'Diving', 'sleep': 'Lying', 'baby': 'Lying', 'downed': 'Lying', 'downed_side': 'Lying', 'lovin': 'Lying', 'spoon': 'Lying', 'dead': 'Lying', 'ragdoll': 'Ragdoll', 'caged': 'Lying', 'fall': 'Lying', 'limp': 'Limping', 'hop': 'Hopping', 'wade': 'Wading', 'swim': 'Swimming', 'tread': 'Treading water', 'aim': 'Aiming', 'strike': 'Striking', 'draw': 'Drawing', 'holster': 'Drawing'}
+                'bend': 'Bending', 'hurt': 'Hurt', 'cower': 'Cowering', 'hunker': 'Cowering', 'cover': 'Taking cover', 'lead': 'Leading', 'rub': 'Rubbing the hands', 'talk': 'Talking', 'teach': 'Teaching', 'wave': 'Waving', 'sad': 'Sad', 'drunk': 'Drunk', 'stir': 'Stirring', 'stir_crouch': 'Stirring', 'stir_campfire': 'Roasting', 'stir_campfire_sit': 'Roasting', 'burning': 'On fire', 'reach': 'Reaching', 'reload': 'Reloading', 'eat_sit': 'Eating', 'eat_stand': 'Eating', 'smoke': 'Taking drugs', 'pill': 'Taking drugs', 'read': 'Reading', 'research': 'Researching', 'research_stand': 'Researching', 'research_floor': 'Researching', 'crouch': 'Working by place', 'sow': 'Working by place', 'plant': 'Working by place', 'bench': 'Working by place', 'bench_sit': 'Working by place', 'chair': 'Working by place', 'tame': 'Taming', 'tame_kneel': 'Taming', 'stomp': 'Beating fires', 'pat': 'Beating fires', 'piano': 'Playing music', 'piano_sit': 'Playing music', 'harp': 'Playing music', 'harp_sit': 'Playing music', 'drum': 'Playing music', 'drum_sit': 'Playing music', 'cast': 'Casting', 'gear': 'Hip gear', 'shield': 'Shield', 'flinch': 'Flinching', 'reel': 'Staggered', 'toss': 'Tossing', 'snowball': 'Tossing', **{'dress_' + k: 'Dressing' for k in ('legs', 'over', 'coat', 'head', 'belt')}, 'kiss': 'Kissing', 'wed': 'Kissing', 'daze': 'Stunned', 'jump': 'Jumping', 'land': 'Jumping', 'work': 'Working', 'pluck': 'Kneeling at work', 'tend': 'Kneeling at work', 'toys': 'Kneeling at work', 'chalk': 'Kneeling at work', 'play_sit': 'Kneeling at work', 'visit_sit': 'Kneeling at work', 'meditate': 'Meditating', 'pray_sit': 'Meditating', 'vomit': 'Vomiting', 'getup': 'Getting up', 'dive': 'Diving', 'duck': 'Hunkering', 'roll': 'Diving', 'sleep': 'Lying', 'baby': 'Lying', 'downed': 'Lying', 'downed_side': 'Lying', 'lovin': 'Lying', 'spoon': 'Lying', 'dead': 'Lying', 'ragdoll': 'Ragdoll', 'caged': 'Lying', 'fall': 'Lying', 'limp': 'Limping', 'hop': 'Hopping', 'wade': 'Wading', 'swim': 'Swimming', 'tread': 'Treading water', 'pool_climb': 'Swimming', 'pool_vault': 'Swimming', 'aim': 'Aiming', 'strike': 'Striking', 'draw': 'Drawing', 'holster': 'Drawing'}
 # The clips timed by the ground covered, posed by Phase: each one's pose at a phase, with the picked kind.
 CYCLES = {'crawl': lambda p, kind: walk.crawl_at(p), 'limp': lambda p, kind: walk.limp_at(p, kind),
           'hop': lambda p, kind: walk.hop_at(p, kind),
@@ -319,7 +319,7 @@ def loop_seconds(what, kind=''):
             'wave': getattr(walk, 'WAVE_SECONDS', None), 'sad': getattr(walk, 'SAD_SECONDS', None), 'drunk': getattr(walk, 'DRUNK_SECONDS', None), 'stir': getattr(walk, 'STIR_SECONDS', None), 'stir_crouch': getattr(walk, 'STIR_SECONDS', None), 'stir_campfire': getattr(walk, 'STIR_SECONDS', None), 'stir_campfire_sit': getattr(walk, 'STIR_SECONDS', None), 'burning': getattr(walk, 'BURN_SECONDS', None), 'reach': getattr(walk, 'REACH_SECONDS', None),
             'reload': getattr(walk, 'RELOAD_SECONDS', None),
             'eat_sit': getattr(walk, 'EAT_SIT_SECONDS', None), 'eat_stand': getattr(walk, 'EAT_STAND_SECONDS', None), 'smoke': getattr(walk, 'SMOKE_SECONDS', None), 'pill': getattr(walk, 'PILL_SECONDS', None), 'read': getattr(walk, 'READ_SECONDS', None), 'research': getattr(walk, 'RESEARCH_SECONDS', None), 'research_stand': getattr(walk, 'RESEARCH_SECONDS', None), 'research_floor': getattr(walk, 'RESEARCH_SECONDS', None), 'crouch': getattr(walk, 'CROUCH_SECONDS', None), 'sow': getattr(walk, 'SOW_SECONDS', None), 'plant': getattr(walk, 'PLANT_SECONDS', None), 'bench': getattr(walk, 'BENCH_SECONDS', None), 'bench_sit': getattr(walk, 'BENCH_SIT_SECONDS', None), 'chair': getattr(walk, 'CHAIR_SECONDS', None), 'tame': getattr(walk, 'TAME_SECONDS', None), 'tame_kneel': getattr(walk, 'CROUCH_SECONDS', None), 'stomp': getattr(walk, 'BEAT_SECONDS', None), 'pat': getattr(walk, 'BEAT_SECONDS', 0.0) * getattr(walk, 'PAT_HITS', 1), **{w: walk.MUSIC[w.replace('_sit', '')]['seconds'] for w in ('piano', 'piano_sit', 'harp', 'harp_sit', 'drum', 'drum_sit') if hasattr(walk, 'MUSIC')}, 'cast': getattr(walk, 'CAST_SECONDS', None),
-            'flinch': FLINCH_SECONDS, 'reel': getattr(walk, 'REEL_SECONDS', None), 'toss': getattr(walk, 'TOSS_SECONDS', None), **{'dress_' + k: d['seconds'] for k, d in getattr(walk, 'DRESS', {}).items()}, 'snowball': getattr(walk, 'SNOW_SECONDS', None), 'kiss': getattr(walk, 'KISS_SECONDS', None), 'wed': getattr(walk, 'WED_SECONDS', None), 'daze': getattr(walk, 'DAZE_SECONDS', None),
+            'flinch': FLINCH_SECONDS, 'reel': getattr(walk, 'REEL_SECONDS', None), 'toss': getattr(walk, 'TOSS_SECONDS', None), 'pool_climb': getattr(walk, 'CLIMB', {}).get('seconds'), 'pool_vault': getattr(walk, 'VAULT', {}).get('seconds'), **{'dress_' + k: d['seconds'] for k, d in getattr(walk, 'DRESS', {}).items()}, 'snowball': getattr(walk, 'SNOW_SECONDS', None), 'kiss': getattr(walk, 'KISS_SECONDS', None), 'wed': getattr(walk, 'WED_SECONDS', None), 'daze': getattr(walk, 'DAZE_SECONDS', None),
             'jump': JUMP_SECONDS, 'aim': AIM_SWEEP_SECONDS,
             'gear': (AIM_SWEEP_SECONDS if kind in ('aim', 'fire') else getattr(walk, 'HIP_DRAW_SECONDS', None) if kind in ('draw', 'put')
                      else getattr(walk, 'HIP_SECONDS', None)),
@@ -406,6 +406,11 @@ def push_settings(p):
             if getattr(p, pre + 'melee_on'):
                 h[k] = tuple(v) if k != 'melee_roll' else v
         walk.HOLSTERS[slot] = h
+    for kind in list(getattr(walk, 'HELMET_BACK', {})):
+        pre = 'hb_%s_' % kind
+        if hasattr(p, pre + 'bone'):
+            walk.HELMET_BACK[kind] = dict(bone=getattr(p, pre + 'bone'), at=tuple(getattr(p, pre + 'at')), turn=tuple(getattr(p, pre + 'turn')),
+                                          scale=getattr(p, pre + 'scale'))
     for mount, old in getattr(walk, 'GEAR', {}).items():
         pre = 'gr_%s_' % mount
         g = dict(old)
@@ -540,6 +545,10 @@ def loop_pose(what, kind, t):
         return walk.wed_at(t, kind != 'over')   # wed:under palms up, wed:over palms down on the partner's
     if what.startswith('dress_'):
         return walk.dress_at(t, what[len('dress_'):])   # Time is how far through it: 0 standing .. dressed .. 1 standing
+    if what == 'pool_climb':
+        return walk.climb_at(t)
+    if what == 'pool_vault':
+        return walk.vault_at(t)   # Time is how far across: 0 standing behind the wall .. 1 standing past it   # Time is how far through it: 0 in the water at the wall .. 1 standing outside
     if what == 'toss':
         return walk.toss_at(t)   # Time is how far through the pitch: 0 standing .. let go at walk.TOSS_RELEASE .. 1 standing
     if what == 'reel':
@@ -2399,6 +2408,129 @@ def gear_mount_items(self, context):
     holster_cache['mounts'] = items or [('', '(none)', 'walk.py has no GEAR')]
     return holster_cache['mounts']
 
+# A helmet carried on the back while its wearer isn't drafted (walk.HELMET_BACK, SkinnedFigure.HelmetOnBack): one of the
+# export's helmet garments, upright and turned to face the side, its middle at 'at' on the bare body (the game pushes it out
+# past what is worn, which this doesn't), drawn at the size of the half-shrunk head's helmet times 'scale'. G on the handle
+# moves it, R turns it.
+HELMET_OBJ = 'helmet_back_'   # + garment: the preview's mesh (under WORN, so a worn-garment pass leaves it to this)
+HELMET_GRIP = 'MaruHelmetGrip'
+SHRUNK_HEAD = 0.543   # SettingsMod.ShrunkSize: the full Shrinkhead key's head, of the full chibi head's
+
+def helmet_garment_items(self, context):
+    items = [(g, g, 'The helmet shown on the back') for g in garment_names() if 'elmet' in g]
+    holster_cache['helmets'] = items or [('', '(none)', 'No helmet garment in the export')]
+    return holster_cache['helmets']
+
+def helmet_kind_changed(self, context):
+    state['helmet'] = None   # the handle goes to the kind picked
+    repose()
+
+def helmet_picked(self, context):
+    if self.hb_pick:
+        self['hb_%s_garment' % self.hb_kind] = self.hb_pick
+    repose()
+
+def helmet_k(mix):
+    """SkinnedFigure.HelmetBackScale: the size of a helmet on the back, of its size worn, for the head shrink in mix."""
+    shrink = dict(mix).get('Shrinkhead', 0.0)
+    if shrink >= 1.0:
+        return 1.0
+    size = lambda s: 1.0 - (1.0 - SHRUNK_HEAD) * s
+    return size((shrink + 1.0) * 0.5) / size(shrink)
+
+HELMET_KINDS = (('open', 'Open', 'A helmet open at the face (simple, flak): its opening against the back, top out'),
+                ('full', 'Full', 'A helmet covering the whole head (power armour, plate, recon): upright, facing the side'))
+HELMET_LOOK = {'open': 'SimpleHelmet', 'full': 'PowerArmorHelmet'}   # the helmet each kind shows to start with
+
+def hb(p, name):
+    """The helmet kind picked's own setting (hb_<kind>_<name>)."""
+    return getattr(p, 'hb_%s_%s' % (p.hb_kind, name))
+
+def helmet_turn(p):
+    return Euler([math.radians(v) for v in hb(p, 'turn')], 'XYZ').to_quaternion()
+
+def helmet_bone(p):
+    bone = hb(p, 'bone')
+    return walk.arm.pose.bones[bone].matrix @ walk.rest[bone].inverted()
+
+def draw_helmet_back(p):
+    """The helmet on the back where the numbers put it; hidden with the box off or no export."""
+    shown = None
+    garment = hb(p, 'garment') if getattr(walk, 'HELMET_BACK', None) else ''
+    if p.hb_show and garment:
+        try:
+            fig = figure()
+            mix = body_mix()
+            rest = np.asarray(fig.shaped(garment, mix), dtype=float)
+        except (OSError, KeyError):
+            rest = None
+        if rest is not None:
+            bpy.context.view_layer.update()   # the bones' new places
+            axes = Matrix(((-1, 0, 0), (0, 0, 1), (0, -1, 0)))   # as export_frames' game_dir
+            turn = np.array(axes @ helmet_turn(p).to_matrix() @ axes.transposed())
+            centre = (rest.min(axis=0) + rest.max(axis=0)) * 0.5
+            at = fig.hips + holster_push.game_dir(tuple(hb(p, 'at')))
+            verts = ((rest - centre) * (helmet_k(mix) * hb(p, 'scale'))) @ turn.T + at
+            m = np.array(helmet_bone(p))
+            verts = to_rest(fig, verts) @ m[:3, :3].T + m[:3, 3]
+            obj = worn_mesh(HELMET_OBJ + garment, verts, fig.piece(garment).tris)
+            obj.matrix_world = walk.arm.matrix_world
+            obj.display_type = 'WIRE' if p.worn_wire else 'TEXTURED'
+            obj.hide_viewport = False
+            shown = obj.name
+    for obj in bpy.data.objects:
+        if obj.name.startswith(WORN + HELMET_OBJ) and obj.name != shown:
+            obj.hide_viewport = True
+
+def place_helmet_grip(p, write=True):
+    """An arrows empty on the helmet's middle (left where it is while playing, or when it was just moved)."""
+    obj = bpy.data.objects.get(HELMET_GRIP)
+    if not p.hb_show or not getattr(walk, 'HELMET_BACK', None):
+        if obj is not None:
+            bpy.data.objects.remove(obj)
+        state['helmet'] = None
+        return
+    if obj is None:
+        obj = bpy.data.objects.new(HELMET_GRIP, None)
+        obj.empty_display_type = 'ARROWS'
+        obj.rotation_mode = 'QUATERNION'
+        obj.hide_render = True
+        bpy.context.scene.collection.objects.link(obj)
+        state['helmet'] = None
+    obj.empty_display_size = walk.LEG * walk.arm.matrix_world.to_scale().y * 0.3
+    if state.get('helmet') is not None and (p.playing or not write):
+        return
+    mw = walk.arm.matrix_world
+    fig = figure()
+    at = fig.hips + holster_push.game_dir(tuple(hb(p, 'at')))
+    obj.location = mw @ (helmet_bone(p) @ Vector(to_rest(fig, at)))
+    obj.rotation_quaternion = mw.to_quaternion() @ helmet_bone(p).to_quaternion() @ helmet_turn(p)
+    state['helmet'] = stored(obj)
+
+def helmet_moved(p):
+    """The helmet handle moved (G) sets its place, and turned (R) its turn, back to the rest pose through the bone it
+    rides. Whether it was."""
+    obj = bpy.data.objects.get(HELMET_GRIP)
+    if obj is None or state.get('helmet') is None:
+        return False
+    loc0, q0 = state['helmet']
+    loc, q = obj.location.copy(), obj.rotation_quaternion.normalized()
+    mw = walk.arm.matrix_world
+    shifted = (loc - loc0).length > 1e-5 * mw.to_scale().y
+    turned = abs(q.dot(q0)) < TURNED
+    if not (shifted or turned):
+        return False
+    state['helmet'] = (loc, q)
+    pre = 'hb_%s_' % p.hb_kind
+    if shifted:
+        back = helmet_bone(p).inverted() @ mw.inverted()
+        p[pre + 'at'] = tuple(Vector(hb(p, 'at')) + (back @ loc - back @ loc0) * model_scale() * mw.to_scale().y)
+    if turned:
+        was = Euler([math.radians(v) for v in hb(p, 'turn')], 'XYZ')
+        rest = (mw.to_quaternion() @ helmet_bone(p).to_quaternion()).inverted() @ q
+        p[pre + 'turn'] = tuple(math.degrees(v) for v in rest.to_euler('XYZ', was))
+    return True
+
 def restore_slab(*_):
     repose()
 
@@ -2629,7 +2761,7 @@ def stored(obj):
     return obj.location.copy(), obj.rotation_quaternion.normalized()
 
 def clear_handles():
-    for name in (HANDLE + 'L', HANDLE + 'R', GRIP, HOLSTER_GRIP, GEAR_GRIP, TOOL_FIST):
+    for name in (HANDLE + 'L', HANDLE + 'R', GRIP, HOLSTER_GRIP, GEAR_GRIP, HELMET_GRIP, TOOL_FIST):
         obj = bpy.data.objects.get(name)
         if obj is not None:
             bpy.data.objects.remove(obj)
@@ -2638,6 +2770,7 @@ def clear_handles():
     state['grip'] = None
     state['holster'] = None
     state['gear'] = None
+    state['helmet'] = None
 
 def grip_moved(p):
     """The grip handle moved (G) sets the weapon's place in the hand ('at'), and turned (R) its aim and roll; whether
@@ -2757,7 +2890,7 @@ def handles_moved(*_):
         finally:
             state['busy'] = False
         return
-    if not state.get('holster') and not state.get('gear') and not state.get('fist') and (not (state['handles'] or state['grip']) or state['chest'] is None):
+    if not state.get('holster') and not state.get('gear') and not state.get('helmet') and not state.get('fist') and (not (state['handles'] or state['grip']) or state['chest'] is None):
         return
     state['busy'] = True   # the re-pose updates the scene itself (draw_weapon): don't look again from inside it
     try:
@@ -2769,6 +2902,13 @@ def moved_handles():
     p = props()
     if tool_fist_moved(p):
         state['quiet'] = {'fist'}   # leave the fist handle where it was put
+        try:
+            repose()
+        finally:
+            state['quiet'] = set()
+        return
+    if helmet_moved(p):
+        state['quiet'] = {'helmet'}   # leave the helmet handle where it was put
         try:
             repose()
         finally:
@@ -3017,6 +3157,8 @@ def repose(_self=None, _context=None):
             place_holster_grip(p, write='holster' not in state['quiet'])
             draw_gear(p, hip_held(what, kind, p.time % 1.0))
             place_gear_grip(p, write='gear' not in state['quiet'])
+            draw_helmet_back(p)
+            place_helmet_grip(p, write='helmet' not in state['quiet'])
         except Exception as e:   # a share of 0 or 1 (STANCE, PEAK) can divide by zero: say so rather than spam tracebacks
             state['error'] = '%s: %s' % (type(e).__name__, e)
     walk.arm.update_tag()
@@ -3134,6 +3276,12 @@ def clip_items():
                   ('wade', 'Wading', 'The walk through water: the game sinks it to the depth (walk.wade_at)'),
                   ('swim', 'Swimming', 'The front crawl, upright: the game tips it face down (walk.swim_at)'),
                   ('tread', 'Treading water', 'Swimming but still, upright: the game sinks it to the neck (walk.tread_at)')]
+        if hasattr(walk, 'climb_at'):
+            items.append(('pool_climb', 'Climbing out of a pool', 'Out over a raised pool\'s wall, by Time (walk.climb_at, '
+                          'CLIMB): from the water to standing outside; the game plays it backwards to get in'))
+        if hasattr(walk, 'vault_at'):
+            items.append(('pool_vault', 'Vaulting a pool wall', 'Over a raised pool\'s wall in passing, by Time (walk.vault_at, '
+                          'VAULT); the game plays it by where the pawn is across the wall'))
     if hasattr(walk, 'hurt_at'):
         items += [('hurt:' + k, 'Hurt: ' + k.replace('_', ' '), 'A hand on the wound, hunched (walk.hurt_at)')
                   for k in walk.hurt_kinds()]
@@ -3475,6 +3623,27 @@ def build_props():
         'gear_mount': bpy.props.EnumProperty(name='Mount', items=gear_mount_items, update=repose,
                                              description='The mount whose numbers are shown and which the handle is on'),
     })
+    if getattr(walk, 'HELMET_BACK', None):
+        ann['hb_show'] = bpy.props.BoolProperty(name='Show helmet on the back', default=True, update=repose,
+                                                description='Draw a helmet carried on the back while undrafted (walk.HELMET_BACK, the helmetStow option)')
+        ann['hb_pick'] = bpy.props.EnumProperty(name='Pick', items=helmet_garment_items, update=helmet_picked,
+                                                description="Show one of the export's helmet garments for this kind")
+        ann['hb_kind'] = bpy.props.EnumProperty(name='Kind', items=HELMET_KINDS, update=helmet_kind_changed,
+                                                description='Which kind of helmet is shown and set: each has its own place')
+        bones = [(b.name, b.name, 'Rides %s' % b.name) for b in walk.arm.data.bones if b.use_deform]
+        for kind, h in walk.HELMET_BACK.items():
+            pre = 'hb_%s_' % kind
+            ann[pre + 'garment'] = bpy.props.StringProperty(name='Helmet', default=HELMET_LOOK.get(kind, ''), update=repose,
+                                                            description="The export's helmet garment shown on the back")
+            ann[pre + 'bone'] = bpy.props.EnumProperty(name='Bone', items=bones, default=h['bone'], update=repose, description='The bone the helmet rides')
+            ann[pre + 'at'] = bpy.props.FloatVectorProperty(name='At', default=h['at'], size=3, soft_min=-0.4, soft_max=0.4, step=0.1, precision=4, update=repose,
+                                                            subtype='XYZ', description="Where the helmet's middle goes at rest, model units from the hips: x left, "
+                                                            "y back, z up (the game pushes it out past what is worn)")
+            ann[pre + 'turn'] = bpy.props.FloatVectorProperty(name='Turn', default=h['turn'], size=3, soft_min=-180.0, soft_max=180.0, step=100, precision=1,
+                                                              update=repose, subtype='XYZ', description='Degrees about x, y and z in that order from upright '
+                                                              'facing forward (-90 about x lays its top out of the back, 90 about z faces the figure\'s left); R on the handle')
+            ann[pre + 'scale'] = bpy.props.FloatProperty(name='Scale', default=h['scale'], min=0.05, soft_max=2.0, step=1, precision=3, update=repose,
+                                                         description='A share of the helmet\'s size at half way from the head shrink to a fully shrunk head')
     for mount, g in getattr(walk, 'GEAR', {}).items():
         pre = 'gr_%s_' % mount
         choices = gear_models().get(mount, [])
@@ -3875,6 +4044,21 @@ def write_gear(src, changed):
     changed.append('GEAR')
     return src[:m.end()] + '\n' + lines + src[close:]
 
+def write_helmet_back(src, changed):
+    """walk.py with the HELMET_BACK table rewritten from the walk module (one kind a line), if it changed."""
+    m = re.search(r'^HELMET_BACK\s*=\s*\{', src, re.M)
+    table = getattr(walk, 'HELMET_BACK', None)
+    if m is None or not table:
+        return src
+    close = match_close(src, m.end() - 1)
+    tup = lambda v: '(%s)' % ', '.join(fmt(x) for x in v)
+    lines = ''.join("    '%s': dict(bone='%s', at=%s, turn=%s, scale=%s),\n" % (k, h['bone'], tup(h['at']), tup(h['turn']), fmt(h['scale']))
+                    for k, h in table.items())
+    if src[m.end():close] == '\n' + lines:
+        return src
+    changed.append('HELMET_BACK')
+    return src[:m.end()] + '\n' + lines + src[close:]
+
 def write_table(src, name, changed):
     """walk.py with the table name (WEAPON_TYPES, TYPE_SCALE, TYPE_HOLSTER) rewritten whole from the walk module, one
     entry a line, if it changed."""
@@ -4093,6 +4277,7 @@ class MARU_OT_write(bpy.types.Operator):
         for name in ('WEAPON_TYPES', 'TYPE_SCALE', 'TYPE_HOLSTER'):
             src = write_table(src, name, changed)
         src = write_gear(src, changed)
+        src = write_helmet_back(src, changed)
         with open(WALK_PY, 'w') as f:
             f.write(src)
         report = ['walk.py: ' + (', '.join(changed) if changed else 'nothing changed')]
@@ -4294,6 +4479,8 @@ class MARU_PT_gait(bpy.types.Panel):
             self.draw_holsters(p)
         if getattr(walk, 'GEAR', None):
             self.draw_gear(p)
+        if getattr(walk, 'HELMET_BACK', None):
+            self.draw_helmet_back(p)
 
         tuples = {n for n, _, t in names if t}
         for i, (title, members) in enumerate(sections):
@@ -4420,6 +4607,28 @@ class MARU_PT_gait(bpy.types.Panel):
         col.label(text='Turned at rest, degrees about x, y, z')
         col.prop(p, pre + 'turn', text='')
         box.operator('maru.gait_grab', text='Select gear handle', icon='EMPTY_ARROWS').target = GEAR_GRIP
+
+    def draw_helmet_back(self, p):
+        box = self.layout.box()
+        row = box.row()
+        row.label(text='HELMET ON THE BACK (undrafted)')
+        row.prop(p, 'hb_show', text='', icon='HIDE_OFF' if p.hb_show else 'HIDE_ON', emboss=False)
+        if not p.hb_show:
+            return
+        box.row(align=True).prop(p, 'hb_kind', expand=True)
+        pre = 'hb_%s_' % p.hb_kind
+        col = box.column(align=True)
+        row = col.row(align=True)
+        row.prop(p, pre + 'garment', text='Helmet')
+        row.prop_menu_enum(p, 'hb_pick', text='', icon='DOWNARROW_HLT')
+        col.prop(p, pre + 'bone')
+        col.label(text='Middle at rest, model units from the hips (x left, y back, z up)')
+        col.prop(p, pre + 'at', text='')
+        col.label(text='Turned, degrees about x, y, z from upright facing forward')
+        col.prop(p, pre + 'turn', text='')
+        col.prop(p, pre + 'scale')
+        box.label(text='Shown on the bare body: the game pushes it out past clothes, packs and weapons', icon='INFO')
+        box.operator('maru.gait_grab', text='Select helmet handle', icon='EMPTY_ARROWS').target = HELMET_GRIP
 
     def draw_holsters(self, p):
         box = self.layout.box()
@@ -4670,6 +4879,9 @@ def reload_walk():
     looks['copy_from'] = keep.copy_from
     looks['holsters'] = keep.holsters
     looks['gear_show'] = keep.gear_show
+    if hasattr(keep, 'hb_show'):
+        looks['hb_show'], looks['hb_kind'] = keep.hb_show, keep.hb_kind
+        looks.update({n: getattr(keep, n) for n in keep.bl_rna.properties.keys() if n.startswith('hb_') and n.endswith('_garment')})
     looks['worn_show'], looks['worn_wire'] = keep.worn_show, keep.worn_wire
     looks.update({n: getattr(keep, n) for n in keep.bl_rna.properties.keys() if n.startswith('wn_') or (n.startswith('hs_') and n.endswith('_filled'))})
     looks.update({n: getattr(keep, n) for n in keep.bl_rna.properties.keys() if n.startswith('gr_') and n.endswith(('_model', '_on'))})

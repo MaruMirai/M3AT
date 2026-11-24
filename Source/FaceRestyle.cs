@@ -348,6 +348,83 @@ namespace M3AT
             return humanMouthWidth;
         }
 
+        // ---- A wide mouth shape drawn narrower.
+
+        // Some shapes are drawn much wider than the set's others (the retexture's Impish and Smirk smiles, curving down on
+        // one side and up on the other, 0.043 .. 0.047 of the texture against its 0.039 median; Experimentals' puzzled
+        // mouths 0.055; UNAGI's Happakuwae 0.14), which reads too wide on the chibi's face. So each shape is measured as
+        // drawn (its own texture, after the race's fit, RaceMouthScale), and only the part of its width past MouthWideFrom
+        // of a human's median width is kept, MouthWideKeep of it: a wider shape still comes out wider than a narrower one,
+        // never clamped to one size. Shapes under it are left alone. With the crisper mouths option (RaceMouthInk).
+        // Not consts, so the dev window (FaceDevTune.cs) can move them.
+        internal static float MouthWideFrom = 0.95f;
+        internal static float MouthWideKeep = 0.35f;
+        private static float drawMouthShape = 1f;   // the pawn being drawn's mouth shape's (Layer, from its first mouth layer)
+        private static bool mouthShaped;
+        private static readonly Dictionary<Texture, float> shapeWidths = new Dictionary<Texture, float>();
+
+        internal static float MouthShapeScale(Graphic g)
+        {
+#if AUTOTEST
+            if (TestNoMouthFit)
+            {
+                return 1f;
+            }
+#endif
+            if (!RaceMouthInk || g == null || g.MatSouth == null)
+            {
+                return 1f;
+            }
+            Texture2D tex = g.MatSouth.mainTexture as Texture2D;
+            if (tex == null)
+            {
+                return 1f;
+            }
+            float own;
+            if (!shapeWidths.TryGetValue(tex, out own))
+            {
+                own = WidthOf(tex);
+                shapeWidths[tex] = own;
+            }
+            float drawn = own * drawMouthScale;
+            float from = MouthWideFrom * HumanMouthWidthNow();
+            if (drawn <= from || drawn <= 0f)
+            {
+                return 1f;
+            }
+            return (from + (drawn - from) * MouthWideKeep) / drawn;
+        }
+
+        // A mouth texture's width (texture widths): its columns with alpha MouthWidthAlpha or more, read at 256. 0 if none.
+        private static float WidthOf(Texture2D tex)
+        {
+            const int Read = 256;
+            Color32[] px;
+            try
+            {
+                px = Api.ReadSpritePixels(tex, Read);
+            }
+            catch (Exception)
+            {
+                px = null;
+            }
+            if (px == null || px.Length < Read * Read)
+            {
+                return 0f;
+            }
+            int c0 = Read, c1 = -1;
+            for (int i = 0; i < Read * Read; i++)
+            {
+                if (px[i].a >= MouthWidthAlpha)
+                {
+                    int c = i % Read;
+                    c0 = Math.Min(c0, c);
+                    c1 = Math.Max(c1, c);
+                }
+            }
+            return c1 >= c0 ? (c1 - c0 + 1f) / Read : 0f;
+        }
+
         // The median width (texture widths) of every south mouth shape in a face set's Mouth folder, as drawn (the last
         // loaded mod's at each path), each by its columns with alpha MouthWidthAlpha or more. 0 if it has none.
         private static float MouthWidthOf(string root)
@@ -375,35 +452,12 @@ namespace M3AT
                 }
             }
             List<float> widths = new List<float>();
-            const int Read = 256;
             foreach (Texture2D tex in found.Values)
             {
-                Color32[] px;
-                try
+                float w = WidthOf(tex);
+                if (w > 0f)
                 {
-                    px = Api.ReadSpritePixels(tex, Read);
-                }
-                catch (Exception)
-                {
-                    px = null;
-                }
-                if (px == null || px.Length < Read * Read)
-                {
-                    continue;
-                }
-                int c0 = Read, c1 = -1;
-                for (int i = 0; i < Read * Read; i++)
-                {
-                    if (px[i].a >= MouthWidthAlpha)
-                    {
-                        int c = i % Read;
-                        c0 = Math.Min(c0, c);
-                        c1 = Math.Max(c1, c);
-                    }
-                }
-                if (c1 >= c0)
-                {
-                    widths.Add((c1 - c0 + 1f) / Read);
+                    widths.Add(w);
                 }
             }
             widths.Sort();

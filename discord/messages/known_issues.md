@@ -8,4 +8,4 @@ These are already known, so there's no need to report them. They'll be worked on
 - **Statues** are still drawn by IsoRim in its own style.
 - **Some animations are still basic** and will be improved.
 
-Found something that isn't on this list? Make a post in #issues-and-bugs.
+Found something that isn't on this list? Report it in #submit-bug-report.

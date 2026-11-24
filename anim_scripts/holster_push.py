@@ -29,7 +29,7 @@ ISORIM_PACK_TALL = 0.40
 ISORIM_PACK_MIDDLE = 0.226
 SLAB_HALF_DEPTH = 0.025 # WalkFigures.SlabHalfDepth: cells, half of IsoRim's slab
 STACK_GAP = 0.005       # WalkFigures.StackGap: model units left between two weapons lying on each other
-NO_CLEARANCE_DEFS = ("Apparel_Bandolier", "CE_Apparel_TacVest", "Apparel_Scarf")   # SkinnedFigure.NoClearanceDefs: webbing lain over, not pushed out by
+NO_CLEARANCE_DEFS = ("Apparel_Bandolier", "CE_Apparel_TacVest", "Apparel_Scarf", "Apparel_Gorget")   # SkinnedFigure.NoClearanceDefs: webbing lain over, not pushed out by
 
 # What a figure has on (Posed.Wearing): the body's keys as ((name, amount), ...), the garments worn by name, and whether an
 # equipment pack is drawn on its back. Grown and of the standard size in the preview, so both pack scales are 1. gear_belt:

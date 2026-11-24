@@ -251,6 +251,12 @@ namespace M3AT
         // the body too, a shader missing): the caller then draws it as IsoRim does.
         public static bool DrawJoined(ModelHandle m, Color tint, string swatch, Matrix4x4 trueSpace)
         {
+            if (m != null && ScreenOutlinesNow)
+            {
+                Api.ModelParts(m, tint, swatch, theirs);
+                DrawJoinedScreen(theirs, trueSpace);
+                return true;
+            }
             if (m == null || !Outlines || !Silhouette || OutlineMaterial() != outline || outline == null || outlineMark == null
                 || ClearMaterial() == null || StencilSetMaterial() == null)
             {

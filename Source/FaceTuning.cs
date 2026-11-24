@@ -98,7 +98,7 @@ namespace M3AT
         {
             Settings s = SettingsMod.Settings;
             bool mouth = kind == "MouthControllerComp";
-            bool sized = mouth && Mathf.Abs(drawMouthScale - 1f) > 1e-4f;   // another race's mouth fitted to a human's size (FaceRestyle.cs)
+            bool sized = mouth && Mathf.Abs(drawMouthScale * drawMouthShape - 1f) > 1e-4f;   // another race's mouth fitted to a human's size, a wide shape narrowed (FaceRestyle.cs)
             sized |= DevTuning;   // the dev window's numbers on every face (FaceDevTune.cs)
             if (s == null || (!noting && !sized && s.faceTunes.Count == 0 && (!mouth || s.mouthTunes.Count == 0)))
             {
@@ -142,7 +142,7 @@ namespace M3AT
             }
             // The mouth's places (m0 = C + (f0 - C - r) / Z, Zoomed) taken back to the face's, tuned as the face, then zoomed
             // again with the mouth's own move and size on top: m = C + (f - C - r - dm) / (Z ms).
-            float ms = Mathf.Max(0.05f, mouthTune.z) * (mouth ? drawMouthScale : 1f);
+            float ms = Mathf.Max(0.05f, mouthTune.z) * (mouth ? drawMouthScale * drawMouthShape : 1f);
             Vector2 c = MouthCentre;
             Vector2 r = new Vector2(0f, raise);
             Vector2 dm = new Vector2(mouthTune.x, mouthTune.y);
