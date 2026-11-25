@@ -42,7 +42,8 @@ KIT_VERSION = 1
 LAYER_OFFSET = {'Underwear': 0.0030, 'OnSkin': 0.0042, 'Middle': 0.0085, 'Shell': 0.0127, 'Webbing': 0.0170}
 TEXTURE_SIZE = 1024   # the most pixels across a written image (M3AT's own are this or less)
 TRIANGLES_LOW = 800      # a garment over this many triangles is told it is heavy
-TRIANGLES_MOST = 2500    # and over this, warned: the body itself has about 1200
+TRIANGLES_MOST = 2500     # M3AT's budget for a garment worn on the body (Source/GarmentBudget.cs): past it the game simplifies it
+TRIANGLES_HEAD = 1500     # and for one worn on the head
 BODY = 'M3AT_Body'
 RIG = 'M3AT_Rig'
 
@@ -206,6 +207,7 @@ class M3AT_OT_import_body(bpy.types.Operator):
         o.shape_key_add(name='Basis', from_mix=False)
         for name, moves in body['keys'].items():
             k = o.shape_key_add(name=name, from_mix=False)
+            k.value = 0.0   # (each came in at 1, every shape at once, and the body swelled over the garments)
             for i, d in moves.items():
                 k.data[i].co = to_blender(*(body['v'][i][c] + d[c] for c in range(3)))
         # The armature: each bone from its joint to its first child's (or on along its parent's way), to pose.
@@ -589,8 +591,10 @@ def export_garment(context, o, out, report):
     with open(os.path.join(out, 'garment_%s.txt' % name), 'w') as f:
         f.write('\n'.join(lines) + '\n')
     count = len(tris)
-    if count > TRIANGLES_MOST:
-        report({'WARNING'}, '%s: %d triangles, more than twice the body\'s: decimate it (Docs/Apparel.md, Keep it low poly)' % (name, count))
+    budget = TRIANGLES_HEAD if s.on_head else TRIANGLES_MOST
+    if count > budget:
+        report({'WARNING'}, '%s: %d triangles, over M3AT\'s budget of %d: the game will simplify it as it loads, which can spoil its shape. '
+               'Decimate it yourself (Docs/Apparel.md, Keep it low poly)' % (name, count, budget))
     elif count > TRIANGLES_LOW:
         report({'INFO'}, '%s: %d triangles (a fair amount; most of M3AT\'s garments are under %d)' % (name, count, TRIANGLES_LOW))
     else:

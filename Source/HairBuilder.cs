@@ -919,23 +919,166 @@ namespace M3AT
             float eyeY = chinAll + FaceEyes * (topAll - chinAll);
             Color32[] px = new Color32[texSize * texSize];
             Color32[] south = Streaked(sp)[0];   // with the 3D beard's strand streaks
+            // Texels a sprite pixel spans across (the rows are spread unevenly by RowOf, but about as much).
+            float texelsPerPixel = texSize * sx / span;
             for (int r = 0; r < texSize; r++)
             {
                 // FaceLayers shows this texel FaceRaise higher up the face than its own place on the patch, so it takes
                 // the sprite row the 3D beard puts there.
                 float y = eyeY + ((r + 0.5f) / texSize - FaceEyeV + FaceLayers.FaceRaise) * span;
                 float Y = RowOf(y);
-                int row = Mathf.RoundToInt(Y);
                 for (int i = 0; i < texSize; i++)
                 {
                     float x = (0.5f - (i + 0.5f) / texSize) * span;
-                    int col = Mathf.RoundToInt(midX + (cx - x) / sx);   // not widened (Widen)
-                    bool inside = col >= 0 && col < Size && row >= 0 && row < Size;
-                    px[r * texSize + i] = inside ? south[row * Size + col] : new Color32(0, 0, 0, 0);
+                    float X = midX + (cx - x) / sx;   // not widened (Widen)
+                    px[r * texSize + i] = FlatSharp ? SharpAt(south, X, Y, texelsPerPixel) : NearestAt(south, X, Y);
                 }
             }
             ClearEars(px, texSize, span, eyeY);
+            if (FlatSharp)
+            {
+                BleedColour(px, texSize);
+            }
             return px;
+        }
+
+        // A flat beard's texture is read from the sprite sharper (SharpAt, BleedColour); the harness turns it off with
+        // M3AT_FLAT_NEAREST, to compare. Taking each texel's nearest sprite pixel, as it was, drew the outline as a staircase
+        // of the art's pixels (about four texels a step), which broke up into dashes further off.
+        internal static bool FlatSharp = true;
+        // Of the way a texel's edge is stretched to one texel wide, as the face shaders' SharpEdge.
+        private const float FlatEdge = 0.9f;
+        // Sprite pixels an edge of the art is soft over as read: most sprites are drawn at 128 pixels and read at Size
+        // (256) bilinearly (IsoRim's SpritePixels), so an edge a pixel wide in the art is about two here.
+        internal static float FlatSoft = 2f;
+        // Art fainter than this (alpha, 0..1) about a place is left as the B-spline reads it, as the face shaders' SharpFaint.
+        private const float FlatFaint = 0.04f;
+        // Clear texels given the colour of the art nearby (BleedColour), so filtering doesn't darken its edges.
+        private const int BleedPasses = 8;
+
+        private static Color32 NearestAt(Color32[] sprite, float X, float Y)
+        {
+            int col = Mathf.RoundToInt(X), row = Mathf.RoundToInt(Y);
+            return col >= 0 && col < Size && row >= 0 && row < Size ? sprite[row * Size + col] : new Color32(0, 0, 0, 0);
+        }
+
+        private static Color32 PixelAt(Color32[] sprite, int col, int row)
+        {
+            return col >= 0 && col < Size && row >= 0 && row < Size ? sprite[row * Size + col] : new Color32(0, 0, 0, 0);
+        }
+
+        // The sprite at (X, Y), sprite pixels (their middles at whole numbers, rows top first), read for a texture that
+        // texelsPerPixel texels a sprite pixel: its alpha as a cubic B-spline of the pixels round it (smooth contours, no
+        // overshoot), stretched about half its local peak so the edge is about one texel wide (as FaceArt sharpens the face
+        // art on screen, here once), so the outline follows smooth curves rather than the sprite's pixel grid; a faint or
+        // thin line keeps its strength. The colour is the nearest pixel's, so the strand streaks stay crisp, or near the
+        // edge, where that may be clear, the alpha-weighted mean of the four round it.
+        private static Color32 SharpAt(Color32[] sprite, float X, float Y, float texelsPerPixel)
+        {
+            int c0 = Mathf.FloorToInt(X), r0 = Mathf.FloorToInt(Y);
+            float fx = X - c0, fy = Y - r0;
+            float[] wx = BSplineWeights(fx), wy = BSplineWeights(fy);
+            float b = 0f;
+            for (int j = 0; j < 4; j++)
+            {
+                for (int i = 0; i < 4; i++)
+                {
+                    b += wx[i] * wy[j] * PixelAt(sprite, c0 - 1 + i, r0 - 1 + j).a;
+                }
+            }
+            b /= 255f;
+            Color32 p00 = PixelAt(sprite, c0, r0), p10 = PixelAt(sprite, c0 + 1, r0);
+            Color32 p01 = PixelAt(sprite, c0, r0 + 1), p11 = PixelAt(sprite, c0 + 1, r0 + 1);
+            float peak = Mathf.Max(b, Mathf.Max(Mathf.Max(p00.a, p10.a), Mathf.Max(p01.a, p11.a)) / 255f);
+            float a = b;
+            if (peak > FlatFaint)
+            {
+                float k = Mathf.Max(1f, texelsPerPixel * FlatSoft * FlatEdge);
+                a = Mathf.Clamp01((b - 0.5f * peak) * k / peak + 0.5f) * peak;
+            }
+            Color32 near = NearestAt(sprite, X, Y);
+            float rr, gg, bb;
+            if (near.a >= 128)
+            {
+                rr = near.r; gg = near.g; bb = near.b;
+            }
+            else
+            {
+                float w00 = (1f - fx) * (1f - fy) * p00.a, w10 = fx * (1f - fy) * p10.a;
+                float w01 = (1f - fx) * fy * p01.a, w11 = fx * fy * p11.a;
+                float w = w00 + w10 + w01 + w11;
+                if (w <= 0f)
+                {
+                    return new Color32(0, 0, 0, 0);
+                }
+                rr = (w00 * p00.r + w10 * p10.r + w01 * p01.r + w11 * p11.r) / w;
+                gg = (w00 * p00.g + w10 * p10.g + w01 * p01.g + w11 * p11.g) / w;
+                bb = (w00 * p00.b + w10 * p10.b + w01 * p01.b + w11 * p11.b) / w;
+            }
+            return new Color32((byte)Mathf.RoundToInt(rr), (byte)Mathf.RoundToInt(gg), (byte)Mathf.RoundToInt(bb),
+                (byte)Mathf.RoundToInt(a * 255f));
+        }
+
+        // The cubic B-spline's weights for the four pixels round a place f (0..1) past the second.
+        private static float[] BSplineWeights(float f)
+        {
+            float f2 = f * f, f3 = f2 * f;
+            return new float[] { (1f - 3f * f + 3f * f2 - f3) / 6f, (4f - 6f * f2 + 3f * f3) / 6f,
+                (1f + 3f * f + 3f * f2 - 3f * f3) / 6f, f3 / 6f };
+        }
+
+        // Clear texels (alpha 0) next to coloured ones take their mean colour, BleedPasses texels out, so the bilinear
+        // filter (and any smaller level), which averages colour whatever its alpha, doesn't draw a dark rim round the beard.
+        // Alpha is left as it is.
+        private static void BleedColour(Color32[] px, int texSize)
+        {
+            bool[] has = new bool[px.Length];
+            for (int k = 0; k < px.Length; k++)
+            {
+                has[k] = px[k].a > 0;
+            }
+            for (int pass = 0; pass < BleedPasses; pass++)
+            {
+                List<int> filled = new List<int>();
+                for (int r = 0; r < texSize; r++)
+                {
+                    for (int i = 0; i < texSize; i++)
+                    {
+                        int at = r * texSize + i;
+                        if (has[at])
+                        {
+                            continue;
+                        }
+                        int n = 0, sr = 0, sg = 0, sb = 0;
+                        for (int dr = -1; dr <= 1; dr++)
+                        {
+                            for (int di = -1; di <= 1; di++)
+                            {
+                                int rr = r + dr, ii = i + di;
+                                if (rr < 0 || rr >= texSize || ii < 0 || ii >= texSize || !has[rr * texSize + ii])
+                                {
+                                    continue;
+                                }
+                                Color32 q = px[rr * texSize + ii];
+                                sr += q.r; sg += q.g; sb += q.b; n++;
+                            }
+                        }
+                        if (n > 0)
+                        {
+                            px[at] = new Color32((byte)(sr / n), (byte)(sg / n), (byte)(sb / n), 0);
+                            filled.Add(at);
+                        }
+                    }
+                }
+                if (filled.Count == 0)
+                {
+                    break;
+                }
+                foreach (int at in filled)
+                {
+                    has[at] = true;
+                }
+            }
         }
 
         // The ears are part of the face patch, and stick out past the cheeks where the sprite's beard reaches on either side

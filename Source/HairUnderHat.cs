@@ -538,9 +538,19 @@ namespace M3AT
             foreach (KeyValuePair<string, Vector3[]> key in from.keys)
             {
                 Vector3[] moves = new Vector3[count];
+                // The head's shrink moves a place by (scale - 1) times its distance from the head's middle, so a place
+                // drawn in under the rim takes that much less of its old place's move. Taken as it was, each drawn-in
+                // vertex was pulled in again by 0.44 of how far it had been drawn in on the whole key, and the fringe's
+                // top went in under the forehead, a strip of skin between it and the hat's brim.
+                bool shrink = string.Equals(key.Key, ShrinkKey, StringComparison.OrdinalIgnoreCase);
                 for (int i = 0; i < count; i++)
                 {
                     moves[i] = Vector3.Lerp(key.Value[sourceA[i]], key.Value[sourceB[i]], along[i]);
+                    if (shrink)
+                    {
+                        Vector3 place = Vector3.Lerp(from.rest[sourceA[i]], from.rest[sourceB[i]], along[i]);
+                        moves[i] += (headScale - 1f) * (p.rest[i] - place);
+                    }
                 }
                 p.keys[key.Key] = moves;
             }

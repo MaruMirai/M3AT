@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using UnityEngine;
 using Verse;
 
@@ -68,13 +69,15 @@ namespace M3AT
                 own[all[g].name] = all[g];
             }
             HashSet<string> names = new HashSet<string>(own.Keys, StringComparer.OrdinalIgnoreCase);
-            foreach (KeyValuePair<string, string> found in ModGarmentFiles())
+            List<GarmentFile> files = ModGarmentFiles().ToList();
+            files.AddRange(PackGarmentFiles());
+            foreach (GarmentFile found in files)
             {
-                string path = found.Key, mod = found.Value;
+                string path = found.path, mod = found.modName;
                 Piece g;
                 try
                 {
-                    g = ReadModGarment(path, mod, own, body);
+                    g = ReadModGarment(path, mod, own, body, found.textureDir, found.owner);
                 }
                 catch (Exception e)
                 {
@@ -92,6 +95,11 @@ namespace M3AT
                 }
                 foreach (string def in g.defs)
                 {
+                    int was;
+                    if (garmentOf.TryGetValue(def, out was) && all[was].owner == null && !ownGarmentOf.ContainsKey(def))
+                    {
+                        ownGarmentOf[def] = was;   // ours, drawn again if the player has M3AT draw that pack's clothing
+                    }
                     garmentOf[def] = all.Count;   // after this mod's own, so it wins for apparel both name
                 }
                 if (g.genes != null && g.genes.Length > 0)
@@ -109,8 +117,34 @@ namespace M3AT
             }
         }
 
+        private struct GarmentFile
+        {
+            public string path, modName, textureDir, owner;   // textureDir: where its image is (null: beside it); owner: its pack (null: by its path)
+        }
+
+        // The garment folders content packs registered (ExpansionApi 2's Garments), their images where the pack says.
+        private static IEnumerable<GarmentFile> PackGarmentFiles()
+        {
+            foreach (KeyValuePair<string, KeyValuePair<string, string>> f in ExpansionApi.GarmentFolders())
+            {
+                string dir = f.Value.Key;
+                if (!Directory.Exists(dir))
+                {
+                    Log.Warning(Tag + f.Key + " registered the garment folder " + dir + ", which isn't there.");
+                    continue;
+                }
+                ModContentPack mod = AddOns.ModById(f.Key);
+                string[] found = Directory.GetFiles(dir, "*.txt");
+                Array.Sort(found, StringComparer.Ordinal);
+                foreach (string file in found)
+                {
+                    yield return new GarmentFile { path = file, modName = mod != null ? mod.Name : f.Key, textureDir = f.Value.Value, owner = f.Key };
+                }
+            }
+        }
+
         // The garment files of every other active mod (path, the mod's name), then the config folder's.
-        private IEnumerable<KeyValuePair<string, string>> ModGarmentFiles()
+        private IEnumerable<GarmentFile> ModGarmentFiles()
         {
             List<KeyValuePair<string, string>> dirs = new List<KeyValuePair<string, string>>();
             string ownRoot = Path.GetFullPath(Path.Combine(folder, "..", ".."));
@@ -146,9 +180,35 @@ namespace M3AT
                 Array.Sort(files, StringComparer.Ordinal);
                 foreach (string file in files)
                 {
-                    yield return new KeyValuePair<string, string>(file, d.Value);
+                    yield return new GarmentFile { path = file, modName = d.Value };
                 }
             }
+        }
+
+        // The active mod whose folder holds this file, or null (the config folder, a harness).
+        internal static ModContentPack ModOfPath(string path)
+        {
+            try
+            {
+                string full = Path.GetFullPath(path);
+                foreach (ModContentPack mod in LoadedModManager.RunningModsListForReading)
+                {
+                    string root = Path.GetFullPath(mod.RootDir).TrimEnd('/', '\\') + Path.DirectorySeparatorChar;
+                    if (full.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return mod;
+                    }
+                }
+            }
+            catch (Exception)
+            {
+            }
+            return null;
+        }
+
+        private static bool IsOwnMod(ModContentPack mod)
+        {
+            return mod.PackageId != null && mod.PackageId.StartsWith("marumirai.m3at", StringComparison.OrdinalIgnoreCase);
         }
 
         // anim.txt's bone lines: each bone's name and parent, by number, as the w lines and ReadAnim number them.
@@ -183,15 +243,17 @@ namespace M3AT
         }
 
         // One mod garment, read and fitted: null (and a message) if it can't be drawn.
-        private Piece ReadModGarment(string path, string mod, Dictionary<string, Piece> own, Piece body)
+        private Piece ReadModGarment(string path, string mod, Dictionary<string, Piece> own, Piece body, string textureDir = null, string ownerId = null)
         {
             Piece g = ReadMesh(path, false, null);
             if (g.name.StartsWith("garment_"))
             {
                 g.name = g.name.Substring("garment_".Length);
             }
-            g.modRoot = Path.GetDirectoryName(path);
+            g.modRoot = textureDir ?? Path.GetDirectoryName(path);   // where its image is read from
             g.modName = mod;
+            ModContentPack from = ModOfPath(path);
+            g.owner = ownerId ?? (from != null ? from.PackageId : null);
             if (g.defs == null)
             {
                 g.defs = new string[0];
@@ -213,6 +275,7 @@ namespace M3AT
                     Log.Warning(Tag + mod + "'s garment " + g.name + " has no vertices or triangles (and no base line), so it is not drawn.");
                     return null;
                 }
+                KeepWithinBudget(g, mod);   // (before fitting, which then works on the triangles kept)
                 FitToBody(g, body);
             }
             if (g.genes == null && g.defs.Length == 0 && string.IsNullOrEmpty(g.layer) && g.standsFor == null)
@@ -1036,6 +1099,10 @@ namespace M3AT
             for (int i = 0; i < geneParts.Count; i++)
             {
                 int g = geneParts[i];
+                if (OffAddOn(g))
+                {
+                    continue;   // its pack off, or the player has M3AT draw gene parts
+                }
                 GeneDef[] defs;
                 if (!geneDefs.TryGetValue(g, out defs))
                 {
@@ -1061,6 +1128,30 @@ namespace M3AT
                 }
             }
             return mask;
+        }
+
+        // True if a gene part in mask is drawn for one of these genes that the pawn has active (so M3AT's own for it isn't).
+        public bool GenePartCovers(GarmentMask mask, Pawn pawn, string[] genes)
+        {
+            if (mask == 0 || pawn.genes == null)
+            {
+                return false;
+            }
+            foreach (int g in GenePartsIn(mask))
+            {
+                foreach (string name in pieces[g].genes)
+                {
+                    if (Array.IndexOf(genes, name) >= 0)
+                    {
+                        GeneDef d = DefDatabase<GeneDef>.GetNamedSilentFail(name);
+                        if (d != null && pawn.genes.HasActiveGene(d))
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
         }
 
         // The gene parts in mask, by piece.

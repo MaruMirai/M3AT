@@ -14,12 +14,12 @@ namespace M3AT
     //
     // Units: positions in world cells; the whole-body matrix and a clip's poses in model units, which are cells at a
     // grown pawn's standard size (SizeOf scales them); yaw in degrees about up, as IsoRim's placing gives it.
-    public static class ExpansionApi
+    public static partial class ExpansionApi
     {
         // A property, not a const, so an expansion reads the running M3AT's rather than the one it was built against.
         public static int Version
         {
-            get { return 1; }
+            get { return 2; }
         }
 
         public delegate bool Poser(Pawn pawn, PoseRequest pose);
@@ -119,6 +119,10 @@ namespace M3AT
         {
             for (int i = 0; i < posers.Count; i++)
             {
+                if (AddOns.AnyOff && AddOns.IsOff(posers[i].Method.DeclaringType.Assembly))
+                {
+                    continue;   // its mod is off for a benchmark turn
+                }
                 pose.Clear();
                 try
                 {
@@ -135,6 +139,12 @@ namespace M3AT
                 }
             }
             return false;
+        }
+
+        // Every poser added, for AddOns.Find.
+        internal static IEnumerable<Delegate> Posers
+        {
+            get { return posers.ToArray(); }
         }
 
         internal static bool Any

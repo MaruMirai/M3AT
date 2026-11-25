@@ -238,6 +238,8 @@ namespace M3AT
             SkinnedFigure figure;
             HairBuilder builder = SkinnedFigure.HarnessBuilder(args[0], beard, out figure);
             HairBuilder.LineUpOn = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("M3AT_NO_LINEUP"));
+            HairBuilder.FlatSharp = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("M3AT_FLAT_NEAREST"));
+            if (float.TryParse(Environment.GetEnvironmentVariable("M3AT_FLAT_SOFT"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float flatSoft)) HairBuilder.FlatSoft = flatSoft;
             HairBuilder.Tapered = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("M3AT_NO_TAPER"));
             string widen = Environment.GetEnvironmentVariable("M3AT_WIDEN");   // a beard's HairBuilder.WidenEyes
             if (!string.IsNullOrEmpty(widen))

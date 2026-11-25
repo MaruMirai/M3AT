@@ -385,9 +385,8 @@ namespace M3AT
         }
 
         // Each opaque pixel's distance in pixels to the nearest clear one (or the picture's edge): two chamfer passes.
-        private static float[] Distances(Color32[] px)
+        private static float[] Distances(Color32[] px, int s = AddonTexSize)
         {
-            int s = AddonTexSize;
             float[] d = new float[s * s];
             const float Far = 1e6f, Diag = 1.41421356f;
             for (int i = 0; i < d.Length; i++)

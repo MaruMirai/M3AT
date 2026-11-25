@@ -35,6 +35,7 @@ namespace M3AT
 
         private List<Profile> standInProfiles;   // every garment that can stand in, made on first use
         private readonly Dictionary<ThingDef, int[]> standInsOf = new Dictionary<ThingDef, int[]>();
+        private int standInsVersion;   // AddOns.Version they were worked out for
         private static readonly int[] NoStandIns = new int[0];
 
         private const float StandInLeast = 0.35f;   // the least score drawn: below it the apparel is left undrawn
@@ -249,6 +250,13 @@ namespace M3AT
                 return NoStandIns;
             }
             int[] found;
+            if (standInsVersion != AddOns.Version)
+            {
+                // Which add-ons are on changed (the benchmark's turns): the pool and every answer worked out again.
+                standInsVersion = AddOns.Version;
+                standInsOf.Clear();
+                standInProfiles = null;
+            }
             if (!standInsOf.TryGetValue(def, out found))
             {
                 found = WorkOutStandIns(def);
@@ -337,6 +345,13 @@ namespace M3AT
             List<Profile> all = StandInProfiles();
             for (int i = 0; i < all.Count; i++)
             {
+                // Apparel with a content pack's garment comes here only because that garment was turned down (the player
+                // chose M3AT's, or it is armour, ContentSources.ArmourByDefault): so M3AT's own garments, not that one nor
+                // another pack garment whose name matches (the Wolfein pack's AIPT power armour for its heavy power armour).
+                if (IsPackGarment(all[i].piece) && PackGarmentOf(def) > 0)
+                {
+                    continue;
+                }
                 // A garment over the skull (not a mask, which FullHead only says is, nor one the apparel is named as) only
                 // for apparel over it: a scarf over the mouth or neck scored just enough for the power armour helmet.
                 bool hint = Hinted(a.text, all[i].name);
@@ -931,7 +946,7 @@ namespace M3AT
             for (int g = 1; g < pieces.Length; g++)
             {
                 Piece piece = pieces[g];
-                if (piece.held || piece.forBaby || piece.genes != null)
+                if (piece.held || piece.forBaby || piece.genes != null || OffAddOn(g))
                 {
                     continue;
                 }

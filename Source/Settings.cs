@@ -15,16 +15,6 @@ namespace M3AT
         Never,
     }
 
-    // When a pawn drawn taller than the ceiling over it crouches under it (WalkFigures.CeilingOf): under any roof; only
-    // while IsoRimZ draws the floor above over it (the upper floor viewed), as otherwise the roof isn't drawn; or never.
-    // Kept in this order, as the menu lists them.
-    public enum CeilingCrouch
-    {
-        Always,
-        FloorShown,
-        Never
-    }
-
     // How the chibi's outline is drawn (SkinnedFigure.Mode): a shell round the figure shown only outside its silhouette
     // (stencil bit 64), the same shell over the body too as IsoRim draws its figures', or found on screen from each part's
     // edge (ScreenOutlines.cs), which also goes round open meshes and thin parts and round a held weapon over the body.
@@ -95,10 +85,13 @@ namespace M3AT
         public float headShrink = DefaultShrink;   // 0 .. 1 of the Shrinkhead key: a smaller, less chibi head (skinned figure only)
         public bool genderSizes = true;   // grown males are drawn bigger than grown females, by WalkFigures.GenderGap (WalkFigures.GenderSize)
         public float heightSpread = DefaultHeightSpread;   // the standard deviation of pawns' own heights about their gender's, of the standard size (WalkFigures.HeightSize)
+        public bool skeletons = true;   // a person gone to bones (a dessicated corpse, a shambler raised from one) drawn as the chibi's skeleton (Skeletons.cs, WalkFigures.Skeletons); off: IsoRim's own skeleton
         public bool agingLooks = true;   // old pawns drawn wrinkled, stooped and a little shorter, with cataracts clouding the eye (Aging.cs, WalkFigures.AgingLooks)
         public bool greyingHair = true;   // hair drawn greying with age, a dye or other new colour starting it again (GreyingHair.cs, WalkFigures.GreyingHair)
         public bool sharpFaceArt = true;   // face art read a sharper mip and its edges re-sharpened when magnified (MarusFace.frag.glsl's FaceArt)
-        public bool raceMouthInk = true;   // soft mouths (races', Experimentals') redrawn with the retexture's hard lines and races' sized (FaceRestyle.cs)
+        public bool raceMouthInk = true;   // soft mouths (races', Experimentals') redrawn with the retexture's hard lines (FaceRestyle.cs)
+        public bool mouthSizeFit = true;   // races' mouths sized to a human's and very wide mouth shapes narrowed (FaceRestyle.cs, FaceLayers.MouthSizeFit)
+        public bool fullDetailGarments = false;   // other mods' garments over the triangle budget kept as made, up to its ceiling (GarmentBudget.cs; read as the chibi loads)
         public bool raceModels = true;  // the popular races' own ears and tails, modelled for them, in place of their built parts (RaceTails.cs)
         public bool raceParts = true;   // a race's ears, tails, horns and wings built in 3D from their sprites on the chibi (AddonParts.cs)
         public bool otherRaces = true;   // humanlike races with no IsoRim alien pack drawn as chibis rather than flat cards (OtherRaces.cs)
@@ -117,7 +110,6 @@ namespace M3AT
         public bool armourHidesTail = true;   // body armour (a garment with hide_clothes, not a vacsuit) leaves the gene tail off (WalkFigures.ArmourHidesTail)
         public EarHiding earHiding = EarHiding.Helmets;   // which headgear leaves the gene ears off (WalkFigures.EarHiding)
         public BeardMode beardMode = BeardMode.Flat;   // how beards are drawn (WalkFigures.Beards, FlatBeards)
-        public CeilingCrouch ceilingCrouch = CeilingCrouch.FloorShown;   // when a pawn taller than the ceiling crouches under it (WalkFigures.CeilingOf)
         public bool powerArmourBulk;   // Spacer power armour over the torso, arms and legs draws its wearer armourBulk bigger and broader (ArmourSize.cs)
         public float armourBulk = DefaultArmourBulk;   // that size, of the pawn's own; GrimWorld's Space Marine armour's too (marineBulk)
         public const float DefaultArmourBulk = 1.25f;   // a Space Marine of about 2.2 m to a person's 1.75
@@ -128,6 +120,17 @@ namespace M3AT
         // The player's own choice of garments for apparel with none of its own, by apparel defName (ClothingTool.cs,
         // WalkFigures.ChosenStandIns): the garments' names joined by commas, "" for none drawn.
         public Dictionary<string, string> clothingChoices = new Dictionary<string, string>();
+        // Apparel, by defName, whose stand-ins are left plain though spriteClothes is on: its own art painted on them looked
+        // wrong (ClothingTool.cs, WalkFigures.PaintedArt).
+        public List<string> plainClothes = new List<string>();
+        // Apparel, by defName, whose content pack garment is painted with its own art (opt-in, unlike stand-ins: a pack's
+        // garment has an image made for it; ClothingTool.cs, WalkFigures.PaintedArtFor).
+        public List<string> paintedPackClothes = new List<string>();
+        // The player's choice of a content pack's or M3AT's content, by "<packageId>|<part>" (lower case): "pack" or "m3at";
+        // only choices other than the default are kept (ContentSources.cs). An option: Restore all defaults clears it.
+        public Dictionary<string, string> contentChoices = new Dictionary<string, string>();
+        public List<string> contentSeen = new List<string>();   // content packs named once already (ContentSources.Started); not an option
+        public bool contentButton = true;   // the M3AT button on the bottom bar in game while content packs are active (ContentWindow.cs)
         // The player's own grips, by weapon defName (GripTool.cs, WalkFigures.GripOverrideOf): x and y the fist's place on
         // the weapon's art (0..1, y up; x below 0 for the grip left as it was), z degrees the weapon is turned in the fist.
         public Dictionary<string, Vector3> gripOverrides = new Dictionary<string, Vector3>();
@@ -203,6 +206,10 @@ namespace M3AT
         // 0.74 (median 0.71; 0.66 on Combat Extended's art), by the autotest's slabsizes.
         public float slabScale = DefaultSlabScale;
         public const float DefaultSlabScale = 0.7f;
+        // Held and holstered weapons follow the pawn height option (WalkFigures.WeaponSizeOf): weaponScales are sizes at
+        // the standard height. Older saves (before 2026-11, this false) held them as sizes at the saved height, and
+        // WalkFigures.SizesToHeight divides them by that height's share once, so each weapon keeps the size it had.
+        public bool weaponSizesAtStandard = true;
 
         // The edge pass's numbers set to the cheap defaults or the detailed ones (the options' two buttons, an old save).
         public void SetDetailedOutlines(bool detailed)
@@ -231,12 +238,15 @@ namespace M3AT
             Scribe_Values.Look(ref headShrink, "headShrink", DefaultShrink);
             Scribe_Values.Look(ref genderSizes, "genderSizes", true);
             Scribe_Values.Look(ref heightSpread, "heightSpread", DefaultHeightSpread);
+            Scribe_Values.Look(ref skeletons, "skeletons", true);
             Scribe_Values.Look(ref agingLooks, "agingLooks", true);
             Scribe_Values.Look(ref greyingHair, "greyingHair", true);
             Scribe_Values.Look(ref otherRaces, "otherRaces", true);
             Scribe_Values.Look(ref raceParts, "raceParts", true);
             Scribe_Values.Look(ref raceModels, "raceModels", true);
+            Scribe_Values.Look(ref fullDetailGarments, "fullDetailGarments", false);
             Scribe_Values.Look(ref raceMouthInk, "raceMouthInk", true);
+            Scribe_Values.Look(ref mouthSizeFit, "mouthSizeFit", true);
             Scribe_Values.Look(ref sharpFaceArt, "sharpFaceArt", true);
             Scribe_Values.Look(ref variedBodies, "variedBodies", true);
             Scribe_Values.Look(ref bodySpread, "bodySpread", DefaultBodySpread);
@@ -253,7 +263,6 @@ namespace M3AT
             Scribe_Values.Look(ref armourHidesTail, "armourHidesTail", true);
             Scribe_Values.Look(ref earHiding, "earHiding", EarHiding.Helmets);
             Scribe_Values.Look(ref beardMode, "beardMode", BeardMode.Flat);
-            Scribe_Values.Look(ref ceilingCrouch, "ceilingCrouch", CeilingCrouch.FloorShown);
             Scribe_Values.Look(ref powerArmourBulk, "powerArmourBulk", false);
             Scribe_Values.Look(ref armourBulk, "armourBulk", DefaultArmourBulk);
             Scribe_Values.Look(ref marineBulk, "marineBulk", true);
@@ -348,6 +357,7 @@ namespace M3AT
             Scribe_Values.Look(ref freecamFov, "freecamFov", DefaultFreecamFov);
             Scribe_Values.Look(ref freecamCutaway, "freecamCutaway", false);
             Scribe_Values.Look(ref slabScale, "slabScale", DefaultSlabScale);
+            Scribe_Values.Look(ref weaponSizesAtStandard, "weaponSizesAtStandard", false, true);   // (absent: an older save)
             Scribe_Collections.Look(ref weaponScales, "weaponGroundScales", LookMode.Value, LookMode.Value);
             Scribe_Values.Look(ref gripToolButton, "gripToolButton", true);
             Scribe_Values.Look(ref gripTool, "gripTool", false);
@@ -391,6 +401,27 @@ namespace M3AT
             {
                 clothingChoices = new Dictionary<string, string>();
             }
+            Scribe_Collections.Look(ref plainClothes, "plainClothes", LookMode.Value);
+            if (plainClothes == null)
+            {
+                plainClothes = new List<string>();
+            }
+            Scribe_Collections.Look(ref paintedPackClothes, "paintedPackClothes", LookMode.Value);
+            if (paintedPackClothes == null)
+            {
+                paintedPackClothes = new List<string>();
+            }
+            Scribe_Collections.Look(ref contentChoices, "contentChoices", LookMode.Value, LookMode.Value);
+            if (contentChoices == null)
+            {
+                contentChoices = new Dictionary<string, string>();
+            }
+            Scribe_Collections.Look(ref contentSeen, "contentSeen", LookMode.Value);
+            if (contentSeen == null)
+            {
+                contentSeen = new List<string>();
+            }
+            Scribe_Values.Look(ref contentButton, "contentButton", true);
             if (weaponScales == null)
             {
                 weaponScales = new Dictionary<string, float>();
@@ -468,7 +499,7 @@ namespace M3AT
 
         // The options' sections, in the order they are read: down the first column, then the second. Two columns rather
         // than three, so the long labels and sliders have room. The freecam always heads the second column and the
-        // weapon sizes and the folded Advanced and Mod compatibility sections always end it (Pinned); the sections between flow from the bottom of the first column to under
+        // folded Outlines, Weapon sizes, Advanced and Mod compatibility sections always end it (Pinned); the sections between flow from the bottom of the first column to under
         // the freecam, and where they break is worked out from how tall each section came out (Columns), so the
         // columns come out even whatever the window's width or the wrapping of the text.
         private static readonly System.Action<Listing_Standard>[] Sections =
@@ -477,8 +508,8 @@ namespace M3AT
             PerformanceSection, ProblemsSection,
         };
         private static readonly System.Action<Listing_Standard> PinnedTop = FreecamSection;
-        // The weapon sizes, then the folded sections, last so that opening one only lengthens the column downward.
-        private static readonly System.Action<Listing_Standard>[] PinnedBottom = { WeaponSizesSection, AdvancedSection, CompatibilitySection };
+        // The folded sections, last so that opening one only lengthens the column downward.
+        private static readonly System.Action<Listing_Standard>[] PinnedBottom = { OutlinesSection, WeaponSizesSection, AdvancedSection, CompatibilitySection };
         private const int ColumnCount = 2;
         private const float SectionGap = 12f;   // px between two sections in a column, as the listing's own Gap
 
@@ -538,13 +569,18 @@ namespace M3AT
             {
                 if (field.IsInitOnly || field.Name == nameof(Settings.freecamOn) || field.Name == nameof(Settings.freecam3D)
                     || field.Name == nameof(Settings.gripOverrides) || field.Name == nameof(Settings.offHandGrips)
-                    || field.Name == nameof(Settings.clothingChoices)
+                    || field.Name == nameof(Settings.clothingChoices) || field.Name == nameof(Settings.plainClothes)
+                    || field.Name == nameof(Settings.paintedPackClothes) || field.Name == nameof(Settings.contentSeen)
                     || field.Name == nameof(Settings.faceTunes) || field.Name == nameof(Settings.mouthTunes)
                     || field.Name == nameof(Settings.faceFits) || field.Name == nameof(Settings.faceFitRows) || field.Name == nameof(Settings.faceFitMouths))   // the player's own work, not an option: cleared by its own button
                 {
                     continue;
                 }
                 field.SetValue(Settings, field.GetValue(fresh));
+            }
+            if (WalkFigures.SkinForAddOns != null)
+            {
+                ContentSources.Apply();   // the content packs' choices back to their defaults
             }
             Messages.Message("M3AT_DefaultsRestored".Translate(), RimWorld.MessageTypeDefOf.NeutralEvent, false);
         }
@@ -659,12 +695,6 @@ namespace M3AT
                 : mode == HelmetStow.Hidden ? "M3AT_HelmetsHidden".Translate() : "M3AT_HelmetsAlwaysHidden".Translate();
         }
 
-        private static string CeilingName(CeilingCrouch mode)
-        {
-            return mode == CeilingCrouch.Always ? "M3AT_CeilingAlways".Translate() : mode == CeilingCrouch.FloorShown
-                ? "M3AT_CeilingFloorShown".Translate() : "M3AT_CeilingNever".Translate();
-        }
-
         private static string OutlineModeName(OutlineMode mode)
         {
             return mode == OutlineMode.Silhouette ? "M3AT_OutlineSilhouette".Translate() : mode == OutlineMode.Lines
@@ -708,6 +738,8 @@ namespace M3AT
                 "M3AT_AgingLooksTip".Translate());
             list.CheckboxLabeled("M3AT_GreyingHair".Translate(), ref Settings.greyingHair,
                 "M3AT_GreyingHairTip".Translate());
+            list.CheckboxLabeled("M3AT_Skeletons".Translate(), ref Settings.skeletons,
+                "M3AT_SkeletonsTip".Translate());
             Settings.bodyShapeStrength = Mathf.Round(Slider(list, "M3AT_BodyShapeStrength".Translate(), Settings.bodyShapeStrength.ToStringPercent(),
                 Settings.bodyShapeStrength, 0f, WalkFigures.BodyShapeMost, "M3AT_BodyShapeStrengthTip".Translate()) / BodyShapeStep) * BodyShapeStep;
             list.CheckboxLabeled("M3AT_VariedBodies".Translate(), ref Settings.variedBodies,
@@ -733,17 +765,6 @@ namespace M3AT
             // (The powerArmourBulk option, the game's own power armour bulking its wearer up, is taken out of the window for
             // now, ArmourSize.PowerArmourBulk: its soles lift the wearer instead, SkinnedFigure.SoleOf. The armoured size,
             // which only GrimWorld's Space Marines take now, is under marineBulk in Mod compatibility.)
-            if (list.ButtonTextLabeledPct("M3AT_CeilingCrouch".Translate(), CeilingName(Settings.ceilingCrouch), SliderLabelShare, TextAnchor.MiddleLeft, null,
-                "M3AT_CeilingCrouchTip".Translate()))
-            {
-                List<FloatMenuOption> modes = new List<FloatMenuOption>();
-                foreach (CeilingCrouch mode in new[] { CeilingCrouch.Always, CeilingCrouch.FloorShown, CeilingCrouch.Never })
-                {
-                    CeilingCrouch picked = mode;
-                    modes.Add(new FloatMenuOption(CeilingName(mode), () => Settings.ceilingCrouch = picked));
-                }
-                Find.WindowStack.Add(new FloatMenu(modes));
-            }
             Settings.gazeStrength = Mathf.Round(Slider(list, "M3AT_EyeMovement".Translate(), Settings.gazeStrength.ToStringPercent(), Settings.gazeStrength, 0f, GazeMost,
                 "M3AT_EyeMovementTip".Translate(Settings.DefaultGazeStrength.ToStringPercent())) / GazeStep) * GazeStep;
             list.CheckboxLabeled("M3AT_TalkingMouths".Translate(), ref Settings.talkingMouths,
@@ -822,47 +843,10 @@ namespace M3AT
             }
         }
 
-        // How the figure is drawn: its outline and IsoRim's shading.
+        // How the figure is drawn (its outline is in its own folded section, OutlinesSection).
         private static void DrawingSection(Listing_Standard list)
         {
             Header(list, "M3AT_Drawing".Translate());
-            list.CheckboxLabeled("M3AT_Outlines".Translate(), ref Settings.outlines,
-                "M3AT_OutlinesTip".Translate());
-            if (Settings.outlines)
-            {
-                BeginSubOptions(list);
-                if (list.ButtonTextLabeledPct("M3AT_OutlineMode".Translate(), OutlineModeName(Settings.outlineMode), SliderLabelShare, TextAnchor.MiddleLeft, null,
-                    "M3AT_OutlineModeTip".Translate()))
-                {
-                    List<FloatMenuOption> modes = new List<FloatMenuOption>();
-                    foreach (OutlineMode mode in new[] { OutlineMode.Silhouette, OutlineMode.Lines, OutlineMode.ScreenSpace })
-                    {
-                        OutlineMode picked = mode;
-                        modes.Add(new FloatMenuOption(OutlineModeName(mode), () => Settings.outlineMode = picked));
-                    }
-                    Find.WindowStack.Add(new FloatMenu(modes));
-                }
-                if (Settings.outlineMode == OutlineMode.ScreenSpace)
-                {
-                    Settings.pawnOutlineWidth = Mathf.Round(Slider(list, "M3AT_PawnOutlineWidth".Translate(), OutlineWidthName(Settings.pawnOutlineWidth),
-                        Settings.pawnOutlineWidth, OutlineWidthLeast, OutlineWidthMost,
-                        "M3AT_PawnOutlineWidthTip".Translate(OutlineWidthName(Settings.DefaultPawnOutlineWidth))) / OutlineWidthStep) * OutlineWidthStep;
-                    Settings.weaponOutlineWidth = Mathf.Round(Slider(list, "M3AT_WeaponOutlineWidth".Translate(), OutlineWidthName(Settings.weaponOutlineWidth),
-                        Settings.weaponOutlineWidth, OutlineWidthLeast, OutlineWidthMost,
-                        "M3AT_WeaponOutlineWidthTip".Translate(OutlineWidthName(Settings.DefaultWeaponOutlineWidth))) / OutlineWidthStep) * OutlineWidthStep;
-                    list.CheckboxLabeled("M3AT_SelfOutlines".Translate(), ref Settings.screenSelfOutlines, "M3AT_SelfOutlinesTip".Translate());
-                    if (Settings.screenSelfOutlines)
-                    {
-                        Settings.selfOutlineStep = Mathf.Round(Slider(list, "M3AT_SelfOutlineStep".Translate(), OutlineWidthName(Settings.selfOutlineStep),
-                            Settings.selfOutlineStep, 0.04f, 0.3f, "M3AT_SelfOutlineStepTip".Translate(OutlineWidthName(Settings.DefaultSelfOutlineStep))) / 0.01f) * 0.01f;
-                    }
-                    if (!SkinnedFigure.ScreenOutlinesAvailable)
-                    {
-                        list.Label("M3AT_ScreenOutlinesUnavailable".Translate());
-                    }
-                }
-                EndSubOptions(list);
-            }
             list.CheckboxLabeled("M3AT_FirstPersonEye".Translate(), ref Settings.firstPersonEye,
                 "M3AT_FirstPersonEyeTip".Translate());
             list.CheckboxLabeled("M3AT_ClothesOcclusion".Translate(), ref Settings.clothesOcclusion,
@@ -903,12 +887,14 @@ namespace M3AT
                     Settings.offHandGrips.Clear();
                 }, true));
             }
-            int clothed = Settings.clothingChoices.Count;
+            int clothed = Settings.clothingChoices.Keys.Union(Settings.plainClothes).Union(Settings.paintedPackClothes).Count();
             if (clothed > 0 && list.ButtonText("M3AT_ClothesClearAll".Translate(clothed)))
             {
                 Find.WindowStack.Add(Dialog_MessageBox.CreateConfirmation("M3AT_ClothesClearAllConfirm".Translate(clothed), () =>
                 {
                     Settings.clothingChoices.Clear();
+                    Settings.plainClothes.Clear();
+                    Settings.paintedPackClothes.Clear();
                     WalkFigures.ClothingChoicesChanged();
                 }, true));
             }
@@ -916,13 +902,70 @@ namespace M3AT
                 "M3AT_RetexturedWeaponModelsTip".Translate());
         }
 
+        // The figure's outline and its style, folded away until its header is clicked: the screen-space style's widths and
+        // detail are many sliders few players will touch.
+        private static void OutlinesSection(Listing_Standard list)
+        {
+            FoldHeader(list, "M3AT_OutlinesHeader".Translate(), "M3AT_OutlinesHeaderTip".Translate(), ref outlinesOpen);
+            if (!outlinesOpen)
+            {
+                return;
+            }
+            list.CheckboxLabeled("M3AT_Outlines".Translate(), ref Settings.outlines,
+                "M3AT_OutlinesTip".Translate());
+            if (Settings.outlines)
+            {
+                BeginSubOptions(list);
+                if (list.ButtonTextLabeledPct("M3AT_OutlineMode".Translate(), OutlineModeName(Settings.outlineMode), SliderLabelShare, TextAnchor.MiddleLeft, null,
+                    "M3AT_OutlineModeTip".Translate()))
+                {
+                    List<FloatMenuOption> modes = new List<FloatMenuOption>();
+                    foreach (OutlineMode mode in new[] { OutlineMode.Silhouette, OutlineMode.Lines, OutlineMode.ScreenSpace })
+                    {
+                        OutlineMode picked = mode;
+                        modes.Add(new FloatMenuOption(OutlineModeName(mode), () => Settings.outlineMode = picked));
+                    }
+                    Find.WindowStack.Add(new FloatMenu(modes));
+                }
+                if (Settings.outlineMode == OutlineMode.ScreenSpace)
+                {
+                    Settings.pawnOutlineWidth = Mathf.Round(Slider(list, "M3AT_PawnOutlineWidth".Translate(), OutlineWidthName(Settings.pawnOutlineWidth),
+                        Settings.pawnOutlineWidth, OutlineWidthLeast, OutlineWidthMost,
+                        "M3AT_PawnOutlineWidthTip".Translate(OutlineWidthName(Settings.DefaultPawnOutlineWidth))) / OutlineWidthStep) * OutlineWidthStep;
+                    Settings.weaponOutlineWidth = Mathf.Round(Slider(list, "M3AT_WeaponOutlineWidth".Translate(), OutlineWidthName(Settings.weaponOutlineWidth),
+                        Settings.weaponOutlineWidth, OutlineWidthLeast, OutlineWidthMost,
+                        "M3AT_WeaponOutlineWidthTip".Translate(OutlineWidthName(Settings.DefaultWeaponOutlineWidth))) / OutlineWidthStep) * OutlineWidthStep;
+                    // Beside the widths, as close up it is the width: the widths above stop growing at it.
+                    Settings.outlineReach = Mathf.Round(Slider(list, "M3AT_OutlineReach".Translate(), Settings.outlineReach.ToString("0"),
+                        Settings.outlineReach, 4f, 32f, "M3AT_OutlineReachTip".Translate(Settings.DefaultOutlineReach.ToString("0"))));
+                    list.CheckboxLabeled("M3AT_SelfOutlines".Translate(), ref Settings.screenSelfOutlines, "M3AT_SelfOutlinesTip".Translate());
+                    if (Settings.screenSelfOutlines)
+                    {
+                        Settings.selfOutlineStep = Mathf.Round(Slider(list, "M3AT_SelfOutlineStep".Translate(), OutlineWidthName(Settings.selfOutlineStep),
+                            Settings.selfOutlineStep, 0.04f, 0.3f, "M3AT_SelfOutlineStepTip".Translate(OutlineWidthName(Settings.DefaultSelfOutlineStep))) / 0.01f) * 0.01f;
+                    }
+                    OutlineDetail(list);
+                    if (!SkinnedFigure.ScreenOutlinesAvailable)
+                    {
+                        list.Label("M3AT_ScreenOutlinesUnavailable".Translate());
+                    }
+                }
+                EndSubOptions(list);
+            }
+        }
+
         // Each weapon type's size in the hands and on the body, once the figure has loaded its types.
         private static void WeaponSizesSection(Listing_Standard list)
         {
+            WalkFigures.SizesToHeight();
             List<KeyValuePair<string, float>> types = WalkFigures.TypeDefaults();
             if (types.Count > 0)
             {
-                Header(list, "M3AT_WeaponSizes".Translate());
+                FoldHeader(list, "M3AT_WeaponSizes".Translate(), "M3AT_WeaponSizesTip".Translate(), ref weaponSizesOpen);
+                if (!weaponSizesOpen)
+                {
+                    return;
+                }
                 foreach (KeyValuePair<string, float> type in types)
                 {
                     string name = TypeName(type.Key);
@@ -1007,6 +1050,8 @@ namespace M3AT
 
         private static bool advancedOpen;   // the Advanced section shown (not saved: closed each time the options open)
         private static bool compatibilityOpen;   // and the Mod compatibility section
+        private static bool outlinesOpen;   // the Outlines section
+        private static bool weaponSizesOpen;   // the Weapon sizes section
 
         // A folded section's header: its name with an arrow, opened and closed by a click.
         private static void FoldHeader(Listing_Standard list, string label, string tip, ref bool open)
@@ -1035,12 +1080,17 @@ namespace M3AT
             {
                 return;
             }
+            GUI.color = Color.gray;
+            list.Label("M3AT_ContentCompatLine".Translate());
+            GUI.color = Color.white;
             list.CheckboxLabeled("M3AT_OtherRaces".Translate(), ref Settings.otherRaces,
                 "M3AT_OtherRacesTip".Translate());
             list.CheckboxLabeled("M3AT_RaceParts".Translate(), ref Settings.raceParts,
                 "M3AT_RacePartsTip".Translate());
             list.CheckboxLabeled("M3AT_RaceModels".Translate(), ref Settings.raceModels,
                 "M3AT_RaceModelsTip".Translate());
+            list.CheckboxLabeled("M3AT_FullDetailGarments".Translate(), ref Settings.fullDetailGarments,
+                "M3AT_FullDetailGarmentsTip".Translate(SkinnedFigure.ClothesBudget, SkinnedFigure.HeadBudget, SkinnedFigure.Ceiling, SkinnedFigure.Simplified.Count));
             list.CheckboxLabeled("M3AT_ArmourDrawScale".Translate(), ref Settings.armourDrawScale,
                 "M3AT_ArmourDrawScaleTip".Translate());
             list.CheckboxLabeled("M3AT_MarineBulk".Translate(), ref Settings.marineBulk,
@@ -1100,6 +1150,8 @@ namespace M3AT
             list.Gap(6f);
             list.CheckboxLabeled("M3AT_RaceMouthInk".Translate(), ref Settings.raceMouthInk,
                 "M3AT_RaceMouthInkTip".Translate());
+            list.CheckboxLabeled("M3AT_MouthSizeFit".Translate(), ref Settings.mouthSizeFit,
+                "M3AT_MouthSizeFitTip".Translate());
             list.CheckboxLabeled("M3AT_SharpFaceArt".Translate(), ref Settings.sharpFaceArt,
                 "M3AT_SharpFaceArtTip".Translate());
             // Here, folded away, rather than under Performance: it is much faster and should stay on, kept only for a
@@ -1107,7 +1159,6 @@ namespace M3AT
             list.Gap(6f);
             list.CheckboxLabeled("M3AT_GpuSkinning".Translate(), ref Settings.gpuSkinning,
                 "M3AT_GpuSkinningTip".Translate());
-            OutlineDetail(list);
             // The freecam's, here rather than in its own section, which is long enough: few will want it.
             list.CheckboxLabeled("M3AT_FreecamClickOffLooks".Translate(), ref Settings.freecamClickOffLooks,
                 "M3AT_FreecamClickOffLooksTip".Translate());
@@ -1115,14 +1166,13 @@ namespace M3AT
                 "M3AT_GripToolButtonTip".Translate());
         }
 
-        // The screen-space outline's edge pass, here rather than with the outline style: the numbers trade the lines' look
-        // close up against the frame time, which few will want to set. Shown whatever the style, as only it reads them.
+        // The screen-space outline's edge pass, under the outline style while it is screen-space (the only style that reads
+        // them): the numbers trade the lines' look close up against the frame time. The widest line's slider is with the
+        // widths, though Fast and Detailed set it too.
         private static void OutlineDetail(Listing_Standard list)
         {
             list.Gap(6f);
             list.Label("M3AT_OutlineDetailHeader".Translate(), -1f, "M3AT_OutlineDetailIntro".Translate());
-            Settings.outlineReach = Mathf.Round(Slider(list, "M3AT_OutlineReach".Translate(), Settings.outlineReach.ToString("0"),
-                Settings.outlineReach, 4f, 32f, "M3AT_OutlineReachTip".Translate(Settings.DefaultOutlineReach.ToString("0"))));
             Settings.outlineProbeDirs = Mathf.RoundToInt(Slider(list, "M3AT_OutlineProbeDirs".Translate(), Settings.outlineProbeDirs.ToString(),
                 Settings.outlineProbeDirs, 4f, 16f, "M3AT_OutlineProbeDirsTip".Translate(Settings.DefaultOutlineProbeDirs)));
             Settings.outlineProbeRings = Mathf.RoundToInt(Slider(list, "M3AT_OutlineProbeRings".Translate(), Settings.outlineProbeRings.ToString(),
@@ -1208,7 +1258,30 @@ namespace M3AT
                 "M3AT_FieldOfViewTip".Translate(Settings.DefaultFreecamFov.ToString("0") + "°")));
         }
 
+        private const float TabHeight = 34f;
+        private static int tab;   // 0 the options, 1 content packs (ContentWindow.cs); not saved
+        private static readonly ContentView contentView = new ContentView();
+
+        // Two tabs: the options, and the content packs' switcher, where players find it (ContentWindow.cs).
         public override void DoSettingsWindowContents(Rect inRect)
+        {
+            Rect body = new Rect(inRect.x, inRect.y + TabHeight, inRect.width, inRect.height - TabHeight);
+            int packs = WalkFigures.SkinForAddOns != null ? ContentSources.Packs().Count : 0;
+            List<TabRecord> tabs = new List<TabRecord>
+            {
+                new TabRecord("M3AT_TabOptions".Translate(), () => tab = 0, tab == 0),
+                new TabRecord(packs > 0 ? "M3AT_TabContentCount".Translate(packs) : "M3AT_TabContent".Translate(), () => tab = 1, tab == 1),
+            };
+            TabDrawer.DrawTabs(body, tabs);
+            if (tab == 1)
+            {
+                contentView.Draw(body.ContractedBy(8f), null, true);
+                return;
+            }
+            DrawOptions(body);
+        }
+
+        private void DrawOptions(Rect inRect)
         {
             Rect view = new Rect(0f, 0f, inRect.width - 16f, Mathf.Max(shownHeight, inRect.height - 4f));   // 16 px for the scroll bar
             if (view.width != laidOutWidth)

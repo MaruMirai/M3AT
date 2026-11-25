@@ -244,9 +244,11 @@ namespace M3AT
         // How much of the lining's colour the inside takes: LiningMost at its middle low down, none from LiningEdge across
         // to the rim and from LiningTip along it, eased between, so the pale patch is small and fades out rather than filling
         // every forward-facing triangle up to a hard line at the rim. In ears' texture places (LiningUvs).
-        private const float LiningMost = 0.7f;
-        private const float LiningCore = 0.25f, LiningEdge = 0.7f;   // across, of the half width: whole inside the core, none past the edge
-        private const float LiningLow = 0.35f, LiningTip = 0.75f;    // along, root to tip: whole below low, none past the tip
+        // 0: no pale patch at all, the inside in the hair's colour as the outside is (asked for, Nov 2026; it was 0.95, and
+        // make_ear_textures.py's PALE_INSIDE paints the texture's fluff to go with it).
+        private const float LiningMost = 0f;
+        private const float LiningCore = 0.3f, LiningEdge = 0.8f;   // across, of the half width: whole inside the core, none past the edge
+        private const float LiningLow = 0.4f, LiningTip = 0.85f;    // along, root to tip: whole below low, none past the tip
 
         private static void LiningShares(Ears e)
         {

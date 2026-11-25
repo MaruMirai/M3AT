@@ -343,7 +343,8 @@ namespace M3AT
         // True for the layers that are moved with the eyes.
         private static bool SpreadsWithEyes(string kind)
         {
-            return kind == "EyeballControllerComp" || kind == "LidControllerComp" || kind == "BrowControllerComp" || kind == "LidOptionControllerComp";
+            return kind == "EyeballControllerComp" || kind == "LidControllerComp" || kind == "BrowControllerComp" || kind == "LidOptionControllerComp"
+                || kind == EyeAreaKind;   // an overlay's art round the eyes (FaceAreas.cs)
         }
 
         private static float SpreadOf(string kind)

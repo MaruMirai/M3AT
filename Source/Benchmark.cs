@@ -75,8 +75,13 @@ namespace M3AT
         private sealed class Condition
         {
             public string key, name;   // the window's label (a translation key) and the report's
+            public string label;       // the window's label as it is, in place of key's (an add-on's name in it)
             public int mode;
             public bool flipFewer;     // fewerPoses the other way from the player's
+            public string[] off;       // add-ons turned off for its turns (AddOns.cs), by packageId; null none
+            public AddOns.AddOn without;   // the one add-on it is without, if just one
+
+            public string Label => label ?? key.Translate();
             public readonly List<float> frames = new List<float>();     // ms, every measured frame
             public readonly Dictionary<int, float> turns = new Dictionary<int, float>(); // ms, each round's turn's mean, by round
             public double drawerMs;
@@ -125,6 +130,8 @@ namespace M3AT
         private int length = 1;
         private bool tryFewer = false;   // also the chibi with fewerPoses the other way from the player's
         private bool tryNone = false;    // also no person figures at all, to show what drawing people costs
+        private bool tryAddOns = true;   // also without the add-ons (AddOns.cs), to tell their cost from M3AT's own
+        private List<AddOns.AddOn> addOns;   // found as the window opened (or Again)
         private List<Condition> conditions;
         private List<Step> steps;
         private int at, framesIn, rounds;
@@ -151,6 +158,22 @@ namespace M3AT
             closeOnCancel = true;
             onlyOneOfTypeAllowed = true;
         }
+
+#if AUTOTEST
+        // AutoTest's addoncost: a run started at once, with the add-ons measured.
+        internal static BenchmarkWindow StartForTest(int length)
+        {
+            BenchmarkWindow w = new BenchmarkWindow { length = length, tryAddOns = true };
+            Find.WindowStack.Add(w);
+            w.addOns = AddOns.Find();
+            w.Start();
+            return w;
+        }
+
+        internal bool TestDone => stage == Stage.Done;
+        internal string TestReport => report ?? stopped;
+        internal List<string> TestSummary => summary;
+#endif
 
         public static void Open()
         {
@@ -187,6 +210,27 @@ namespace M3AT
             {
                 conditions.Add(new Condition { key = "M3AT_BenchNone", name = "no people drawn", mode = 2 });
             }
+            if (tryAddOns && addOns != null && addOns.Count > 0)
+            {
+                // Without all of them: M3AT's own cost is this against IsoRim's figures, theirs the chibi against this.
+                conditions.Add(new Condition
+                {
+                    key = "M3AT_BenchNoAddOns", name = "M3AT's chibis without add-ons", mode = 0,
+                    off = addOns.Select(a => a.packageId).ToArray(),
+                });
+                // And without each in turn, if there are more than one, for each one's own share.
+                if (addOns.Count > 1)
+                {
+                    foreach (AddOns.AddOn a in addOns)
+                    {
+                        conditions.Add(new Condition
+                        {
+                            key = "M3AT_BenchWithout", label = "M3AT_BenchWithout".Translate(a.name), name = "M3AT's chibis without " + a.name,
+                            mode = 0, off = new[] { a.packageId }, without = a,
+                        });
+                    }
+                }
+            }
             if (tryFewer)
             {
                 conditions.Add(new Condition
@@ -221,6 +265,7 @@ namespace M3AT
         {
             WalkFigures.PerfMode = s.c.mode;
             WalkFigures.PerfAllowed = null;
+            AddOns.SetOff(s.c.off);   // (patches taken off or put back: a hitch in this frame, which the turn's first frames leave out)
             if (SettingsMod.Settings != null)
             {
                 SettingsMod.Settings.fewerPoses = s.c.flipFewer ? !fewerWas : fewerWas;
@@ -357,6 +402,7 @@ namespace M3AT
 
         private void PutBack()
         {
+            AddOns.SetOff(null);
             WalkFigures.PerfMode = 0;
             WalkFigures.PerfAllowed = null;
             if (SettingsMod.Settings != null && conditions != null)
@@ -500,7 +546,7 @@ namespace M3AT
             s.AppendLine("```");
             foreach (Condition c in conditions)
             {
-                summary.Add("M3AT_BenchRow".Translate(c.key.Translate(), F(c.Fps), F(c.LowFps), F(c.Mean, 2)));
+                summary.Add("M3AT_BenchRow".Translate(c.Label, F(c.Fps), F(c.LowFps), F(c.Mean, 2)));
             }
             float people = chibi.PerFrame(chibi.asked);
             float cost = Paired(chibi, iso, out float noise);
@@ -528,6 +574,28 @@ namespace M3AT
                 summary.Add(saved > fewerNoise
                     ? "M3AT_BenchFewerSaves".Translate(option, way, F(saved, 2), F(fewer.Fps))
                     : "M3AT_BenchFewerNoSaving".Translate(option, way, F(fewer.Fps)));
+            }
+            Condition bare = conditions.Find(c => c.off != null && c.without == null);
+            List<string> addOnLines = new List<string>();
+            if (bare != null)
+            {
+                float own = Paired(bare, iso, out float ownNoise), extra = Paired(chibi, bare, out float extraNoise);
+                summary.Add("M3AT_BenchOwnCost".Translate(F(own, 2), F(ownNoise, 2)));
+                summary.Add(Mathf.Abs(extra) <= extraNoise ? "M3AT_BenchAddOnsSame".Translate(F(extraNoise, 2))
+                    : "M3AT_BenchAddOnsCost".Translate(F(extra, 2), F(extraNoise, 2)));
+                addOnLines.Add("M3AT alone (no add-ons) over IsoRim's figures: " + F(own, 2) + " ms a frame (+/-" + F(ownNoise, 2) + ")");
+                addOnLines.Add("All add-ons together: " + F(extra, 2) + " ms a frame (+/-" + F(extraNoise, 2) + ")");
+                foreach (Condition c in conditions.Where(c => c.without != null))
+                {
+                    float one = Paired(chibi, c, out float oneNoise);
+                    summary.Add(Mathf.Abs(one) <= oneNoise ? "M3AT_BenchAddOnSame".Translate(c.without.name, F(oneNoise, 2))
+                        : "M3AT_BenchAddOnCost".Translate(c.without.name, F(one, 2), F(oneNoise, 2)));
+                    addOnLines.Add("  " + c.without.name + ": " + F(one, 2) + " ms a frame (+/-" + F(oneNoise, 2) + ")");
+                }
+                foreach (AddOns.AddOn a in addOns)
+                {
+                    addOnLines.Add("  add-on " + a.name + " (" + a.packageId + "): " + a.garments + " garments, " + a.patches + " patches on M3AT's code, " + a.posers + " posers");
+                }
             }
             if (chibi.draws == 0)
             {
@@ -563,7 +631,11 @@ namespace M3AT
             }
             s.AppendLine("(+/- is the standard error of the mean frame time from the spread of its turns; our CPU ms is the time in M3AT's figure drawer a frame)");
             s.AppendLine();
-            s.AppendLine("M3AT over IsoRim's figures: " + (cost >= 0f ? "+" : "") + F(cost, 2) + " ms a frame" + (Mathf.Abs(cost) <= noise ? " (within noise, +/-" + F(noise, 2) + ")" : ""));
+            s.AppendLine("M3AT" + (bare != null ? " with its add-ons" : "") + " over IsoRim's figures: " + (cost >= 0f ? "+" : "") + F(cost, 2) + " ms a frame" + (Mathf.Abs(cost) <= noise ? " (within noise, +/-" + F(noise, 2) + ")" : ""));
+            foreach (string line in addOnLines)
+            {
+                s.AppendLine(line);
+            }
             if (none != null)
             {
                 s.AppendLine("People with M3AT: " + F(ours, 2) + " ms a frame; with IsoRim's figures: " + F(theirs, 2) + " ms" + (people >= 1f ? "; per chibi: " + F(Mathf.Max(0f, ours) / people, 3) + " ms" : ""));
@@ -630,6 +702,15 @@ namespace M3AT
             list.Gap(6f);
             list.CheckboxLabeled((FewerOnNow ? "M3AT_BenchTryFewerOff" : "M3AT_BenchTryFewerOn").Translate("M3AT_FewerPoses".Translate()), ref tryFewer);
             list.CheckboxLabeled("M3AT_BenchTryNone".Translate(), ref tryNone, "M3AT_BenchTryNoneTip".Translate());
+            if (addOns == null)
+            {
+                addOns = AddOns.Find();
+            }
+            if (addOns.Count > 0)
+            {
+                list.CheckboxLabeled("M3AT_BenchTryAddOns".Translate(addOns.Count), ref tryAddOns,
+                    "M3AT_BenchTryAddOnsTip".Translate(string.Join("\n", addOns.Select(a => "- " + a.name + ": " + "M3AT_BenchAddOnParts".Translate(a.garments, a.patches, a.posers)))));
+            }
             list.Gap(10f);
             if (!CanRun)
             {
@@ -644,7 +725,8 @@ namespace M3AT
         // Seconds a run of that length takes, besides waiting on hair.
         private float Estimate(int which)
         {
-            int n = 2 + (tryNone ? 1 : 0) + (tryFewer ? 1 : 0);
+            int n = 2 + (tryNone ? 1 : 0) + (tryFewer ? 1 : 0)
+                + (tryAddOns && addOns != null && addOns.Count > 0 ? 1 + (addOns.Count > 1 ? addOns.Count : 0) : 0);
             return WarmSeconds * (n + 1) + Measured[which] * TurnFrames / (TurnFrames - SkipFrames);
         }
 
@@ -653,7 +735,7 @@ namespace M3AT
             Step s = steps[at];
             if (s.round == 0)
             {
-                list.Label("M3AT_BenchWarming".Translate(s.c.key.Translate()));
+                list.Label("M3AT_BenchWarming".Translate(s.c.Label));
                 if (s.waitHair && WalkFigures.HairBuilding > 0)
                 {
                     list.Label("M3AT_BenchWaitHair".Translate(WalkFigures.HairBuilding));
@@ -661,7 +743,7 @@ namespace M3AT
             }
             else
             {
-                list.Label("M3AT_BenchMeasuring".Translate(s.c.key.Translate(), s.round, RoundsAbout()));
+                list.Label("M3AT_BenchMeasuring".Translate(s.c.Label, s.round, RoundsAbout()));
             }
             list.Label("M3AT_BenchLeft".Translate(F(left, 0)));
             list.Label("M3AT_BenchUnpaused".Translate());
@@ -706,6 +788,7 @@ namespace M3AT
             if (list.ButtonText("M3AT_BenchAgain".Translate()))
             {
                 stage = Stage.Setup;
+                addOns = null;
             }
         }
     }

@@ -163,6 +163,7 @@ namespace M3AT
         private static float TypeSize(string type)
         {
             float scale;
+            SizesToHeight();
             if (SettingsMod.Settings == null || !SettingsMod.Settings.weaponScales.TryGetValue(type, out scale))
             {
                 scale = skin != null ? skin.TypeScale(type) : FileTypeScale(type);
@@ -182,6 +183,39 @@ namespace M3AT
         public static bool AutoGrips   // false: a weapon with no hold of its own takes its kind's as it is (the mod's options set it)
         {
             get { return !NoAutoGrips && (SettingsMod.Settings == null || SettingsMod.Settings.autoGrips); }
+        }
+
+        // The figure's size a held or holstered weapon is laid out against: what its cells are divided by to give the
+        // figure's model units (SlabMatrix, the holsters' depths, the grip slides). size is the pawn's (SizeOf), over the
+        // pawn height option's share of the standard (PawnSize): a weapon is as big in cells whoever holds it (a child,
+        // a big race), but grows with the height option, so the type sizes, set at the standard height, hold at any height.
+        internal static float WeaponSizeOf(float size)
+        {
+            return size / PawnSize;
+        }
+
+        // Once, for options saved before weapons followed the pawn height (Settings.weaponSizesAtStandard): their type
+        // sizes were at the saved height, so each is divided by its share of the standard and every weapon keeps the size
+        // it had. A type left at its default isn't pinned, so it now grows with the height. Not done as the options load,
+        // as that is while the mods are built, before this class may start (it reads anim.txt for the standard height).
+        internal static void SizesToHeight()
+        {
+            Settings s = SettingsMod.Settings;
+            if (s == null || s.weaponSizesAtStandard)
+            {
+                return;
+            }
+            s.weaponSizesAtStandard = true;
+            float share = PawnSize;
+            if (Mathf.Abs(share - 1f) < 1e-4f || s.weaponScales.Count == 0)
+            {
+                return;
+            }
+            foreach (string type in new List<string>(s.weaponScales.Keys))
+            {
+                s.weaponScales[type] = s.weaponScales[type] / share;
+            }
+            Log.Message(Tag + "weapon sizes now follow the pawn height: the saved ones divided by " + share.ToString("F2") + " to keep their size.");
         }
 
         // M3AT_NO_AUTOGRIP=1 turns it off for a run without touching the saved options (to compare autotest pictures).
@@ -253,8 +287,8 @@ namespace M3AT
                 return Vector2.zero;
             }
             float scale = ScaleOf(weapon), own = TypeSize(type), theirs = TypeSize(TypeOf(refDef));
-            Vector2 draw = g.drawSize * scale / size;
-            Vector2 refDraw = refDef.graphicData.drawSize * scale * (own > 0f && theirs > 0f ? theirs / own : 1f) / size;
+            Vector2 draw = g.drawSize * scale / WeaponSizeOf(size);
+            Vector2 refDraw = refDef.graphicData.drawSize * scale * (own > 0f && theirs > 0f ? theirs / own : 1f) / WeaponSizeOf(size);
             // The fist's place from the slab's middle in each sprite's axes, as DrawSlab lays each out from this hold.
             Vector2 here = FistOnSprite(fist, hand, a, top, behind, def.equippedAngleOffset, draw);
             Vector2 there = FistOnSprite(fist, hand, a, top, behind, refDef.equippedAngleOffset, refDraw);
@@ -266,7 +300,7 @@ namespace M3AT
         private static bool ArtDrawSize(Thing weapon, float size, out Vector2 draw)
         {
             Graphic g = weapon.Graphic;
-            draw = g != null && size > 0f ? g.drawSize * ScaleOf(weapon) / size : Vector2.zero;
+            draw = g != null && size > 0f ? g.drawSize * ScaleOf(weapon) / WeaponSizeOf(size) : Vector2.zero;
             return draw.x > 0f && draw.y > 0f;
         }
 

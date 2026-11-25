@@ -238,6 +238,15 @@ GARMENT_PROPS['PauldronsBig'] = {'hard': True, 'part_weights': True, 'marine_of'
 # SkinnedFigure.FurPiece finds it by that name). "fur": the body stays whole under it, as its skin is the undercoat, and
 # it is written with the normals of the skin under each vertex, so the tufts are lit as the skin is and their roots melt into it.
 GARMENT_PROPS['Furskin'] = {'defs': 'Gene_Furskin', 'fur': True}
+# The skeleton (anim_scripts/make_skeleton.py): drawn in place of the body for a person gone to bones (a dessicated corpse, a
+# shambler raised from one; SkinnedFigure.SkeletonPiece finds it by this def, no apparel's). Its own weights, each piece
+# whole on one bone (KEEP_WEIGHTS), so it stays rigid; hard, so the body types move it with its bones rather than fattening
+# it, but the Babylimbs key fitted from the body, so a child's shorter limbs take their bones with them (and ShrinkHead,
+# HARD_FITTED, the skull). Its colours are its own; it hides nothing, as the body is not drawn under it.
+# "inside": it lies under the skin, so a fitted key moves it as the skin nearest it moves and nothing more (a garment
+# that ends up under the reshaped skin is pushed back out past it, which took every bone out through the skin).
+GARMENT_PROPS['Skeleton'] = {'defs': 'M3AT_Skeleton', 'hard': True, 'fit': 'babylimbs', 'tint': False, 'hides': False, 'inside': True,
+                             'cutout': True}
 # The shoes (make_from_groups.py's BELOW: the feet below the trousers): the game has no footwear, so "with_legwear" has
 # them worn with any apparel that covers the legs and nothing else (trousers, not a duster or a tribal wrap), and
 # "colour" (r, g, b, 0 to 1) is theirs in place of that apparel's. Apparel_Shoes, if a mod has it, also gets them.
@@ -373,7 +382,7 @@ for _name, _defs in STANDS_FOR.items():
     GARMENT_PROPS.setdefault(_name, {})['stands_for'] = ' '.join(_defs)
 # Garments that keep the weights on them: loose ones standing well off the skin, which on the body's weights stretch
 # badly (a long skirt would follow each thigh and tear between the legs). Every other garment's are ignored.
-KEEP_WEIGHTS = ('Duster', 'TribalA', 'Parka', 'Cape', 'Robe', 'RobeRoyal', 'Burka', 'LabCoat') + SKIRTS + DRESSES
+KEEP_WEIGHTS = ('Duster', 'TribalA', 'Parka', 'Cape', 'Robe', 'RobeRoyal', 'Burka', 'LabCoat', 'Skeleton') + SKIRTS + DRESSES
 # Of those, the ones cut from the body's own faces (a tunic, a coat's top) with a skirt or hood of their own built on: the
 # faces on the skin always take the body's weights as they are now (body_cut_weights), so a re-weighted body can't leave
 # them bending as the skin used to (the tribalwear's bodice went with the raised arm and the chest came through it). On
@@ -438,6 +447,10 @@ FILL_WAY_PASSES = 4   # the outward ways averaged over neighbours this many time
 # glass, written as visor lines and drawn see-through in the game (SkinnedFigure.DrawVisor). They hide nothing of the
 # body, so the face behind them is drawn (and the face layers, which go by how much of the face is hidden).
 VISOR = 'visor'
+# Cut-out parts: a garment's triangles on a material named UNLINED (any case) are left out of its outline shell (written
+# as unlined lines), as the shell can't follow what the image's alpha cuts away (the skeleton's painted ribs, hands and
+# feet): their outline is painted in the image instead.
+UNLINED = 'unlined'
 HIDE_REACH = 0.04        # cells: the body under a garment this close (outside it, or inside where it already pokes through) is left out while it is worn
 HIDE_LOOK = 0.25         # cells: how far out from the skin the garment must lie in front of it to hide it, so an opening (an open coat's chest, a collar) shows skin
 
@@ -1136,6 +1149,8 @@ def write_garment(g, path):
     glass = {i for i, slot in enumerate(g.material_slots) if slot.material and slot.material.name.lower().split('.')[0] == VISOR}
     visor = [k for k, t in enumerate(g.data.loop_triangles) if t.material_index in glass]
     glass_tris = set(visor)
+    cut = {i for i, slot in enumerate(g.material_slots) if slot.material and slot.material.name.lower().split('.')[0] == UNLINED}
+    unlined = [k for k, t in enumerate(g.data.loop_triangles) if t.material_index in cut]
     # The texture, if it has one. A vertex with more than one place on it (a UV seam) is written once per place; copy i
     # is of the garment's vertex order[i], and the game welds the copies back together by place for the shading.
     image = base_colour_image(g) if g.data.uv_layers.active else None
@@ -1290,6 +1305,10 @@ def write_garment(g, path):
             f.write('# visor k ...: its own triangles (its f lines, from 0) that are glass, drawn see-through.\n')
             for k in range(0, len(visor), 32):
                 f.write('visor %s\n' % ' '.join(str(x) for x in visor[k:k + 32]))
+        if unlined:
+            f.write('# unlined k ...: its own triangles (its f lines, from 0) cut out by the image\'s alpha, left out of its outline.\n')
+            for k in range(0, len(unlined), 32):
+                f.write('unlined %s\n' % ' '.join(str(x) for x in unlined[k:k + 32]))
         f.write('# hide k ...: body triangles (skin.txt\'s f lines, from 0) left out while it is worn.\n')
         for k in range(0, len(hide), 32):
             f.write('hide %s\n' % ' '.join(str(x) for x in hide[k:k + 32]))
@@ -1326,6 +1345,8 @@ def write_garment(g, path):
                 if rigid:
                     mean = sum(fitted, Vector()) / len(fitted)
                     fitted = [mean] * len(fitted)
+                elif props.get('inside', False):
+                    pass   # inside the body (the skeleton): each vertex as the skin nearest it moves, never pushed out past it
                 else:
                     fitted = hung(fitted, hang, neighbours)
                     # Where the body under a vertex changed which way it faces (between the thighs), following the

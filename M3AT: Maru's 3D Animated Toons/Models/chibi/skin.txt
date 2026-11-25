@@ -5806,6 +5806,7 @@ garment Shorts garment_Shorts.txt
 garment ShortShorts garment_ShortShorts.txt
 garment ShoulderBag garment_ShoulderBag.txt
 garment SimpleHelmet garment_SimpleHelmet.txt
+garment Skeleton garment_Skeleton.txt
 garment Skirt garment_Skirt.txt
 garment SkirtLong garment_SkirtLong.txt
 garment SkirtMedium garment_SkirtMedium.txt

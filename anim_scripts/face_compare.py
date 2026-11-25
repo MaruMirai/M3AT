@@ -288,4 +288,5 @@ def load_cell(path):
     return a.reshape(h, w, 4).copy()
 
 
-main()
+if __name__ == "__main__":
+    main()

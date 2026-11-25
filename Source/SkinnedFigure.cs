@@ -124,6 +124,8 @@ namespace M3AT
             // Another mod's garment (ModGarments.cs): the lines that say how it is fitted to the body in the game.
             public string modRoot;      // the folder it was read from (its texture is found there); null: this mod's own
             public string modName;      // and the mod's name, for messages
+            public string owner;        // the packageId of the mod it came from (any way: its M3ATgarments folder, or a file
+                                        // another mod put on skin.txt's list); null: this mod's own (GarmentBudget.cs, Benchmark.cs)
             public string baseName;     // its base line: this mod's garment whose mesh it takes (a retexture)
             public string bodyStamp;    // its body line: the skin.txt hash it was exported against; its w, hide and key lines count only on that body
             public bool weightsGiven;   // it had w lines
@@ -147,6 +149,9 @@ namespace M3AT
             public bool[] glass;      // a garment's: which of its triangles are glass (a helmet's visor), drawn see-through (DrawVisor); null: none
             public int[] shellTris;   // and its triangles that aren't glass, which its solid mesh draws
             public Piece visor;       // and the glass as a piece of its own (VisorOf), posed as the hair is
+            public bool[] unlined;    // a garment's: which of its triangles its image's alpha cuts out (the skeleton's painted
+                                      // parts, its unlined lines), left out of its outline, which can't follow the cut; null: none
+            public int[] linedTris;   // and its triangles that aren't, which its outline mesh draws
             public Vector3[] rest;
             public int[] tris;
             public int[] firstWeight;   // vertex i's weights are weightBone/weight[firstWeight[i] .. firstWeight[i + 1])
@@ -190,6 +195,7 @@ namespace M3AT
             internal Vector3 headLow, headHigh;
             internal readonly Dictionary<(int, GarmentMask), PieceShape> letOut = new Dictionary<(int, GarmentMask), PieceShape>();   // webbing let out, by garment and garments under it (LetOut.cs)
             internal readonly Dictionary<GarmentMask, ArmRoom> armRoom = new Dictionary<GarmentMask, ArmRoom>();   // the trunk's girth for the held arms, by garments worn (ArmsClear.cs)
+            internal float[] handScale;   // each hand's size against the base body's, R then L (HandSize.cs); null until asked
         }
 
         private Piece[] pieces;
@@ -367,7 +373,9 @@ namespace M3AT
             internal readonly Dictionary<Piece, PieceMeshes> addons = new Dictionary<Piece, PieceMeshes>();   // its race parts built from their sprites (AddonBuilder.cs)
             public EarState earState;   // and how they are moving
             internal PieceMeshes tail;   // its cat tail (CatTail.cs), made when first drawn
-            public bool furTail, tailMadeFur;   // whether it has the furry tail, and whether those meshes are of it
+            public bool furTail;          // whether it has the furry tail
+            public string packTail;       // a content pack's tail file it has (ExpansionApi 2), null none
+            internal object tailMadeFrom; // the tail its tail meshes were made from (CatTail.cs's Tail)
             public TailState tailState;   // and how it is moving
             internal readonly Dictionary<Piece, TailState> raceTails = new Dictionary<Piece, TailState>();   // its race's built tails' springs (RaceTails.cs)
             internal readonly Dictionary<Piece, EarState> raceEars = new Dictionary<Piece, EarState>();     // and its built ears'
@@ -397,6 +405,9 @@ namespace M3AT
             public GarmentMask wornMask;       // the garments it has on this draw (Wearing)
             public GarmentMask soleMask;       // the garments sole was worked out for (SoleOf)
             public float sole = -1f;           // the most any of them reaches below the body's soles, model units; -1 not yet
+            public GarmentMask topMask;        // the garments top was worked out for (TopOf)
+            public Shape topShape;             // and the shape
+            public float top = -1f;            // the highest point of the body and them standing at rest, model units; -1 not yet
             public bool gearPack;      // and whether an equipment pack is drawn on its back
             public float packScale = 1f;   // the size an equipment pack is drawn at, of this figure's: as big on every pawn
             public float backpackScale = 1f;   // and a backpack, likewise, a child's being a smaller one
@@ -623,13 +634,112 @@ namespace M3AT
             }
             if (garmentOf.TryGetValue(def.defName, out g))
             {
-                return g;
+                return Wanted(def, def.defName, g);
             }
             string adult;
-            return AdultOf.TryGetValue(def.defName, out adult) && garmentOf.TryGetValue(adult, out g) ? g : -1;
+            return AdultOf.TryGetValue(def.defName, out adult) && garmentOf.TryGetValue(adult, out g) ? Wanted(def, adult, g) : -1;
+        }
+
+        // A content pack's garment is drawn for its apparel only while the player has it so (ContentSources.cs): the
+        // pack draws that clothing and this item isn't armour (ArmourByDefault), or the player picked this garment for it
+        // in the clothing tool. Otherwise this mod's own garment for it, if the pack's took its place, else none, so the
+        // apparel goes to the stand-ins (and any choice the player made among them).
+        private int Wanted(ThingDef def, string defName, int g)
+        {
+            string owner = g > 0 && g < pieces.Length ? pieces[g].owner : null;
+            if (owner == null || PackGarmentWanted(def, owner, g))
+            {
+                return g;
+            }
+            int own;
+            return ownGarmentOf.TryGetValue(defName, out own) ? own : -1;
+        }
+
+        private bool PackGarmentWanted(ThingDef def, string owner, int g)
+        {
+            if (AddOns.IsOff(owner))
+            {
+                return false;
+            }
+            Settings s = SettingsMod.Settings;
+            string chosen;
+            if (s != null && s.clothingChoices != null && s.clothingChoices.Count > 0 && s.clothingChoices.TryGetValue(def.defName, out chosen))
+            {
+                return chosen == pieces[g].name;   // the player's pick: this very garment, or something else
+            }
+            return ContentSources.UsesPack(owner, ContentPart.Clothing) && !ContentSources.ArmourByDefault(def);
+        }
+
+        // A content pack's piece that is off now (AddOns.cs, ContentSources.cs): its mod off for a benchmark turn, or the
+        // player has M3AT draw that part (clothing, or gene parts). Left out of the stand-ins and the gene parts.
+        internal bool OffAddOn(int g)
+        {
+            if (g <= 0 || g >= pieces.Length || pieces[g].owner == null)
+            {
+                return false;
+            }
+            string owner = pieces[g].owner;
+            return AddOns.IsOff(owner) || !ContentSources.UsesPack(owner, pieces[g].genes != null ? ContentPart.GeneParts : ContentPart.Clothing);
+        }
+
+        // Whether a garment is another mod's (a content pack's), for the clothing tool.
+        internal bool IsPackGarment(int g)
+        {
+            return g > 0 && g < pieces.Length && pieces[g].owner != null;
+        }
+
+        internal string OwnerOf(int g)
+        {
+            return g > 0 && g < pieces.Length ? pieces[g].owner : null;
+        }
+
+        // This mod's own garment for apparel a content pack's garment also names; -1 for none.
+        internal int OwnGarmentOf(ThingDef def)
+        {
+            int g;
+            return def != null && ownGarmentOf.TryGetValue(def.defName, out g) ? g : -1;
+        }
+
+        // The apparel the game has that a content pack's garments are for, by label.
+        internal List<ThingDef> PackApparel(string packageId)
+        {
+            List<ThingDef> found = new List<ThingDef>();
+            foreach (KeyValuePair<string, int> e in garmentOf)
+            {
+                if (pieces[e.Value].owner != null && string.Equals(pieces[e.Value].owner, packageId, StringComparison.OrdinalIgnoreCase))
+                {
+                    ThingDef d = DefDatabase<ThingDef>.GetNamedSilentFail(e.Key);
+                    if (d != null && d.apparel != null)
+                    {
+                        found.Add(d);
+                    }
+                }
+            }
+            found.Sort((a, b) => string.Compare(a.label, b.label, StringComparison.OrdinalIgnoreCase));
+            return found;
+        }
+
+        // The content pack's garment for this apparel, whether drawn now or not; -1 for none.
+        internal int PackGarmentOf(ThingDef def)
+        {
+            int g;
+            return def != null && garmentOf.TryGetValue(def.defName, out g) && IsPackGarment(g) ? g : -1;
+        }
+
+        // The mod each other mod's piece came from (one entry a piece), and whether it is a gene part, for AddOns.Find.
+        internal IEnumerable<KeyValuePair<string, bool>> GarmentOwners()
+        {
+            for (int g = 1; g < pieces.Length; g++)
+            {
+                if (pieces[g].owner != null)
+                {
+                    yield return new KeyValuePair<string, bool>(pieces[g].owner, pieces[g].genes != null);
+                }
+            }
         }
 
         private readonly Dictionary<string, int> garmentOf = new Dictionary<string, int>();
+        private readonly Dictionary<string, int> ownGarmentOf = new Dictionary<string, int>();   // this mod's own garment for apparel a pack's garment also names
 
         // Children's apparel and the grown-up apparel whose garment it borrows. The romper has no grown-up version.
         private static readonly Dictionary<string, string> AdultOf = new Dictionary<string, string>
@@ -871,7 +981,17 @@ namespace M3AT
                 s.turnRound = turn;
                 foreach (string file in garments)
                 {
-                    Piece g = s.ReadMesh(Path.Combine(folder, file), false, null);
+                    string garmentPath = Path.Combine(folder, file);
+                    Piece g = s.ReadMesh(garmentPath, false, null);
+                    // A file from outside this mod's folder (another mod adds its own to the list): held to the budget
+                    // (GarmentBudget.cs) and known as that mod's.
+                    ModContentPack from = Path.IsPathRooted(file) ? ModOfPath(garmentPath) : null;
+                    if (from != null && !IsOwnMod(from))
+                    {
+                        g.owner = from.PackageId;
+                        g.modName = from.Name;
+                        KeepWithinBudget(g, from.Name);
+                    }
                     foreach (int k in g.hides)
                     {
                         if (k < 0 || k >= body.tris.Length / 3)
@@ -900,12 +1020,17 @@ namespace M3AT
                         p.shellTris = Kept(p.tris, p.glass);
                         p.visor = VisorOf(p);
                     }
+                    if (p.unlined != null)
+                    {
+                        p.linedTris = Kept(p.tris, p.unlined);
+                    }
                 }
                 if (turn && s.faceTris != null)
                 {
                     TurnRound(s.faceTris);
                 }
                 s.AddModGarments(all, animPath);   // other mods' garments and gene parts, fitted to the body here (ModGarments.cs)
+                s.EvenHeadShrink(all);   // hats, helmets and masks shrink with the head as one (EvenShrink.cs)
                 s.pieces = all.ToArray();
                 if (all.Count - 1 > MaxHiding)
                 {
@@ -989,7 +1114,7 @@ namespace M3AT
             Piece piece = new Piece { name = Path.GetFileNameWithoutExtension(path), layer = "", groups = new string[0], defs = null };
             List<Vector3> v = new List<Vector3>();
             List<int> first = new List<int>(), bone = new List<int>(), t = new List<int>(), fFrom = new List<int>(), fTris = new List<int>();
-            List<int> hides = new List<int>(), opens = new List<int>(), skinVerts = new List<int>(), glass = new List<int>();
+            List<int> hides = new List<int>(), opens = new List<int>(), skinVerts = new List<int>(), glass = new List<int>(), unlined = new List<int>();
             List<float> w = new List<float>();
             List<Vector3> fRest = new List<Vector3>();
             List<Vector2> fUvs = new List<Vector2>(), uvs = new List<Vector2>();
@@ -1186,6 +1311,12 @@ namespace M3AT
                             glass.Add(int.Parse(p[i]));
                         }
                         break;
+                    case "unlined":
+                        for (int i = 1; i < p.Length; i++)
+                        {
+                            unlined.Add(int.Parse(p[i]));
+                        }
+                        break;
                     case "key":
                         // The vertices come before the keys, so each key's moves can be laid out in full.
                         keyMoves = new Vector3[v.Count];
@@ -1276,6 +1407,18 @@ namespace M3AT
                         throw new InvalidDataException(path + ": glass triangle " + k + ", but it has " + piece.glass.Length);
                     }
                     piece.glass[k] = true;
+                }
+            }
+            if (unlined.Count > 0)
+            {
+                piece.unlined = new bool[piece.tris.Length / 3];
+                foreach (int k in unlined)
+                {
+                    if (k < 0 || k >= piece.unlined.Length)
+                    {
+                        throw new InvalidDataException(path + ": unlined triangle " + k + ", but it has " + piece.unlined.Length);
+                    }
+                    piece.unlined[k] = true;
                 }
             }
             if (skinVerts.Count > 0)
@@ -1961,6 +2104,10 @@ namespace M3AT
                 // or colours are set). The outline keeps every triangle, so the glass is inside the silhouette.
                 m.solid.SetTriangles(piece.shellTris, 0, false);
             }
+            if (piece.linedTris != null)
+            {
+                m.outline.SetTriangles(piece.linedTris, 0, false);   // the cut-out parts have their outline painted instead
+            }
             m.parts.Add(new MeshPart { mesh = m.solid, material = SolidMaterial(), outline = false });
             m.parts.Add(new MeshPart { mesh = m.outline, material = OutlineMaterial(), outline = true });
             return m;
@@ -2166,8 +2313,12 @@ namespace M3AT
         // laid on top points just as it does standing.
         public void Crouch(Posed p, float amount)
         {
-            p.crouch = Mathf.Clamp01(amount);
+            p.crouch = Mathf.Clamp(amount, 0f, CrouchMost);
         }
+
+        // As far as a crouch may go past its full depth, the knees folding further: a swimmer standing still in a shallow
+        // pool, down to its shoulders (WalkFigures.PoolCrouch).
+        private const float CrouchMost = 1.6f;
 
         // How far the hips go down at a full crouch, cells for a figure of size 1 in the base shape.
         public float CrouchDepth()
@@ -2777,7 +2928,10 @@ namespace M3AT
                 Vector3 outward = p.turn[root] * new Vector3(rest[thigh].x - rest[root].x, 0f, 0f);
                 Vector3 bend = Vector3.ProjectOnPlane(knee - hip, along);
                 Vector3 front = Vector3.ProjectOnPlane(facing, along).normalized;
-                bend = bend.sqrMagnitude > 1e-8f ? bend.normalized : front;
+                // The knee bends the way it points across the hip-to-ankle line, but never back: let down past the full
+                // crouch (a swimmer in a shallow pool), the line tips forward under the hips gone back over the heels, and a
+                // thigh still pointing down reads as pointing back across it, which folded the legs round behind.
+                bend = bend.sqrMagnitude > 1e-8f && Vector3.Dot(bend, front) > 0f ? bend.normalized : front;
                 bend = Vector3.ProjectOnPlane(bend + outward.normalized * CrouchSplay, along);
                 if (bend.sqrMagnitude < 1e-8f)
                 {
@@ -3255,6 +3409,48 @@ namespace M3AT
             p.soleMask = p.wornMask;
             p.sole = sole;
             return sole;
+        }
+
+        // How tall the figure stands at rest in its shape with what it had on at its last draw (Wearing), model units above
+        // its soles: the highest of the body (a shrunk head stands lower) and its worn garments (a helmet stands well over the
+        // head). Packs and held shields are left out, as they are not drawn at their rest place. For the ceiling (ArmourSize.cs).
+        public float TopOf(Posed p)
+        {
+            if (p.top >= 0f && p.topShape == p.shape && p.topMask == p.wornMask)
+            {
+                return p.top;
+            }
+            float top = 0f;
+            if (p.shape != null)
+            {
+                top = HighestOf(ShapedPiece(p.shape, 0).rest);
+                GarmentMask skip = PackMask | HeldMask;
+                for (int g = 1; g < pieces.Length && g <= MaxHiding; g++)
+                {
+                    GarmentMask bit = GarmentBit(g);
+                    if ((p.wornMask & bit) != 0 && (skip & bit) == 0)
+                    {
+                        top = Mathf.Max(top, HighestOf(ShapedPiece(p.shape, g).rest));
+                    }
+                }
+            }
+            p.topShape = p.shape;
+            p.topMask = p.wornMask;
+            p.top = top;
+            return top;
+        }
+
+        private static float HighestOf(Vector3[] rest)
+        {
+            float top = float.MinValue;
+            for (int i = 0; i < rest.Length; i++)
+            {
+                if (rest[i].y > top)
+                {
+                    top = rest[i].y;
+                }
+            }
+            return top;
         }
 
         // What the figure has on this draw, which places what it carries on its back. Before any of it is drawn.
@@ -4938,6 +5134,8 @@ namespace M3AT
             Color32[] pixels = builder != null ? builder.FlatFace(sprites, FlatBeardSize) : null;
             if (pixels != null)
             {
+                // Without mipmaps: with them, the engine's mipmapped copy came out blurred and blocky close up (worse than
+                // the top level alone, whatever mipMapBias), and further off made little difference (autotest, Nov 2026).
                 Texture2D texture = new Texture2D(FlatBeardSize, FlatBeardSize, TextureFormat.ARGB32, false);
                 texture.name = "Marus_flat_" + name;
                 texture.wrapMode = TextureWrapMode.Clamp;

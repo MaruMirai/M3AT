@@ -78,6 +78,82 @@ namespace M3AT
             return at.HasValue;
         }
 
+        private const float ForeShare = 0.65f;   // the other hand along a gun with no fore grip, a share of its length from the back
+        private const float ForePast = 0.5f;     // a fore grip hangs in front of this share of the length ...
+        private const float ForeWide = 0.12f;    // ... at most this wide ...
+        private const float ForeDeep = 0.08f;    // ... and at least this deep, shares of the length
+
+        private static readonly Dictionary<ValueTuple<int, float>, Vector2?> fores = new Dictionary<ValueTuple<int, float>, Vector2?>();
+
+        // Where the other hand holds a gun along it (detect.py's fore; WalkFigures.ForeShift uses only the place along the
+        // gun, the stance keeping how far under it the hand closes). Turned level by offset (as Find's): a fore grip if one
+        // hangs below the body in its front half (narrow and deep: a vertical grip, a launcher's front handle), else
+        // ForeShare of the gun's length from its back, at the body's underside. Measured against the hand on the game's
+        // guns in their drafted stances (fore_score.py): 6 pixels of 128 off along the gun at the median, against 11 for
+        // the assault rifle's distance from the holding fist. False when the art is unreadable.
+        public static bool FindFore(Texture tex, float offset, out Vector2 uv)
+        {
+            uv = Vector2.zero;
+            if (tex == null)
+            {
+                return false;
+            }
+            ValueTuple<int, float> key = new ValueTuple<int, float>(tex.GetInstanceID(), offset);
+            Vector2? at;
+            if (!fores.TryGetValue(key, out at))
+            {
+                at = null;
+                try
+                {
+                    bool[] m = MaskOf(tex);
+                    Body b = m != null ? Underside(Turned(m, -offset)) : null;
+                    if (b != null)
+                    {
+                        float along = b.i0 + ForeShare * b.length, under = b.parts != null ? b.base0 : (b.j0 + b.j1) / 2f;
+                        if (b.parts != null)
+                        {
+                            foreach (Part p in b.parts)
+                            {
+                                if (p.lo > b.i0 + ForePast * b.length && p.hi - p.lo + 1 <= ForeWide * b.length && p.depth >= ForeDeep * b.length)
+                                {
+                                    along = (p.lo + p.hi + 1) / 2f;
+                                    break;
+                                }
+                            }
+                        }
+                        at = TurnPoint(new Vector2(along / Size, (under + 0.5f) / Size), offset);
+                    }
+                }
+                catch (Exception e)
+                {
+                    at = null;
+                    Log.WarningOnce("[M3AT] finding a weapon's fore grip failed: " + e, 61530120);
+                }
+                fores[key] = at;
+            }
+            if (at.HasValue)
+            {
+                uv = at.Value;
+            }
+            return at.HasValue;
+        }
+
+        // The art's alpha over half on a Size x Size mask, m[j * Size + i] with row j going up; null if unreadable.
+        private static bool[] MaskOf(Texture tex)
+        {
+            Color32[] px = Api.ReadSpritePixels(tex, Size);
+            if (px == null || px.Length < Size * Size)
+            {
+                return null;
+            }
+            bool[] m = new bool[Size * Size];
+            for (int k = 0; k < m.Length; k++)
+            {
+                m[k] = px[k].a > 128;
+            }
+            return m;
+        }
+
         private static readonly Dictionary<ValueTuple<int, float>, bool> tubes = new Dictionary<ValueTuple<int, float>, bool>();
 
         // Whether a gun's art is a plain tube (its grip found as one: nothing hangs below a long thin body), as a disposable
@@ -240,13 +316,25 @@ namespace M3AT
             return list;
         }
 
-        // A gun turned level (muzzle to the right); the place is turned back by offset.
-        private static Vector2? Gun(bool[] mask, float offset, out bool tube)
+        // A level gun's mask measured: its extent, each column's top and bottom row, and its body's underside (base0, the
+        // parts hanging below it, rear to front), the highest cut that leaves the most separate parts hanging (parts null
+        // if there is no cut).
+        private sealed class Body
         {
-            tube = false;
-            bool[] m = Largest(mask);
+            public bool[] m;
+            public int i0, i1, j0, j1, length, base0 = -1;
+            public int[] top = new int[Size], bot = new int[Size];
+            public List<Part> parts;
+            public int[] label;
+        }
+
+        // Null for an empty mask.
+        private static Body Underside(bool[] mask)
+        {
+            Body b = new Body { m = Largest(mask), i0 = Size, i1 = -1, j0 = Size, j1 = -1 };
+            bool[] m = b.m;
             int i0 = Size, i1 = -1, j0 = Size, j1 = -1;
-            int[] top = new int[Size], bot = new int[Size];
+            int[] top = b.top, bot = b.bot;
             for (int i = 0; i < Size; i++)
             {
                 top[i] = -1;
@@ -275,6 +363,7 @@ namespace M3AT
             int[] label = new int[m.Length];
             int base0 = -1, bestWiden = 0;
             List<Part> parts = null;
+            b.label = label;
             for (int h = j0 + 3; h < j1; h++)
             {
                 List<Part> here = Hanging(m, h, i0, length, label);
@@ -296,10 +385,29 @@ namespace M3AT
                     bestWiden = widen;
                 }
             }
-            if (parts == null)
+            b.i0 = i0;
+            b.i1 = i1;
+            b.j0 = j0;
+            b.j1 = j1;
+            b.length = length;
+            b.base0 = base0;
+            b.parts = parts;
+            return b;
+        }
+
+        // A gun turned level (muzzle to the right); the place is turned back by offset.
+        private static Vector2? Gun(bool[] mask, float offset, out bool tube)
+        {
+            tube = false;
+            Body b = Underside(mask);
+            if (b == null || b.parts == null)
             {
                 return null;
             }
+            bool[] m = b.m;
+            int i0 = b.i0, i1 = b.i1, j0 = b.j0, j1 = b.j1, length = b.length, base0 = b.base0;
+            int[] top = b.top, bot = b.bot, label = b.label;
+            List<Part> parts = new List<Part>(b.parts);
             if (parts.Count == 0)
             {
                 // Nothing hangs below the body: a tube (a disposable rocket launcher), held from under it. Only a long,

@@ -119,7 +119,7 @@ namespace M3AT
                         continue;
                     }
                     Matrix4x4 slab = SlabMatrix(h.weapon, g, ScaleOf(h.weapon), grip, a, top, behind, size);
-                    float depth = HalfDepth(h.weapon) / size;
+                    float depth = HalfDepth(h.weapon) / WeaponSizeOf(size);
                     for (int p = 0; p < n; p++)
                     {
                         Vector3 out1 = PointOut(handAt[p] + moved, slab, art, depth);

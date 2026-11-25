@@ -28,6 +28,12 @@ namespace M3AT
         // race mods' sleeved dresses and shirts 0.04 and up, their sleeveless ones 0.016 at most; the race bodies have no
         // arms drawn, so a sleeve is what stands out there. Art that doesn't reach the shoulders (strapless) is sleeveless.
         private const float SleevelessBelow = 0.025f;
+        // Art that follows the body's outline (each edge within HugSlack pixels) up from its bottom for more than HugRun
+        // of the body's height has legwear drawn in (Milira's bodycon dress over stockings to the feet: 57 rows of 76;
+        // every other race dress looked at, 7 at most), and its hem can't be told from its outline, so the length the
+        // scoring picked is kept (the sleeves still go by the art).
+        private const float HugRun = 0.12f;
+        private const int HugSlack = 1;
         private const float SleeveBand = 0.3f;
         private const int HemSize = 128;          // sprites read at this many pixels a side
         private const float HemLeast = 0.3f;      // a measure outside these is taken for art that isn't a skirt's or a dress's
@@ -86,6 +92,10 @@ namespace M3AT
                         continue;
                     }
                     float share = HemShareOn(apparel, pawn);
+                    if (!float.IsNaN(share) && LegwearDrawnIn(apparel, pawn))
+                    {
+                        share = pieces[found[k]].hemShare + HemShorter;   // (the scoring's length, as unreadable)
+                    }
                     int[] among = kinds[kind];
                     if (kind == DressKind || kind == SleevelessKind)
                     {
@@ -172,6 +182,46 @@ namespace M3AT
                 hemShares[(body, worn)] = share;
             }
             return share;
+        }
+
+        private static readonly Dictionary<(Texture, Texture), bool> legwear = new Dictionary<(Texture, Texture), bool>();
+
+        // Whether the apparel's front sprite follows the pawn's body sprite's outline up from its bottom for more than
+        // HugRun of the body's height: legwear drawn in with it.
+        public static bool LegwearDrawnIn(Apparel apparel, Pawn pawn)
+        {
+            Texture body, worn;
+            bool legless;
+            Pictures(apparel, pawn, out body, out worn, out legless);
+            if (body == null || worn == null)
+            {
+                return false;
+            }
+            bool drawn;
+            if (!legwear.TryGetValue((body, worn), out drawn))
+            {
+                bool[] b = AlphaOf(body), a = AlphaOf(worn);
+                float[] rb = RowsOf(body), ra = RowsOf(worn);
+                drawn = false;
+                if (a != null && b != null && rb != null && ra != null)
+                {
+                    int top = Mathf.RoundToInt(rb[0] * HemSize), bottom = Mathf.RoundToInt(rb[1] * HemSize);
+                    int r = Mathf.RoundToInt(ra[1] * HemSize), run = 0;
+                    for (; r > top; r--, run++)
+                    {
+                        int j = HemSize - 1 - r;   // (rows bottom up)
+                        int al, ar, bl, br;
+                        if (!Extent(a, j, out al, out ar) || !Extent(b, j, out bl, out br)
+                            || Math.Abs(al - bl) > HugSlack || Math.Abs(ar - br) > HugSlack)
+                        {
+                            break;
+                        }
+                    }
+                    drawn = bottom > top && run >= HugRun * (bottom - top);
+                }
+                legwear[(body, worn)] = drawn;
+            }
+            return drawn;
         }
 
         private static readonly Dictionary<(Texture, Texture), float> sleeveOverhangs = new Dictionary<(Texture, Texture), float>();

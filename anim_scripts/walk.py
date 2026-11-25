@@ -294,12 +294,12 @@ WEAPON_TYPES = {
 # Each type's size, against the same weapon lying on the floor as IsoRim draws it (the game divides it by GroundRatio,
 # as IsoRim's ground models are smaller than their sprites, to get the share of the sprite it draws it at).
 TYPE_SCALE = {
-    'handgun': 0.66,
-    'rifle': 1.0,
-    'bow': 1.2,
-    'grenade': 0.66,
-    'melee_1h': 1.0,
-    'melee_2h': 1.3,
+    'handgun': 0.5,
+    'rifle': 0.85,
+    'bow': 1.0,
+    'grenade': 0.6,
+    'melee_1h': 0.6,
+    'melee_2h': 1.1,
 }
 # The holster slots (HOLSTERS' 'size') each type takes.
 TYPE_HOLSTER = {

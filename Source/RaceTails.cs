@@ -507,7 +507,7 @@ namespace M3AT
         private static readonly Dictionary<string, RaceModel> RaceModels = new Dictionary<string, RaceModel>
         {
             { "Ratkin", new RaceModel { ears = "race_ratkin_ears.txt", tail = "race_ratkin_tail.txt", lining = new Color(1f, 0.55f, 0.55f), liningShare = 0.9f } },
-            { "Wolfein_Race", new RaceModel { ears = "race_wolfein_ears.txt", tail = "race_wolfein_tail.txt", lining = new Color(0.97f, 0.95f, 0.92f), liningShare = 0.7f,
+            { "Wolfein_Race", new RaceModel { ears = "race_wolfein_ears.txt", tail = "race_wolfein_tail.txt", lining = new Color(0.97f, 0.95f, 0.92f), liningShare = 0f,   // no pale inside (was 0.7)
                 tip = new Color(0.97f, 0.95f, 0.92f), tipShare = 0.75f } },
             { "Milira_Race", new RaceModel { wings = new[] { "race_milira_wing_L.txt", "race_milira_wing_R.txt" }, tip = new Color(0.82f, 0.84f, 0.9f), tipShare = 0.35f } },
         };

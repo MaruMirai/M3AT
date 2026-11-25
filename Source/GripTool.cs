@@ -103,14 +103,14 @@ namespace M3AT
             }
             if (skin.BoneOf(fig, "hand." + side, out turn) && skin.GripOf(side, out grip))
             {
-                fist = wrist + turn.MultiplyVector(grip).normalized * (skin.HandGrip >= 0f ? skin.HandGrip : HandGrip);
+                fist = wrist + turn.MultiplyVector(grip).normalized * (skin.HandGrip >= 0f ? skin.HandGrip : HandGrip) * skin.HandScaleOf(fig, side);
                 return true;
             }
             if (!skin.JointOf(fig, "forearm." + side, out elbow))
             {
                 return false;
             }
-            fist = FistOf(wrist, elbow);
+            fist = FistOf(wrist, elbow, skin.HandScaleOf(fig, side));
             return true;
         }
 
@@ -123,7 +123,7 @@ namespace M3AT
         {
             ThingWithComps weapon;
             Vector2 off;
-            if (ease.stance == null || size <= 0f || (weapon = HeldWeapon(pawn)) == null || !OffHandOf(weapon.def, out off)
+            if (ease.stance == null || size <= 0f || (weapon = HeldWeapon(pawn)) == null
                 || (pawn.carryTracker != null && pawn.carryTracker.CarriedThing != null) || Reloaded(pawn) != null)
             {
                 return;
@@ -143,7 +143,205 @@ namespace M3AT
             {
                 return;
             }
-            ReachOffHand(pawn, weapon, off, ease.stance, fig, whole, size, ease, w);
+            if (OffHandOf(weapon.def, out off))
+            {
+                ReachOffHand(pawn, weapon, off, ease.stance, fig, whole, size, ease, w);
+            }
+            else
+            {
+                HoldSupport(pawn, ease.stance, fig, whole, size, ease, w);
+            }
+        }
+
+        // No point set: the other hand kept where the stance has it against the holding hand on the base body
+        // (SkinnedFigure.SupportOf), so on a shape with moved joints (a Hulk's wide shoulders) it stays on the weapon.
+        private static void HoldSupport(Pawn pawn, string stance, SkinnedFigure.Posed fig, Matrix4x4 whole, float size, Ease ease, float w)
+        {
+            WeaponPlaced placed = PlaceWeapon(pawn, stance, fig, size, ease);
+            if (placed == null || placed.hold.line != "hand")
+            {
+                return;
+            }
+            string side = placed.left ? "R" : "L";
+            Vector3 aim = (placed.hold.aim.normalized + Vector3.down * placed.hold.drop).normalized;   // PlaceWeapon's rest
+            Vector3 wrist;
+            Quaternion turn;
+            if (skin.SupportOf(fig, stance, side, aim, out wrist, out turn))
+            {
+                // The fist where the stance has it, from the hand's fist now turned as it will be.
+                Vector3 fistNow, wristNow;
+                if (FistOf(fig, side, out fistNow) && skin.JointOf(fig, "hand." + side, out wristNow))
+                {
+                    Quaternion wr = whole.rotation;
+                    Vector3 fist = wrist + wr * skin.TurnFromNow(fig, side, turn) * Quaternion.Inverse(wr) * (fistNow - wristNow);
+                    Vector3 shift = SupportShift(placed, stance, fist, size);
+                    wrist += shift;
+#if AUTOTEST
+                    string how;
+                    if (AutoSupportShift.TryGetValue(placed.weapon.thingIDNumber, out how))
+                    {
+                        int cut = how.IndexOf(" |");
+                        Vector2 from = FistOnArt(placed.weapon, fist, placed.hand, placed.a, placed.top, placed.hold.behind, size, placed.slide);
+                        Vector2 to = FistOnArt(placed.weapon, fist + shift, placed.hand, placed.a, placed.top, placed.hold.behind, size, placed.slide);
+                        AutoSupportShift[placed.weapon.thingIDNumber] = (cut >= 0 ? how.Substring(0, cut) : how) + " | from (" + from.x.ToString("F3") + ", "
+                            + from.y.ToString("F3") + ") to (" + to.x.ToString("F3") + ", " + to.y.ToString("F3") + ") on the art, weight " + w.ToString("F2");
+                    }
+#endif
+                }
+                skin.HoldSupport(fig, whole, side, wrist, turn, w);
+                skin.Reached(fig, whole);
+            }
+        }
+
+        // The weapon each drafted kind's stance was set on (preview.py's KIND_LOOK), for a weapon that plays its kind's.
+        private static readonly Dictionary<string, string> KindLook = new Dictionary<string, string>
+        {
+            { "rifle", "Gun_AssaultRifle" },
+            { "pistol", "Gun_Autopistol" },
+            { "bow", "Bow_Recurve" },
+            { "melee", "MeleeWeapon_Knife" },
+        };
+
+        // A weapon of each def a stance was set on, never spawned: GroundRatio and the art go by a Thing.
+        private static readonly Dictionary<ThingDef, Thing> designThings = new Dictionary<ThingDef, Thing>();
+
+        // The other hand is moved along the weapon by at most this share of its length either way from where the stance
+        // has it, against a weapon drawn far bigger or smaller than the one the stance was set on.
+        private const float SupportScaleLeast = 0.4f, SupportScaleMost = 2.5f;
+
+        // How far to move the other hand's wrist from where the stance puts it (fist: its fist then, PlaceWeapon's space) so
+        // it holds the same part of this weapon as drawn now. The stance was set on one weapon (its own, or its kind's
+        // KindLook) at its type's size in the export; the weapon here may be drawn at another size (the type's size in the
+        // options, the slab's share, weapons taking the pawn's size) or be another weapon. Held by its kind's stance, a gun
+        // whose art and the kind's both show a fore grip (GripFinder.FindFore) has the hand put on this one's as the stance
+        // has it on the kind's; otherwise the hand's distance along the weapon from the holding fist grows and shrinks with
+        // the weapon's length against that weapon's, and how far beside or under the line it is stays (the hand's own size).
+        private static Vector3 SupportShift(WeaponPlaced placed, string stance, Vector3 fist, float size)
+        {
+            ThingWithComps weapon = placed.weapon;
+            Thing design = DesignWeapon(weapon, stance);
+            bool slab = AsSlab(weapon);
+            Vector2 draw, designDraw;
+            if (design == null || !ArtDrawSize(weapon, size, out draw) || !DesignDrawSize(design, slab, size, out designDraw))
+            {
+                return Vector3.zero;
+            }
+            Vector3 shift;
+            if (design.def != weapon.def && ForeShift(placed, design, draw, designDraw, out shift))
+            {
+                return shift;
+            }
+            float ratio = Mathf.Clamp(Mathf.Max(draw.x, draw.y) / Mathf.Max(designDraw.x, designDraw.y), SupportScaleLeast, SupportScaleMost);
+#if AUTOTEST
+            AutoSupportShift[weapon.thingIDNumber] = "length " + ratio.ToString("F3") + " of " + design.def.defName + "'s";
+#endif
+            return placed.a * (Vector3.Dot(fist - placed.closed, placed.a) * (ratio - 1f));
+        }
+
+        // The other hand put at a gun's fore grip (GripFinder.FindFore) as the kind's stance has it at the kind's own gun's:
+        // the shift from the fist to the fore grip on this art, as drawn now, less the same on the kind's art at its export
+        // size, along the weapon. Each art's fore grip and fist go along that art's own axes, so a sprite drawn turned
+        // (equippedAngleOffset) agrees. False if either art is unreadable, or the weapon isn't a gun.
+        private static bool ForeShift(WeaponPlaced placed, Thing design, Vector2 draw, Vector2 designDraw, out Vector3 shift)
+        {
+            shift = Vector3.zero;
+            ThingWithComps weapon = placed.weapon;
+            if (!AutoGrips || KindOf(weapon.def) != "rifle" || Thrown(weapon.def) || design.def.graphicData == null)
+            {
+                return false;
+            }
+            Graphic g = weapon.Graphic;
+            Material mat = g != null ? g.MatSingleFor(weapon) : null;
+            Texture art = mat != null ? mat.mainTexture : null, refArt = OwnArt(design.def.graphicData.texPath);
+            float offset = weapon.def.equippedAngleOffset, refOffset = design.def.equippedAngleOffset;
+            Vector2 fore, refFore;
+            if (!GripFinder.FindFore(art, offset, out fore) || !GripFinder.FindFore(refArt, refOffset, out refFore))
+            {
+                return false;
+            }
+            float behind = placed.hold.behind;
+            Vector2 half = new Vector2(0.5f, 0.5f);
+            Vector2 here = FistOnSprite(placed.closed, placed.hand, placed.a, placed.top, behind, offset, draw) + placed.slide;
+            Vector2 there = FistOnSprite(placed.closed, placed.hand, placed.a, placed.top, behind, refOffset, designDraw);
+            shift = ArtVector(placed.a, placed.top, offset, Vector2.Scale(fore - half, draw) - here)
+                - ArtVector(placed.a, placed.top, refOffset, Vector2.Scale(refFore - half, designDraw) - there);
+            // Along the weapon only: how far under its line the hand closes is the stance's (on the game's guns the hand
+            // keeps much the same height against the holding fist, and not against the art's underside).
+            shift = placed.a * Vector3.Dot(shift, placed.a);
+#if AUTOTEST
+            AutoSupportShift[weapon.thingIDNumber] = "fore grip at (" + fore.x.ToString("F2") + ", " + fore.y.ToString("F2") + "), "
+                + design.def.defName + "'s at (" + refFore.x.ToString("F2") + ", " + refFore.y.ToString("F2") + ")";
+#endif
+            return true;
+        }
+
+        // A shift along an art's own axes (x its right, y its up, as drawn) laid on the weapon's line a and top.
+        private static Vector3 ArtVector(Vector3 a, Vector3 top, float offset, Vector2 along)
+        {
+            Vector3 x, y;
+            SpriteAxes(a, top, offset, out x, out y);
+            return x * along.x + y * along.y;
+        }
+
+        // The weapon a drafted stance was set on: its own (drafted_<defName>, a slab's too), else its kind's (KindLook);
+        // null for a stance set on none of the game's (a shield's, another mod's weapon's).
+        private static Thing DesignWeapon(ThingWithComps weapon, string stance)
+        {
+            string name = stance.StartsWith("drafted_") ? stance.Substring("drafted_".Length) : stance;
+            if (name.EndsWith(Slab))
+            {
+                name = name.Substring(0, name.Length - Slab.Length);
+            }
+            string look;
+            ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail(name);
+            if (def == null && KindLook.TryGetValue(name, out look))
+            {
+                def = DefDatabase<ThingDef>.GetNamedSilentFail(look);
+            }
+            if (def == null || def.graphicData == null)
+            {
+                return null;
+            }
+            if (def == weapon.def)
+            {
+                return weapon;
+            }
+            Thing made;
+            if (!designThings.TryGetValue(def, out made))
+            {
+                try
+                {
+                    made = ThingMaker.MakeThing(def, def.MadeFromStuff ? GenStuff.DefaultStuffFor(def) : null);
+                }
+                catch (Exception e)
+                {
+                    made = null;
+                    Log.WarningOnce(Tag + "making a " + def.defName + " to measure a stance by failed: " + e.Message, def.shortHash ^ 0x5a17);
+                }
+                designThings[def] = made;
+            }
+            return made;
+        }
+
+        // A weapon's art as DrawSlab would size it at its type's size in the export (the options' left out), and a slab at
+        // the slab's default share: as big as it was when a stance was set on it.
+        private static bool DesignDrawSize(Thing design, bool slab, float size, out Vector2 draw)
+        {
+            draw = Vector2.zero;
+            Graphic g = design.Graphic;
+            if (g == null || size <= 0f)
+            {
+                return false;
+            }
+            string type = TypeOf(design.def);
+            float scale = skin != null ? skin.TypeScale(type) : FileTypeScale(type);
+            scale = scale < 0f ? (skin != null && skin.WeaponScale >= 0f ? skin.WeaponScale : WeaponScale) : scale / GroundRatio(design);
+            if (slab && !Thrown(design.def))
+            {
+                scale *= Settings.DefaultSlabScale;
+            }
+            draw = g.drawSize * scale / size;
+            return draw.x > 0f && draw.y > 0f;
         }
 
         // The other arm bent so its fist is on that point (off, on the art) of the weapon as placed in this pose, w of the way.

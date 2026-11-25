@@ -56,6 +56,11 @@ namespace M3AT
         // The hairstyle to draw for this pawn: its hair add-ons with its own hairstyle, or its own hairstyle if it has none.
         internal static HairDef HairOf(Pawn pawn)
         {
+            HairDef pack = ExpansionApi.HairFor(pawn);
+            if (pack != null)
+            {
+                return pack;   // a content pack's for its race (ExpansionApi 2)
+            }
             HairDef own = pawn.story != null ? pawn.story.hairDef : null;
             if (addonFailed || pawn.story == null || !HarReady())
             {

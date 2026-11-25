@@ -765,6 +765,10 @@ namespace M3AT
         // syllables (MouthOpen), Facial Animation's "open" mouth shape swapped in for whatever mouth it shows.
         public static void Draw(Pawn pawn, Patch patch, Vector3 position, float yaw, float size, EyeWound[] wounds = null, bool lowMouth = false, float speaking = 0f)
         {
+            if (ExpansionApi.DrawFace(pawn, position, yaw, size, speaking))
+            {
+                return;   // a content pack drew this race's face (ExpansionApi 2)
+            }
             TakeEyeFit(pawn);   // its eyes' layers fitted to a human's (FaceGaze.cs), whichever comes first
             drawMouthScale = 1f;
             drawMouthShape = 1f;
@@ -824,6 +828,7 @@ namespace M3AT
                 bool stacking = StackLayers && stackShader != null && woundsDrawn;
                 calls.Clear();
                 eyeLayers.Clear();
+                pendingMouth.Clear();
                 for (int i = 0; i < f.parts.Count; i++)
                 {
                     PawnRenderNode node = f.parts[i];
@@ -885,6 +890,17 @@ namespace M3AT
                             g = open;
                         }
                     }
+#if AUTOTEST
+                    string forced = kind == "HeadControllerComp" && f.layers[i] == "Cover" ? TestHeadShape : kind == "EmotionControllerComp" ? TestEmotionShape : null;
+                    if (forced != null)
+                    {
+                        Graphic shaped = ShapeGraphic(node, pawn, forced);
+                        if (shaped != null && !IsDummy(shaped))
+                        {
+                            g = shaped;
+                        }
+                    }
+#endif
                     int cut = 0;
                     if (f.missing != 0 && kind == "EyeballControllerComp")
                     {
@@ -902,7 +918,15 @@ namespace M3AT
                             cut = CutBoth & ~f.missing;
                         }
                     }
+                    if (cut == 0 && SplitFaceAreas(stacking, g, kind, f.layers[i], shift, patch, mouth, placed, ref place))
+                    {
+                        continue;   // an overlay's eye and mouth areas, drawn with the eyes and the mouth (FaceAreas.cs)
+                    }
                     Layer(stacking, g, kind, f.layers[i], cut, shift, patch, mouth, placed, ref place);
+                }
+                if (pendingMouth.Count > 0)
+                {
+                    DrawPendingMouth(stacking, Vector2.zero, null, patch, mouth, placed, ref place);   // no mouth layer to go with
                 }
                 if (stacking)
                 {
@@ -945,6 +969,7 @@ namespace M3AT
             public int cut;
             public Vector2 shift;   // Facial Animation's offset now (ShiftOf), texture places
             public Vector3 tune;    // the player's tuning of its mod (TuneOf): scale less 1, then the offset
+            public Texture tex;     // drawn with this in place of its own texture (FaceAreas.cs), or null
         }
 
         private struct Stacked
@@ -967,7 +992,7 @@ namespace M3AT
         private static readonly int[] stackQ = { Shader.PropertyToID("_Q0"), Shader.PropertyToID("_Q1") };
 
         // One layer: drawn now, or kept for DrawStacked.
-        private static void Layer(bool stacking, Graphic g, string kind, string layer, int cut, Vector2 shift, Patch patch, Mesh mouth, Matrix4x4 placed, ref int place)
+        private static void Layer(bool stacking, Graphic g, string kind, string layer, int cut, Vector2 shift, Patch patch, Mesh mouth, Matrix4x4 placed, ref int place, Texture tex = null)
         {
             if (kind == "MouthControllerComp" && !mouthShaped)
             {
@@ -975,13 +1000,17 @@ namespace M3AT
                 mouthShaped = true;                    // so the others go with it
             }
             Vector3 tune = WithEyeFit(TuneOf(g, kind, mouth == patch.mouthLow ? MouthRaisePig : MouthRaise), kind);   // a race's eyes at a human's size (FaceGaze.cs)
+            if (kind == "MouthControllerComp" && pendingMouth.Count > 0)
+            {
+                DrawPendingMouth(stacking, shift, g, patch, mouth, placed, ref place);   // an overlay's mouth area, under it and moved with it (FaceAreas.cs)
+            }
             if (stacking)
             {
-                calls.Add(new LayerCall { g = g, kind = kind, layer = layer, cut = cut, shift = shift, tune = tune });
+                calls.Add(new LayerCall { g = g, kind = kind, layer = layer, cut = cut, shift = shift, tune = tune, tex = tex });
             }
             else
             {
-                DrawLayer(g, kind, layer, cut, shift, tune, patch, mouth, placed, ref place);
+                DrawLayer(g, kind, layer, cut, shift, tune, patch, mouth, placed, ref place, tex);
             }
         }
 
@@ -1007,7 +1036,7 @@ namespace M3AT
                     // Facial Animation's own material, which only it can draw: every layer a draw of its own, in order.
                     for (int k = 0; k < calls.Count; k++)
                     {
-                        DrawLayer(calls[k].g, calls[k].kind, calls[k].layer, calls[k].cut, calls[k].shift, calls[k].tune, patch, mouth, placed, ref place);
+                        DrawLayer(calls[k].g, calls[k].kind, calls[k].layer, calls[k].cut, calls[k].shift, calls[k].tune, patch, mouth, placed, ref place, calls[k].tex);
                     }
                     return;
                 }
@@ -1021,7 +1050,7 @@ namespace M3AT
                 }
                 if (mode == ModeGlow)
                 {
-                    DrawLayer(call.g, call.kind, call.layer, call.cut, call.shift, call.tune, patch, mouth, placed, ref place);
+                    DrawLayer(call.g, call.kind, call.layer, call.cut, call.shift, call.tune, patch, mouth, placed, ref place, call.tex);
                     continue;
                 }
                 // Its colours and mask as LitFor gives its own material.
@@ -1049,7 +1078,7 @@ namespace M3AT
                 {
                     colour *= whiteTint;
                 }
-                stack.Add(new Stacked { tex = call.kind == "MouthControllerComp" ? MouthTexture(call.g, gm.mainTexture, call.layer) : gm.mainTexture, mask = mask, colour = colour, colourTwo = two, mode = mode, cut = call.cut, mouth = call.kind == "MouthControllerComp", call = i, shift = call.shift, spread = SpreadOf(call.kind), tune = call.tune });
+                stack.Add(new Stacked { tex = call.tex != null ? call.tex : call.kind == "MouthControllerComp" ? MouthTexture(call.g, gm.mainTexture, call.layer) : gm.mainTexture, mask = mask, colour = colour, colourTwo = two, mode = mode, cut = call.cut, mouth = OnMouthPatch(call.kind), call = i, shift = call.shift, spread = SpreadOf(call.kind), tune = call.tune });
             }
             Vector4 mouthMap = MouthMap(mouth == patch.mouthLow ? MouthRaisePig : MouthRaise);
 #if AUTOTEST
@@ -1091,7 +1120,7 @@ namespace M3AT
                 if (solo)
                 {
                     LayerCall call = calls[stack[i].call];
-                    DrawLayer(call.g, call.kind, call.layer, call.cut, call.shift, call.tune, patch, mouth, placed, ref place);
+                    DrawLayer(call.g, call.kind, call.layer, call.cut, call.shift, call.tune, patch, mouth, placed, ref place, call.tex);
                     from = i + 1;
                 }
                 else
@@ -1331,7 +1360,7 @@ namespace M3AT
         private const float StonedSteps = 8f;
         private const float StonedFull = 0.15f;   // SmokeleafHigh severity from which the tint is whole (about 3.6 game hours left)
 
-        private static void DrawLayer(Graphic g, string kind, string layer, int cut, Vector2 shift, Vector3 tune, Patch patch, Mesh mouth, Matrix4x4 placed, ref int place)
+        private static void DrawLayer(Graphic g, string kind, string layer, int cut, Vector2 shift, Vector3 tune, Patch patch, Mesh mouth, Matrix4x4 placed, ref int place, Texture over = null)
         {
             Material gm = g != null ? g.MatSouth : null;
             if (gm == null || gm.mainTexture == null || IsDummy(g) || cut == CutBoth)
@@ -1370,13 +1399,17 @@ namespace M3AT
             {
                 mat.mainTexture = MouthTexture(g, gm.mainTexture, layer);   // a soft mouth inked (FaceRestyle.cs)
             }
+            if (mode >= 0 && over != null)
+            {
+                mat.mainTexture = over;   // an overlay with its eye and mouth areas cut out, or one of them alone (FaceAreas.cs)
+            }
             if (mode >= 0 && kind == "LidControllerComp" && layer == "Bottom")
             {
                 mat.color *= whiteTint;   // (LitFor copies the colour afresh each draw)
             }
             MaterialPropertyBlock block = mode >= 0 ? BlockFor(patch, patch.smooth, cut) : null;
             SetShift(block, shift, SpreadOf(kind), tune);
-            Api.SubmitFigureMesh(kind == "MouthControllerComp" ? mouth : patch.face, mat, placed * local, block,
+            Api.SubmitFigureMesh(OnMouthPatch(kind) ? mouth : patch.face, mat, placed * local, block,
                 FigureMeshFlags.NoCull, 0, mode >= 0 ? Flash : 0f);
             place++;
         }
@@ -1735,6 +1768,8 @@ namespace M3AT
         private const float PhraseRest = 0.4f;
         private static float talkClock;
 #if AUTOTEST
+        internal static string TestHeadShape, TestEmotionShape;   // humanfaces: the head's cover (blush) and the emotion forced (FaceAreas.cs)
+        internal static bool TestNoAreas;   // and drawn with no eye or mouth areas split off, to compare
         internal static bool TestMouthOpen;   // the autotest's beard: the open mouth shape forced, to see it under a beard
         internal static int TalkOpenDraws, TalkShutDraws, TalkNoOpen;   // (NoOpen: open draws where the open shape is missing or the same picture)
         internal static readonly Dictionary<int, int> TalkDrawsOf = new Dictionary<int, int>();   // talking face draws per pawn id (the autotest's chat)

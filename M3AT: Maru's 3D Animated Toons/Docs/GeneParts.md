@@ -6,10 +6,17 @@ Read [Apparel.md](Apparel.md) first, especially **Keep it low poly** and **The g
 
 ## What M3AT already draws
 
-M3AT has its own drawing for some genes. A gene part can't replace these yet:
+M3AT has its own drawing for some genes.
 
-- Cat, pig and floppy ears (animated), and the cat tails (smooth and furry, animated).
-- The mini horns and the centre horn, and the Furskin gene's fur.
+**A gene part can take M3AT's place for these:**
+- Cat, pig and floppy ears: `Ears_Cat`, `Ears_Pig`, `Ears_Floppy`.
+- The cat tails: `Tail_Furry`, `Tail_Smooth`.
+- The mini horns and the centre horn: `Headbone_MiniHorns`, `Headbone_CenterHorn`.
+
+A gene part for one of these genes is drawn **instead of** M3AT's own, unless the player chooses M3AT's for your mod's gene parts ([RacePacks.md](RacePacks.md)). It doesn't get the springs and flicks M3AT's ears and tails have.
+
+**These can't be replaced yet:**
+- The Furskin gene's fur.
 - Facial ridges, and the pig nose's nostrils.
 - Body shapes for pointed ears, heavy brow, heavy jaw, gaunt head, pig nose, pig hands, elongated fingers and webbed fingers.
 - Skin and hair colours.

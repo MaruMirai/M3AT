@@ -30,6 +30,8 @@
   <M3AT_HeightVarietyTip>小人身高的差异程度（默认 {0}）。采用正态分布：大多数接近正常尺寸，少数偏离较远。0% 时同性别的人一样高。每个小人的身高由其 ID 推算，因此不需要存档数据。</M3AT_HeightVarietyTip>
   <M3AT_GenderSizes>性别体型差异</M3AT_GenderSizes>
   <M3AT_GenderSizesTip>男性与女性有 10% 的体型差异，在青春期逐渐显现。关闭：两者一样大。</M3AT_GenderSizesTip>
+  <M3AT_Skeletons>Q版骷髅</M3AT_Skeletons>
+  <M3AT_SkeletonsTip>已风干成白骨的尸体及由其复活的蹒跚者，会以Q版比例的卡通骷髅绘制，动作与Q版小人相同，并穿着其身上剩余的衣物。关闭：使用IsoRim自带的骷髅。</M3AT_SkeletonsTip>
   <M3AT_AgingLooks>可见衰老</M3AT_AgingLooks>
   <M3AT_AgingLooksTip>年长的小人从四十多岁起逐步出现皱纹，五十多岁后背部渐渐佝偻（背痛或虚弱时更甚），身高也略有降低；白内障会使眼睛浑浊。年龄按各种族的预期寿命计算。关闭：老人看起来和年轻人一样。</M3AT_AgingLooksTip>
   <M3AT_GreyingHair>头发随年龄变白</M3AT_GreyingHair>
@@ -40,8 +42,12 @@
   <M3AT_RacePartsTip>模组种族的耳朵、尾巴、角、翅膀等会根据该种族自己的图片生成3D形状，让种族在3D小人上保持其外观。它们只是粗略的替代：现实中很薄的部件可能会显得较厚。</M3AT_RacePartsTip>
   <M3AT_RaceModels>热门种族的专属耳朵和尾巴模型</M3AT_RaceModels>
   <M3AT_RaceModelsTip>鼠族（Ratkin）和狼族（Wolfein）使用专门制作的耳朵和尾巴模型，会像基因耳朵和尾巴一样摆动，取代根据其图片生成的形状。</M3AT_RaceModelsTip>
+  <M3AT_FullDetailGarments>保留其他模组服装的完整细节</M3AT_FullDetailGarments>
+  <M3AT_FullDetailGarmentsTip>其他模组的服装若三角面数超过 M3AT 的预算（衣物 {0}，头部穿戴 {1}），会在加载时简化，因为每一帧每个穿着它的小人都要绘制它的全部三角面。勾选后按作者原样保留，最多 {2} 个三角面。本次已简化：{3} 件；错误报告中会列出。重启游戏后生效。</M3AT_FullDetailGarmentsTip>
   <M3AT_RaceMouthInk>更清晰的嘴巴</M3AT_RaceMouthInk>
-  <M3AT_RaceMouthInkTip>柔和的手绘嘴巴（Facial Animation - Experimentals 自带的以及模组种族的）会重新绘制为深色轮廓，去掉浅色光晕和嘴唇阴影，种族的嘴巴也会调整到接近人类的大小，使其在较大的3D脸上更清楚。已经是硬线条的面部（如 Facial Animation - Retexture）保留其线条。比平常宽得多的嘴型也会按其超出的程度相应画窄一些。</M3AT_RaceMouthInkTip>
+  <M3AT_RaceMouthInkTip>柔和的手绘嘴巴（Facial Animation - Experimentals 自带的以及模组种族的）会重新绘制为深色轮廓，去掉浅色光晕和嘴唇阴影，使其在较大的3D脸上更清楚。已经是硬线条的面部（如 Facial Animation - Retexture）保留其线条。</M3AT_RaceMouthInkTip>
+  <M3AT_MouthSizeFit>调整嘴巴大小</M3AT_MouthSizeFit>
+  <M3AT_MouthSizeFitTip>模组种族的嘴巴会调整到接近人类的大小，比平常宽得多的嘴型也会按其超出的程度相应画窄一些。关闭后每个嘴巴都按其面部模组原本的大小绘制。</M3AT_MouthSizeFitTip>
   <M3AT_SharpFaceArt>更锐利的面部图案</M3AT_SharpFaceArt>
   <M3AT_SharpFaceArtTip>Facial Animation 的眼睛、眉毛和嘴巴（以及其他种族面部模组的）在3D脸上绘制得更锐利：在常用视角下稍微清晰一些，近景时模糊的柔和边缘会重新绘制为干净的线条。关闭后将按面部模组原本的样子显示图案。</M3AT_SharpFaceArtTip>
   <M3AT_BodyShapeStrength>体型强度</M3AT_BodyShapeStrength>
@@ -95,7 +101,9 @@
   <M3AT_ArchotechProsthetics>  可见超凡义肢</M3AT_ArchotechProsthetics>
   <M3AT_ArchotechProstheticsTip>超凡肢体绘制为超凡机械的橄榄色与黄色电路外观。关闭：看起来像天然血肉，如游戏过去的描述。</M3AT_ArchotechProstheticsTip>
   <M3AT_Drawing>绘制</M3AT_Drawing>
-  <M3AT_Outlines>描边</M3AT_Outlines>
+  <M3AT_OutlinesHeader>描边</M3AT_OutlinesHeader>
+  <M3AT_OutlinesHeaderTip>点击显示或隐藏描边及其样式的选项。</M3AT_OutlinesHeaderTip>
+  <M3AT_Outlines>绘制描边</M3AT_Outlines>
   <M3AT_OutlinesTip>小人的身体、衣服和头发周围绘制深色描边，与 IsoRim 绘制模型的方式一样。关闭：无描边。武器和工具保留 IsoRim 自己的描边。</M3AT_OutlinesTip>
   <M3AT_OutlineMode>描边样式</M3AT_OutlineMode>
   <M3AT_OutlineModeTip>轮廓：描边只围绕小人的外轮廓，不会画在身体上。身体上的线条：与 IsoRim 的描边方式一样，当手臂等部位明显位于身体前方时，身体上也会出现线条。屏幕空间：根据屏幕上每个部件的边缘绘制描边，因此也会围绕肩甲等薄而开放的部件，以及身体前方手持的武器，小人和武器的描边宽度可分别设置。屏幕空间需要 IsoRim 的场景深度；在 IsoRim 的照片中按轮廓样式绘制。</M3AT_OutlineModeTip>
@@ -103,9 +111,9 @@
   <M3AT_OutlineLines>身体上的线条</M3AT_OutlineLines>
   <M3AT_OutlineScreen>屏幕空间</M3AT_OutlineScreen>
   <M3AT_PawnOutlineWidth>小人描边宽度</M3AT_PawnOutlineWidth>
-  <M3AT_PawnOutlineWidthTip>屏幕空间描边围绕小人的宽度，单位为百分之一格，因此缩小视野时会变细。默认：{0}。</M3AT_PawnOutlineWidthTip>
+  <M3AT_PawnOutlineWidthTip>屏幕空间描边围绕小人的宽度，单位为百分之一格，因此缩小视野时会变细。近距离时最宽不超过下方的近距离宽度上限。默认：{0}。</M3AT_PawnOutlineWidthTip>
   <M3AT_WeaponOutlineWidth>武器描边宽度</M3AT_WeaponOutlineWidth>
-  <M3AT_WeaponOutlineWidthTip>屏幕空间描边围绕手持武器的宽度，以及武器与握持它的手或身体之间的描边宽度，单位为百分之一格。默认：{0}。</M3AT_WeaponOutlineWidthTip>
+  <M3AT_WeaponOutlineWidthTip>屏幕空间描边围绕手持武器的宽度，以及武器与握持它的手或身体之间的描边宽度，单位为百分之一格。近距离时最宽不超过下方的近距离宽度上限。默认：{0}。</M3AT_WeaponOutlineWidthTip>
   <M3AT_OutlineWidthValue>{0}</M3AT_OutlineWidthValue>
   <M3AT_SelfOutlines>自身内描边</M3AT_SelfOutlines>
   <M3AT_SelfOutlinesTip>屏幕空间描边也绘制在小人自己的身体上，当手臂或手等部位明显位于身体前方时。关闭：只围绕小人外轮廓，以及小人与手持物品之间。</M3AT_SelfOutlinesTip>
@@ -136,7 +144,8 @@
   <M3AT_RetexturedWeaponModels>重绘贴图的武器使用 3D 模型</M3AT_RetexturedWeaponModels>
   <M3AT_RetexturedWeaponModelsTip>即使其他模组（如 Combat Extended 或材质包）给游戏原版武器换了新贴图或移除了其模型，仍显示 IsoRim 的 3D 模型。模型会与新贴图对齐，但保持自己的形状，因此重绘差异很大的武器可能对不上。其他模组的武器交给 IsoRim 处理。关闭：由 IsoRim 决定，重绘贴图的武器显示为贴图。需要开启 IsoRim 的"武器使用 3D 模型"设置。对地上的武器，关闭此窗口后生效。</M3AT_RetexturedWeaponModelsTip>
   <M3AT_WeaponSizes>武器尺寸</M3AT_WeaponSizes>
-  <M3AT_WeaponSizeTip>此类武器在小人手中或身上的大小，相对于同一武器放在地上时（默认 {0}）。100% 即 IsoRim 在地上绘制它的大小。</M3AT_WeaponSizeTip>
+  <M3AT_WeaponSizesTip>点击显示或隐藏每类武器在手中和身上的尺寸。</M3AT_WeaponSizesTip>
+  <M3AT_WeaponSizeTip>此类武器在小人手中或身上的大小，相对于同一武器放在地上时，以“小人身高”为 100% 时为准（默认 {0}）。此处 100% 即 IsoRim 在地上绘制它的大小。武器会随“小人身高”一同缩放，因此调整身高后无需修改此项。</M3AT_WeaponSizeTip>
   <M3AT_SlabScale>按贴图绘制的武器</M3AT_SlabScale>
   <M3AT_SlabScaleTip>没有 3D 模型的武器（多数其他模组的武器，或关闭 IsoRim 武器模型时的所有武器）会以从贴图切出的扁平板绘制，比 3D 模型显得更长。此项将其缩小以与模型相称，在上方各武器类型尺寸的基础上再相乘（默认 {0}）。</M3AT_SlabScaleTip>
   <M3AT_ResetWeaponSizes>重置武器尺寸</M3AT_ResetWeaponSizes>
@@ -144,9 +153,9 @@
   <M3AT_GpuSkinning>在显卡上计算动画</M3AT_GpuSkinning>
   <M3AT_GpuSkinningTip>在显卡上把每个小人的身体、衣服和头发摆成当前姿势，画面中小人多时快得多。如果小人看起来破碎或被拉伸，请关闭此项，改用旧方式计算动画。</M3AT_GpuSkinningTip>
   <M3AT_OutlineDetailHeader>屏幕空间描边精度</M3AT_OutlineDetailHeader>
-  <M3AT_OutlineDetailIntro>仅限屏幕空间描边样式。每条线是通过在小人附近的每个像素周围查找更靠前的部位得到的。这些设置决定查找的仔细程度：越高，近距离时线条越平滑、越宽，但小人占满屏幕时开销越大。在通常的游戏距离下几乎没有区别。</M3AT_OutlineDetailIntro>
-  <M3AT_OutlineReach>最宽线条（像素）</M3AT_OutlineReach>
-  <M3AT_OutlineReachTip>近距离时线条最宽可绘制的像素数，以1080行屏幕计（更高的屏幕相应更多）。越低：放大时线条越细，开销越小。默认：{0}。</M3AT_OutlineReachTip>
+  <M3AT_OutlineDetailIntro>仅限屏幕空间描边样式。每条线是通过在小人附近的每个像素周围查找更靠前的部位得到的。这些设置决定查找的仔细程度：越高，近距离时线条越平滑，但小人占满屏幕时开销越大。在通常的游戏距离下几乎没有区别。</M3AT_OutlineDetailIntro>
+  <M3AT_OutlineReach>近距离宽度上限（像素）</M3AT_OutlineReach>
+  <M3AT_OutlineReachTip>线条最宽可绘制的像素数，以1080行屏幕计（更高的屏幕相应更多）。放大到上方宽度达到此值后，线条保持此宽度，上方滑块在此距离不再起作用。越低：放大时线条越细，开销越小。下方的快速和精细按钮也会设置它。默认：{0}。</M3AT_OutlineReachTip>
   <M3AT_OutlineProbeDirs>快速检查点数</M3AT_OutlineProbeDirs>
   <M3AT_OutlineProbeDirsTip>完整查找之前，先检查每个像素周围的少数像素，看那里是否可能有线条。点越多：细小部位和转角处的缺口越少，但更慢。默认：{0}。</M3AT_OutlineProbeDirsTip>
   <M3AT_OutlineProbeRings>快速检查圈数</M3AT_OutlineProbeRings>
@@ -173,6 +182,16 @@
   <M3AT_BenchTryFewerOff>同时测试关闭"{0}"的情况</M3AT_BenchTryFewerOff>
   <M3AT_BenchTryNone>同时测量完全不绘制人物的情况</M3AT_BenchTryNone>
   <M3AT_BenchTryNoneTip>增加一轮完全不绘制人物的测量，以显示使用 M3AT 和使用 IsoRim 时绘制人物各占每帧多少时间。</M3AT_BenchTryNoneTip>
+  <M3AT_BenchTryAddOns>单独测量附加模组（找到 {0} 个）</M3AT_BenchTryAddOns>
+  <M3AT_BenchTryAddOnsTip>增加关闭这些为 M3AT 添加绘制内容的模组的测量轮次，使它们的开销与 M3AT 本身的开销分开显示：\n{0}</M3AT_BenchTryAddOnsTip>
+  <M3AT_BenchAddOnParts>{0} 件服装，{1} 处对 M3AT 代码的修改，{2} 个姿势</M3AT_BenchAddOnParts>
+  <M3AT_BenchNoAddOns>M3AT 小人（不含附加模组）</M3AT_BenchNoAddOns>
+  <M3AT_BenchWithout>M3AT 小人（不含 {0}）</M3AT_BenchWithout>
+  <M3AT_BenchOwnCost>不含附加模组时，M3AT 本身比 IsoRim 的人物每帧多花 {0} 毫秒（误差 ±{1} 毫秒）。</M3AT_BenchOwnCost>
+  <M3AT_BenchAddOnsCost>附加模组合计每帧花费 {0} 毫秒（误差 ±{1} 毫秒）。</M3AT_BenchAddOnsCost>
+  <M3AT_BenchAddOnsSame>附加模组合计的开销与误差无法区分（±{0} 毫秒）。</M3AT_BenchAddOnsSame>
+  <M3AT_BenchAddOnCost>{0} 每帧花费 {1} 毫秒（误差 ±{2} 毫秒）。</M3AT_BenchAddOnCost>
+  <M3AT_BenchAddOnSame>{0} 的开销与误差无法区分（±{1} 毫秒）。</M3AT_BenchAddOnSame>
   <M3AT_BenchUnpaused>测量期间请不要暂停游戏。</M3AT_BenchUnpaused>
   <M3AT_BenchFlicker>测量期间小人大约每秒来回切换一次：这是测试在轮流测量。</M3AT_BenchFlicker>
   <M3AT_BenchStart>开始</M3AT_BenchStart>
@@ -262,8 +281,8 @@
   <M3AT_GripClearAll>清除已调整的握把（{0}）</M3AT_GripClearAll>
   <M3AT_GripClearAllConfirm>忘记你为 {0} 种武器设置的握把？它们将恢复通常握法。</M3AT_GripClearAllConfirm>
   <M3AT_ToolsToggleTip>M3AT 工具：在持有武器的殖民者上显示"调整握把"，在穿着其他模组服装的小人上显示"调整服装"。</M3AT_ToolsToggleTip>
-  <M3AT_ClothesAdjust>调整服装</M3AT_ClothesAdjust>
-  <M3AT_ClothesAdjustDesc>其他模组的服装会显示为 M3AT 中最接近的服装。可以为任意一件改选其他服装，或不显示。对所有穿着这件服装的人、所有存档都有效。</M3AT_ClothesAdjustDesc>
+  <M3AT_ClothesAdjust>M3AT 外观</M3AT_ClothesAdjust>
+  <M3AT_ClothesAdjustDesc>M3AT 如何绘制此人：其种族或服装对应的内容包，以及来自其他模组的每件服装（显示为最接近的 M3AT 模型或内容包的模型）。可为任意一件选择其他模型或不绘制。该选择对所有穿着这件服装的人、所有存档都有效。</M3AT_ClothesAdjustDesc>
   <M3AT_ClothesWindowTitle>服装外观</M3AT_ClothesWindowTitle>
   <M3AT_ClothesNoPawn>请选择一名穿着其他模组服装的小人。</M3AT_ClothesNoPawn>
   <M3AT_ClothesAuto>显示为：{0}</M3AT_ClothesAuto>
@@ -276,6 +295,8 @@
   <M3AT_ClothesMenuAuto>自动（{0}）</M3AT_ClothesMenuAuto>
   <M3AT_ClothesNotDrawn>不显示</M3AT_ClothesNotDrawn>
   <M3AT_ClothesMenuNone>不显示</M3AT_ClothesMenuNone>
+  <M3AT_ClothesPaint>用其自身贴图绘制</M3AT_ClothesPaint>
+  <M3AT_ClothesPaintTip>像"用服装自身贴图绘制替代服装"选项那样，用这件服装自己的贴图绘制该服装。如果这件的贴图效果不对，取消勾选：它将以该服装的普通纹理和这件服装的颜色显示。</M3AT_ClothesPaintTip>
   <M3AT_ClothesHelp>更改会立即显示在所有穿着这件服装的人身上，对所有存档都有效。"再加一件"可同时显示两件，例如用衬衫和裤子表现连体服。可在模组设置中全部清除。</M3AT_ClothesHelp>
   <M3AT_ClothesClearAll>清除服装选择（{0}）</M3AT_ClothesClearAll>
   <M3AT_ClothesClearAllConfirm>忘记你为 {0} 件服装做的选择？它们将恢复自动匹配。</M3AT_ClothesClearAllConfirm>
@@ -336,17 +357,6 @@
   <M3AT_PowerArmourBulkTip>穿着动力装甲（覆盖躯干、手臂和腿部的太空科技装甲，例如海军陆战队装甲、重装甲和侦察装甲）的小人会被画得更高大、更魁梧，头部相对更小，像一位全副武装的巨人。默认关闭，因为游戏本身的装甲是普通人穿的。</M3AT_PowerArmourBulkTip>
   <M3AT_ArmourBulk>装甲体型</M3AT_ArmourBulk>
   <M3AT_ArmourBulkTip>GrimWorld 40,000 的星际战士与禁军装甲使穿戴者变大多少。默认：{0}（星际战士约 2.2 米，常人约 1.75 米）。</M3AT_ArmourBulkTip>
-  <M3AT_CeilingCrouch>高于天花板时</M3AT_CeilingCrouch>
-  <M3AT_CeilingCrouchTip>被画得比头顶天花板还高的小人在室内的表现：蹲下并弯腰。
-
-总是：在任何屋顶下。
-
-显示上层时（默认）：仅当 IsoRimZ 在其上方绘制上一层楼时，因为否则没有绘制天花板，头不会穿过去。
-
-从不：保持完整身高。</M3AT_CeilingCrouchTip>
-  <M3AT_CeilingAlways>总是蹲下</M3AT_CeilingAlways>
-  <M3AT_CeilingFloorShown>显示上层时</M3AT_CeilingFloorShown>
-  <M3AT_CeilingNever>从不蹲下</M3AT_CeilingNever>
   <M3AT_Compatibility>模组兼容</M3AT_Compatibility>
   <M3AT_CompatibilityTip>点击显示或隐藏与其他模组物品相关的选项。</M3AT_CompatibilityTip>
   <M3AT_ArmourDrawScale>放大绘制的装甲使穿戴者变大</M3AT_ArmourDrawScale>
@@ -363,4 +373,54 @@
   <M3AT_SizeOldAge>衰老：x{0}</M3AT_SizeOldAge>
   <M3AT_SizeArmour>护甲：x{0}</M3AT_SizeArmour>
   <M3AT_SizeTotal>最终：{0}（{1} 格）</M3AT_SizeTotal>
+  <M3AT_TabOptions>选项</M3AT_TabOptions>
+  <M3AT_TabContent>内容</M3AT_TabContent>
+  <M3AT_TabContentCount>内容（{0}）</M3AT_TabContentCount>
+  <M3AT_ContentTitle>内容包</M3AT_ContentTitle>
+  <M3AT_ContentIntro>为 M3AT 小人提供自己的耳朵、尾巴、脸、头发或服装的模组。可为每个部分选择绘制内容包的还是 M3AT 自己的。更改立即生效，并在所有存档中保留。</M3AT_ContentIntro>
+  <M3AT_ContentButton>底栏上的 M3AT 按钮</M3AT_ContentButton>
+  <M3AT_ContentButtonTip>有内容包启用时，在游戏底栏显示 M3AT 按钮，可在地图上打开此列表。</M3AT_ContentButtonTip>
+  <M3AT_ContentNotLoaded>M3AT 小人加载后才能找到内容包：请先在 3D 视图中打开一个存档。</M3AT_ContentNotLoaded>
+  <M3AT_ContentNone>没有启用的内容包。内容包是为 M3AT 小人提供自己的部件或服装的模组；模组作者请参阅 M3AT 文件夹中的 Docs/RacePacks.md。</M3AT_ContentNone>
+  <M3AT_ContentSummary>{0} · {1} 件服装 · 种族：{2}</M3AT_ContentSummary>
+  <M3AT_ContentReset>重置此内容包</M3AT_ContentReset>
+  <M3AT_ContentItems>逐件（{0}）</M3AT_ContentItems>
+  <M3AT_ContentCompatLine>内容包（为 M3AT 提供自己部件或服装的模组）：请见顶部的“内容”标签页。</M3AT_ContentCompatLine>
+  <M3AT_ContentNew>正在使用来自 {0} 的内容。可通过底栏的 M3AT 按钮或 M3AT 选项的“内容”标签页，为每个部分选择内容包的或 M3AT 自己的。</M3AT_ContentNew>
+  <M3AT_SourcePack>内容包的</M3AT_SourcePack>
+  <M3AT_SourceM3AT>M3AT 的</M3AT_SourceM3AT>
+  <M3AT_SourceDefault>{0}（默认）</M3AT_SourceDefault>
+  <M3AT_SourceMenuDefault>默认（{0}）</M3AT_SourceMenuDefault>
+  <M3AT_Part_EarsTail>耳朵和尾巴</M3AT_Part_EarsTail>
+  <M3AT_Part_Face>脸</M3AT_Part_Face>
+  <M3AT_Part_Hair>头发</M3AT_Part_Hair>
+  <M3AT_Part_HeadwearFit>帽子与头发、耳朵的贴合</M3AT_Part_HeadwearFit>
+  <M3AT_Part_BodyShape>体型</M3AT_Part_BodyShape>
+  <M3AT_Part_SkinColour>肤色</M3AT_Part_SkinColour>
+  <M3AT_Part_Clothing>服装</M3AT_Part_Clothing>
+  <M3AT_Part_GeneParts>基因部件</M3AT_Part_GeneParts>
+  <M3AT_Part_Poses>姿势</M3AT_Part_Poses>
+  <M3AT_Part_Other>其他更改</M3AT_Part_Other>
+  <M3AT_PartTip_EarsTail>种族的耳朵和尾巴。M3AT 自己的根据种族图片生成，少数热门种族有专门模型。</M3AT_PartTip_EarsTail>
+  <M3AT_PartTip_Face>脸。M3AT 的是适配到小人上的 Facial Animation 脸；没有 Facial Animation 脸的种族则没有脸。</M3AT_PartTip_Face>
+  <M3AT_PartTip_Hair>头发。M3AT 根据种族的头发图片生成。</M3AT_PartTip_Hair>
+  <M3AT_PartTip_HeadwearFit>帽子和头盔如何覆盖头发和耳朵。</M3AT_PartTip_HeadwearFit>
+  <M3AT_PartTip_BodyShape>内容包为该种族对体型所做的更改。</M3AT_PartTip_BodyShape>
+  <M3AT_PartTip_SkinColour>肤色。M3AT 的肤色与游戏中该种族显示的颜色一致。</M3AT_PartTip_SkinColour>
+  <M3AT_PartTip_Clothing>服装使用内容包的模型，或 M3AT 最接近的模型并用服装原图上色。“逐件”可为每件分别选择。</M3AT_PartTip_Clothing>
+  <M3AT_PartTip_GeneParts>内容包为基因绘制的部件，取代 M3AT 的猫耳、尾巴和角。</M3AT_PartTip_GeneParts>
+  <M3AT_PartTip_Poses>内容包添加的姿势和动画。</M3AT_PartTip_Poses>
+  <M3AT_PartTip_Other>内容包对 M3AT 绘制方式的其他更改。</M3AT_PartTip_Other>
+  <M3AT_HintNoFace>M3AT 没有此种族的脸：将不绘制脸。</M3AT_HintNoFace>
+  <M3AT_HintBuiltEars>M3AT 根据种族图片生成。</M3AT_HintBuiltEars>
+  <M3AT_HintArmour>护甲和头盔默认使用 M3AT 的；可逐件选择。</M3AT_HintArmour>
+  <M3AT_PackClothesTitle>{0}：服装</M3AT_PackClothesTitle>
+  <M3AT_ItemPack>内容包的模型</M3AT_ItemPack>
+  <M3AT_ItemM3AT>M3AT 的：{0}</M3AT_ItemM3AT>
+  <M3AT_ItemNone>不绘制</M3AT_ItemNone>
+  <M3AT_ItemDefault>显示为 {0}</M3AT_ItemDefault>
+  <M3AT_ItemMenuPack>内容包的模型</M3AT_ItemMenuPack>
+  <M3AT_ItemMenuM3AT>M3AT 自动匹配（{0}）</M3AT_ItemMenuM3AT>
+  <M3AT_PackPaintTip>用这件服装自己的贴图（按游戏的上色方式）为内容包的模型上色，保留模型形状。适用于颜色不对的模型。</M3AT_PackPaintTip>
+  <M3AT_LookTitle>M3AT 外观</M3AT_LookTitle>
 </LanguageData>

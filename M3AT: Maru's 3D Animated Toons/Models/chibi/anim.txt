@@ -560228,12 +560228,12 @@ weapon_type Gun_HellcatRifle rifle
 weapon_type Gun_Incinerator rifle
 weapon_type NerveSpiker rifle
 weapon_type Gun_BeamRepeater rifle
-type_scale handgun 0.6600 small
-type_scale rifle 1.0000 big
-type_scale bow 1.2000 big
-type_scale grenade 0.6600 grenade
-type_scale melee_1h 1.0000 small
-type_scale melee_2h 1.3000 big
+type_scale handgun 0.5000 small
+type_scale rifle 0.8500 big
+type_scale bow 1.0000 big
+type_scale grenade 0.6000 grenade
+type_scale melee_1h 0.6000 small
+type_scale melee_2h 1.1000 big
 holster_weapon handgun Gun_Autopistol
 holster_weapon rifle Gun_AssaultRifle
 holster_weapon bow Bow_Recurve

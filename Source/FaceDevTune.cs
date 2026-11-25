@@ -177,8 +177,9 @@ namespace M3AT
             if (s != null)
             {
                 list.CheckboxLabeled("Crisper race mouths (mod option)", ref s.raceMouthInk);
+                list.CheckboxLabeled("Fit mouth sizes (mod option)", ref s.mouthSizeFit);
             }
-            list.Label("Wide mouth shapes (with crisper mouths): the width past a share of a human's kept at a share");
+            list.Label("Wide mouth shapes (with fit mouth sizes): the width past a share of a human's kept at a share");
             FaceLayers.MouthWideFrom = Row(list, "Narrowed from (of a human's width)", FaceLayers.MouthWideFrom, 0.6f, 2f, 0.01f);
             FaceLayers.MouthWideKeep = Row(list, "Width past it kept", FaceLayers.MouthWideKeep, 0f, 1f, 0.01f);
             if (list.ButtonText("Reset these sliders"))

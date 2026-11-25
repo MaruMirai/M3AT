@@ -808,7 +808,7 @@ namespace M3AT
             {
                 if (slotWeapon[s] != null && skin.UnderShield(s))
                 {
-                    outer = Mathf.Max(outer, skin.HolsterOuter(fig, s, mask, slotExtra[s]) + HalfDepth(slotWeapon[s]) / size);
+                    outer = Mathf.Max(outer, skin.HolsterOuter(fig, s, mask, slotExtra[s]) + HalfDepth(slotWeapon[s]) / WeaponSizeOf(size));
                 }
             }
             return outer;
@@ -876,7 +876,7 @@ namespace M3AT
             }
             // Lengths as DrawSlab sizes the slab (model units: its cells over the pawn's size), the placeholder at this
             // weapon's scale, as it is of the same type.
-            float scale = ScaleOf(weapon) / size;
+            float scale = ScaleOf(weapon) / WeaponSizeOf(size);
             ThingDef pd = DefDatabase<ThingDef>.GetNamedSilentFail(placeholder);
             Vector2 pDraw = pd != null && pd.graphicData != null ? pd.graphicData.drawSize : g.drawSize;
             float ownLong = Mathf.Max(g.drawSize.x, g.drawSize.y) * scale, itsLong = Mathf.Max(pDraw.x, pDraw.y) * scale;
@@ -919,10 +919,10 @@ namespace M3AT
         }
 
         // HolsterAt's extra for a weapon on its own against a pack (model units): its depth in cells whatever the pawn's
-        // size, as DrawSlab draws it, so a share of a small pawn's model units more.
+        // size, as DrawSlab draws it, so a share of a small pawn's model units more (the pawn height's share left in: WeaponSizeOf).
         private static float PackClear(Thing weapon, int slot, GarmentMask mask, SkinnedFigure.Posed fig, float size)
         {
-            return skin.HolsterClear(fig, slot, mask, HalfDepth(weapon) / size + StackGap);
+            return skin.HolsterClear(fig, slot, mask, HalfDepth(weapon) / WeaponSizeOf(size) + StackGap);
         }
 
         // How much further out than its Clearance this weapon goes to lie on a pack and on those already in the slots under
@@ -935,7 +935,7 @@ namespace M3AT
                 if (slotWeapon[s] != null && skin.HolsterStacks(slot, s))
                 {
                     // Its depth in cells whatever the pawn's size (DrawSlab), so a share of a small pawn's model units more.
-                    float apart = (HalfDepth(weapon) + HalfDepth(slotWeapon[s])) / size + StackGap;
+                    float apart = (HalfDepth(weapon) + HalfDepth(slotWeapon[s])) / WeaponSizeOf(size) + StackGap;
                     most = Mathf.Max(most, skin.HolsterOver(fig, slot, s, mask, slotExtra[s], apart));
                 }
             }

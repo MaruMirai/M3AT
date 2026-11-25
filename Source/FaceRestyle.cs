@@ -41,6 +41,11 @@ namespace M3AT
 
         internal static bool RaceMouthInk { get { return SettingsMod.Settings == null || SettingsMod.Settings.raceMouthInk; } }
 
+        // Whether mouths are sized to the chibi's face (the mouthSizeFit mod option, "Fit mouth sizes"): a race's to about a
+        // human's (RaceMouthScale) and any shape drawn much wider than usual narrowed (MouthShapeScale). Apart from the ink,
+        // which changes how the art looks rather than how big it is.
+        internal static bool MouthSizeFit { get { return SettingsMod.Settings == null || SettingsMod.Settings.mouthSizeFit; } }
+
         // The texture a mouth layer (g's, layer the layer's name) is drawn with: with the option on, its restyled copy; else,
         // or for a cover (the skin-coloured layer hiding a sprite head's own mouth), a mod whose mouths are drawn in dark ink
         // already (InkStyled: the retexture), or one that can't be read, its own.
@@ -300,9 +305,9 @@ namespace M3AT
             {
                 return scale;
             }
-            if (!RaceMouthInk)
+            if (!MouthSizeFit)
             {
-                return 1f;   // the size fit goes with the rest of the mouths' changes, under the one option
+                return 1f;
             }
             if (pawn.def == RimWorld.ThingDefOf.Human)
             {
@@ -355,7 +360,7 @@ namespace M3AT
         // mouths 0.055; UNAGI's Happakuwae 0.14), which reads too wide on the chibi's face. So each shape is measured as
         // drawn (its own texture, after the race's fit, RaceMouthScale), and only the part of its width past MouthWideFrom
         // of a human's median width is kept, MouthWideKeep of it: a wider shape still comes out wider than a narrower one,
-        // never clamped to one size. Shapes under it are left alone. With the crisper mouths option (RaceMouthInk).
+        // never clamped to one size. Shapes under it are left alone. With the mouth size option (MouthSizeFit).
         // Not consts, so the dev window (FaceDevTune.cs) can move them.
         internal static float MouthWideFrom = 0.95f;
         internal static float MouthWideKeep = 0.35f;
@@ -371,7 +376,7 @@ namespace M3AT
                 return 1f;
             }
 #endif
-            if (!RaceMouthInk || g == null || g.MatSouth == null)
+            if (!MouthSizeFit || g == null || g.MatSouth == null)
             {
                 return 1f;
             }

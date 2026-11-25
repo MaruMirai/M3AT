@@ -280,6 +280,7 @@ namespace M3AT
     public sealed partial class SkinnedFigure
     {
         private const int HelmKey = 1000;          // holsterPush's key for a helmet on the back, past every shield's
+        private const float HelmSink = 0.025f;      // model units: how far a helmet on the back lies into the clothes, pack, shield or weapons it is pushed out past, so it sits close rather than standing off them
         private const float HelmSpots = 0.8f;      // of its footprint's half width and height: how far out across it Clearance looks
         private readonly Dictionary<int, float> shieldDepths = new Dictionary<int, float>();
 
@@ -396,6 +397,8 @@ namespace M3AT
             {
                 push = Mathf.Max(push, over + GearGap - face);
             }
+            // Settled a little into what it lies on (HelmSink), never in past where the bare body's place has it.
+            push = Mathf.Max(0f, push - HelmSink);
             place = p.whole[bone] * Matrix4x4.Translate(p.shape.boneMove[bone] + way * push + helmAt)
                 * Matrix4x4.TRS(Vector3.zero, helmTurn, new Vector3(k, k, k)) * Matrix4x4.Translate(-pivot);
             return true;

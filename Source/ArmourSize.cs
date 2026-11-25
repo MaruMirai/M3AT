@@ -264,28 +264,31 @@ namespace M3AT
         // Ceilings. A pawn under a roof that would be drawn taller than the ceiling crouches under it: the hips let down
         // (Crouch, up to all of CrouchDepth) and then the upper back bent forward (Stoop, up to CeilingStoopMost), as far as
         // it takes to keep its head CeilingClear under. The ceiling is the floor above's height over its own with IsoRimZ's
-        // stacked floors (IsoRim's Api.Floors), else the wall height (a roof is drawn on the walls). By the ceilingCrouch
-        // option: under any roof, only while the floor above is drawn over it (the upper floor viewed: a roof is not drawn
-        // otherwise), or never.
+        // stacked floors (IsoRim's Api.Floors), else the wall height (a roof is drawn on the walls). Only while the floor
+        // above is drawn over it (the upper floor viewed), as otherwise no ceiling is drawn for its head to go through;
+        // without stacked floors a roof is never drawn over a pawn, so it never crouches. (Once an option, which could also
+        // crouch it under any roof or never.)
         private const float CeilingClear = 0.04f;    // cells between the head's top and the ceiling
         private const float CeilingStoopMost = 55f;  // degrees the back bends under a ceiling at most
         private const float FigureTop = 1.25f;       // the top of the head standing, model units (export_frames.py's FIGURE_HEIGHT)
+        private const float SlabThickness = 0.12f;   // cells an upper floor's slab hangs below its height (IsoRim's internal
+                                                     // Floors.SlabThickness, which it clips models under too): the ceiling's underside
         private const float BackShare = 0.5f;        // of the figure's height, from the hips to the head's top, which the stoop swings down
         private const float CeilingEase = 2f;        // how fast a pawn crouches under a ceiling or stands up again, of all the way per real second
 
-        // How far down the pawn needs to bring its head under the ceiling over it, cells; 0 for none. raised: cells it stands
-        // on its armour's soles.
-        private static float CeilingDrop(Pawn pawn, float size, float raised)
+        // How far down the pawn needs to bring its head under the ceiling over it, cells; 0 for none. standing: how tall it
+        // stands at rest with what it has on, model units (SkinnedFigure.TopOf: a helmet stands over the head, a shrunk head
+        // lower); raised: cells it stands on its armour's soles.
+        private static float CeilingDrop(Pawn pawn, float size, float standing, float raised)
         {
-            Settings s = SettingsMod.Settings;
-            if (s == null || s.ceilingCrouch == CeilingCrouch.Never || !pawn.Spawned)
+            if (!pawn.Spawned)
             {
                 return 0f;
             }
-            float top = FigureTop * size + raised;   // (raised: cells it stands on its armour's soles, SoleOf)
-            if (top <= Api.WallHeight - CeilingClear && Api.Floors == null)
+            float top = standing * size + raised;   // (raised: cells it stands on its armour's soles, SoleOf)
+            if (Api.Floors == null)
             {
-                return 0f;   // (spares the roof lookup for everyone under the walls' height without stacked floors)
+                return 0f;   // (no stacked floors: no floor above is ever drawn over it)
             }
             Map map = pawn.Map;
             IntVec3 c = pawn.Position;
@@ -295,15 +298,16 @@ namespace M3AT
             }
             bool drawn;
             float ceiling = CeilingOver(map, c, out drawn);
-            if (s.ceilingCrouch == CeilingCrouch.FloorShown && !drawn)
+            if (!drawn)
             {
                 return 0f;
             }
             return Mathf.Max(0f, top - (ceiling - CeilingClear));
         }
 
-        // The ceiling's height over the cell's floor, cells, and whether a floor above it is drawn now (IsoRimZ's upper floor
-        // viewed); the wall height, not drawn, without stacked floors or on the top floor.
+        // The ceiling's height over the cell's floor, cells: the underside of the floor above's slab with IsoRimZ's stacked
+        // floors, else (or on the top floor) the wall height; and whether that floor above is drawn now (not drawn for the
+        // wall height).
         private static float CeilingOver(Map map, IntVec3 c, out bool drawn)
         {
             drawn = false;
@@ -338,7 +342,7 @@ namespace M3AT
                 float above;
                 int aboveShift;
                 drawn = layout.Floor(map, own + 1, out above, out aboveShift);
-                return above - ownHeight;
+                return above - ownHeight - SlabThickness;   // (the slab's underside, not its top: a tall pawn's helmet went into it)
             }
             catch (Exception e)
             {
@@ -362,9 +366,9 @@ namespace M3AT
 
         // Eases the pawn's crouch under a ceiling toward what it needs and gives the crouch (0 .. 1 of CrouchDepth) and the
         // stoop (degrees) that bring its head down that far.
-        private static void CeilingPose(Pawn pawn, Ease e, float size, float raised, bool upright, out float crouch, out float stoop)
+        private static void CeilingPose(Pawn pawn, Ease e, float size, float standing, float raised, bool upright, out float crouch, out float stoop)
         {
-            float need = upright ? CeilingDrop(pawn, size, raised) : 0f;
+            float need = upright ? CeilingDrop(pawn, size, standing, raised) : 0f;
             e.ceilingDrop = Mathf.MoveTowards(e.ceilingDrop, need, CeilingEase * FigureTop * size * Time.deltaTime);
             crouch = 0f;
             stoop = 0f;

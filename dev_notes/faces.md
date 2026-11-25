@@ -1,0 +1,56 @@
+# Faces
+
+`Source/FaceLayers.cs` draws Facial Animation's layers on the chibi's face patch (`face_*.obj`, `dev_notes/clips.md`). Without FA, or an export with no face patches, the head is bare. Modelled on IsoRim's `FaceDecal` and the sibling mod `../IsoRim Nals Experimentals Patch`.
+
+## Layers
+
+- The pawn's FA part nodes are found by reflection and sorted by `baseLayer`. The head's Basic layer and the whole-sprite skin layer are skipped (they carry the sprite outline); the head's Cover/Highlight layers and see-through skin overlays are kept. The master's `UpdateAnimation` is called once a tick.
+- Each layer's `MatSouth` is copied into one of this mod's materials (`Defs/ShaderDefs/MarusFace_Shaders.xml`, `Shaders/MarusFace.*.glsl`): the game shader's colour maths, shaded by IsoRim's sun like the head (FA's own are unlit, so its skin-coloured lid cover showed as a brighter patch).
+- The lid's Cover layer (mode 5) keeps only its shape: skin colour × the lid mask, the colour rounded like IsoRim's head tint, as FA paints it from the sprite head's art.
+- Queued at 2950 + their place, before IsoRim's light pass (3099). The mouth is drawn on a copy of the patch with its UVs zoomed.
+- `sharpFaceArt` ("Sharper face art", on, Advanced; `FaceLayers.SharpFaceArt`, the global `_MarusFaceSharp` set by `SetSharpness`, as face blocks are cached): the shaders' `FaceArt` (keep the two shaders' copies in step) mips sharper by `ArtMipBias` (-0.5, via `textureGrad` with scaled gradients, as it takes no bias), and past `SharpFrom` screen pixels a texel reads alpha as a cubic B-spline with its edge stretched to about a screen pixel at half its local peak (`SharpEdge`, `SharpMost`), so magnified lines are crisp while thin, faint lines keep their strength. Masks by `FaceMask`, same bias. Not the wounds' sheet.
+- A missing eye (`MissingEyes`: FA's eye labels for the race, `GetMissingPartsCommonAncestors`; a prosthetic isn't missing) leaves its half of the texture out of the eyeball and lid layers (`_EyeCut`; the "right eye" is the texture's right half unless FA's `SwitchLeftAndRightEyes`) and gets FA's closed lid there (`ClosedLid`: the lid controller's `graphicList` by layer, `GetSubGraphic` with the `close` LidShapeDef).
+- FA colours hurt or blind eyes and eye colour genes only when it loads its textures, so `FaceLayers.PatchEyes` postfixes `HediffSet.DirtyCache` (when an eye's health changed, `eyeHealth`: the eyeball controller's `SetDirty` and `ReloadIfNeed`; this mends FA's sprite face too) and `GenesPostfix` on `Pawn_GeneTracker.Notify_GenesChanged` reloads them. `Patches/EyeGenes.xml` replaces FA's `Eyes_Red`/`Eyes_Gray` colours (its red came out pink on its dark art).
+- Furskin pawns: `FaceLayers.PatchBlush` postfixes `FAHelper.GetThoughts` to leave out the naked thoughts (`NakedBlush`), so Experimentals doesn't blush; the mood is untouched.
+
+## Content packs' faces
+
+`FaceLayers.Draw` first asks `ExpansionApi.DrawFace` (a pack's `Face`, only where the player has the pack's face). A pack that patches `FaceLayers` (Miho, Wolfein: a prefix skipping ours) has those patches taken off while the player has M3AT's face; by default M3AT's where Facial Animation has faces for the race (Wolfein), the pack's otherwise (Miho). `dev_notes/options.md`, Content packs.
+
+## Gaze and offsets (`Source/FaceGaze.cs`)
+
+FA moves eyes (one eyeball shape; every look is an offset), brows, lids and mouth by a draw offset per controller (`eyeballOffset`, `eyeballOffsetL`/`R`, `lidOffset`, `browOffset`, `mouthOffset`, world units on the 2D head). `ShiftOf` reads each layer's (the controller's `Offset`, plus `OffsetL`/`OffsetR` for eyes; not the race's fixed offset or the head controller's) over its graphic's `drawSize`, and the shaders read the layer that much moved via `_MarusFaceShift`, a per-draw storage buffer (MarusFace binding 7, MarusFaceStack 18, two layers a vec4; stacked materials are kept per mix of layers). **Every block these shaders get must set it** (`SetShift`, `SetNoShift`, `SetStackShifts`), as the engine binds an unset storage slot to the first set one (the bones). `gazeStrength` ("Eye movement", 1, `FaceLayers.GazeStrength`) scales the eyes' only. `FaceLayers.TestGaze` forces a gaze for the `prosthetics` autotest (`IrisReport`).
+
+## Fitting races and human sets
+
+- Mouth row: for any race but the human, mouth layers move to the human row (`FaceGaze.RaceMouthShift`, measured once per race from the first mouth texture, every pixel by alpha; unmeasurable ones skipped with a warning; logged). Kiiro's is at 0.601, a human's about `MouthCentre`'s 0.624.
+- Eyes: for any race but the human, eye, lid, brow and lid option layers (`SpreadsWithEyes`) are fitted to a human's (`FaceGaze.RaceEyeSpread`, `EyeFit`, measured once per race from its first eyeball texture with both irises, each half's alpha-weighted middle; logged):
+  - scaled about the eyes' middle so the whole eye is a human's size (`EyeSizeOf`: the eye whites, `Lids/<style>/<gender>/normal_bottom_south`, `RootOf` of each eye's opaque box, averaged over styles, the last loaded mod's at each path; left alone within `EyeScaleSlack`; through `WithEyeFit`, so the player's tuning still applies). Sizing by irises instead was tried and rejected (Wolfein's came out a fifth too small);
+  - moved up so the whites' middle (`EyeRowOf`) is the human's (`EyeRiseOf`; by the irises to `HumanEyeRow` if the whites can't be read);
+  - each half moved out so the irises are `HumanIrisApart` (0.118) apart: a single layer's spread in its shift slot's z, stacked ones in `SpreadSlots` (shaders' `SpreadOf`/`SpreadAt`, eased to none over `SpreadEase` either side of the middle so the strip between the eyes stretches). Eye wounds and prosthetic eyes go with it.
+- Human face sets (`Source/FaceSetFit.cs`) are fitted the same way to a fixed reference, the retexture's own measure (`RefEyeSize`, `RefEyeRow`, `RefIrisApart`), by the mod a human's irises come from (`humanEyeMods`, `NoteEyeMod`; `MeasureSet` uses that mod's own textures only; `SetFit`). The retexture is left alone; Experimentals' own art (whites 12% smaller, 0.007 high) is scaled and lowered. The races' reference (`HumanEyeSizeNow`, `HumanEyeRowNow`) is the same fixed one.
+- Face areas (`Source/FaceAreas.cs`): skin overlays, emotions and the head's Cover (`HasAreas`) are split once per texture into pieces (within `AreaGroup` pixels). A small piece centred in the mouth's box goes with the mouth (`MouthAreaKind`, on the mouth's patch with its first layer's shift and tuning, not the wide-shape narrowing or ink, just under it, `pendingMouth`), one round the eyes with the eye fit (`EyeAreaKind`), the rest stays (blush, emotions, makeup from `stom13.wantedfacialanim.fr`, freckles). Only some head types have a blush picture (`FaceLayers.TestHeadShape`, `TestEmotionShape`, `TestNoAreas` for tests).
+- `anim_scripts/face_compare.py` (`blender -b --python anim_scripts/face_compare.py -- <sheet.png> [set ...]`) renders face sets (`SETS`) on the patch with the game's moves, to compare.
+
+## Mouths (`Source/FaceRestyle.cs`)
+
+- `raceMouthInk` ("Crisper mouths", on, Advanced): every mouth texture but a cover layer's, from a mod not already in ink (`InkStyled`: south mouths' median luminance under `InkDark`; the retexture is), is copied once in the retexture's hard-lined style: light pixels reachable from the edge without crossing a darker one cleared (`HaloLight`), so an open mouth's inside stays, the rim (`InkRim` px at 512) darkened `InkRimTimes` and half greyed, easing to `InkInsideTimes` inside (`MouthTexture`, in `DrawLayer` and `DrawStacked`).
+- `mouthSizeFit` ("Fit mouth sizes", on, `FaceLayers.MouthSizeFit`): a race's mouths are scaled toward a human's (`RaceMouthScale`: median south width in its Mouth folder against Experimentals', to `MouthFitPower`, within `MouthScaleLeast`..`MouthScaleMost`), on the mouth's tune size (`TuneOf`, `drawMouthScale`), kept in a tuned mod's pin (`Settings.faceFitMouths`). Then any mouth shape wider than `MouthWideFrom` (0.95) of a human's median keeps only `MouthWideKeep` (0.35) of the width past that (`MouthShapeScale`, `WidthOf` per texture, set from a face's first mouth layer, `drawMouthShape`; humans too).
+
+## Face tuning (`Source/FaceTuning.cs`, `Source/FacePins.cs`)
+
+- The player moves and sizes FA's art, the whole face (about `FacePivot`, the eye line) and the mouth (about `MouthCentre`), per mod the art comes from, by packageId (`Settings.faceTunes`, `mouthTunes`: x, y in face texture widths, + right and up from the front, z the size; not touched by "Restore all defaults", cleared by its own button). A mod with face numbers and none for the mouth takes (0, 0, 1) for the mouth (`TryGetValue`'s zeros drew it at no size).
+- Each layer is tuned by the mod its texture is found in (`FaceLayers.ModOf`, as `ContentFinder` finds it, last loaded first), in the shaders: `TuneOf` makes a scale and offset on the layer's texture places, in `_MarusFaceShift`'s second slot or, stacked, after the spreads (`TuneSlots`). All zero is as drawn, so ridges, flat beard and skin wounds (`SetNoShift`) stay put; eye wounds and prosthetic eyes take the eyes' (`drawEyeTune`). The patch's own UVs carry only `FaceRaise` and the mouth zoom.
+- `FaceToolWindow`: opened from the options' Advanced section (`SettingsMod.AdvancedSection`, `advancedOpen`) or the dev action M3AT > Face tuning window. Lists the mods the selected pawn's face was last drawn from (`TuneWatched`, `BeginTuneNotes`, `TuneNotes`), sliders, Reset, Restore defaults, and copying numbers to the face's other mods; written on mouse up.
+- Pins: the first change to a mod's numbers pins the automatic fit its face has then (`FaceLayers.Pin`, `Settings.faceFits`: eye scale, rise, spread; `faceFitRows`: eye row, mouth move), used for good (`PinnedEyes`, `PinnedMouth` in `TakeEyeFit`, `RaceEyeSpread`, `RaceMouthShift`; a race's eyes go by the mod its `_Basic` eyeball layer comes from, `NoteEyeMod`), so later changes to the measuring leave it alone. Back to automatic (`M3AT_FaceReset`, `Unpin`) drops both. Old tunings without a pin: a human set's (`KnownHumanMod`, `HumanArt`) pinned to no fit, a race's cleared once with a message (`CheckPins`, `M3AT_FaceTuneCleared`).
+
+## Dev tools (`Source/FaceDevTune.cs`)
+
+M3AT > Race face lineup spawns four bareheaded pawns (both genders, 20..45) of the human and each loaded HAR race in rows by the camera, standing still, and opens M3AT > All faces tuning (`FaceDevWindow`): unsaved sliders moving every face on top of everything else, the whole face (`FaceLayers.DevFace`), eyes/lids/brows (`DevEyes`) and mouth (`DevMouth`, incl. the wide-mouth numbers), with Copy. "Race face lineup: remove" takes them away.
+
+## Autotests
+
+- `facedev`: each group moves the faces. `facepins`: the pin cases (wants Wolfein Race and its face mod).
+- `humanfaces`: eight humans' faces (e.g. `M3AT_SKIP_MODS="barb.facetexture"` to see base FA's and Experimentals' own).
+- `racefaces`: two pawns of each test race and a human, before (options off, `TestNoMouthFit`), mouth open, after, and from the play camera.
+- `facetune`: the mods found, the face untuned, with its eyes' mod tuned and its mouth tuned, stacked and a layer at a time.

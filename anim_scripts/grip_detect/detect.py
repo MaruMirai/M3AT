@@ -45,11 +45,9 @@ def hanging(m, h, i0, L):
     parts.sort(key=lambda p: p['lo'])
     return parts
 
-def gun(m, info, pistol=False):
-    """A gun drawn level, muzzle to the right. The body's underside is the highest cut that leaves the most separate
-    parts hanging below it (stock, grip, magazine, ...). The fist on the pistol grip: the rearmost of those that is not
-    the stock; else the stock's wrist (where it meets the body)."""
-    m = largest(m)
+def underside(m):
+    """A level gun's extent (i0, i1, L, rows) and its body's underside: (base row, the parts hanging below it, widen),
+    the highest cut that leaves the most separate parts hanging; None if there is no cut."""
     cols = np.nonzero(m.any(0))[0]
     rows = np.nonzero(m.any(1))[0]
     i0, i1 = cols[0], cols[-1]
@@ -63,6 +61,14 @@ def gun(m, info, pistol=False):
         widen = int(m[h, i0:i1+1].sum()) - int(m[h - 1, i0:i1+1].sum())
         if best is None or (len(parts), widen) >= (len(best[1]), best[2]):
             best = (h, parts, widen)
+    return i0, i1, L, rows, best
+
+def gun(m, info, pistol=False):
+    """A gun drawn level, muzzle to the right. The body's underside is the highest cut that leaves the most separate
+    parts hanging below it (stock, grip, magazine, ...). The fist on the pistol grip: the rearmost of those that is not
+    the stock; else the stock's wrist (where it meets the body)."""
+    m = largest(m)
+    i0, i1, L, rows, best = underside(m)
     if best is None:
         info['how'] = 'none'
         return (i0 + 0.3 * L) / N, (rows[0] + rows[-1]) / 2 / N
@@ -113,6 +119,36 @@ def gun(m, info, pistol=False):
         return (i + 0.5) / N, ((top[i] + bot[i]) / 2 + 0.5) / N
     info['how'] = 'none'
     return (i0 + 0.3 * L) / N, (base + 0.5) / N
+
+FORE_SHARE = 0.65   # the support hand along a gun with no fore grip, a share of its length from the back (ForeShare)
+FORE_PAST = 0.5     # a fore grip hangs in front of this share of the length (ForePast)
+FORE_WIDE = 0.12    # at most this wide (ForeWide) ...
+FORE_DEEP = 0.08    # ... and at least this deep, shares of the length (ForeDeep)
+
+def fore(m, info):
+    """Where the other hand holds a level gun (muzzle right), along it: a fore grip if one hangs below the body in its
+    front half (narrow and deep: a vertical grip, a launcher's front handle), else FORE_SHARE of the gun's length from
+    its back, at the body's underside. Scored against the hand on the game's guns in their drafted stances by
+    fore_score.py (offtruth.json). Only the place along the gun is used (WalkFigures.ForeShift): how far below it the
+    hand closes is the stance's."""
+    m = largest(m)
+    i0, i1, L, rows, best = underside(m)
+    base = best[0] if best is not None else (rows[0] + rows[-1]) / 2
+    if best is not None:
+        for p in best[1]:
+            if p['lo'] > i0 + FORE_PAST * L and p['hi'] - p['lo'] + 1 <= FORE_WIDE * L and p['depth'] >= FORE_DEEP * L:
+                info['how'] = 'fore grip'
+                return (p['lo'] + p['hi'] + 1) / 2 / N, (base + 0.5) / N
+    info['how'] = 'share'
+    return (i0 + FORE_SHARE * L) / N, (base + 0.5) / N
+
+def detect_fore(path, offset=0.0):
+    """fore() on a gun's sprite, turned level by its equippedAngleOffset first and the place turned back."""
+    info = {}
+    u, v = fore(turned(mask_of(path), -offset), info)
+    u, v = turn_point(u, v, offset)
+    info.update(u=float(u), v=float(v))
+    return info
 
 def melee(m, info, two=False):
     """A melee weapon, its head to the right (as the game's art has them): along its long axis, the handle is the

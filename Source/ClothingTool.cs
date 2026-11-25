@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using RimWorld;
 using UnityEngine;
 using Verse;
@@ -17,6 +18,7 @@ namespace M3AT
     public static partial class WalkFigures
     {
         public const string NoneDrawn = "-";   // a choice of no garment: the apparel isn't drawn
+        public const string M3atAutomatic = "*";   // a choice of M3AT's automatic match over a content pack's own garment (no garment has this name)
 
         private static Texture2D clothesIcon;
         private static bool clothesIconLooked;
@@ -69,6 +71,47 @@ namespace M3AT
             return true;
         }
 
+        // Whether this apparel's stand-ins are painted with its own art: the spriteClothes option, less the apparel the
+        // player has left plain in the clothing tool (Settings.plainClothes).
+        internal static bool PaintedArt(ThingDef def)
+        {
+            Settings s = SettingsMod.Settings;
+            if (s == null)
+            {
+                return true;
+            }
+            return s.spriteClothes && (s.plainClothes == null || s.plainClothes.Count == 0 || !s.plainClothes.Contains(def.defName));
+        }
+
+        // Whether this garment drawn for this apparel is painted with the apparel's art: a stand-in as PaintedArt says; a
+        // content pack's garment only if the player ticked it (Settings.paintedPackClothes), as it has an image of its own.
+        internal static bool PaintedArtFor(int g, ThingDef def)
+        {
+            if (skin == null || !skin.IsPackGarment(g))
+            {
+                return PaintedArt(def);
+            }
+            Settings s = SettingsMod.Settings;
+            return s != null && s.spriteClothes && s.paintedPackClothes != null && s.paintedPackClothes.Contains(def.defName);
+        }
+
+#if AUTOTEST
+        internal static int ClothPaintedDraws;   // garments drawn painted with their apparel's art (the plainclothes test)
+#endif
+
+        // What content packs draw changed (a benchmark turn, a player's choice: AddOns.cs): what each pawn wears worked out
+        // again (a pack's garments may be off). The apparel on the ground keeps what it was baked with.
+        internal static void AddOnsChanged()
+        {
+            wornCaches.Clear();
+        }
+
+        // The chibi, for AddOns.Find: null until it has loaded.
+        internal static SkinnedFigure SkinForAddOns
+        {
+            get { return ready ? skin : null; }
+        }
+
         // A choice changed: every pawn's garments are worked out again, and the apparel on the ground baked again if it is
         // drawn as garments.
         internal static void ClothingChoicesChanged()
@@ -91,14 +134,16 @@ namespace M3AT
             List<Apparel> worn = pawn.apparel.WornApparel;
             for (int i = 0; i < worn.Count; i++)
             {
-                if (worn[i].def.apparel != null && skin.GarmentOf(worn[i].def) < 0 && GearMountOf(worn[i]) == null)
+                if (worn[i].def.apparel != null && (skin.GarmentOf(worn[i].def) < 0 || skin.PackGarmentOf(worn[i].def) > 0) && GearMountOf(worn[i]) == null)
                 {
-                    found.Add(worn[i]);
+                    found.Add(worn[i]);   // drawn by stand-ins, or a content pack's garment (or M3AT's in its place)
                 }
             }
             return found;
         }
 
+        // Whether M3AT look has anything for this person: apparel drawn by stand-ins or a content pack's garments, or a
+        // content pack for its race.
         internal static bool HasStandInApparel(Pawn pawn)
         {
             if (skin == null || pawn == null || pawn.apparel == null || pawn.RaceProps == null || !pawn.RaceProps.Humanlike)
@@ -108,23 +153,25 @@ namespace M3AT
             List<Apparel> worn = pawn.apparel.WornApparel;
             for (int i = 0; i < worn.Count; i++)
             {
-                if (worn[i].def.apparel != null && skin.GarmentOf(worn[i].def) < 0 && GearMountOf(worn[i]) == null)
+                if (worn[i].def.apparel != null && (skin.GarmentOf(worn[i].def) < 0 || skin.PackGarmentOf(worn[i].def) > 0) && GearMountOf(worn[i]) == null)
                 {
                     return true;
                 }
             }
-            return false;
+            return ready && ContentSources.Packs().Any(a => pawn.def != null && a.races.Contains(pawn.def.defName));
         }
     }
 
     // The window: each piece of apparel the selected pawn wears drawn by stand-ins, what it is drawn as, and buttons to pick
     // other garments, none, or go back to the automatic match. Follows the selected pawn and doesn't pause, so the change
     // shows on it at once.
+    // M3AT look: for the selected person, the content packs for its race or clothes (ContentView), then its clothing.
     public class ClothingToolWindow : Window
     {
         public Pawn pawn;
         private Vector2 scroll;
         private float viewHeight;
+        private readonly ContentView content = new ContentView();
 
         public override Vector2 InitialSize => new Vector2(420f, 520f);
 
@@ -167,11 +214,11 @@ namespace M3AT
             SkinnedFigure figure = WalkFigures.Skin;
             Text.Font = GameFont.Medium;
             Rect title = new Rect(inRect.x, inRect.y, inRect.width, 34f);
-            Widgets.Label(title, "M3AT_ClothesWindowTitle".Translate());
+            Widgets.Label(title, "M3AT_LookTitle".Translate());
             Text.Font = GameFont.Small;
             List<Apparel> apparel = WalkFigures.StandInApparel(pawn);
             float y = title.yMax + 4f;
-            if (figure == null || apparel.Count == 0)
+            if (figure == null || pawn == null || !WalkFigures.HasStandInApparel(pawn))
             {
                 Widgets.Label(new Rect(inRect.x, y, inRect.width, 60f), "M3AT_ClothesNoPawn".Translate());
                 return;
@@ -183,10 +230,12 @@ namespace M3AT
             Rect outer = new Rect(inRect.x, y, inRect.width, inRect.yMax - y - HelpHeight);
             Rect view = new Rect(0f, 0f, outer.width - 16f, Mathf.Max(viewHeight, outer.height));
             Widgets.BeginScrollView(outer, ref scroll, view);
-            float at = 0f;
+            float at = content.Draw(new Rect(0f, 0f, view.width, 100000f), pawn, false);
             for (int i = 0; i < apparel.Count; i++)
             {
-                at = Row(figure, apparel[i], view.width, at);
+                at = figure.PackGarmentOf(apparel[i].def) > 0
+                    ? PackItemRow(figure, apparel[i].def, apparel[i], pawn, view.width, at)
+                    : Row(figure, apparel[i], view.width, at);
             }
             viewHeight = at;
             Widgets.EndScrollView();
@@ -208,7 +257,17 @@ namespace M3AT
             int[] now = figure.StandInsOn(apparel, pawn);
             int[] auto = figure.AutoStandInsOn(apparel, pawn);
 
-            Rect box = new Rect(0f, y, width, 96f);
+            // With the stand-ins painted with the apparel's art, a box to leave this one plain, if any garment drawn for it
+            // can take the art at all.
+            bool paintable = false;
+            if (WalkFigures.SpriteClothes)
+            {
+                for (int i = 0; i < now.Length; i++)
+                {
+                    paintable |= figure.PaintsArt(now[i], apparel);
+                }
+            }
+            Rect box = new Rect(0f, y, width, paintable ? 122f : 96f);
             Widgets.DrawBoxSolidWithOutline(box, new Color(0.13f, 0.13f, 0.13f), new Color(0.3f, 0.3f, 0.3f));
             Rect inner = box.ContractedBy(6f);
             Widgets.Label(new Rect(inner.x, inner.y, inner.width, 22f), def.LabelCap);
@@ -223,6 +282,27 @@ namespace M3AT
                     : (now.Length > 0 ? "M3AT_ClothesAuto".Translate(drawn) : "M3AT_ClothesAutoNone".Translate()));
             GUI.color = Color.white;
             Text.Font = GameFont.Small;
+            if (paintable)
+            {
+                List<string> plain = SettingsMod.Settings.plainClothes;
+                bool painted = !plain.Contains(def.defName);
+                bool was = painted;
+                Rect check = new Rect(inner.x, inner.y + 56f, inner.width, 24f);
+                Widgets.CheckboxLabeled(check, "M3AT_ClothesPaint".Translate(), ref painted);
+                TooltipHandler.TipRegion(check, "M3AT_ClothesPaintTip".Translate());
+                if (painted != was)
+                {
+                    if (painted)
+                    {
+                        plain.Remove(def.defName);
+                    }
+                    else
+                    {
+                        plain.Add(def.defName);
+                    }
+                    SettingsMod.Settings.Write();
+                }
+            }
 
             Rect buttons = new Rect(inner.x, inner.yMax - 28f, inner.width, 28f);
             float third = buttons.width / 3f;
@@ -303,8 +383,88 @@ namespace M3AT
             return string.Join(",", names);
         }
 
+        // A row for apparel a content pack has a garment for: drawn as the pack's garment or M3AT's (its own garment, or
+        // stand-ins), the pack's painted with the apparel's art if ticked, and a menu to choose. apparel and pawn may be
+        // null (the pack's clothing list, worn by no one).
+        internal static float PackItemRow(SkinnedFigure figure, ThingDef def, Apparel apparel, Pawn pawn, float width, float y)
+        {
+            int packG = figure.PackGarmentOf(def);
+            int drawn = figure.GarmentOf(def);
+            bool packDrawn = drawn == packG;
+            Settings s = SettingsMod.Settings;
+            bool own = s.clothingChoices.ContainsKey(def.defName);
+            string owner = figure.OwnerOf(packG);
+            bool packByDefault = ContentSources.UsesPack(owner, ContentPart.Clothing) && !ContentSources.ArmourByDefault(def);
+            int[] m3at = figure.OwnGarmentOf(def) > 0 ? new[] { figure.OwnGarmentOf(def) }
+                : apparel != null && pawn != null ? figure.AutoStandInsOn(apparel, pawn) : figure.AutoStandInsFor(def);
+            int[] now = packDrawn ? new[] { packG } : drawn > 0 ? new[] { drawn }
+                : apparel != null && pawn != null ? figure.StandInsOn(apparel, pawn) : figure.StandInsFor(def);
+            bool paintable = packDrawn && WalkFigures.SpriteClothes && figure.PaintsArt(packG, def);
+            Rect box = new Rect(0f, y, width, paintable ? 122f : 96f);
+            Widgets.DrawBoxSolidWithOutline(box, new Color(0.13f, 0.13f, 0.13f), new Color(0.3f, 0.3f, 0.3f));
+            Rect inner = box.ContractedBy(6f);
+            Widgets.Label(new Rect(inner.x, inner.y, inner.width, 22f), def.LabelCap);
+            Text.Font = GameFont.Tiny;
+            GUI.color = Color.gray;
+            Widgets.Label(new Rect(inner.x, inner.y + 20f, inner.width, 16f), def.defName + (def.modContentPack != null ? " (" + def.modContentPack.Name + ")" : ""));
+            GUI.color = own ? new Color(0.5f, 1f, 0.55f) : Color.white;
+            string what = packDrawn ? (string)"M3AT_ItemPack".Translate()
+                : now.Length > 0 ? (string)"M3AT_ItemM3AT".Translate(Names(figure, now)) : (string)"M3AT_ItemNone".Translate();
+            Widgets.Label(new Rect(inner.x, inner.y + 36f, inner.width, 18f), own ? (string)"M3AT_ClothesChosen".Translate(what) : (string)"M3AT_ItemDefault".Translate(what));
+            GUI.color = Color.white;
+            Text.Font = GameFont.Small;
+            if (paintable)
+            {
+                List<string> painted = s.paintedPackClothes;
+                bool on = painted.Contains(def.defName), was = on;
+                Rect check = new Rect(inner.x, inner.y + 56f, inner.width, 24f);
+                Widgets.CheckboxLabeled(check, "M3AT_ClothesPaint".Translate(), ref on);
+                TooltipHandler.TipRegion(check, "M3AT_PackPaintTip".Translate());
+                if (on != was)
+                {
+                    if (on)
+                    {
+                        painted.Add(def.defName);
+                    }
+                    else
+                    {
+                        painted.Remove(def.defName);
+                    }
+                    s.Write();
+                    WalkFigures.ClothingChoicesChanged();
+                }
+            }
+            Rect buttons = new Rect(inner.x, inner.yMax - 28f, inner.width, 28f);
+            float half = buttons.width / 2f;
+            if (Widgets.ButtonText(new Rect(buttons.x, buttons.y, half - 4f, 28f), "M3AT_ClothesChoose".Translate()))
+            {
+                string packName = figure.PieceName(packG);
+                List<FloatMenuOption> options = new List<FloatMenuOption>
+                {
+                    new FloatMenuOption("M3AT_ItemMenuPack".Translate(), () => Set(def, packByDefault ? null : packName)),
+                    new FloatMenuOption("M3AT_ItemMenuM3AT".Translate(m3at.Length > 0 ? Names(figure, m3at) : (string)"M3AT_ClothesNotDrawn".Translate()),
+                        () => Set(def, packByDefault ? WalkFigures.M3atAutomatic : null)),
+                    new FloatMenuOption("M3AT_ClothesMenuNone".Translate(), () => Set(def, WalkFigures.NoneDrawn)),
+                };
+                foreach (int g in figure.ChoosableGarments().OrderBy(g => figure.GarmentLabel(g)))
+                {
+                    string name = figure.PieceName(g);
+                    if (g != packG)
+                    {
+                        options.Add(new FloatMenuOption(figure.GarmentLabel(g) + " (" + name + ")", () => Set(def, name)));
+                    }
+                }
+                Find.WindowStack.Add(new FloatMenu(options));
+            }
+            if (own && Widgets.ButtonText(new Rect(buttons.x + half, buttons.y, half - 4f, 28f), "M3AT_ClothesReset".Translate()))
+            {
+                Set(def, null);
+            }
+            return box.yMax + 6f;
+        }
+
         // Sets the choice (null: back to the automatic match) and saves it at once, as a pick is one click.
-        private static void Set(ThingDef def, string names)
+        internal static void Set(ThingDef def, string names)
         {
             Settings s = SettingsMod.Settings;
             if (names == null)

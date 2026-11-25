@@ -27,6 +27,7 @@ namespace M3AT
         {
             public int tick;
             public int worn;
+            public int version;   // AddOns.Version they were gathered for (a content pack's source changed: gathered again)
             public readonly List<SkinnedFigure.AddonSource> sources = new List<SkinnedFigure.AddonSource>();
             public readonly List<Color> tints = new List<Color>();
             public readonly List<bool> tails = new List<bool>();   // a body part below the waist the armour option hides, as the cat tail
@@ -103,11 +104,11 @@ namespace M3AT
         {
             RaceParts r;
             int now = Find.TickManager != null ? Find.TickManager.TicksGame : 0;
-            if (raceParts.TryGetValue(pawn.thingIDNumber, out r) && r.worn == worn && now - r.tick < AddonLook && now >= r.tick)
+            if (raceParts.TryGetValue(pawn.thingIDNumber, out r) && r.worn == worn && r.version == AddOns.Version && now - r.tick < AddonLook && now >= r.tick)
             {
                 return r;
             }
-            r = new RaceParts { tick = now, worn = worn };
+            r = new RaceParts { tick = now, worn = worn, version = AddOns.Version };
             if (raceParts.Count > 512)
             {
                 raceParts.Clear();
@@ -167,6 +168,10 @@ namespace M3AT
             bool[] hairAddon = new bool[nodes.Count];
             string[] model = new string[nodes.Count];
             bool[] modelIsEars = new bool[nodes.Count];
+            // Ears or a tail the pawn has already, from its genes or a content pack (its ears and tail for the race, by
+            // ExpansionApi or its patches on EarFileOf and HasCatTail): the race's ear and tail add-ons are left out, so
+            // they aren't drawn twice.
+            bool earsElsewhere = EarFileOf(pawn) != null, tailElsewhere = HasCatTail(pawn);
             for (int i = 0; i < nodes.Count; i++)
             {
                 PawnRenderNode n = nodes[i];
@@ -187,6 +192,10 @@ namespace M3AT
                         if ((words.Contains(w) || words.Contains(w + "s")) && HairBuilder.CatLikeAddon(pawn.def, w))
                         {
                             skip[i] = "the chibi's own " + w;
+                        }
+                        else if ((words.Contains(w) || words.Contains(w + "s")) && (w == "ear" ? earsElsewhere : tailElsewhere))
+                        {
+                            skip[i] = w + " from genes or a content pack";
                         }
                     }
                 }

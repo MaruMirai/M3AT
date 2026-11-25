@@ -1603,6 +1603,14 @@ namespace M3AT
                             + (garments.Length > 0 ? garments : "none") + ".");
                         ready = true;
                         ExpansionApi.Loaded(skin);
+                        try
+                        {
+                            ContentSources.Started();   // content packs' patches gated to the player's choices (ContentSources.cs)
+                        }
+                        catch (Exception e)
+                        {
+                            Log.Error(Tag + "content packs could not be set to the choices made: " + e);
+                        }
                         LoadTrail.Note("chibi loaded, skinned" + LoadTrail.MemoryNow());
                         return ready;
                     }
@@ -1667,10 +1675,11 @@ namespace M3AT
             }
             if (pawn.Dead)
             {
-                // Not gone to bones, nor in a grave (only spawned or carried corpses, or one hung in a gibbet cage).
+                // Not in a grave (only spawned or carried corpses, or one hung in a gibbet cage), nor gone to bones unless
+                // drawn as the chibi's skeleton (Skeletons.cs).
                 Corpse corpse = pawn.Corpse;
                 return corpse != null && (corpse.Spawned || corpse.ParentHolder is Pawn_CarryTracker || corpse.ParentHolder is Building_GibbetCage cage && cage.Spawned)
-                    && RotOf(pawn) != RotDrawMode.Dessicated;
+                    && (RotOf(pawn) != RotDrawMode.Dessicated || DrawsBones());
             }
             return true;
         }
@@ -1786,11 +1795,13 @@ namespace M3AT
             return offset > 0.001f ? Mathf.Clamp(dz, 0f, offset) / offset : 1f;
         }
 
-        // The skin's colour as the game draws it now: rotting, a corpse's is the game's rotten colour.
+        // The skin's colour as the game draws it now: rotting, a corpse's is the game's rotten colour, and so is a shambler's
+        // raised from a rotting corpse (it keeps the corpse's rot stage; the living are always Fresh).
         private static Color SkinOf(Pawn pawn)
         {
-            Color skin = pawn.story.SkinColor;
-            return pawn.Dead && RotOf(pawn) == RotDrawMode.Rotting ? PawnRenderUtility.GetRottenColor(skin) : skin;
+            Color? pack = ExpansionApi.SkinFor(pawn);   // a content pack's for its race (ExpansionApi 2)
+            Color skin = pack ?? pawn.story.SkinColor * RaceSkinTint(pawn);   // another race's as its body sprite shows it (SkinTint.cs)
+            return RotOf(pawn) == RotDrawMode.Rotting ? PawnRenderUtility.GetRottenColor(skin) : skin;
         }
 
         private static RotDrawMode RotOf(Pawn pawn)
@@ -6435,10 +6446,11 @@ namespace M3AT
             { "melee", new SkinnedFigure.Hold { hand = "R", line = "aim", behind = 0.38f, aim = new Vector3(0.45f, 1f, 0.4f) } },
         };
 
-        // Where a hand closes on a weapon (model units): on from the wrist along the forearm (walk.HAND_GRIP).
-        private static Vector3 FistOf(Vector3 wrist, Vector3 elbow)
+        // Where a hand closes on a weapon (model units): on from the wrist along the forearm (walk.HAND_GRIP), as far again
+        // as the hand is bigger than the base body's (handScale, SkinnedFigure.HandScaleOf).
+        private static Vector3 FistOf(Vector3 wrist, Vector3 elbow, float handScale = 1f)
         {
-            return wrist + (wrist - elbow).normalized * (skin.HandGrip >= 0f ? skin.HandGrip : HandGrip);
+            return wrist + (wrist - elbow).normalized * (skin.HandGrip >= 0f ? skin.HandGrip : HandGrip) * handScale;
         }
 
         // A weapon's top: straight up as far as its line lets it (its face to the front when it points straight up), then
@@ -6519,7 +6531,10 @@ namespace M3AT
             }
             bool left = hold.hand == "L";
             Vector3 wrist = left ? wristL : wristR, elbow = left ? elbowL : elbowR;
-            Vector3 hand = FistOf(wrist, elbow);
+            // The fist's place grows with the hand (HandSize.cs): measured on the base hand, a Hulk's or Fat body's bigger
+            // fingers closed round a point further out, and the grip came out in the palm, the knuckles over the receiver.
+            float handScale = skin.HandScaleOf(fig, left ? "L" : "R");
+            Vector3 hand = FistOf(wrist, elbow, handScale);
             Matrix4x4 turn;
             Vector3 grip, a, top;
             Vector3 closed = hand;   // where the hand closes, before the hold's at moves the slab off it
@@ -6527,11 +6542,11 @@ namespace M3AT
             Matrix4x4 handTurn = Matrix4x4.zero;   // the holding hand's bone, for the hold's at (zero: the hold isn't on the hand)
             if (hold.line == "hand" && skin.BoneOf(fig, left ? "hand.L" : "hand.R", out turn) && skin.GripOf(hold.hand, out grip))
             {
-                hand = wrist + turn.MultiplyVector(grip).normalized * (skin.HandGrip >= 0f ? skin.HandGrip : HandGrip);
+                hand = wrist + turn.MultiplyVector(grip).normalized * (skin.HandGrip >= 0f ? skin.HandGrip : HandGrip) * handScale;
                 closed = hand;
                 fist = hand;
                 handTurn = turn;
-                hand += turn.MultiplyVector(hold.at);
+                hand += turn.MultiplyVector(hold.at * handScale);
                 Vector3 rest = (hold.aim.normalized + Vector3.down * hold.drop).normalized;
                 a = turn.MultiplyVector(rest).normalized;
                 top = turn.MultiplyVector(TopOf(rest, hold.roll));
@@ -6542,7 +6557,7 @@ namespace M3AT
                 Vector3 along;
                 if (hold.line == "hands")
                 {
-                    along = left ? FistOf(wristR, elbowR) - hand : FistOf(wristL, elbowL) - hand;
+                    along = left ? FistOf(wristR, elbowR, skin.HandScaleOf(fig, "R")) - hand : FistOf(wristL, elbowL, skin.HandScaleOf(fig, "L")) - hand;
                 }
                 else if (hold.line == "forearm" || hold.line == "hand")   // "hand" from an export without weapon_grip
                 {
@@ -6572,6 +6587,7 @@ namespace M3AT
             Vector2 slide = GripSlide(weapon, holdName, slab, closed, hand, a, top, hold.behind, size);
 #if AUTOTEST
             AutoGripSlide[pawn.thingIDNumber] = slide * size;
+            AutoHandScale[pawn.thingIDNumber] = handScale;
 #endif
             // Flat under fire: still in the hand, but brought round to lie along the ground the way the
             // figure faces, past its head. Whatever the hand's turn would make of this weapon's hold.
@@ -6587,6 +6603,10 @@ namespace M3AT
             // its turn. Model space: the figure's right is +x, its front +z.
             Vector3 shift = skin.WeaponShift;
             hand += Quaternion.AngleAxis(fig.twist, Vector3.up) * (Vector3.up * shift.y + (left ? Vector3.left : Vector3.right) * shift.x + Vector3.forward * shift.z);
+#if AUTOTEST
+            AutoHandGap[pawn.thingIDNumber] = "closed " + skin.HandGapOf(fig, left ? "L" : "R", closed) + "; slab " + skin.HandGapOf(fig, left ? "L" : "R", hand)
+                + "; wrist " + wrist.ToString("F3");
+#endif
             return new WeaponPlaced { weapon = weapon, hold = hold, left = left, hand = hand, closed = closed, a = a, top = top, slide = slide, fist = fist, handTurn = handTurn };
         }
 
@@ -6789,8 +6809,9 @@ namespace M3AT
             // The figure's size moves the hands but not the weapon: it is as big (and as thick) in every pawn's hands as in
             // a grown one's, so a child holds a whole rifle. Its axes are divided back out of the size the matrix below
             // scales everything by, so its scale is a share of the size the game draws it at on the floor and its
-            // thickness is IsoRim's slab's own.
-            float unsize = 1f / size;
+            // thickness is IsoRim's slab's own. Only the pawn height option's share is left in (WeaponSizeOf), so
+            // weapons grow with every pawn as that does.
+            float unsize = 1f / WeaponSizeOf(size);
             Vector2 draw = g.drawSize * scale * unsize;
             Vector3 x = (a * c - top * sn) * draw.x, y = (a * sn + top * c) * draw.y;
             Vector3 middle = hand + a * (behind * Mathf.Max(draw.x, draw.y));
@@ -6882,8 +6903,14 @@ namespace M3AT
                         colour = worn[g].GetColorIgnoringTainted();
                     }
                     // A stand-in painted with the apparel's own art (SpriteClothes.cs); until it is made, as before.
-                    SkinnedFigure.ClothImage cloth = SpriteClothes && skin.PaintsArt(g, worn[g]) && !IsPajamas(worn[g])
+                    SkinnedFigure.ClothImage cloth = PaintedArtFor(g, worn[g].def) && skin.PaintsArt(g, worn[g]) && !IsPajamas(worn[g])
                         ? skin.ClothImageOf(g, worn[g], pawn) : null;
+#if AUTOTEST
+                    if (cloth != null)
+                    {
+                        ClothPaintedDraws++;
+                    }
+#endif
                     skin.Draw(fig, g, at, yaw, size, colour, false, cloth);
                 }
             }
@@ -6918,6 +6945,17 @@ namespace M3AT
             {
                 skin.Shielding(fig, ShieldOutOf(pawn), ShieldOverWeapons(pawn, mask, fig, size));
             }
+            // Gone to bones: the skeleton in the body's place, under what it still wears, and nothing of the flesh (Skeletons.cs).
+            if (Skeletal(pawn))
+            {
+                skin.HairUnderHats(fig, null, mask);
+                skin.HideUnder(fig, mask, null);
+                skin.HideGarments(fig, mask, wornBuffer, wornVersion);
+                skin.Draw(fig, skin.SkeletonPiece, at, yaw, size, Color.white);
+                DrawGarments(pawn, wornBuffer, fig, at, yaw, size);
+                FaceLayers.Flash = 0f;
+                return mask;
+            }
             // A full helmet or armour that hides the head leaves the hair (and its scalp colour) or the face off, as does
             // having no head at all (CutLimbs has cut it off). A baby has none. A hat only cuts it (DrawHair).
             bool headless = pawn.health != null && !pawn.health.hediffSet.HasHead;
@@ -6928,6 +6966,24 @@ namespace M3AT
             GarmentMask geneParts = skin.GenePartsOf(pawn);
             skin.HideUnder(fig, mask | geneParts, hair);
             string earFile = headless ? null : EarFileOf(pawn);
+            // A content pack's gene part for a gene M3AT draws itself (cat ears, a tail, horns) is drawn in its place.
+            bool geneTail = HasCatTail(pawn);
+            string geneHorns = headless ? null : HornsOf(pawn);
+            if (geneParts != 0)
+            {
+                if (earFile != null && skin.GenePartCovers(geneParts, pawn, EarGenes))
+                {
+                    earFile = null;
+                }
+                if (geneTail && skin.GenePartCovers(geneParts, pawn, TailGenes))
+                {
+                    geneTail = false;
+                }
+                if (geneHorns != null && skin.GenePartCovers(geneParts, pawn, HornGenes))
+                {
+                    geneHorns = null;
+                }
+            }
             skin.HideGarments(fig, mask, wornBuffer, wornVersion);
             int fur = FurOf(pawn);
             int coat = fur > 0 ? skin.CoatPiece : -1;
@@ -6988,13 +7044,13 @@ namespace M3AT
             {
                 DrawGeneEars(pawn, fig, earFile, mask, wornBuffer, at, yaw, size, skinColour);
             }
-            string horns = headless ? null : HornsOf(pawn);
+            string horns = geneHorns;
             if (horns != null && !skin.HidesEars(mask))
             {
                 skin.DrawHorns(fig, horns, at, yaw, size);   // through the hair, but not through a hat
             }
             DrawRaceParts(pawn, fig, mask, wornVersion, headless, at, yaw, size, sat, tailFloor, tailOnGround);   // a race's ears, tails, horns and wings from its sprites (AddonParts.cs)
-            if (HasCatTail(pawn) && !fig.tucked)
+            if (geneTail && !fig.tucked)
             {
                 DrawCatTail(pawn, fig, mask, wornBuffer, at, yaw, size, sat, tailFloor, tailOnGround);
             }
@@ -7557,7 +7613,7 @@ namespace M3AT
                 float size = SizeOf(pawn);
                 FigurePlacement placed;
                 bool hasPlace = ctx.ReadPlacement(new FigurePlacementOptions(), out placed);
-                if (hasPlace && placed.Bones)
+                if (hasPlace && placed.Bones && !DrawsBones())
                 {
                     return false;
                 }
@@ -8255,6 +8311,10 @@ namespace M3AT
             float poolAt = 0f;
             bool poolAttached = PoolOf(pawn, out poolAt);
             bool inPool = poolAttached || InRaisedPool(pawn);   // (any pawn in one wades on its floor, whatever its job)
+            if (poolAttached && !lying && skin.Has("swim") && skin.Has("tread"))
+            {
+                swim = Mathf.Max(swim, ease.poolGait);   // a swimmer swims while it moves about the pool, and stands on its floor between
+            }
             float wade = inPool && skin.Has("wade") ? 1f : skin.Has("wade") ? Mathf.Clamp01(ease.depth / Shallow) : 0f;
             float limp = ease.limpClip != null && skin.Has(ease.limpClip) ? ease.limp : 0f;
             float ground = Mathf.Lerp(groundPerCycle[below], groundPerCycle[above], level - below);
@@ -8284,9 +8344,9 @@ namespace M3AT
             {
                 return DrawPlain(ctx);
             }
-            if (placed.Bones)
+            if (placed.Bones && !DrawsBones())
             {
-                return false;   // IsoRim's own: gone to bones (a skeleton, which the chibi has none of)
+                return false;   // IsoRim's own: gone to bones, with the chibi's skeleton off (Skeletons.cs)
             }
             // (in a pool: wading on its floor, as above, rather than drawn plainly on its host)
             poolAttached &= placed.Situation == FigureSituation.Attached;
@@ -8431,7 +8491,7 @@ namespace M3AT
                 gait = placed.Gait;
                 if (poolAttached)
                 {
-                    PoolStroke(pawn, ease, wadeGround * size, out yaw, out phase, out gait);   // (IsoRim steps no stride for an attached figure)
+                    PoolStroke(pawn, ease, ground * size, out yaw, out phase, out gait);   // (IsoRim steps no stride for an attached figure)
                 }
                 float aimDrawn = placed.AimDrawn;
                 aiming = !lying && !ease.hipUsing && placed.Aiming;
@@ -8495,7 +8555,7 @@ namespace M3AT
                     ? StoopOf(pawn) * Mathf.Lerp(1f, StoopDrafted, ease.drafted) * Mathf.Lerp(1f, StoopAiming, ease.aim) * (seated ? StoopSeated : 1f) : 0f;
                 // Under a ceiling it would stand taller than (ArmourSize.cs): crouched and, if need be, bent forward.
                 float ceilingCrouch, ceilingStoop;
-                CeilingPose(pawn, ease, size, skin.SoleOf(fig) * size, !lying && !crawling && !seated && flight < 0f && swim <= 0f && duck <= 0f, out ceilingCrouch, out ceilingStoop);
+                CeilingPose(pawn, ease, size, skin.TopOf(fig), skin.SoleOf(fig) * size, !lying && !crawling && !seated && flight < 0f && swim <= 0f && duck <= 0f, out ceilingCrouch, out ceilingStoop);
                 skin.Stoop(fig, Mathf.Max(stooped, ceilingStoop));
                 if (seated && ease.share > 0f && ease.shareWay.sqrMagnitude > 1e-4f)
                 {
@@ -8759,7 +8819,8 @@ namespace M3AT
                     skin.Add(fig, skin.Variant("land", ease.landedRoll), 0f, crouch * land);
                     // Behind cover, or an old pawn's knees giving a little standing still (Aging.cs).
                     float aged = sat <= 0f ? AgeKnees * stooped / StoopMost * (1f - moving) : 0f;
-                    skin.Crouch(fig, Mathf.Max(Mathf.Max(cover, aged) * (1f - bend * (1f - onTheMove)) * land, ceilingCrouch));
+                    skin.Crouch(fig, Mathf.Max(Mathf.Max(Mathf.Max(cover, aged) * (1f - bend * (1f - onTheMove)) * land, ceilingCrouch),
+                        poolAttached ? PoolCrouch(poolAt, size) * (1f - ease.poolGait) : 0f));   // (a swimmer still in a pool: in to the shoulders, Hygiene.cs)
                     float stroke = swim > 0f ? StrokeOf(ease, moving) : moving;
                     skin.Add(fig, "swim", cycle, stroke * swim);
                     skin.Add(fig, "tread", LoopPhase(pawn, "tread"), (1f - stroke) * swim);
@@ -9102,6 +9163,16 @@ namespace M3AT
                     }
                     float wading = y - Mathf.Min(ease.depth, Mathf.Max(0f, (neck.y - HeadClear) * size));
                     y = Mathf.Lerp(wading, WaterLine - neck.y * size, swim);
+                }
+                else if (inPool && swim > 0f)
+                {
+                    // Swimming in a pool: from standing on its floor (added below) up to the neck just over its water line.
+                    Vector3 neck;
+                    if (!skin.JointOf(fig, NeckBone, out neck))
+                    {
+                        neck = new Vector3(0f, headHeight, 0f);
+                    }
+                    y = Mathf.Lerp(y, poolAt + PoolWaterOverAnchor - PoolFloor + PoolFaceClear * size - neck.y * size, swim);
                 }
                 Vector3 at = new Vector3(drawLoc.x, y + lift, drawLoc.z) + underGlass;
                 ClimbBack(pawn, ref at);   // just over a pool's wall: brought to the game's place (Hygiene.cs)

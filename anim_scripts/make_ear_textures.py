@@ -4,9 +4,9 @@
 # Each is two halves, the outside on the left and the inside on the right, and in each half an ear is laid out by its
 # place along it (v: the root at the bottom, the tip at the top) and across it (u: from one edge, LIMIT, to the other),
 # so one painting fits every ear shape. Written:
-#   ear_fluffy.png  the cat ears (the gene's and Kiiro's) and Wolfein's: fur streaks outside; inside, a small pale patch
-#                   low in the middle (CORE, EDGE, LOW, TIP) with a shadowed cup and soft tufts of fluff, fading out into
-#                   the outside's fur toward the rim and the tip
+#   ear_fluffy.png  the cat ears (the gene's and Kiiro's) and Wolfein's: fur streaks outside; inside, with PALE_INSIDE, a
+#                   small pale patch low in the middle (CORE, EDGE, LOW, TIP) with a shadowed cup and soft tufts of fluff,
+#                   fading out into the outside's fur toward the rim and the tip (off: the inside is the outside's fur)
 #   ear_mouse.png   Ratkin's: short velvet outside; inside, bare smooth skin with a shadowed cup, faint veins and a thin
 #                   fringe of fur along the rim
 # Our own art, procedural (a fixed seed), no game sprites.
@@ -22,8 +22,11 @@ HALF = 0.23     # of the width, half an ear's width in its half, as EarLining.cs
 SEED = 11
 # Where the fluffy inside shows, as EarLining.cs's LiningShares colours it (keep them the same): whole within CORE of the
 # half width across and below LOW along, none past EDGE and TIP, eased between; elsewhere the inside is the outside's fur.
-CORE, EDGE = 0.25, 0.7
-LOW, TIP = 0.35, 0.75
+CORE, EDGE = 0.3, 0.8
+LOW, TIP = 0.4, 0.85
+# Whether the fluffy inside is painted at all. Off (Nov 2026, asked for): the inside is the outside's fur, as EarLining.cs's
+# LiningMost of 0 leaves it in the hair's colour, so the inside of the ear is not pale.
+PALE_INSIDE = False
 
 
 def grid():
@@ -101,7 +104,7 @@ def fluffy():
     # Inside: pale, the cup in shadow (deepest low and in the middle), soft noise for the skin under the fluff.
     edge = np.abs(across) / width_at(along)
     cup = np.exp(-(across / 0.45) ** 2) * np.exp(-((along - 0.38) / 0.3) ** 2)
-    base = 0.88 - 0.12 * cup + 0.04 * (smooth_noise(rng, (SIZE, SIZE), 30, 30) - 0.5)
+    base = 0.94 - 0.1 * cup + 0.04 * (smooth_noise(rng, (SIZE, SIZE), 30, 30) - 0.5)
     fluff = np.zeros((SIZE, SIZE))
 
     def start(rng):
@@ -122,10 +125,10 @@ def fluffy():
         return float(np.clip(1.2 - t * 1.1, 0.25, 1.0))
 
     fluff = strokes(fluff, True, rng, 520, start, direction, lambda r: r.uniform(16, 40), lambda r: r.uniform(0.7, 1.4), 1.0, fade)
-    inner = np.maximum(base, 0.8 + 0.16 * fluff)
+    inner = np.maximum(base, 0.84 + 0.16 * fluff)
     # Darker between the tufts low down, so they read as tufts.
     inner -= 0.05 * (1 - fluff) * np.clip(1.0 - along * 1.3, 0, 1)
-    lined = lining_share(across, along)
+    lined = lining_share(across, along) if PALE_INSIDE else np.zeros_like(along)
     inner = outside + (inner - outside) * lined
     img = np.where(inside, inner, outside)
     return np.clip(img, 0, 1)

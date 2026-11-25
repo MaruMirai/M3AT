@@ -68,7 +68,9 @@ def head(b):
 def tail(b):
     return np.array(tuple(rig.matrix_world @ bones[b].tail_local))
 LEG = head('thigh.L')[2]   # the floor is z 0
-WAIST_Z = head('spine.001')[2]
+# A dress's waist: the skirt masters' waist ring, where the skirt joins it (15 rig units over the body's lowest point,
+# the ankle joint being 1.025 over it), as Source/SpriteClothes.cs's RigWaist lays an apparel's waist there.
+WAIST_Z = head('foot.L')[2] - 1.025 + 15.0
 ANKLE_Z = head('foot.L')[2]
 
 # The kinds: the garment names that start with each, longest first.

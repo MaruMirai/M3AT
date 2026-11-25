@@ -65,7 +65,7 @@ Every garment is skinned again for every pawn whenever it is posed, and it is dr
 | Full power armour | about 1000 |
 | A small accessory (a collar, a strap, a badge) | under 150 |
 
-Aim for these. The kit tells you the count and warns past 2500. The figure is small on screen and outlined, so detail you'd model on a normal character turns to noise here. Put fine detail in the texture instead.
+Aim for these. **M3AT's budget is 2500 triangles for a garment worn on the body and 1500 for one worn on the head.** A garment over it is simplified automatically as the game loads, which keeps the cost down but can spoil its shape, and the game's log names it. Players can choose to keep garments at full detail, up to 30000 triangles, in the mod options. The kit tells you the count and warns past the budget. The figure is small on screen and outlined, so detail you'd model on a normal character turns to noise here. Put fine detail in the texture instead.
 
 **Approach 2 is the cheapest way to get a garment that fits.** The pushed-out copy of the body's faces has exactly as many triangles as the patch of skin it covers. Each of its vertices also sits straight out from a vertex of the skin, so it bends with exactly the same weights and can't clip into the body at a bent knee or elbow. A sculpted or shrink-wrapped mesh needs many more triangles to follow the body as closely, and it still clips where its vertices don't line up with the skin's.
 

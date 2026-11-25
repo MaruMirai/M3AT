@@ -1,0 +1,76 @@
+# Autotest
+
+`./autotest.sh [scenario,...|all] [--stills] [--out folder] [--seed n|none]` runs `Source/AutoTest.cs` in the game. It is in the DLL only when built with `-p:DefineConstants=AUTOTEST`: the script builds that, starts the game with `-quicktest -m3atTest=<scenarios> -m3atTestQuit` and puts the normal build back after. Changes are checked by running the game, mostly this way.
+
+## How a run works
+
+- It finds a clear patch near the map's middle, spawns new colonists per scenario and sets the scenario up through the game's own code.
+- It turns IsoRim's 3D view on (`Api.View3DActive`), holds IsoRim's camera on the scenario (`Api.PushViewPose`), and steps the game one tick a frame while paused.
+- Seeded by IsoRim's `-isorimseed=N` (Api 72; `--seed`, 1 by default, `none` for a new world each time): the world, colonists and each tick's random numbers are the same every run (the report's `Seed:` line).
+- Output: `probe.txt` (the figure's `Ease` fields each tick, `WalkFigures.AutoProbe`) and `report.md` (PASS/FAIL per check, and what to look at).
+- By default, one `.mp4` per scenario (`Shot`s only noted in the log), rendered rather than recorded (`RenderTick`, `RenderFrameDue`): each game tick gets exactly a tick of frame time (`Time.maximumDeltaTime`, which caps `Time.deltaTime`, at 1/60 s at normal speed), then time is frozen (paused, the cap at 0) while IsoRim's offscreen photo from the scenario's camera comes back (`Api.CaptureView`, 1600x900, `RenderWidth`) and is piped to ffmpeg. `--fps 30` (default, a frame every two ticks) or `--fps 60`. A scenario takes about five times its game time. The camera follows where the pawn is drawn (`DrawnAt`, `Ease.drawnAt`), not its cell.
+- `--screen` records the game window at normal speed (ffmpeg `x11grab`). `--stills` writes pictures instead (`Api.RequestSceneImage`, no interface, from two sides 90° apart); `shots` and `perf` always run as stills. The videos are IsoRim photos, which draw the screen-space outline as the silhouette (`dev_notes/options.md`); use `--stills` to see it.
+- `./autotest.sh shots --load <save> [--from tick] [--ticks n] [--every n]` loads a save and changes nothing: the camera held at the freecam eye saved with the game (`FreecamPlaces`), it writes a full-size scene image every `--every` ticks, `shot_t<tick>.png`, for picking a still (the Workshop picture, `About/Preview.png`).
+- Mods that draw over the pictures (`skip_mods` in the script: Center Marker, `jia.center.marker`) are taken out of `ModsConfig.xml` for the run and the file put back by the exit trap (a copy beside the lock, `m3at-autotest.ModsConfig.xml`, restored first by the next run if one was killed). `M3AT_SKIP_MODS="<packageId> ..."` leaves out more. `M3AT_ADD_MODS="<packageId>[=folder] ..."` turns mods on for one run, just before this mod; a `=folder` one (a dependency not from the Workshop) is linked into `Mods/` for the run.
+- A mod's message box at the start of the game (the Wolfein race's notice about its 1.7 update comes up in every new game; GrimWorld's) forces the pause and covers the pictures and the benchmark: `CloseMessageBoxes` notes and closes every `Dialog_MessageBox` before each scenario (and `addoncost` again before its benchmark).
+- One run at a time: a second waits on `flock` (`~/.local/state/m3at-autotest.lock`) until the first has put the normal build back, as the test build goes into the mod's own DLL and results are read from the one `Player.log`.
+- In the AUTOTEST build, files in `<config>/M3AT/` switch some things off for comparison (`no_armsclear`, `no_race_models`), as the game is started through Steam and environment variables don't reach it.
+
+## Adding a scenario
+
+An iterator in `ScenarioOf`: `yield return Ticks(n, ...)`, `Shot(name)`, `WaitReal(s)`, `Check(...)`. `Unpaused(pawn, done, seconds)` runs the game at normal speed, for what moves on frame time times the game's speed (none while stepped paused): a weapon's draw from its holster (`StepDraw`), a ragdoll, a shield draw (`StepShield`). A mod's message box at the start forces the pause, which `Unpaused` notes.
+
+## Scenarios
+
+`<name>_<case>` runs one case where noted. Scenarios for a particular area are also described in its notes: apparel (`dmsvest`, `dress`, `footwear`, `grimworld`, `helmetback`, `helmetstow`, `hemlengths`, `openfront`, `plainclothes`, `raceclothes`, `underwear`; `packclothes`: `clothesdevlog`'s pictures for Wolfein and Miho outfits the IsoRim race packs model, run as is and again with `M3AT_ADD_MODS="aalummi.isorimwaylith.wolfeinpack saiha.isorimwaylith.mihopack.loadtimeart"` to set their garments beside ours; `--out` must name a folder that exists; `contentsources`: with the same packs, a Miho and two Wolfein (nun, heavy power armour); the defaults checked (Wolfein's face M3AT's, Miho's the pack's, the nun's outfit the pack's garment, the armour M3AT's), each part of each pack set to M3AT's and the pack's with its patches checked off and on and pictures, a per-item choice each way, every patch back at the end; `addoncost`: a crowd of 24 in the Miho and Wolfein packs' outfits and the player's benchmark run on them with add-ons measured, checking every patch is back after, with the same `M3AT_ADD_MODS`, and once more with `<config>/M3AT/full_detail_garments` for the garments as made: `dev_notes/apparel.md`'s triangle budget), body (`aging`, `agingstrip`, `eyetypes`, `furskin`, `prosthetics`, `race_<defName>`, `skeletons`), faces (`facedev`, `facepins`, `facetune`, `humanfaces`, `racefaces`), motion (`bedin`, `cuddle`, `floordraw`, `kidbed`, `lovin`, `lovinbare`, `mine`, `read`, `rolljoint`, `romance`, `wedding`), options (`fpeye`, `outlines`, `perf`), weapons (`armourgrip`, `handholster`, `hulkarms`).
+
+Life and work:
+- `hitflash`.
+- `explode`: IsoRim's 3D explosions (Api 74): a frag-sized blast watched from four cells off at set ticks, checked by `Api.Dev`'s burst counters; a shell-sized one on two colonists, run at normal speed in slices paused for each picture so flings and ragdolls play; a flame blast.
+- `lively` (`lively_<case>`): a wave and glances at a chat, a sad wander, patting at flames, a catatonic pawn lying still, flicking a standing lamp, refuelling a generator and a campfire.
+- `beatfire`: on the floor, furniture, a person standing and lying.
+- `horseshoes` and hoopstone. `hunker` and the roll.
+- `cuddle`: a cat standing and on a chair (wants [DG]Lovly Animal Cuddling).
+- `read`: standing and at a chair. `pray`: Ideology's MeditatePray on the floor and a dining chair, and visiting a grave.
+- `eat`: a meal carried to a dining chair at a table (`eat_sit`), then eaten standing with no furniture (`eat_stand`).
+- `drugs`: a joint smoked standing and by a chair at a table (`smoke`), a pill (wake-up) and a powder (yayo) standing (`pill`).
+- `talkvariants`: each talk variant (`talk`, `talk~2`, ...) on one pawn under one close camera, eased in, played twice and eased out, one video each (`talkvariants_<n>.mp4`; `WalkFigures.TalkTestPawn`/`TalkTestClip`).
+- `talk`: a visitor talking to a patient in a bed and sat by one on a sleeping spot; checks `Ease.speaking`, that Facial Animation's `open` mouth swaps in and out (`FaceLayers.TalkOpenDraws`/`TalkShutDraws`, the Basic layer's open picture differing) and stops when the visit ends.
+- `music`: piano, harpsichord, harp and drum, standing and on a chair. `teach`: a lesson at a school desk, standing and on chairs (Biotech). `floordraw`: a child chalking the cell south, then east (Biotech).
+- `romance` (`romance_<date>+<date>`; wants Romance on the Rim): its dates started through its lord jobs by reflection: kiss, skygaze (called off by the mod when it's cold outside), music, pillow (spouses, `bedBlankets` on), pillowbare (`bedBlankets` off: both lie face to face, `lovin_L`/`lovin_R`, never the caress or spooning), snowball, shareread.
+- `readroom`: the shared reading in a furnished room for Workshop stills (wood floor, three walls, bookcase, lamp, armchair, potted rose; bare heads, other colonists held away, zones cleared, Interaction Bubbles off), pictured once both sit, from four angles.
+- `gibbet`: a man, a woman and a child of 9 dead in gibbet cages, put straight into each container.
+- `vat`: a baby, child and teen in growth vats and a grown pawn in a biosculpter pod (no power), reporting how far `UnderGlass` let each down and slid it.
+- `wedding`: two fiancés given the marriage job a cell apart, the countdown cut to `WeddingTicks`; checks holding hands facing (`wed_under`, `wed_over`), vows in turn, the kiss, married.
+- Beds: `sharedbed` (two spouses asleep in a double bed, one in a single, under the blanket), `lovin` (two spouses at lovin under the blanket, close and facing), `bedcompare` (lovin beside asleep, comparing `Ease.headAlong` and `blanketAlong`), `sleepwear` (a grown pawn and a child through each `sleepWear` choice, no blanket), `bedin` (walking to bed and getting in), `sleepside` (which `sleep` variant four sleepers on single beds pick).
+- `tend` (`tend_<place>`): a doctor tending in a bed, on a sleeping spot and downed on the floor (a ragdoll), with and without medicine, and a downed warg (`animal`). `tendbed`: a bed patient awake, asleep, anaesthetised, in pain shock, fed, downed on the bed's cell without being put in it, and in a hospital bed.
+- `drunk`: hammered, swaying, then weaving as it walks.
+- `socialfight`: a knife and a rifle colonist in a social fight, a tick at a time; each punches bare-handed (`melee_fist_`, unarmed stance), its weapon never shown or aimed (`WalkFigures.SocialFighting`).
+- `tools`: felling an oak (axe) and sowing potatoes (spade). `mine`: a granite block; checks `work_pickaxe` and the game's strike, pictured through a stroke and on the strike's tick.
+- `cook`: at a fueled stove (a bout of `work_stir`), a campfire (`stir_campfire`) and on a chair at one (`stir_campfire_sit`).
+- `rolljoint`: a Make_SmokeleafJoint bill at the drug lab and a crafting spot, stood or knelt and sat; the rolled joint drawn seated only.
+- `hygiene` (`hygiene_<case>`; wants `M3AT_ADD_MODS="dubwise.dubsbadhygiene james.isorimwaylith.dbhmodels"`): toilet, pit latrine, bath, hot tub and pool through DBH's jobs (fixtures filled and pipes taken off by reflection, `FillTub`); checks each frame was drawn by the chibi (`WalkFigures.DrawnAs`: chibi, climb, plain, isorim, vault) with no `DrawFailures`, and for the pool that it vaulted in and out. `hygiene_vault`: a colonist ordered straight across the pool, from the side.
+
+Hair and hats:
+- `fringe`: a beardless pawn in each of a list of fringed styles, close from the front, three quarters and IsoRim's pitch, to see where each fringe ends against the eyes (the hair cache keeps what was built, so compare across a `HairBuilder.Version` change).
+- `beard`: a bald man in the Circle, Anchor, Full, Moustache, MuttonChops, SideWhiskers and Wizard beards, flat and 3D, mouth shut and forced open (`FaceLayers.TestMouthOpen`), the face's layers stacked and singly. `M3AT_WIDEN` sets `HairBuilder.WidenEyes`; clear the cache's `beards/` between runs.
+- `slicecap`: the slicecap over Bob, Afro, Spikes and FancyBun; checks the hair is whole and cleared (`OverHairReport`) and every body triangle the cap hides has the cap near it.
+- `hats`: a pawn with hair (fixed seed) in each tucking hat, front, back and above, with each rim and what it hides. Run it and `slicecap` once with `M3AT_LEGACY_HATS=1` (the old rules, `SkinnedFigure.Legacy`) to compare. `hatshrink`: the same at the whole `Shrinkhead` key. Both also picture from below the brim (`_below`, `_belowback`, `WalkFigures.EyeForTest`) and add the full helmets (power armour, recon, cataphract, vacsuit).
+
+Weapons and gear:
+- `bows` (`bows_<defName>`, `bows_parka` in a parka, `bows_slab` as sprite slabs with IsoRim's weapon models off for the run): each bow drafted, then shooting at a wall (CE's arrows put in the inventory), checking the left fist lands on the art about its middle (`WalkFigures.AutoSlabGrip`).
+- `weapons_<defName or mod packageId>+...` (e.g. `weapons_det.spacerarsenal`): the same for any weapons, a packageId standing for all a mod adds (ranged shot at the wall, thrown thrown once, melee only held; name, kind and type noted). `slabweapons_<names>`: the same with every weapon its slab at `slabScale` (`M3AT_SLAB_SCALE` sets it). `bigweapons_<names>`: the same with every weapon type's size in the options 1.4 times the export's (`WithTypeSizes`), to see the other hand keep to its place on the weapon (`AutoSupportShift`). `M3AT_*` variables don't reach a game started through Steam, which the script does whenever Steam is running.
+- `shields`: CE's melee and ballistic shields with an autopistol: on the back, drafted into the guard by `shield_draw_`, undrafted and put back, at normal speed (`Unpaused`) with pictures part way, checking `Ease.shieldOut`, `shieldClip`, `shield`.
+- `handholster`: the hands kept out of holstered weapons (`M3AT_HANDCLEAR=1`).
+
+Bodies:
+- `tail`: a bare child with each cat tail gene chalking, close from behind and the side, noting `TailRootGap`.
+- `fatseam`: a Fat woman in a basic shirt and trousers, alone, under a jacket and a duster, at body shape strengths 1 and 1.5, front and back.
+- `race_<defName>` (e.g. `race_Kiiro_Race`): four pawns of a race from five angles with ears and tail, beside a human with the cat ears gene, checking each gets its HAR hair add-ons (`HairBuilder.HairOf`).
+- `facetune`: a bald pawn noting each face part's mod (`FaceLayers.ModOf`), pictured untuned, with its eyes' mod tuned and its mouth tuned.
+
+No pawn, notes only:
+- `standins`: the garment drawn for every apparel loaded (own, stand-ins or none), checking no belt or shield gets one and all the game's body and head wear is drawn.
+- `retextured`: every official weapon's binding (`Api.HowBound`), `WeaponRule`'s answer and whether drawn as its model, with `retexturedWeaponModels` on then off; also how many `RestoredModels` gave back (23 with the old CE pack, none with the Workshop one).
+- `slabsizes`: every official modelled weapon's fitted length, `GroundRatio`, art length and the `slabScale` that would match its model, medians per type (only the guns' lengths are measured along the right axis).
+- `weaponkinds`: every holdable gun's art length, kind, mass, classes and tags, checking the game's own sort as their names say (for `PistolLongest`).

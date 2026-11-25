@@ -70,6 +70,7 @@ namespace M3AT
         }
 
         private Tail tail, furTail;
+        private readonly Dictionary<string, Tail> packTails = new Dictionary<string, Tail>();   // content packs' tails, by file
         private bool tailTried, furTailTried;
         private int hipsBone = -2;
 
@@ -87,6 +88,23 @@ namespace M3AT
         // The tail this pawn has (Posed.furTail): an export without the furry one gives it the smooth one.
         private Tail TailOf(Posed p)
         {
+            if (p.packTail != null)
+            {
+                Tail own;
+                if (!packTails.TryGetValue(p.packTail, out own))
+                {
+                    own = LoadTail(p.packTail);   // (a path from M3AT's folder, or absolute: Path.Combine keeps it)
+                    packTails[p.packTail] = own;
+                    if (own == null)
+                    {
+                        Log.Warning(Tag + "a content pack's tail " + p.packTail + " could not be read; the cat tail is drawn.");
+                    }
+                }
+                if (own != null)
+                {
+                    return own;
+                }
+            }
             if (!p.furTail)
             {
                 return TailOf();
@@ -374,11 +392,11 @@ namespace M3AT
             {
                 return;
             }
-            if (p.tail == null || p.tailMadeFur != p.furTail)
+            if (p.tail == null || p.tailMadeFrom != t)
             {
-                RetireTail(p);   // the gene changed: the other tail's meshes won't fit
+                RetireTail(p);   // the gene or its source changed: the other tail's meshes won't fit
                 p.tail = NewPieceMeshes(t.piece);
-                p.tailMadeFur = p.furTail;
+                p.tailMadeFrom = t;
             }
             Material solid = GrainedMaterial(t.piece, p.tail);
             PoseTail(p, p.tail, t, s, floor);
@@ -519,6 +537,10 @@ namespace M3AT
             {
                 return false;
             }
+            if (ExpansionApi.TailFileFor(pawn) != null)
+            {
+                return true;   // a content pack's tail for its race
+            }
             foreach (GeneDef def in tailGenes)
             {
                 if (pawn.genes != null && pawn.genes.HasActiveGene(def))
@@ -655,6 +677,7 @@ namespace M3AT
         private static void DrawCatTail(Pawn pawn, SkinnedFigure.Posed fig, GarmentMask mask, Apparel[] worn, Vector3 at, float yaw, float size, float sat, float floor, bool onGround)
         {
             fig.furTail = furTailGene != null && pawn.genes != null && pawn.genes.HasActiveGene(furTailGene);
+            fig.packTail = ExpansionApi.TailFileFor(pawn);
             StepTail(pawn, fig, at, yaw, size, sat, onGround);
             if (ArmourHidesTail && skin.HidesTail(mask, worn))
             {

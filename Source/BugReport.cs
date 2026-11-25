@@ -105,7 +105,8 @@ namespace M3AT
                     if (worn[g] == a)
                     {
                         drawn.Add(skin.PieceName(g) + (skin.GarmentOf(a.def) == g ? ""
-                            : SettingsMod.Settings != null && SettingsMod.Settings.clothingChoices.ContainsKey(a.def.defName) ? " (player's choice)" : " (stand-in)"));
+                            : SettingsMod.Settings != null && SettingsMod.Settings.clothingChoices.ContainsKey(a.def.defName) ? " (player's choice)" : " (stand-in)")
+                            + (skin.GarmentOf(a.def) != g && WalkFigures.SpriteClothes && !WalkFigures.PaintedArt(a.def) ? " (plain, player's choice)" : ""));
                     }
                 }
                 // A skirt or dress drawn at the length its art comes to (HemLengths.cs): how far down the body that is.
@@ -210,6 +211,7 @@ namespace M3AT
             s.AppendLine("```");
             Section(s, "Build", Basics);
             Section(s, "Related mods", RelatedMods);
+            Section(s, "Add-ons", AddOnsSection);
             Section(s, "Selected pawns", SelectedPawns);
             Section(s, "Options", Options);
             Section(s, "Log (this mod)", LogLines);
@@ -281,6 +283,38 @@ namespace M3AT
             s.AppendLine("GPU: " + SystemInfo.graphicsDeviceName + ", " + SystemInfo.graphicsMemorySize + " MB");
             s.AppendLine("CPU: " + SystemInfo.processorType + ", " + SystemInfo.processorCount + " threads, " + SystemInfo.systemMemorySize + " MB");
             s.AppendLine("In a game: " + (Current.ProgramState == ProgramState.Playing));
+        }
+
+        // Other mods that change what M3AT draws (AddOns.cs), and their garments over the triangle budget (GarmentBudget.cs).
+        private static void AddOnsSection(StringBuilder s)
+        {
+            List<AddOns.AddOn> found = AddOns.Find();
+            if (found.Count == 0)
+            {
+                s.AppendLine(WalkFigures.SkinForAddOns == null ? "(the chibi isn't loaded yet)" : "(none)");
+            }
+            foreach (AddOns.AddOn a in found)
+            {
+                s.AppendLine(a.name + " (" + a.packageId + "): " + a.garments + " garments, " + a.geneParts + " gene parts, " + a.patches + " patches on M3AT's code, "
+                    + a.posers + " posers; races " + (a.races.Count > 0 ? string.Join(", ", a.races) : "-"));
+                List<string> parts = new List<string>();
+                foreach (ContentPart part in ContentSources.Shown)
+                {
+                    if (a.parts.Contains(part))
+                    {
+                        parts.Add(part + " " + (ContentSources.UsesPack(a.packageId, part) ? "pack" : "M3AT") + (ContentSources.Chosen(a.packageId, part) != null ? " (player's choice)" : ""));
+                    }
+                }
+                s.AppendLine("  parts: " + string.Join(", ", parts));
+            }
+            foreach (string g in SkinnedFigure.Simplified)
+            {
+                s.AppendLine("simplified: " + g);
+            }
+            foreach (string g in SkinnedFigure.OverBudget)
+            {
+                s.AppendLine("over budget, kept (full detail): " + g);
+            }
         }
 
         private const string OwnId = "marumirai.M3AT";

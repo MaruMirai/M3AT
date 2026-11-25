@@ -42,6 +42,8 @@ namespace M3AT
         private const float RacePink = 0.85f;           // the skin's colour this share of the way to RaceLining
         private const float EarPink = 0.5f;   // the lining's colour: the skin's, this share of the way to EarLining
         private static readonly Color EarLining = new Color(1f, 0.74f, 0.72f);
+        private const float FluffyPink = 0.75f;   // the fluffy ears' fading patch (EarLining.cs): the skin's this share of the way to FluffyLining,
+        private static readonly Color FluffyLining = new Color(1f, 0.9f, 0.88f);   // a paler pink than EarLining, as only a small patch shows
         private static readonly float[] EarShare = { 0.5f, 0.3f, 0.2f };   // each joint's share of a three-boned ear's swing, root first
         public const int EarMostBones = 8;   // on one ear, and how far apart in earBones the two ears' bones are
         // A floppy ear's curl: a joint's bend at a curl of 1 is taken out wholly, this many degrees past it, so the nearly straight
@@ -644,8 +646,10 @@ namespace M3AT
             if (e.liningShare != null)
             {
                 // Pale only in the cup's low middle, fading out to the hair's colour at the rim and toward the tip.
+                // Paler than a whole lining's, as only a small patch of it shows (FluffyPink).
+                Color patch = file == RaceEarFile ? inner * ScalpShade : Color.Lerp(skin, FluffyLining, FluffyPink);
                 DrawMeshes(p, p.ears, piece.rest.Length, solid, position, yaw, size, tint, null, default(Color), null, default(Color), null,
-                    LiningPaint(p, e, tint, inner * ScalpShade));
+                    LiningPaint(p, e, tint, patch));
                 return;
             }
             DrawMeshes(p, p.ears, piece.rest.Length, solid, position, yaw, size, tint, null, default(Color), e.inner, inner);
@@ -770,12 +774,19 @@ namespace M3AT
             }
             if (pawn.genes == null)
             {
-                return RaceEars(pawn);
+                return PackEars(pawn) ?? RaceEars(pawn);
             }
             string file = catEarsGene != null && pawn.genes.HasActiveGene(catEarsGene) ? SkinnedFigure.CatEarFile
                 : pigEarsGene != null && pawn.genes.HasActiveGene(pigEarsGene) ? SkinnedFigure.PigEarFile
                 : floppyEarsGene != null && pawn.genes.HasActiveGene(floppyEarsGene) ? SkinnedFigure.FloppyEarFile : null;
-            return file != null && skin.HasEars(file) ? file : RaceEars(pawn);
+            return file != null && skin.HasEars(file) ? file : PackEars(pawn) ?? RaceEars(pawn);
+        }
+
+        // A content pack's ears for this pawn's race (ExpansionApi 2), if the player has the pack draw them.
+        private static string PackEars(Pawn pawn)
+        {
+            string file = ExpansionApi.EarFileFor(pawn);
+            return file != null && skin.HasEars(file) ? file : null;
         }
 
         // A race's own ears, for a cat-like one with an ear add-on (HairBuilder.CatLikeAddon), or null.

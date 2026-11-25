@@ -1,5 +1,5 @@
-**How to report a bug**
+**Issues and bugs**
 
-Bug reports go in #submit-bug-report. The pinned message there shows how, and only you and I see what you send.
+This forum is for discussion of any bugs, visual glitches, or other issues with the mod.
 
-This forum is for talking about bugs in the open: asking whether anyone else has seen something, or comparing notes. If you post here, the **Copy bug report** text from the mod options (under Problems) still helps a lot.
+You can also send a bug report to Maru using the #submit-bug-report channel.

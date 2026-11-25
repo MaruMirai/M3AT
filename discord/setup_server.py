@@ -68,7 +68,10 @@ LAYOUT = [
     {"category": "INFO", "channels": [
         {"name": "welcome", "type": TEXT, "access": "read_only",
          "topic": "What M3AT is, what it needs, the rules and the known issues.",
-         "messages": ["welcome.md", "rules.md", "known_issues.md"]},
+         "messages": ["welcome.md", "rules.md", "known_issues.md"],
+         # Edited in place by --update: found among the bot's own messages there by
+         # their first line.
+         "update": ["known_issues.md"]},
         {"name": "dev-log", "type": TEXT, "access": "read_only",
          "topic": "New versions, and work in progress: clips and pictures of what's being made.",
          "messages": ["first_announcement.md"]},
@@ -80,7 +83,8 @@ LAYOUT = [
                   ("Clothes", "👕"), ("Hair", "💇"), ("Mod conflict", "🧩"),
                   ("Performance", "🐢"), ("Fixed", "✅"), ("Can't reproduce", "❓")],
          "moderated_tags": ["Fixed", "Can't reproduce"],
-         "pinned_post": ("How to report a bug", "bug_howto.md")},
+         # Title, text, and titles it had before (found by them and renamed).
+         "pinned_post": ("Issues and bugs", "bug_howto.md", ["How to report a bug"])},
         {"name": "submit-bug-report", "type": TEXT, "access": "private_threads",
          "topic": "Report a bug: start a private thread here, seen only by you and Maru.",
          "messages": ["bug_private.md"]},
@@ -327,7 +331,7 @@ def main():
             pin(api, made["id"], first["id"])
             print(f"  #{spec['name']}: posted {file_name}")
         if "pinned_post" in spec:
-            title, file_name = spec["pinned_post"]
+            title, file_name = spec["pinned_post"][:2]
             text = linked(message_text(file_name, workshop_id))
             if kind == FORUM:
                 thread = api.call("POST", f"/channels/{made['id']}/threads", {
@@ -358,10 +362,15 @@ def update_posts(api, guild_id, by_name, made_now, linked, workshop_id):
     """Edits the guidelines and pinned post of forums that were already there to
     the texts as they are now."""
     made_names = {s["name"] for s, m, k in made_now}
+    me = api.call("GET", "/users/@me", writes=False)["id"]
     for group in LAYOUT:
         for spec in group["channels"]:
             have = by_name.get((spec["name"], False))
-            if not have or spec["name"] in made_names or have["type"] != FORUM:
+            if not have or spec["name"] in made_names:
+                continue
+            if spec.get("update"):
+                update_messages(api, have, spec, me, linked, workshop_id)
+            if have["type"] != FORUM:
                 continue
             if "guidelines" in spec:
                 text = linked(message_text(spec["guidelines"], workshop_id))
@@ -370,11 +379,22 @@ def update_posts(api, guild_id, by_name, made_now, linked, workshop_id):
                     print(f"  #{spec['name']}: guidelines updated")
             if "pinned_post" not in spec:
                 continue
-            title, file_name = spec["pinned_post"]
-            thread = find_thread(api, guild_id, have["id"], title)
+            title, file_name = spec["pinned_post"][:2]
+            names = [title] + (spec["pinned_post"][2] if len(spec["pinned_post"]) > 2 else [])
+            thread = None
+            for name in names:
+                thread = find_thread(api, guild_id, have["id"], name)
+                if thread:
+                    break
             if not thread:
                 print(f"  #{spec['name']}: no post \"{title}\" found to update")
                 continue
+            if thread.get("thread_metadata", {}).get("archived"):
+                api.call("PATCH", f"/channels/{thread['id']}", {"archived": False})
+                thread["thread_metadata"]["archived"] = False
+            if thread["name"] != title:
+                api.call("PATCH", f"/channels/{thread['id']}", {"name": title})
+                print(f"  #{spec['name']}: \"{thread['name']}\" renamed \"{title}\"")
             # A forum post's first message has the thread's own id.
             text = linked(message_text(file_name, workshop_id))
             first = api.call("GET", f"/channels/{thread['id']}/messages/{thread['id']}", writes=False)
@@ -386,6 +406,29 @@ def update_posts(api, guild_id, by_name, made_now, linked, workshop_id):
             api.call("PATCH", f"/channels/{thread['id']}/messages/{thread['id']}",
                      {"content": text, "allowed_mentions": {"parse": []}})
             print(f"  #{spec['name']}: \"{title}\" edited in place")
+
+
+def update_messages(api, channel, spec, me, linked, workshop_id):
+    """Edits the bot's own messages in a channel to the files named in `update`,
+    each found by its first line. Only files short enough for one message."""
+    recent = api.call("GET", f"/channels/{channel['id']}/messages?limit=100", writes=False)
+    mine = [m for m in recent if m["author"]["id"] == me]
+    for file_name in spec["update"]:
+        text = linked(message_text(file_name, workshop_id))
+        if len(split_message(text)) != 1:
+            print(f"  #{spec['name']}: {file_name} is too long for one message; not updated")
+            continue
+        head = text.split("\n", 1)[0]
+        found = [m for m in mine if m["content"].split("\n", 1)[0] == head]
+        if len(found) != 1:
+            print(f"  #{spec['name']}: {len(found)} messages start like {file_name}; not updated")
+            continue
+        if found[0]["content"] == text:
+            print(f"  #{spec['name']}: {file_name} already up to date")
+            continue
+        api.call("PATCH", f"/channels/{channel['id']}/messages/{found[0]['id']}",
+                 {"content": text, "allowed_mentions": {"parse": []}})
+        print(f"  #{spec['name']}: {file_name} edited in place")
 
 
 def find_thread(api, guild_id, forum_id, title):

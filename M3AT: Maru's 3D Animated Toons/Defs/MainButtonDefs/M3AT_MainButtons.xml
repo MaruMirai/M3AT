@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Defs>
+
+  <!-- The content packs' switcher (Source/ContentWindow.cs), shown while content packs are active and the contentButton
+       option is on (ContentButtonWorker). -->
+  <MainButtonDef>
+    <defName>M3AT_Content</defName>
+    <label>M3AT</label>
+    <description>Choose, for each content pack (mods with their own ears, tails, faces, hair or clothes for M3AT's figures), whether the pack's or M3AT's own is drawn.</description>
+    <tabWindowClass>M3AT.ContentTabWindow</tabWindowClass>
+    <workerClass>M3AT.ContentButtonWorker</workerClass>
+    <order>95</order>
+    <closesWorldView>true</closesWorldView>
+  </MainButtonDef>
+
+</Defs>

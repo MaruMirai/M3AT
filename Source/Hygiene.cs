@@ -29,9 +29,30 @@ namespace M3AT
         // water terrain under the pool, so the wading's sinking into water is left out there (DrawSkinned).
         private const float PoolFloor = 0.091f;
 
-        // A swimmer's neck this far (model units: cells at a grown pawn's size) under a pool's water line, so the mouth and
-        // nose are out of the water (the ground's water, opaque, keeps the neck at its line).
-        private const float PoolFaceClear = 0.12f;
+        // A pool's swimmer, on the move (a swimming job, PoolOf: the swim clip by its pace, PoolStroke's gait; still, it
+        // stands on the floor), has its neck this far (model units: cells at a grown pawn's size) over the water line, so
+        // the mouth and nose are out of the water (the ground's water, opaque, keeps the neck at its line).
+        private const float PoolFaceClear = 0.07f;
+
+        // A swimmer still in a pool crouches until the water is at its shoulders (the crouch's amount, SkinnedFigure.Crouch,
+        // past its full depth if need be): the shoulder joints PoolShoulder model units up standing (the rig's, at rest),
+        // let down from standing on the floor to the water at anchor plus PoolWaterOverAnchor. 0 where it is shallow enough.
+        private const float PoolShoulder = 0.79f;
+
+        private static float PoolCrouch(float anchor, float size)
+        {
+            float full = skin.CrouchDepth() * size;
+            if (full <= 0f)
+            {
+                return 0f;
+            }
+            float drop = PoolShoulder * size + PoolFloor - (anchor + PoolWaterOverAnchor);
+            return Mathf.Max(0f, drop / full);
+        }
+
+        // The pack's pool water over its attachment anchor, cells (the anchor 0.55 of the fill, the water 0.7 at full,
+        // falling by 0.55 of what is missing: its TransparentWater).
+        private const float PoolWaterOverAnchor = 0.15f;
 
         private static bool InTub(Thing host)
         {

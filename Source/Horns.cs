@@ -183,6 +183,9 @@ namespace M3AT
         private static bool hornGenesLooked;
 
         // The horns the pawn's genes give it, by horns_<name>.txt's name; null none.
+        internal static readonly string[] HornGenes = { "Headbone_MiniHorns", "Headbone_CenterHorn" };
+        internal static readonly string[] EarGenes = { "Ears_Cat", "Ears_Pig", "Ears_Floppy" };
+
         private static string HornsOf(Pawn pawn)
         {
             if (!hornGenesLooked)
