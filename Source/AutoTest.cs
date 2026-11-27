@@ -6286,7 +6286,7 @@ namespace M3AT
             List<string[]> loaded = outfits.Where(o => DefDatabase<ThingDef>.GetNamedSilentFail(o[0]) != null).ToList();
             if (loaded.Count == 0)
             {
-                Check("a race mod active", false, "none of Ratkin, Kiiro, Milira or Wolfein is active");
+                Check("a race mod active", false, "none of Ratkin, Kiiro, Milira, Wolfein or Miho is active");
                 yield break;
             }
             const int Row = 4;
@@ -6455,6 +6455,20 @@ namespace M3AT
                 new[] { "Kiiro_Penance" },
                 new[] { "Kiiro_GuerrillaUniform", "Kiiro_ChestPlate" },
                 new[] { "Kiiro_WhiteGown", "Kiiro_Apparel_DorsalCrossbow" },
+                // Miho, matched by hand (2026-11-27), three rows of four.
+                new[] { "Miho_Apparel_OnSkin_Maid", "Miho_Apparel_Special_Maid" },
+                // (Its glasses and headpieces are all on its Miho_Special layer, so one at a time.)
+                new[] { "Miho_Apparel_OnSkin_Regular", "Miho_Apparel_Hat_ShooterCap", "Miho_Apparel_Special_RoundGlasses" },
+                new[] { "Miho_Apparel_OnSkin_Hoodie", "Miho_Apparel_Hat_Winter", "Miho_Apparel_Special_SunGlasses" },
+                new[] { "Miho_Apparel_OnSkin_Pariah", "Miho_Apparel_Hat_Pariah" },
+                new[] { "Miho_Apparel_OnSkin_Simple", "Miho_Apparel_Middle_MilitiaVest", "Miho_Apparel_Hat_MilitiaEar" },
+                new[] { "Miho_Apparel_OnSkin_PMC", "Miho_Apparel_Middle_Militia", "Miho_Apparel_Hat_PMC" },
+                new[] { "Miho_Apparel_OnSkin_OrnatedCaptain", "Miho_Apparel_Hat_EltexCaptain", "Miho_Apparel_Mask_Eltex" },
+                new[] { "Miho_Apparel_OnSkin_OrnatedNomadic", "Miho_Apparel_Shell_Winter" },
+                new[] { "Miho_Apparel_OnSkin_Shirt", "Miho_Apparel_Under_IndustrialBear", "Miho_Apparel_Special_Glasses" },
+                new[] { "Miho_Apparel_OnSkin_OrnatedTwo", "Miho_Apparel_Shell_Sorceress", "Miho_Apparel_Hat_Sorceress" },
+                new[] { "Miho_Apparel_Middle_Powered", "Miho_Apparel_Hat_Worker", "Miho_Apparel_Special_Visor" },
+                new[] { "Miho_Apparel_Under_Tribal", "Miho_Apparel_Shell_Padding", "Miho_Apparel_Special_Toxmask" },
             };
             // What the rules were made for: the apparel and the garments it should be drawn as.
             Dictionary<string, string> want = new Dictionary<string, string>
@@ -6491,6 +6505,23 @@ namespace M3AT
                 { "Kiiro_SuspenderTrousers", "CollarShirt+Shorts+BodyStrap" }, { "Kiiro_LoadCarrier", "CE_TacVest" },
                 { "Kiiro_Penance", "Robe" }, { "Kiiro_GuerrillaUniform", "Dress" }, { "Kiiro_ChestPlate", "FlakVest" },
                 { "Kiiro_WhiteGown", "LabCoat" }, { "Kiiro_Apparel_DorsalCrossbow", "BodyStrap" },
+                { "Miho_Apparel_OnSkin_Maid", "Dress" }, { "Miho_Apparel_Special_Maid", "MaidHeaddress" },
+                { "Miho_Apparel_Special_RoundGlasses", "Glasses" }, { "Miho_Apparel_OnSkin_Regular", "Dress" },
+                { "Miho_Apparel_Hat_ShooterCap", "AirwireHeadset+AuthorityCap" }, { "Miho_Apparel_OnSkin_Hoodie", "Dress" },
+                { "Miho_Apparel_Hat_Winter", "Tuque" }, { "Miho_Apparel_Special_SunGlasses", "Sunglasses" },
+                { "Miho_Apparel_OnSkin_Pariah", "Leotard+Stockings" }, { "Miho_Apparel_Hat_Pariah", "AirwireHeadset+GasMask" },
+                { "Miho_Apparel_OnSkin_Simple", "Dress" }, { "Miho_Apparel_Middle_MilitiaVest", "CE_TacVest" },
+                { "Miho_Apparel_Hat_MilitiaEar", "SimpleHelmet" }, { "Miho_Apparel_OnSkin_PMC", "Dress" },
+                { "Miho_Apparel_Middle_Militia", "FlakVest" }, { "Miho_Apparel_Hat_PMC", "AdvancedHelmet" },
+                { "Miho_Apparel_OnSkin_OrnatedCaptain", "Dress" }, { "Miho_Apparel_Hat_EltexCaptain", "AuthorityCap" },
+                { "Miho_Apparel_Mask_Eltex", "VisageMask" }, { "Miho_Apparel_OnSkin_OrnatedNomadic", "LongJohns" },
+                { "Miho_Apparel_Shell_Winter", "Cape" }, { "Miho_Apparel_OnSkin_Shirt", "CollarShirt" },
+                { "Miho_Apparel_Under_IndustrialBear", "CropTop+Underwear" }, { "Miho_Apparel_Special_Glasses", "Glasses" },
+                { "Miho_Apparel_OnSkin_OrnatedTwo", "Dress" }, { "Miho_Apparel_Shell_Sorceress", "Duster" },
+                { "Miho_Apparel_Hat_Sorceress", "HatHood" }, { "Miho_Apparel_Middle_Powered", "CE_ExoFrame+FlakVest" },
+                { "Miho_Apparel_Hat_Worker", "SimpleHelmet" }, { "Miho_Apparel_Special_Visor", "Goggles" },
+                { "Miho_Apparel_Under_Tribal", "Chestwrap+Underwear" }, { "Miho_Apparel_Shell_Padding", "Parka" },
+                { "Miho_Apparel_Special_Toxmask", "GasMask" },
             };
             List<string[]> loaded = new List<string[]>();
             foreach (string[] outfit in outfits)
@@ -6504,7 +6535,7 @@ namespace M3AT
             }
             if (loaded.Count == 0)
             {
-                Check("a race mod active", false, "none of Ratkin, Kiiro, Milira or Wolfein is active");
+                Check("a race mod active", false, "none of Ratkin, Kiiro, Milira, Wolfein or Miho is active");
                 yield break;
             }
             const int Row = 4;

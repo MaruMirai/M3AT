@@ -861,7 +861,7 @@ namespace M3AT
         // WornGears.cs; but GrimWorld's Terminator armour lists the belt and its Custodes plate has a shield in it, while
         // Biotech's heavy shield unit, Middle over the torso, is a shield); power armour's packs (ArmourPack): never drawn
         // as clothes. A pack or webbing on the belt (AsWhatItIs) takes a pack or webbing garment.
-        private static readonly Regex Jewellery = new Regex(@"\b(rings?|psyrings?|bracelets?|anklets?|bangles?|pendants?|necklaces?|amulets?|lockets?)\b");
+        private static readonly Regex Jewellery = new Regex(@"\b(rings?|psyrings?|bracelets?|anklets?|bangles?|pendants?|necklaces?|amulets?|lockets?|talismans?|charms?)\b");
         private static bool NeverStoodIn(ThingDef def)
         {
             ApparelProperties ap = def.apparel;
@@ -870,7 +870,8 @@ namespace M3AT
             LayerNames(ap, out names, out labels);
             bool packLayers = PackLayers(names, labels);
             // Jewellery (a ring, bracelet or anklet) worn on the hands or feet is not a glove or a boot, nor a pendant on
-            // the neck a vest (Milira's psychic defense pendant, Middle over the torso, took the psyfocus vest).
+            // the neck a vest (Milira's psychic defense pendant, Middle over the torso, took the psyfocus vest), nor a
+            // talisman on the body long johns (Miho's seal talisman, a paper charm on its own underwear layer).
             if (Jewellery.IsMatch(text))
             {
                 return true;

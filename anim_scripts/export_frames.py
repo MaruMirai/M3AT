@@ -518,6 +518,58 @@ for _name, _defs in {
         'BodyStrap': ('Kiiro_SuspenderTrousers', 'Kiiro_Apparel_DorsalCrossbow'),
         }.items():
     STANDS_FOR[_name] = STANDS_FOR.get(_name, ()) + _defs
+# Miho, the celestial fox (2026-11-27; its defs are labelled in Korean, the English labels in its translation files):
+# its outfits are short dresses over boots, sailor tops over pleated skirts, a maid's dress, an oversized hoodie and
+# wrap robes (the scoring took a shirt and trousers), its officer's uniform a long-skirted coat (a dress); its
+# northern Eltex garment a white bodysuit (long johns), its Pariah battle suit a high-cut bodysuit over thigh-high
+# stockings; its shirt an open shirt with no trousers; its padding a puffer (a robe), its winter poncho a hooded
+# capelet (the jacket); its trooper and medic armour plate carriers (the psyfocus vest), its tactical vest a chest rig
+# (the royal vest), its exoskeleton heavy armour an exoframe under plates; its trooper and safety helmets steel
+# helmets (CE's plate helmet with CE, a tuque without), its elite trooper helmet a closed visored helmet, its Pariah
+# helmet ear guards and a respirator, its tactical cap a cap with a headset, its sorceress hat a hood and its vacsuit
+# helmet a vacsuit helmet (both labelled only in Korean: a tuque); its fox mask, glasses, magnifier, visor, aiming
+# computer and maid headpiece, on its own Miho_Special layer, took nothing; its gas mask took the cloth mask; its
+# protective, Eltex, bear, Santa and tribal underwear a leotard, a corset over briefs and stockings, a crop top, a
+# bikini and a chest wrap over briefs.
+for _name, _defs in {
+        'Dress': ('Miho_Apparel_OnSkin_Celestial', 'Miho_Apparel_OnSkin_Hoodie', 'Miho_Apparel_OnSkin_Maid',
+                  'Miho_Apparel_OnSkin_Militia', 'Miho_Apparel_OnSkin_OrnatedCaptain',
+                  'Miho_Apparel_OnSkin_OrnatedMiho', 'Miho_Apparel_OnSkin_OrnatedOne',
+                  'Miho_Apparel_OnSkin_OrnatedTwo', 'Miho_Apparel_OnSkin_PMC', 'Miho_Apparel_OnSkin_Regular',
+                  'Miho_Apparel_OnSkin_Simple'),
+        'CollarShirt': ('Miho_Apparel_OnSkin_Shirt',),
+        'LongJohns': ('Miho_Apparel_OnSkin_OrnatedNomadic',),
+        'Leotard': ('Miho_Apparel_OnSkin_Pariah', 'Miho_Apparel_Under_Armor'),
+        'Stockings': ('Miho_Apparel_OnSkin_Pariah', 'Miho_Apparel_Under_EltexOne'),
+        'Parka': ('Miho_Apparel_Shell_Padding',),
+        'Cape': ('Miho_Apparel_Shell_Winter',),
+        'FlakVest': ('Miho_Apparel_Middle_Militia', 'Miho_Apparel_Middle_MilitiaMedic',
+                     'Miho_Apparel_Middle_Militia_Tan', 'Miho_Apparel_Middle_Powered'),
+        'CE_TacVest': ('Miho_Apparel_Middle_MilitiaVest',),
+        'CE_ExoFrame': ('Miho_Apparel_Middle_Powered', 'Miho_Apparel_Middle_PoweredMechanitor',
+                        'Miho_Apparel_Middle_PoweredWorker'),
+        'SimpleHelmet': ('Miho_Apparel_Hat_Militia', 'Miho_Apparel_Hat_MilitiaEar', 'Miho_Apparel_Hat_MilitiaMedic',
+                         'Miho_Apparel_Hat_MilitiaShoot', 'Miho_Apparel_Hat_MilitiaVegi', 'Miho_Apparel_Hat_Worker'),
+        'AdvancedHelmet': ('Miho_Apparel_Hat_PMC',),
+        'GasMask': ('Miho_Apparel_Hat_Pariah', 'Miho_Apparel_Special_Toxmask'),
+        'AirwireHeadset': ('Miho_Apparel_Hat_Pariah', 'Miho_Apparel_Hat_ShooterCap'),
+        'AuthorityCap': ('Miho_Apparel_Hat_ShooterCap',),
+        'HatHood': ('Miho_Apparel_Hat_Sorceress',),
+        'VacsuitHelmet': ('Miho_Apparel_Hat_Vacsuit',),
+        'VisageMask': ('Miho_Apparel_Mask_Eltex',),
+        'Glasses': ('Miho_Apparel_Special_Glasses', 'Miho_Apparel_Special_RoundGlasses'),
+        'Sunglasses': ('Miho_Apparel_Special_SunGlasses',),
+        'Goggles': ('Miho_Apparel_Special_Magnifier', 'Miho_Apparel_Special_Visor'),
+        'Gunlink': ('Miho_Apparel_Special_TacticalAssist',),
+        'MaidHeaddress': ('Miho_Apparel_Special_Maid',),
+        'Corset': ('Miho_Apparel_Under_EltexOne',),
+        'Underwear': ('Miho_Apparel_Under_EltexOne', 'Miho_Apparel_Under_IndustrialBear',
+                      'Miho_Apparel_Under_SeasonalSanta', 'Miho_Apparel_Under_Tribal'),
+        'CropTop': ('Miho_Apparel_Under_IndustrialBear',),
+        'Bra': ('Miho_Apparel_Under_SeasonalSanta',),
+        'Chestwrap': ('Miho_Apparel_Under_Tribal',),
+        }.items():
+    STANDS_FOR[_name] = STANDS_FOR.get(_name, ()) + _defs
 for _name, _defs in STANDS_FOR.items():
     GARMENT_PROPS.setdefault(_name, {})['stands_for'] = ' '.join(_defs)
 # Garments that keep the weights on them: loose ones standing well off the skin, which on the body's weights stretch

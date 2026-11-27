@@ -258,6 +258,24 @@ def files_of(folder):
     return glob.glob(os.path.join(folder, '**', '*.xml'), recursive=True)
 
 
+def english_labels(folders):
+    """Labels from the English translation files (Languages/English/DefInjected/ThingDef) beside the defs, as the game
+    shows them in English: Miho's defs are labelled in Korean, with English labels only there."""
+    out = {}
+    for r in folders:
+        roots = [r] + ([os.path.dirname(r)] if os.path.basename(os.path.normpath(r)) == 'Defs' else [])
+        for root in roots:
+            for f in glob.glob(os.path.join(root, 'Languages', 'English', 'DefInjected', 'ThingDef', '*.xml')):
+                try:
+                    tree = ET.parse(f).getroot()
+                except Exception:
+                    continue
+                for e in tree:
+                    if e.tag.endswith('.label') and e.tag.count('.') == 1 and e.text:
+                        out[e.tag[:-len('.label')]] = e.text.strip()
+    return out
+
+
 def read_defs(folders):
     nodes = {}
     for r in folders:
@@ -290,11 +308,12 @@ def read_defs(folders):
             own = [x.text if x.text and x.text.strip() else x.get('Class') for x in v]
             return own if v.get('Inherit') == 'False' else (up or []) + own
         return v.text
+    english = english_labels(folders)
     out = {}
     for (kind, name), d in nodes.items():
         if kind != 'd' or d.get('Abstract') == 'True' or get(d, 'apparel/layers') is None:
             continue
-        out[name] = dict(name=name, label=get(d, 'label') or '', layers=get(d, 'apparel/layers') or [],
+        out[name] = dict(name=name, label=english.get(name) or get(d, 'label') or '', layers=get(d, 'apparel/layers') or [],
                          groups=get(d, 'apparel/bodyPartGroups') or [], cats=get(d, 'thingCategories') or [],
                          tags=get(d, 'apparel/tags') or [], tech=get(d, 'techLevel'), stuff=get(d, 'stuffCategories') or [],
                          stage=get(d, 'apparel/developmentalStageFilter') or 'Child, Adult', comps=get(d, 'comps') or [],
@@ -431,7 +450,7 @@ def never(d):
     it; Biotech's heavy shield unit, Middle over the torso, is a shield); power armour's packs (armour_pack). A pack or
     webbing on the belt (as_what_it_is) takes a pack or webbing garment."""
     text = text_of(d)
-    if re.search(r'\b(rings?|psyrings?|bracelets?|anklets?|bangles?|pendants?|necklaces?|amulets?|lockets?)\b', text):   # jewellery is no glove, boot or vest
+    if re.search(r'\b(rings?|psyrings?|bracelets?|anklets?|bangles?|pendants?|necklaces?|amulets?|lockets?|talismans?|charms?)\b', text):   # jewellery is no glove, boot or vest
         return True
     if is_webbing(text):
         return False

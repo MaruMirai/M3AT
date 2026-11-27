@@ -6,9 +6,11 @@ You need **no C# and no XML**. A garment is a plain text file in a folder in you
 
 Gene parts (spikes, scales, crests and so on drawn for a gene) are made the same way. See [GeneParts.md](GeneParts.md) after this guide.
 
-> **M3AT is in early development, and its body is liable to change between updates.** We're still finding the body's best shape, and we aim to settle on one soon. Until then, garments made the ways below keep working, but one may need exporting again on the new body. Keep your `.blend` files. See [When M3AT's body changes](#when-m3ats-body-changes).
+> **M3AT is in early development, and its body is liable to change between updates.** We're still finding the body's best shape, and we're prioritising settling on a more final shape soon to make things more robust for content creators. **Currently apparel is likely to break when the body is redone**. Keep your `.blend` files and the script or steps that made each garment as they may help remake it on the new body. See [When M3AT's body changes](#when-m3ats-body-changes).
+>
+> **The systems for player-made clothing are at a very early stage.** The kit, the file format's options, the ways of making a garment and this guide are first versions, and we're focusing on making garments easier and more robust soon.
 
-> **We recommend starting with Approach 2 or Approach 1.** A garment made from the body's own faces (Approach 2), a retexture of one of M3AT's garments (Approach 1) or one of them cut down fits every body type and pose and costs a fraction of anything else. Meshes generated from sprites, image-to-3D services or sculpts tend to come out many times heavier and clip, and M3AT optimizes anything over its budget. M3AT is MIT licensed, so its meshes are yours to start from. Using an AI assistant? Point it at [AGENTS.md](AGENTS.md).
+> **We recommend starting with Approach 2 or Approach 1.** A garment made from the body's own faces (Approach 2), a retexture of one of M3AT's garments (Approach 1) or one of them cut down fits every body type and pose and costs a fraction of anything else. Meshes generated from sprites, image-to-3D services or sculpts tend to come out many times heavier and clip, and M3AT optimizes anything over its budget. Approach 2 is the one most likely to need remaking when the body is redone, but it is the best practice and future approaches will likely remain similar to it, so it's worth learning now: keep the steps that made each garment and they can be run again on the new body. M3AT is MIT licensed, so its meshes are yours to start from. Using an AI assistant? Point it at [AGENTS.md](AGENTS.md).
 
 ## Contents
 
@@ -68,9 +70,9 @@ Every garment is skinned again for every pawn whenever it is posed, and it is dr
 
 | | Triangles |
 | --- | --- |
-| The whole chibi body | 1,194 |
-| M3AT's shirt, trousers, simple helmet | 194, 220, 118 |
-| M3AT's parka, long dress | 344, 392 |
+| The whole chibi body | 1,200 |
+| M3AT's shirt, trousers, simple helmet | 190, 220, 118 |
+| M3AT's parka, long dress | 344, 398 |
 | M3AT's power armour | 1,044 |
 | A small accessory (a collar, a strap, a badge) | under 150 |
 
@@ -330,20 +332,23 @@ Any line M3AT doesn't know is ignored.
 
 ## When M3AT's body changes
 
-M3AT is in early development, and its body is still being improved. Shoulders, shins and the belly have all been reshaped, and the mesh has been cut finer in places. This is because the mod is at an early stage: we're still finding the body's best shape, and **we aim to settle on a body soon**, after which it should change rarely, if at all. Until then, **a garment you make today may need exporting again after a M3AT update.**
+M3AT is in early development, and its body is still being improved. The belly has been reshaped and the mesh cut finer there, and more changes to its shape are on the way. This is because the mod is at an early stage: we're still finding the body's best shape, and **we aim to settle on a body soon**, after which it should change rarely, if at all. Until then, **a garment you make today may well need exporting again, or remaking, after a M3AT update.**
+
+**Garments made from the body's faces ([Approach 2](#approach-2-push-out-the-bodys-own-faces)) are the most likely to break.** They are the body's own triangles pushed outward, so they match its faces one for one. When we redo the body, its faces will change and those garments will no longer line up with it: expect to remake them (or re-cut them) on the new body rather than just export them again. Retextures of M3AT's garments and separate meshes ([Approach 3](#approach-3-a-separate-mesh)) depend less on the faces, but may still clip or float where the skin has moved.
 
 **What may change in any update:**
 - The body's vertices, triangles and edges: how many there are, their numbers, and where the edges run. Don't rely on a body vertex or triangle number in your files or code.
 - Exactly where the skin's surface is. Where an update moves the skin outward past a garment's push-out, the skin can poke through that garment.
 - How the skin is weighted to the bones.
+- The figure's scale.
+- The body shapes (Fat, Hulk, Thin and so on): which there are, their names and their shapes.
 
-**What we try hard to keep the same:**
+**What is likely to stay the same:**
 - The bone names and the way they connect (listed at the end of the [Settings reference](#settings-reference)).
-- The rest pose (the A-pose) and the scale: 1 unit is 1 map cell, the figure facing -Z.
-- The body shapes' names (Fat, Hulk, Thin and so on).
-- The garment file format. New lines may be added; old ones keep working.
+- The rest pose (the A-pose), with 1 unit being 1 map cell and the figure facing -Z.
+- The garment file format. New lines may be added; old ones should keep working.
 
-**Why most garments survive a change anyway:** M3AT fits each garment's weights, body shapes and the skin it hides to the installed body as it loads. A garment made from the old body's faces is still a close fit to the new body. Its hems sit a little off the new body's edges, which doesn't show.
+**Why many garments survive a small change:** M3AT fits each garment's weights, body shapes and the skin it hides to the installed body as it loads. After a small reshape, a garment made from the old body's faces is still a close fit, and its hems sit a little off the new body's edges, which doesn't show. A redone body with different faces is not a small reshape, and we can't promise this will hold for it.
 
 **How you'll know.** Every garment the kit exports has a `body` line naming the body it was made on, with its **generation**, a number M3AT raises when the body changes enough to move garments. If yours was made on an older generation, M3AT's log says so as it loads it ("Made on body generation 1 (this M3AT's is 2)…"). A garment without a `body` line (exported before the kit wrote one) gets no such note. Look at it in the game after an update.
 

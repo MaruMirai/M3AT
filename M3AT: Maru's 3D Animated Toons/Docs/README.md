@@ -12,6 +12,6 @@ Guides for making things for M3AT: Maru's 3D Animated Toons without changing M3A
 - [Tools/m3at_garment_kit.py](Tools/m3at_garment_kit.py): the Blender add-on both guides use.
 - [Examples/M3ATgarments/](Examples/M3ATgarments/): a retexture and a gene part, as they would sit in a mod's `M3ATgarments` folder.
 
-M3AT is in early development and its body is liable to change between updates (we aim to settle on one soon), so keep what you made each piece from: see [When M3AT's body changes](Apparel.md#when-m3ats-body-changes).
+M3AT is in early development and its body is liable to change between updates (we aim to settle on one soon), so keep what you made each piece from: see [When M3AT's body changes](Apparel.md#when-m3ats-body-changes). Apparel is likely to break when the body is redone, most of all garments made by pushing out the body's own faces, since those faces will change. The whole system for player-made clothing (and gene parts) is at a very early stage, and we're looking to make it easier and more robust soon.
 
 In short: put `garment_<Name>.txt` files (and their images) in a folder named `M3ATgarments` at your mod's root. Each file gives a mesh's shape and which apparel or genes it is for. M3AT fits the rest to its body in the game.

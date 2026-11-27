@@ -2,7 +2,7 @@
 
 A **gene part** is a mesh M3AT draws on the chibi while the pawn has a certain gene: spikes down the back, scales on the arms, a bony crest, tusks, a tail of armour plates. It is made exactly like a garment ([Apparel.md](Apparel.md)) and goes in the same `M3ATgarments` folder. The only difference is that it names genes instead of apparel.
 
-Read [Apparel.md](Apparel.md) first, especially **Keep it low poly** and **The garment kit for Blender**. M3AT's body is liable to change between updates, and a gene part that sits close to the skin may need exporting again: see [When M3AT's body changes](Apparel.md#when-m3ats-body-changes).
+Read [Apparel.md](Apparel.md) first, especially **Keep it low poly** and **The garment kit for Blender**. M3AT's body is liable to change between updates, but gene parts are not sensitive to changes in the body's faces, so they are likely to be fine when the body is redone. One that sits very close to the skin may still need exporting again: see [When M3AT's body changes](Apparel.md#when-m3ats-body-changes). Gene parts are made with the same early-stage system as player-made clothing, which we're looking to make easier and more robust soon.
 
 ## What M3AT already draws
 
