@@ -117,6 +117,17 @@ namespace M3AT
         {
             return EyeOf(pawn);
         }
+
+        // The body keys the pawn's shape is made of, as "key=amount, ..." (the ownframe autotest).
+        internal static string ShapeKeysForTest(Pawn pawn)
+        {
+            if (skin == null)
+            {
+                return "(the chibi not loaded yet)";
+            }
+            SkinnedFigure.Shape shape = ShapeFor(pawn);
+            return shape.mix == null ? "base" : string.Join(", ", shape.mix.ConvertAll(k => k.Key + "=" + k.Value.ToString("0.00")));
+        }
 #endif
 
         // The provider IsoRim asks (main thread only): null for a pawn not drawn by the chibi, or not drawn yet as doing what

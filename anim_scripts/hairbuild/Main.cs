@@ -252,6 +252,7 @@ namespace M3AT
             HairBuilder.ForeOn = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("M3AT_NO_FORE"));
             HairBuilder.FringeOn = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("M3AT_NO_FRINGE"));
             HairBuilder.HugOn = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("M3AT_NO_HUG"));
+            HairBuilder.BeardlessOn = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("M3AT_NO_BEARDLESS"));   // a beard drawn into the hair cleared
             if (int.TryParse(Environment.GetEnvironmentVariable("M3AT_HUG_GAP"), out int hugGap)) HairBuilder.HugGap = hugGap;
             if (float.TryParse(Environment.GetEnvironmentVariable("M3AT_EYE_MATCH"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float eyeMatch)) HairBuilder.EyeMatch = eyeMatch;
             if (int.TryParse(Environment.GetEnvironmentVariable("M3AT_FRINGE_GAP"), out int fringeGap)) HairBuilder.FringeGap = fringeGap;
@@ -313,6 +314,10 @@ namespace M3AT
                 if (builder.lastLineUp != 0)
                 {
                     Console.WriteLine("LINEUP " + style + ": front and back sprites " + builder.lastLineUp + " px apart, each moved half way onto the head");
+                }
+                if (builder.lastBeardless != 0)
+                {
+                    Console.WriteLine("BEARDLESS " + style + ": " + builder.lastBeardless + " px of a beard drawn into the hair cleared");
                 }
                 if (builder.lastHug != 0)
                 {

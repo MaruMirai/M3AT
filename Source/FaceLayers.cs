@@ -666,6 +666,43 @@ namespace M3AT
         // The lid cover (mode 5) is drawn as its colour times its mask, so with the coat multiplied into the mask's colour it
         // comes out as the coat under it rather than a flat strip of the skin's colour across the eyes.
         internal static Color32[] Coat;
+        // The skin colour the model's head is drawn in (WalkFigures.SkinOf), set by WalkFigures around its Draw, else null.
+        // Facial Animation colours the lid cover in the plain skin colour, but another race's head is drawn in that times its
+        // body sprite's tint (SkinTint.cs), so the cover came out as a pale patch round each eye (Wolfein, Ratkin).
+        internal static Color? Skin;
+        internal static bool TestFaCover;   // racecovers autotest: the lid cover in Facial Animation's colour, as it was
+
+        // The lid cover's colour: the head's, rounded as IsoRim rounds the tint of the head under it (DynamicModels.PartsFor),
+        // so the two match exactly; Facial Animation's own (from) where the head's isn't known.
+        private static Color CoverColour(Color from)
+        {
+            Color32 c = Skin.HasValue && !TestFaCover ? new Color(Skin.Value.r, Skin.Value.g, Skin.Value.b, from.a) : from;
+            c.r = (byte)(c.r & 0xF8);
+            c.g = (byte)(c.g & 0xF8);
+            c.b = (byte)(c.b & 0xF8);
+            return c;
+        }
+        // The head's cover (blush, cold, hot) and the emotions Facial Animation colours in the plain skin colour: drawn in the
+        // head's (Skin) instead when SkinOverlays is on. Off until seen to look better (racecovers autotest compares).
+        internal static bool SkinOverlays;
+        private static Color drawSkinFrom;   // the pawn's plain skin colour, Facial Animation's, for this Draw
+
+        private static Color OverlayColour(string kind, string layer, int mode, Color from)
+        {
+            if (!SkinOverlays || !Skin.HasValue || mode == ModeLidCover || mode == ModeGlow)
+            {
+                return from;
+            }
+            if (!(kind == "HeadControllerComp" && layer == "Cover") && kind != "EmotionControllerComp")
+            {
+                return from;
+            }
+            if (Mathf.Abs(from.r - drawSkinFrom.r) > 0.01f || Mathf.Abs(from.g - drawSkinFrom.g) > 0.01f || Mathf.Abs(from.b - drawSkinFrom.b) > 0.01f)
+            {
+                return from;   // in a colour of its own (hair, white): left alone
+            }
+            return new Color(Skin.Value.r, Skin.Value.g, Skin.Value.b, from.a);
+        }
         private static readonly Dictionary<(Texture, Color32[]), Texture> coated = new Dictionary<(Texture, Color32[]), Texture>();
 
         private static Texture CoatedMask(Texture mask)
@@ -737,12 +774,7 @@ namespace M3AT
             m.color = source.color;
             if (mode == ModeLidCover)
             {
-                // Rounded as IsoRim rounds the tint of the head under it (DynamicModels.PartsFor), so the two match exactly.
-                Color32 c = source.color;
-                c.r = (byte)(c.r & 0xF8);
-                c.g = (byte)(c.g & 0xF8);
-                c.b = (byte)(c.b & 0xF8);
-                m.color = c;
+                m.color = CoverColour(source.color);
             }
             if (mode == ModeComplex)
             {
@@ -769,6 +801,7 @@ namespace M3AT
             {
                 return;   // a content pack drew this race's face (ExpansionApi 2)
             }
+            drawSkinFrom = pawn.story != null ? pawn.story.SkinColor : Color.white;
             TakeEyeFit(pawn);   // its eyes' layers fitted to a human's (FaceGaze.cs), whichever comes first
             drawMouthScale = 1f;
             drawMouthShape = 1f;
@@ -837,6 +870,13 @@ namespace M3AT
                     Graphic g = node.GraphicFor(pawn);
                     overrideRotField.SetValue(node, rot);   // as it was, for the game's own drawing (portraits)
                     string kind = f.kinds[i];
+#if AUTOTEST
+                    if (noting)
+                    {
+                        TestPaths.Add(kind.Replace("ControllerComp", "") + "/" + f.layers[i] + " (" + node.GetType().Name + "): "
+                            + (g == null ? "none" : (g.path ?? "?").Replace("\0", " + ")));
+                    }
+#endif
                     Vector2 shift = ShiftOf(node, g, kind, f.layers[i]);
                     if (kind == "MouthControllerComp")
                     {
@@ -1054,14 +1094,10 @@ namespace M3AT
                     continue;
                 }
                 // Its colours and mask as LitFor gives its own material.
-                Color colour = gm.color;
+                Color colour = OverlayColour(call.kind, call.layer, mode, gm.color);
                 if (mode == ModeLidCover)
                 {
-                    Color32 c = gm.color;
-                    c.r = (byte)(c.r & 0xF8);
-                    c.g = (byte)(c.g & 0xF8);
-                    c.b = (byte)(c.b & 0xF8);
-                    colour = c;
+                    colour = CoverColour(gm.color);
                 }
                 Color two = mode == ModeComplex && gm.HasProperty(ShaderPropertyIDs.ColorTwo) ? gm.GetColor(ShaderPropertyIDs.ColorTwo) : Color.white;
                 Texture mask = null;
@@ -1395,6 +1431,10 @@ namespace M3AT
                 * Matrix4x4.Scale(new Vector3(grow, grow, grow))
                 * Matrix4x4.Translate(-patch.centre);
             Material mat = mode >= 0 ? LitFor(gm, mode, place) : gm;   // a shader not known here: Facial Animation's own, unlit
+            if (mode >= 0)
+            {
+                mat.color = OverlayColour(kind, layer, mode, mat.color);
+            }
             if (mode >= 0 && kind == "MouthControllerComp")
             {
                 mat.mainTexture = MouthTexture(g, gm.mainTexture, layer);   // a soft mouth inked (FaceRestyle.cs)
@@ -1768,6 +1808,7 @@ namespace M3AT
         private const float PhraseRest = 0.4f;
         private static float talkClock;
 #if AUTOTEST
+        internal static readonly List<string> TestPaths = new List<string>();   // racefaces: each layer's texture path, as drawn
         internal static string TestHeadShape, TestEmotionShape;   // humanfaces: the head's cover (blush) and the emotion forced (FaceAreas.cs)
         internal static bool TestNoAreas;   // and drawn with no eye or mouth areas split off, to compare
         internal static bool TestMouthOpen;   // the autotest's beard: the open mouth shape forced, to see it under a beard

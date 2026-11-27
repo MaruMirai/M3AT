@@ -2,6 +2,7 @@
 // reports how they came out, so a garment can be checked without starting the game.
 //
 //   RimWorld.dll <chibi folder> [--compare] [--write folder] <garment.txt> [...]
+//   RimWorld.dll <chibi folder> --outfit <garment name> [...]   (outer first: a person in them, counted as made)
 //
 // Each file is read and fitted as SkinnedFigure.ReadModGarment does (its weights, every body key and the body triangles
 // it hides, unless its body line is this body's). --compare first takes the file's own w, key and hide lines (this
@@ -35,6 +36,45 @@ namespace M3AT
             s.pieces = new[] { body };
             s.ReadBoneNames(Path.Combine(folder, "anim.txt"));
             return s;
+        }
+
+        // The triangles a person in these garments of the folder's draws (outer garment first: each one goes over those after
+        // it), as DrawnTriangles counts a worn outfit in the game, but from the files as made, before any mod changes them as
+        // they are read. A development count (the About poly counts message no longer shows an outfit, since Nov 2026).
+        internal string HarnessOutfit(List<string> names)
+        {
+            List<Piece> all = new List<Piece> { pieces[0] };
+            foreach (string name in names)
+            {
+                Piece g = ReadMesh(Path.Combine(folder, "garment_" + name + ".txt"), false, null);
+                if (turnRound)
+                {
+                    TurnRound(g.tris);
+                }
+                all.Add(g);
+            }
+            pieces = all.ToArray();
+            GarmentMask mask = 0;
+            for (int g = 1; g < pieces.Length; g++)
+            {
+                mask |= GarmentBit(g);
+            }
+            int body = BodyTris(mask, 0).Length / 3, sum = body;
+            StringBuilder r = new StringBuilder();
+            r.AppendFormat("body {0} of {1}\n", body, pieces[0].tris.Length / 3);
+            for (int g = 1; g < pieces.Length; g++)
+            {
+                GarmentMask over = 0;
+                for (int h = 1; h < g; h++)
+                {
+                    over |= GarmentBit(h);
+                }
+                int kept = GarmentTris(g, over).Length / 3;
+                sum += kept;
+                r.AppendFormat("{0} {1} of {2}\n", names[g - 1], kept, pieces[g].tris.Length / 3);
+            }
+            r.AppendFormat("outfit {0}\n", sum);
+            return r.ToString();
         }
 
         internal string HarnessFit(string path, bool compare, string writeTo)
@@ -183,13 +223,19 @@ namespace M3AT
             try
             {
                 List<string> files = new List<string>();
-                bool compare = false;
+                bool compare = false, outfit = false;
                 string writeTo = null;
                 for (int i = 1; i < argv.Length; i++)
                 {
                     if (argv[i] == "--compare") compare = true;
+                    else if (argv[i] == "--outfit") outfit = true;
                     else if (argv[i] == "--write") writeTo = argv[++i];
                     else files.Add(argv[i]);
+                }
+                if (outfit && files.Count > 0)
+                {
+                    Console.Write(SkinnedFigure.HarnessFigure(argv[0]).HarnessOutfit(files));
+                    return 0;
                 }
                 if (argv.Length < 2 || files.Count == 0)
                 {

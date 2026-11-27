@@ -6,7 +6,7 @@
 
 ![M3AT preview](M3AT%3A%20Maru%27s%203D%20Animated%20Toons/About/Preview.png)
 
-Early WIP, Main features:
+WIP, Main features:
 
 - Animations for most actions (some currently basic)
 - Wearable 3D apparel and sprite-to-3D hair

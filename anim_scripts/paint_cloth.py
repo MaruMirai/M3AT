@@ -4,7 +4,7 @@ read as plastic, and with no texture places of their own the game can't lay anot
 (Source/SpriteClothes.cs projects an apparel's own sprites into these UVs and multiplies this texture's detail back in).
 
     blender -b Models/pawnHumanRig.blend --python anim_scripts/paint_cloth.py -- <garment.glb> [...] [--size 512]
-        [--keep folder] [--preview folder]
+        [--keep folder] [--preview folder] [--kind kind]
 
 Each .glb is rewritten in place (a copy first into --keep, Models/unused/ by default, as <name>_beforePaint.glb, unless
 one is there already): welded, unwrapped by Smart UV Project (its old UVs were the body's atlas, using a few per cent of
@@ -23,6 +23,10 @@ argv = sys.argv[sys.argv.index('--') + 1:]
 SIZE = 512
 keep_dir = 'Models/unused'
 preview_dir = None
+force_kind = None   # --kind <kind>: paint every garment given as that kind (KINDS' second words), whatever its name; with a
+                    # Meshy-textured garment remade from the body's faces (its UVs the body's atlas, a few per cent of the
+                    # image), it gives the new mesh an unwrap of its own for carry_texture.py to paint, the cloth image
+                    # then replaced (2026-11-27: the shirts, jackets, vests, Corset, KidRomper and TribalA)
 files = []
 i = 0
 while i < len(argv):
@@ -30,6 +34,8 @@ while i < len(argv):
         SIZE = int(argv[i + 1]); i += 2
     elif argv[i] == '--keep':
         keep_dir = argv[i + 1]; i += 2
+    elif argv[i] == '--kind':
+        force_kind = argv[i + 1]; i += 2
     elif argv[i] == '--preview':
         preview_dir = argv[i + 1]; i += 2
     else:
@@ -375,7 +381,7 @@ def paint_file(path):
             bpy.data.objects.remove(o)
         return
     g = meshes[0]
-    kind = kind_of(g.name) or kind_of(name[:1].upper() + name[1:])
+    kind = force_kind or kind_of(g.name) or kind_of(name[:1].upper() + name[1:])
     if kind is None:
         print('PAINT %s: no kind for %s, left alone' % (name, g.name))
         for o in new:

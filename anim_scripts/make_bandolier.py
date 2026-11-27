@@ -28,7 +28,14 @@ from mathutils.bvhtree import BVHTree
 
 argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
 bag = '--bag' in argv
-argv = [a for a in argv if a != '--bag']
+over = '--over' in argv
+argv = [a for a in argv if a not in ('--bag', '--over')]
+# The drawn Bandolier (Models/garments/Bandolier.glb, a plain strap of 146 triangles) is not this script's (rounds, a
+# pouch, 542): checked 2026-11-27. Only --bag (the ShoulderBag, which it makes exactly) is still in use; the bandolier
+# itself is made only with --over, so a run can't replace the drawn one by mistake.
+if not bag and not over:
+    sys.exit('make_bandolier.py: the drawn Bandolier is not this script\'s; give --bag for the ShoulderBag, or --over to '
+             'make the bandolier anyway')
 if not argv:
     sys.exit('make_bandolier.py: give an out.glb')
 out_glb = os.path.abspath(argv[0])

@@ -40,10 +40,6 @@
   <M3AT_OtherRacesTip>Pawns of modded races (Ratkin, Milira and the like) are drawn as animated 3D pawns rather than flat pictures, unless an IsoRim pack already gives the race a 3D look. They get the race's skin colour, hair, clothes and face, and with the option below its ears, tails and the like. IsoRim's "Keep as paper" list still keeps any race flat.</M3AT_OtherRacesTip>
   <M3AT_RaceParts>Race parts from their pictures</M3AT_RaceParts>
   <M3AT_RacePartsTip>A modded race's ears, tails, horns, wings and the like are made into 3D shapes from the race's own pictures, so the race keeps its look on 3D pawns. They are rough stand-ins: a part that is thin in life may come out thick.</M3AT_RacePartsTip>
-  <M3AT_RaceModels>Modelled ears and tails for popular races</M3AT_RaceModels>
-  <M3AT_RaceModelsTip>Ratkin and Wolfein get ears and tails modelled for them, which move like the gene ears and tails, in place of the shapes made from their pictures.</M3AT_RaceModelsTip>
-  <M3AT_FullDetailGarments>Keep mods' garments at full detail</M3AT_FullDetailGarments>
-  <M3AT_FullDetailGarmentsTip>Garments from other mods with more triangles than M3AT's budget ({0} for clothes, {1} for anything worn on the head) are simplified as they load, as every triangle is drawn for every pawn wearing it each frame. Tick to keep them as their makers made them, up to {2} triangles. Simplified this session: {3}; the bug report names them. Takes effect after a restart.</M3AT_FullDetailGarmentsTip>
   <M3AT_RaceMouthInk>Crisper mouths</M3AT_RaceMouthInk>
   <M3AT_RaceMouthInkTip>Soft, painted mouths (Facial Animation - Experimentals' own and modded races') are redrawn with dark outlines and without their pale glow and lip shading, so they read on the large 3D face. Faces already drawn with hard lines, such as Facial Animation - Retexture's, keep their lines.</M3AT_RaceMouthInkTip>
   <M3AT_MouthSizeFit>Fit mouth sizes</M3AT_MouthSizeFit>
@@ -124,6 +120,8 @@
   <M3AT_FirstPersonEyeTip>IsoRim's first person looks out from where the pawn's eyes are drawn, so lower for a child and higher for a tall adult, and lower when sitting, lying or swimming. Off: IsoRim's own eye height setting is used for everyone. Needs a recent IsoRim.</M3AT_FirstPersonEyeTip>
   <M3AT_ClothesOcclusion>Occlusion and shadows on clothes</M3AT_ClothesOcclusion>
   <M3AT_ClothesOcclusionTip>With IsoRim's ambient occlusion or screen-space shadows on, clothes and hair are darkened in their creases and by shadows as the rest of the world is. It picks out their flat faces, so they look less smooth. Off: pawns are left out of both, though they still cast shadows. Skin and faces are always left out, as it spoils the eyes.</M3AT_ClothesOcclusionTip>
+  <M3AT_ClothesOcclusionStrength>Strength on clothes</M3AT_ClothesOcclusionStrength>
+  <M3AT_ClothesOcclusionStrengthTip>How much of IsoRim's ambient occlusion and screen-space shadows clothes and hair take. Lower softens the dark patches it leaves in creases and on flat faces; 100% is the same as the rest of the world.</M3AT_ClothesOcclusionStrengthTip>
   <M3AT_Combat>Combat</M3AT_Combat>
   <M3AT_Ragdolls>Ragdolls</M3AT_Ragdolls>
   <M3AT_RagdollsTip>Pawns knocked down or killed where they stand fall limp under their own weight and lie as they land. Off: they play a set fall instead.</M3AT_RagdollsTip>
@@ -155,15 +153,15 @@
   <M3AT_OutlineDetailHeader>Screen-space outline detail</M3AT_OutlineDetailHeader>
   <M3AT_OutlineDetailIntro>Only for the screen-space outline style. Each line is found by looking round every pixel near a pawn for a nearer part. These set how hard it looks: more is smoother lines close up but costs more frame time when a pawn fills the screen. At the usual play distance they make little difference.</M3AT_OutlineDetailIntro>
   <M3AT_OutlineReach>Close-up width limit (pixels)</M3AT_OutlineReach>
-  <M3AT_OutlineReachTip>The widest a line can be drawn, in pixels on a 1080-row screen (more on a taller one). Zoomed in past where the widths above reach it, the lines stay this wide, so those sliders change nothing there. Lower: thinner lines when zoomed right in, and cheaper. Fast and Detailed below set it too. Default: {0}.</M3AT_OutlineReachTip>
+  <M3AT_OutlineReachTip>The widest a line can be drawn, in pixels on a 1080-row screen (more on a taller one). Zoomed in past where the widths above reach it, the lines stay this wide, so those sliders change nothing there. Lower: thinner lines when zoomed right in, and cheaper. The Default and Faster buttons below set it too. Default: {0}.</M3AT_OutlineReachTip>
   <M3AT_OutlineProbeDirs>Quick look points</M3AT_OutlineProbeDirs>
   <M3AT_OutlineProbeDirsTip>Before the full search, a few pixels round each one are checked to see whether a line could be there at all. More points: fewer gaps at thin parts and corners, but slower. Default: {0}.</M3AT_OutlineProbeDirsTip>
   <M3AT_OutlineProbeRings>Quick look rings</M3AT_OutlineProbeRings>
   <M3AT_OutlineProbeRingsTip>How many rings of those points, from the widest line in toward the pixel. More: catches small parts better, but slower. Default: {0}.</M3AT_OutlineProbeRingsTip>
   <M3AT_OutlineRings>Search rings</M3AT_OutlineRings>
   <M3AT_OutlineRingsTip>The most rings the full search looks at round a pixel. More: wide lines close up have smooth edges rather than steps and notches at corners, but cost the most. Default: {0}.</M3AT_OutlineRingsTip>
-  <M3AT_OutlineDetailFast>Fast (default)</M3AT_OutlineDetailFast>
-  <M3AT_OutlineDetailDetailed>Detailed</M3AT_OutlineDetailDetailed>
+  <M3AT_OutlineDetailFast>Default</M3AT_OutlineDetailFast>
+  <M3AT_OutlineDetailFaster>Faster</M3AT_OutlineDetailFaster>
   <M3AT_FewerPoses>Fewer updates with many pawns</M3AT_FewerPoses>
   <M3AT_FewerPosesTip>When many pawns are in view they are animated less often, giving a stop-motion like effect. Reduces M3AT's performance overhead around 6–9%. Off: Pawn animated as normal. (Default)</M3AT_FewerPosesTip>
   <M3AT_BenchmarkButton>Benchmark M3AT impact</M3AT_BenchmarkButton>
@@ -296,6 +294,7 @@ Before you start, point the camera at your colonists the way you usually play an
   <M3AT_ClothesNotDrawn>not drawn</M3AT_ClothesNotDrawn>
   <M3AT_ClothesMenuNone>Don't draw it</M3AT_ClothesMenuNone>
   <M3AT_ClothesPaint>Paint with its own art</M3AT_ClothesPaint>
+  <M3AT_PackPaint>M3AT Retexture</M3AT_PackPaint>
   <M3AT_ClothesPaintTip>Paint the garment with this clothing's own sprites, as the "Paint stand-in clothes with their own art" option does. Untick it if the art comes out wrong on this one: it is then drawn in the garment's plain texture in the clothing's colour.</M3AT_ClothesPaintTip>
   <M3AT_ClothesHelp>Changes show at once, on everyone wearing that piece of clothing, in every game. "Add another" draws two together, such as a shirt and trousers for a one-piece suit. Clear them all in the mod options.</M3AT_ClothesHelp>
   <M3AT_ClothesClearAll>Clear clothing choices ({0})</M3AT_ClothesClearAll>
@@ -376,22 +375,35 @@ Before you start, point the camera at your colonists the way you usually play an
   <M3AT_TabOptions>Options</M3AT_TabOptions>
   <M3AT_TabContent>Content</M3AT_TabContent>
   <M3AT_TabContentCount>Content ({0})</M3AT_TabContentCount>
-  <M3AT_ContentTitle>Content packs</M3AT_ContentTitle>
-  <M3AT_ContentIntro>Mods that give M3AT's figures their own ears, tails, faces, hair or clothes. For each part, choose whether the pack's or M3AT's own is drawn. Changes show at once and are kept for every game.</M3AT_ContentIntro>
+  <M3AT_ContentTitle>M3AT content manager</M3AT_ContentTitle>
+  <M3AT_PolyAbout>About poly counts</M3AT_PolyAbout>
+  <M3AT_PolyAboutTip>Why the poly counts shown here matter, and what is light or heavy.</M3AT_PolyAboutTip>
+  <M3AT_PolyAboutTitle>About poly counts</M3AT_PolyAboutTitle>
+  <M3AT_PolyAboutText>Models with higher poly counts are performance heavy on M3AT's animation system with little visual benefit.\n\n&lt;b&gt;M3AT's counts, for reference&lt;/b&gt;\n  Pawn body: {0} polys\n  Shirt: {1}\n  Duster: {2}\n  Power armour: {3}\n  Cat ears pair: {4}{5}\n\nM3AT automatically reduces extreme poly counts to more reasonable levels (set in Auto Optimization), but content created as optimized will provide the best performance and looks.\n\nMaking something for M3AT? M3AT's apparel guides (in the mod's Docs folder) can help you or an AI do it in the best way.</M3AT_PolyAboutText>
+  <M3AT_PolyAboutGuides>Open the guides folder</M3AT_PolyAboutGuides>
+  <M3AT_PolyAboutBodyChanged>The body in use has been changed by {0}: {1} polys.</M3AT_PolyAboutBodyChanged>
+  <M3AT_BodyCopy>M3AT is running from {0}'s own copy of it, so the body and garments drawn are that mod's and may differ from M3AT's.</M3AT_BodyCopy>
+  <M3AT_BodyCopyChanged>M3AT is running from {0}'s own copy of it, whose body has been changed: {1} polys (M3AT's: {2}).</M3AT_BodyCopyChanged>
   <M3AT_ContentButton>M3AT button on the bottom bar</M3AT_ContentButton>
-  <M3AT_ContentButtonTip>Shows an M3AT button on the bottom bar in game while content packs are active, which opens this list over the map.</M3AT_ContentButtonTip>
+  <M3AT_ContentButtonTip>Shows an M3AT button on the bottom bar in game while content packs are active, which opens the Content tab's list of packs over the map.</M3AT_ContentButtonTip>
   <M3AT_ContentNotLoaded>Content packs are found once M3AT's figures have loaded: open a game in the 3D view first.</M3AT_ContentNotLoaded>
   <M3AT_ContentNone>No content packs are active. A content pack is a mod that gives M3AT's figures their own parts or clothes; modders can see Docs/RacePacks.md in M3AT's folder.</M3AT_ContentNone>
   <M3AT_ContentSummary>{0} · {1} garments · races: {2}</M3AT_ContentSummary>
-  <M3AT_ContentReset>Reset this pack</M3AT_ContentReset>
   <M3AT_ContentItems>Items ({0})</M3AT_ContentItems>
   <M3AT_ContentCompatLine>Content packs (mods with their own parts or clothes for M3AT): see the Content tab at the top.</M3AT_ContentCompatLine>
-  <M3AT_ContentNew>Content from {0} is in use. Choose the pack's or M3AT's own for each part with the M3AT button on the bottom bar, or the Content tab of M3AT's options.</M3AT_ContentNew>
+  <M3AT_NoticeTitle>M3AT content manager</M3AT_NoticeTitle>
+  <M3AT_NoticeText>M3AT has a content manager for mods that add content to its 3D figures. In it you can choose, part by part, which content is drawn.\n\nThe content manager opens from the M3AT button on the bottom bar or the Content tab of M3AT's options.</M3AT_NoticeText>
+  <M3AT_NoticeOpen>Open the content manager</M3AT_NoticeOpen>
+  <M3AT_NoticeClose>Close</M3AT_NoticeClose>
   <M3AT_SourcePack>The pack's</M3AT_SourcePack>
   <M3AT_SourceM3AT>M3AT's</M3AT_SourceM3AT>
-  <M3AT_SourceDefault>{0} (default)</M3AT_SourceDefault>
-  <M3AT_SourceMenuDefault>Default ({0})</M3AT_SourceMenuDefault>
-  <M3AT_Part_EarsTail>Ears and tail</M3AT_Part_EarsTail>
+  <M3AT_ContentDefaultTip>This is the default.</M3AT_ContentDefaultTip>
+  <M3AT_ContentCellPackTip>Draw the pack's for this part.</M3AT_ContentCellPackTip>
+  <M3AT_ContentCellM3ATTip>Draw M3AT's own for this part.</M3AT_ContentCellM3ATTip>
+  <M3AT_ContentEveryPart>Every part</M3AT_ContentEveryPart>
+  <M3AT_ContentEveryPartTip>Sets every part of this pack at once. On when every part is drawn from that side, neither while they are mixed.</M3AT_ContentEveryPartTip>
+  <M3AT_ContentAllPackTip>Draw the pack's for every part of this pack.</M3AT_ContentAllPackTip>
+  <M3AT_ContentAllM3ATTip>Draw M3AT's own for every part of this pack.</M3AT_ContentAllM3ATTip>
   <M3AT_Part_Face>Face</M3AT_Part_Face>
   <M3AT_Part_Hair>Hair</M3AT_Part_Hair>
   <M3AT_Part_HeadwearFit>Hats over hair and ears</M3AT_Part_HeadwearFit>
@@ -401,26 +413,172 @@ Before you start, point the camera at your colonists the way you usually play an
   <M3AT_Part_GeneParts>Gene parts</M3AT_Part_GeneParts>
   <M3AT_Part_Poses>Poses</M3AT_Part_Poses>
   <M3AT_Part_Other>Other changes</M3AT_Part_Other>
-  <M3AT_PartTip_EarsTail>The race's ears and tail. M3AT's own are built from the race's pictures, or modelled for a few popular races.</M3AT_PartTip_EarsTail>
   <M3AT_PartTip_Face>The face. M3AT's is Facial Animation's, fitted to the figure; a race with no Facial Animation faces has none.</M3AT_PartTip_Face>
   <M3AT_PartTip_Hair>The hair. M3AT builds it from the race's hair pictures.</M3AT_PartTip_Hair>
   <M3AT_PartTip_HeadwearFit>How hats and helmets sit over the hair and ears.</M3AT_PartTip_HeadwearFit>
   <M3AT_PartTip_BodyShape>Changes to the figure's body shape for the race.</M3AT_PartTip_BodyShape>
   <M3AT_PartTip_SkinColour>The skin colour. M3AT's follows the colour the game shows for the race.</M3AT_PartTip_SkinColour>
   <M3AT_PartTip_Clothing>The pack's garments for its clothing, or M3AT's closest garments painted with the clothing's art. Items opens the list, to choose for each piece.</M3AT_PartTip_Clothing>
-  <M3AT_PartTip_GeneParts>Parts the pack draws for genes, in place of M3AT's cat ears, tails and horns.</M3AT_PartTip_GeneParts>
+  <M3AT_PartTip_GeneParts>The race's ears and tail, and parts drawn for genes (ears, tails, horns, scales and the like). M3AT's own are its models where it has them (a few popular races, cat ears, tails and horns), and elsewhere stand-ins built from the race's pictures. The pack's: on the pack's races only the pack's are drawn, and elsewhere its gene parts take the place of M3AT's.</M3AT_PartTip_GeneParts>
   <M3AT_PartTip_Poses>Poses and animations the pack adds.</M3AT_PartTip_Poses>
   <M3AT_PartTip_Other>Other changes the pack makes to how M3AT draws.</M3AT_PartTip_Other>
-  <M3AT_HintNoFace>M3AT has no face for this race: drawn without one.</M3AT_HintNoFace>
-  <M3AT_HintBuiltEars>M3AT builds them from the race's pictures.</M3AT_HintBuiltEars>
-  <M3AT_HintArmour>Armour and helmets are drawn as M3AT's by default; choose per item.</M3AT_HintArmour>
+  <M3AT_HintNoFace>Facial Animation has no face for this race, so it is drawn without one. Download a Facial Animation face pack for this race (for example from the Steam Workshop) to give it a face.</M3AT_HintNoFace>
+  <M3AT_HintBuiltEars>M3AT builds them from the race's pictures. An early prototype: rougher than M3AT's other automatic parts.</M3AT_HintBuiltEars>
+  <M3AT_HintArmour>M3AT's own armour and helmets. The first packs' helmets covered the face.</M3AT_HintArmour>
+  <M3AT_HintMatchedArmour>M3AT has no models of its own for some of this pack's armour and helmets: each is drawn as the closest match among M3AT's garments.</M3AT_HintMatchedArmour>
+  <M3AT_NoteMatchedArmour>Automatched</M3AT_NoteMatchedArmour>
+  <M3AT_HintModelEars>M3AT's own models of this race's ears and tail.</M3AT_HintModelEars>
+  <M3AT_NoteModelEars>Custom models</M3AT_NoteModelEars>
+  <M3AT_HintMatchedClothes>M3AT has no models of its own for this pack's clothes: each is drawn as the closest match among M3AT's garments.</M3AT_HintMatchedClothes>
+  <M3AT_NoteMatchedClothes>Automatched</M3AT_NoteMatchedClothes>
+  <M3AT_NoteNoFace>FA face required</M3AT_NoteNoFace>
+  <M3AT_HintFace>Facial Animation has faces for this race, fitted to the figure.</M3AT_HintFace>
+  <M3AT_NoteFace>Available</M3AT_NoteFace>
+  <M3AT_NoteBuiltEars>Autogenerated (WIP)</M3AT_NoteBuiltEars>
+  <M3AT_HintHair>M3AT builds the hair from the race's hair pictures.</M3AT_HintHair>
+  <M3AT_NoteHair>Autogenerated</M3AT_NoteHair>
+  <M3AT_HintHeadwearFit>M3AT's own fit of hats and helmets over the hair and ears.</M3AT_HintHeadwearFit>
+  <M3AT_NoteHeadwearFit>–</M3AT_NoteHeadwearFit>
+  <M3AT_HintSkinColour>M3AT's follows the colour the game shows for the race.</M3AT_HintSkinColour>
+  <M3AT_NoteSkinColour>–</M3AT_NoteSkinColour>
+  <M3AT_PartPolysTip>The pack's {0} pieces for this part average {1} polys each. M3AT's budget for them averages {2}: green is well within it, amber within it, red over.</M3AT_PartPolysTip>
+  <M3AT_PartPolysCutTip>The pack's {0} pieces for this part average {1} polys each as drawn, auto-optimized from {2} as made. M3AT's budget for them averages {3}: green is well within it, amber within it, red over.</M3AT_PartPolysCutTip>
+  <M3AT_ColPack>Pack</M3AT_ColPack>
+  <M3AT_ColM3AT>M3AT</M3AT_ColM3AT>
+  <M3AT_ColMade>Pack</M3AT_ColMade>
+  <M3AT_ColMade2>Avg polys →</M3AT_ColMade2>
+  <M3AT_ColMade3>Auto optimized to</M3AT_ColMade3>
+  <M3AT_ColMadeTip>The pack's pieces for each part, their average polys. Where M3AT had to cut them down (Auto Optimization), the first figure is what the pack made them with (red if that was over M3AT's budget, grey if not) and the coloured one, after the arrow, what M3AT draws. Green is well within M3AT's budget, amber within it, red over.</M3AT_ColMadeTip>
+  <M3AT_ColPolys>M3AT</M3AT_ColPolys>
+  <M3AT_ColPolys2>Avg polys</M3AT_ColPolys2>
+  <M3AT_ColPolysTip>M3AT's own for the same part, their average polys: the garments M3AT draws for the pack's items, or its models of the race's ears and tail.</M3AT_ColPolysTip>
+  <M3AT_ColNote>M3AT</M3AT_ColNote>
+  <M3AT_ColNote2>Support status</M3AT_ColNote2>
+  <M3AT_OursPolysTip>For the pack's {0} items M3AT draws its own garment or the closest match: {1} polys on average.</M3AT_OursPolysTip>
+  <M3AT_OursPartsTip>M3AT's own models of the race's ears and tail ({0}): {1} polys on average.</M3AT_OursPartsTip>
+  <M3AT_OursBuiltTip>M3AT builds these from the race's pictures the first time one is drawn, cutting each down to about {0} polys (an ear, tuft or horn) or {1} (a tail): shown is their mean.</M3AT_OursBuiltTip>
+  <M3AT_ContentDetails>Details</M3AT_ContentDetails>
+  <M3AT_ContentFold>Hide the pack's details.</M3AT_ContentFold>
+  <M3AT_ContentUnfold>Show the pack's details: what it changes, its costs in full, and Measure now.</M3AT_ContentUnfold>
+  <M3AT_CostPackShort>avg {0} polys</M3AT_CostPackShort>
   <M3AT_PackClothesTitle>{0}: clothing</M3AT_PackClothesTitle>
   <M3AT_ItemPack>the pack's garment</M3AT_ItemPack>
   <M3AT_ItemM3AT>M3AT's: {0}</M3AT_ItemM3AT>
   <M3AT_ItemNone>not drawn</M3AT_ItemNone>
   <M3AT_ItemDefault>Drawn as {0}</M3AT_ItemDefault>
-  <M3AT_ItemMenuPack>The pack's garment</M3AT_ItemMenuPack>
-  <M3AT_ItemMenuM3AT>M3AT's automatic ({0})</M3AT_ItemMenuM3AT>
+  <M3AT_ItemCustom>Custom…</M3AT_ItemCustom>
+  <M3AT_ItemCellPackTip>Draw the pack's own garment for this item.</M3AT_ItemCellPackTip>
+  <M3AT_ItemCellM3ATTip>Draw M3AT's automatic match for this item: {0}.</M3AT_ItemCellM3ATTip>
+  <M3AT_ItemCellCustomTip>Pick any of M3AT's garment models for this item, or none.</M3AT_ItemCellCustomTip>
+  <M3AT_ItemCellCustomOnTip>Drawn as {0}, your pick. Click to pick another.</M3AT_ItemCellCustomOnTip>
+  <M3AT_ItemsAllPack>All the pack's</M3AT_ItemsAllPack>
+  <M3AT_ItemsAllM3AT>All M3AT's</M3AT_ItemsAllM3AT>
+  <M3AT_ItemsAllPackTip>Every item below drawn as the pack's own garment (custom picks too).</M3AT_ItemsAllPackTip>
+  <M3AT_ItemsAllM3ATTip>Every item below drawn as M3AT's automatic match (custom picks too).</M3AT_ItemsAllM3ATTip>
+  <M3AT_ItemsCustomHead>Custom: per item</M3AT_ItemsCustomHead>
   <M3AT_PackPaintTip>Paint the pack's garment with this clothing's own sprites, as the game colours them, keeping the garment's shape. For a garment whose colours come out wrong.</M3AT_PackPaintTip>
   <M3AT_LookTitle>M3AT look</M3AT_LookTitle>
+  <M3AT_GarmentDetail>Auto Optimization</M3AT_GarmentDetail>
+  <M3AT_GarmentDetail_0>High</M3AT_GarmentDetail_0>
+  <M3AT_GarmentDetail_1>Default</M3AT_GarmentDetail_1>
+  <M3AT_GarmentDetail_2>None</M3AT_GarmentDetail_2>
+  <M3AT_GarmentDetail_3>Low</M3AT_GarmentDetail_3>
+  <M3AT_GarmentDetailRange>{0} ({1}× M3AT's, {2}-{3} polys)</M3AT_GarmentDetailRange>
+  <M3AT_GarmentDetailUpTo>{0} (up to {1} polys)</M3AT_GarmentDetailUpTo>
+  <M3AT_GarmentDetailTip>Each garment from another mod is held to a budget based on M3AT's own garment for the same thing (or the one M3AT would draw for it: a one-piece suit is M3AT's shirt and trousers), and optimized as it loads if it is over. Images larger than {4} pixels a side are shrunk. Every poly is drawn for every pawn wearing it each frame.\n\nHigh: up to {1} times M3AT's, cutting the most, for slower computers.\nDefault: up to {0} times M3AT's.\nLow: up to {2} times M3AT's, keeping more of their makers' detail.\nNone: kept as their makers made them, up to {5} polys and twice the image size.\n\nAt Default, no garment is held under {3} polys. Optimized this session: {6}; the content switcher and the bug report name them. Takes effect after a restart.</M3AT_GarmentDetailTip>
+  <M3AT_ContentPatches>Changes {0} of M3AT's own methods, some of which run every frame. A pack using M3AT's API needs none.</M3AT_ContentPatches>
+  <M3AT_HintOther>Changes M3AT's code in ways M3AT can't name; switching to M3AT's takes those changes off.</M3AT_HintOther>
+  <M3AT_CostTris>{0} polys</M3AT_CostTris>
+  <M3AT_GarmentDetailBody>&lt;color=#ff8080&gt;{0} changes M3AT's body: the body {1} polys, now {2}; M3AT's own garments {3}, now {4}. M3AT can't auto-optimize those at any level: this option lightens only other mods' own garments. Choose M3AT's body in the content switcher to undo it.&lt;/color&gt;</M3AT_GarmentDetailBody>
+  <M3AT_CostTrisCut>{0} polys (M3AT auto-optimized from {1})</M3AT_CostTrisCut>
+  <M3AT_CostItem>{0} · M3AT's: {1}</M3AT_CostItem>
+  <M3AT_CostTrisTip>Every poly of a garment is drawn for every person wearing it, every frame, so lighter garments mean a smoother game with more colonists.\n\nFor scale, M3AT's own: its whole body {0} polys, a shirt {1}, power armour {2}. A garment from another mod may have {3} times as many as M3AT's own garment for the same thing: {4} for this one. Over it, M3AT optimizes the garment as it loads.\n\nGreen: light. Amber: within the budget. Red: over it.</M3AT_CostTrisTip>
+  <M3AT_CostVsOurs>About {0} times M3AT's equivalent ({1} polys).</M3AT_CostVsOurs>
+  <M3AT_CostTextureCut>Its image was {0} pixels a side, shrunk to {1} (the budget is {2}).</M3AT_CostTextureCut>
+  <M3AT_CostColony>Colony poly count: {0} polys for {1} people, {2} each.</M3AT_CostColony>
+  <M3AT_CostColonyTip>Body and clothes, as drawn. M3AT's body with a full outfit of its own garments comes to about {0}; over {1} a person starts to cost noticeably with many people on screen.</M3AT_CostColonyTip>
+  <M3AT_CostPawn>Drawn as {0} polys (body and clothes).</M3AT_CostPawn>
+  <M3AT_CostPack>{0} garments, {1} polys on average as made; {2} optimized, {3} images shrunk</M3AT_CostPack>
+  <M3AT_CostPackOver>; {0} over budget kept as made (Auto Optimization: None)</M3AT_CostPackOver>
+  <M3AT_CostPackTip>Each garment against its budget: {0} times M3AT's own garment for the same thing (at least {1} polys), images of {2} pixels a side. Red means some of the pack's garments were over it.</M3AT_CostPackTip>
+  <M3AT_CostMeasured>Measured: {0} ms a frame (±{1}) with {2} people drawn, {3}.</M3AT_CostMeasured>
+  <M3AT_CostMeasuredSmall>Measured: too small to tell (±{0} ms) with {1} people drawn, {2}.</M3AT_CostMeasuredSmall>
+  <M3AT_CostNotMeasured>Not measured yet.</M3AT_CostNotMeasured>
+  <M3AT_CostMeasureNow>Measure now</M3AT_CostMeasureNow>
+  <M3AT_CostMeasureNowTip>Opens M3AT's benchmark, which measures each content pack's cost apart from M3AT's. Have some people wearing the pack's content in view.</M3AT_CostMeasureNowTip>
+  <M3AT_PackReport>Pack report</M3AT_PackReport>
+  <M3AT_PackReportWritten>Pack report written to {0}</M3AT_PackReportWritten>
+  <M3AT_HintBodyMeshPack>Reshapes M3AT's body and every garment for every person, of every race: several times the polys. Takes effect after a restart.</M3AT_HintBodyMeshPack>
+  <M3AT_BodyChoice>Body</M3AT_BodyChoice>
+  <M3AT_BodyChoiceTip>Some content packs reshape M3AT's body and every garment as they load. That body is then drawn for every pawn of every race, so only one can be chosen.</M3AT_BodyChoiceTip>
+  <M3AT_BodyChoiceNote>Currently affects every pawn. Restart required.</M3AT_BodyChoiceNote>
+  <M3AT_BodyOverride>Currently overrides the body and every garment for every pawn! Poly counts:</M3AT_BodyOverride>
+  <M3AT_BodyOverrideAtRestart>Will override the body and every garment for every pawn! It is enabled when you restart the game, as the body is read once as the game loads; the poly counts show then.</M3AT_BodyOverrideAtRestart>
+  <M3AT_BodyOverrideBody>Body:</M3AT_BodyOverrideBody>
+  <M3AT_BodyOverrideGarments>Garments:</M3AT_BodyOverrideGarments>
+  <M3AT_BodyOverrideOurs>(M3AT's: {0})</M3AT_BodyOverrideOurs>
+  <M3AT_BodyOverrideNoAuto>This will also break M3AT's auto-optimization as it doesn't use the body API.</M3AT_BodyOverrideNoAuto>
+  <M3AT_BodyPendingRestart>The pack's body stays loaded until you restart the game.</M3AT_BodyPendingRestart>
+  <M3AT_BodyChoicePack>{0}'s</M3AT_BodyChoicePack>
+  <M3AT_BodyChoiceM3ATTip>M3AT's own body, as made.</M3AT_BodyChoiceM3ATTip>
+  <M3AT_BodyChosenAbove>Body: {0}, chosen under Body at the top.</M3AT_BodyChosenAbove>
+  <M3AT_BodyOneOnly>Only one content pack may change M3AT's body at a time, as two would stack on each other: {0}'s kept, {1}'s turned back to M3AT's. Takes effect after a restart.</M3AT_BodyOneOnly>
+  <M3AT_CostLoadShort>3D loading took {0}s</M3AT_CostLoadShort>
+  <M3AT_CostLoadTip>Time spent reading, optimizing and fitting this pack's garments to M3AT's body as the figures load (all of loading took {0} s). Optimized garments are kept on disk, so the next load is faster; garments within the budget load fastest.</M3AT_CostLoadTip>
+  <M3AT_ContentSlowLoad>Content packs added {0} s to loading M3AT's figures: {1}. The M3AT button on the bottom bar shows what each costs.</M3AT_ContentSlowLoad>
+  <M3AT_ContentLoadFresh>{0} garments fitted and kept, so the next load is faster</M3AT_ContentLoadFresh>
+  <M3AT_ContentLoadSome>{0} garments fitted and kept, {1} from before</M3AT_ContentLoadSome>
+  <M3AT_ContentLoadCached>already fitted, {0} garments from before</M3AT_ContentLoadCached>
+  <M3AT_Part_Armour>Armour and helmets</M3AT_Part_Armour>
+  <M3AT_PartTip_Armour>The pack's garments for armour and helmets (apparel named armour or a helmet, or in the game's armour categories). They have a row of their own because M3AT's armour and helmets came out better than the first packs' (their helmets covered the face). Items in the Clothing row's list can still be chosen one by one.</M3AT_PartTip_Armour>
+  <M3AT_RacesTitle>Other mods</M3AT_RacesTitle>
+  <M3AT_RaceColRace>Race or mod</M3AT_RaceColRace>
+  <M3AT_RaceColDrawn>Drawn</M3AT_RaceColDrawn>
+  <M3AT_RaceColDrawnTip>Whether the race is drawn as an M3AT figure at all.</M3AT_RaceColDrawnTip>
+  <M3AT_RaceColParts>Gene parts</M3AT_RaceColParts>
+  <M3AT_RaceColPartsTip>The race's own body parts: M3AT's models of them, or built from the race's pictures.</M3AT_RaceColPartsTip>
+  <M3AT_RaceColFace>Face</M3AT_RaceColFace>
+  <M3AT_RaceColFaceTip>Whether Facial Animation (or a face mod for it) has faces for the race.</M3AT_RaceColFaceTip>
+  <M3AT_RaceColClothes>Its mod's clothing</M3AT_RaceColClothes>
+  <M3AT_RaceColClothesTip>Clothing the race's mod adds: M3AT's own garments for it, or the closest of M3AT's garments painted with its art.</M3AT_RaceColClothesTip>
+  <M3AT_RaceColStatus>Tested</M3AT_RaceColStatus>
+  <M3AT_RaceColStatusTip>How well the race's mod is supported, from M3AT's compatibility list (Docs/Compatibility.md in M3AT's folder).</M3AT_RaceColStatusTip>
+  <M3AT_RaceRowTip>{0}, from {1}</M3AT_RaceRowTip>
+  <M3AT_RacePackedTip>Also covered by a content pack: {0}. The notes here are what M3AT itself draws, for each part you set to M3AT's in the pack's row above.</M3AT_RacePackedTip>
+  <M3AT_RaceChibi>3D</M3AT_RaceChibi>
+  <M3AT_RaceChibiTip>Drawn as an M3AT figure, by the "Other races as 3D pawns" option.</M3AT_RaceChibiTip>
+  <M3AT_RaceChibiIsoPackTip>{0} (an IsoRim pack) makes this race 3D, so M3AT draws it as one of its figures.</M3AT_RaceChibiIsoPackTip>
+  <M3AT_RaceCard>2D card</M3AT_RaceCard>
+  <M3AT_RaceCardPaperTip>Kept a flat card by IsoRim's "Keep as paper" list. To draw it in 3D, take it off that list: Mod options → IsoRim → Creatures and effects → Keep as paper.</M3AT_RaceCardPaperTip>
+  <M3AT_RaceCardIsoPackTip>{0} (an IsoRim pack) keeps this race a flat card. That is the pack's own setting, not M3AT's: check the pack's description or options.</M3AT_RaceCardIsoPackTip>
+  <M3AT_RaceCardOptionTip>M3AT's "Other races as 3D pawns" option is off, so races other than human stay flat cards. To turn it on: Mod options → M3AT: Maru's 3D Animated Toons → Mod compatibility → Other races as 3D pawns.</M3AT_RaceCardOptionTip>
+  <M3AT_RacePartsNoneTip>No ears, tail, horns or wings found among the race's parts: nothing to build.</M3AT_RacePartsNoneTip>
+  <M3AT_RaceOff>Off</M3AT_RaceOff>
+  <M3AT_RacePartsOffTip>M3AT's "Race parts from their pictures" option is off, so the race's ears, tails and the like aren't drawn.</M3AT_RacePartsOffTip>
+  <M3AT_RaceClothesNoneTip>The race's mod adds no clothing.</M3AT_RaceClothesNoneTip>
+  <M3AT_RaceClothesOwnTip>M3AT has its own garments for all {0} of the mod's clothing.</M3AT_RaceClothesOwnTip>
+  <M3AT_RaceClothesMatchedTip>{0} of the mod's {1} pieces of clothing have no M3AT garment of their own: each is drawn as the closest of M3AT's garments, painted with its art.</M3AT_RaceClothesMatchedTip>
+  <M3AT_RaceUntested>Untested</M3AT_RaceUntested>
+  <M3AT_RaceUntestedTip>Not on M3AT's compatibility list: it gets M3AT's general support for any race, and may look off.</M3AT_RaceUntestedTip>
+  <M3AT_NoteTunedParts>Mapped</M3AT_NoteTunedParts>
+  <M3AT_HintTunedParts>Drawn as M3AT's own parts, matched by hand to their pictures, so they move like M3AT's gene ears and tails:\n{0}</M3AT_HintTunedParts>
+  <M3AT_NoteTunedClothes>Automatched (tuned)</M3AT_NoteTunedClothes>
+  <M3AT_HintTunedClothes>M3AT has no models of its own for this pack's clothes: each is drawn as the closest match among M3AT's garments, painted with its art, and for some of them M3AT's garments were picked by hand.</M3AT_HintTunedClothes>
+  <M3AT_HintTunedArmour>M3AT has no models of its own for some of this pack's armour and helmets: each is drawn as the closest match among M3AT's garments, and for some of them M3AT's garments were picked by hand.</M3AT_HintTunedArmour>
+  <M3AT_NoteTunedArmour>Automatched (tuned)</M3AT_NoteTunedArmour>
+  <M3AT_RaceClothesTunedTip>{0} of the mod's {1} pieces of clothing have no M3AT garment of their own: each is drawn as the closest of M3AT's garments, painted with its art. For {2} of them M3AT's garments were picked by hand.</M3AT_RaceClothesTunedTip>
+  <M3AT_ModRowTip>{0}: adds no race of its own. M3AT has tuned matches for its genes or clothing.</M3AT_ModRowTip>
+  <M3AT_ModDrawnTip>Its people are humans (its own xenotypes), drawn as M3AT figures.</M3AT_ModDrawnTip>
+  <M3AT_ModNoRaceTip>Adds no race of its own.</M3AT_ModNoRaceTip>
+  <M3AT_ModFaceTip>Its people are humans, with Facial Animation's human faces.</M3AT_ModFaceTip>
+  <M3AT_ModPartsNoneTip>No ear or tail genes M3AT draws.</M3AT_ModPartsNoneTip>
+  <M3AT_ModUntestedTip>Not on M3AT's compatibility list.</M3AT_ModUntestedTip>
+  <M3AT_RaceListedTip>On M3AT's compatibility list as {0}.</M3AT_RaceListedTip>
+  <M3AT_RaceWorks>Works: {0}</M3AT_RaceWorks>
+  <M3AT_RaceGaps>Known gaps: {0}</M3AT_RaceGaps>
+  <M3AT_RaceNeeds>Also needs: {0}</M3AT_RaceNeeds>
+  <M3AT_RaceStatus_Full>Full</M3AT_RaceStatus_Full>
+  <M3AT_RaceStatus_Partialearly>Partial (early)</M3AT_RaceStatus_Partialearly>
+  <M3AT_RaceStatus_Partial>Partial</M3AT_RaceStatus_Partial>
+  <M3AT_RaceStatus_Untested>Untested</M3AT_RaceStatus_Untested>
 </LanguageData>

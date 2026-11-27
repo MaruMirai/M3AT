@@ -106,6 +106,18 @@ namespace M3AT
             wornCaches.Clear();
         }
 
+        // The triangles drawn for a person's body and clothes, as last dressed (the worn cache; 0 if not drawn yet), for
+        // the content switcher's totals.
+        internal static int DrawnTriangles(Pawn pawn)
+        {
+            WornCache c;
+            if (!ready || skin == null || pawn == null || !wornCaches.TryGetValue(pawn.thingIDNumber, out c) || c.worn == null)
+            {
+                return 0;
+            }
+            return skin.DrawnTriangles(c.mask, c.worn);
+        }
+
         // The chibi, for AddOns.Find: null until it has loaded.
         internal static SkinnedFigure SkinForAddOns
         {
@@ -173,7 +185,7 @@ namespace M3AT
         private float viewHeight;
         private readonly ContentView content = new ContentView();
 
-        public override Vector2 InitialSize => new Vector2(420f, 520f);
+        public override Vector2 InitialSize => new Vector2(Mathf.Min(900f, UI.screenWidth - 40f), Mathf.Min(720f, UI.screenHeight - 100f));
 
         public static void Open(Pawn pawn)
         {
@@ -230,13 +242,19 @@ namespace M3AT
             Rect outer = new Rect(inRect.x, y, inRect.width, inRect.yMax - y - HelpHeight);
             Rect view = new Rect(0f, 0f, outer.width - 16f, Mathf.Max(viewHeight, outer.height));
             Widgets.BeginScrollView(outer, ref scroll, view);
-            float at = content.Draw(new Rect(0f, 0f, view.width, 100000f), pawn, false);
+            // The pack radios on the left and the clothing items beside them on the right, in one scroll.
+            float left = Mathf.Min(420f, view.width * 0.5f), gap = 10f;
+            float at = content.Draw(new Rect(0f, 0f, left, 100000f), pawn, false);
+            float right = 0f;
+            GUI.BeginGroup(new Rect(left + gap, 0f, view.width - left - gap, 100000f));
             for (int i = 0; i < apparel.Count; i++)
             {
-                at = figure.PackGarmentOf(apparel[i].def) > 0
-                    ? PackItemRow(figure, apparel[i].def, apparel[i], pawn, view.width, at)
-                    : Row(figure, apparel[i], view.width, at);
+                right = figure.PackGarmentOf(apparel[i].def) > 0
+                    ? PackItemRow(figure, apparel[i].def, apparel[i], pawn, view.width - left - gap, right)
+                    : Row(figure, apparel[i], view.width - left - gap, right);
             }
+            GUI.EndGroup();
+            at = Mathf.Max(at, right);
             viewHeight = at;
             Widgets.EndScrollView();
 
@@ -394,16 +412,20 @@ namespace M3AT
             Settings s = SettingsMod.Settings;
             bool own = s.clothingChoices.ContainsKey(def.defName);
             string owner = figure.OwnerOf(packG);
-            bool packByDefault = ContentSources.UsesPack(owner, ContentPart.Clothing) && !ContentSources.ArmourByDefault(def);
+            bool packByDefault = ContentSources.UsesPack(owner, ContentSources.ClothingPartOf(def));
             int[] m3at = figure.OwnGarmentOf(def) > 0 ? new[] { figure.OwnGarmentOf(def) }
                 : apparel != null && pawn != null ? figure.AutoStandInsOn(apparel, pawn) : figure.AutoStandInsFor(def);
             int[] now = packDrawn ? new[] { packG } : drawn > 0 ? new[] { drawn }
                 : apparel != null && pawn != null ? figure.StandInsOn(apparel, pawn) : figure.StandInsFor(def);
             bool paintable = packDrawn && WalkFigures.SpriteClothes && figure.PaintsArt(packG, def);
-            Rect box = new Rect(0f, y, width, paintable ? 122f : 96f);
+            // The paint tick sits in the box's top right corner, beside the name, so showing or hiding it leaves the row's
+            // height alone.
+            Rect box = new Rect(0f, y, width, 114f);
             Widgets.DrawBoxSolidWithOutline(box, new Color(0.13f, 0.13f, 0.13f), new Color(0.3f, 0.3f, 0.3f));
             Rect inner = box.ContractedBy(6f);
-            Widgets.Label(new Rect(inner.x, inner.y, inner.width, 22f), def.LabelCap);
+            string paintLabel = "M3AT_PackPaint".Translate();
+            float paintWidth = paintable ? Text.CalcSize(paintLabel).x + 34f : 0f;
+            Widgets.Label(new Rect(inner.x, inner.y, inner.width - paintWidth, 22f), def.LabelCap);
             Text.Font = GameFont.Tiny;
             GUI.color = Color.gray;
             Widgets.Label(new Rect(inner.x, inner.y + 20f, inner.width, 16f), def.defName + (def.modContentPack != null ? " (" + def.modContentPack.Name + ")" : ""));
@@ -411,14 +433,19 @@ namespace M3AT
             string what = packDrawn ? (string)"M3AT_ItemPack".Translate()
                 : now.Length > 0 ? (string)"M3AT_ItemM3AT".Translate(Names(figure, now)) : (string)"M3AT_ItemNone".Translate();
             Widgets.Label(new Rect(inner.x, inner.y + 36f, inner.width, 18f), own ? (string)"M3AT_ClothesChosen".Translate(what) : (string)"M3AT_ItemDefault".Translate(what));
+            // The pack's garment's cost: its triangles against the budget, coloured, M3AT's equivalent for scale.
+            Rect cost = new Rect(inner.x, inner.y + 54f, inner.width, 18f);
+            GUI.color = Costs.Band(figure.MadeTrianglesOf(packG), figure.BudgetOf(packG));
+            Widgets.Label(cost, Costs.Tris(figure, packG));
+            TooltipHandler.TipRegion(cost, Costs.TrisTip(figure, packG, m3at));
             GUI.color = Color.white;
             Text.Font = GameFont.Small;
             if (paintable)
             {
                 List<string> painted = s.paintedPackClothes;
                 bool on = painted.Contains(def.defName), was = on;
-                Rect check = new Rect(inner.x, inner.y + 56f, inner.width, 24f);
-                Widgets.CheckboxLabeled(check, "M3AT_ClothesPaint".Translate(), ref on);
+                Rect check = new Rect(inner.xMax - paintWidth, inner.y, paintWidth, 24f);
+                Widgets.CheckboxLabeled(check, paintLabel, ref on);
                 TooltipHandler.TipRegion(check, "M3AT_PackPaintTip".Translate());
                 if (on != was)
                 {
@@ -434,16 +461,31 @@ namespace M3AT
                     WalkFigures.ClothingChoicesChanged();
                 }
             }
-            Rect buttons = new Rect(inner.x, inner.yMax - 28f, inner.width, 28f);
-            float half = buttons.width / 2f;
-            if (Widgets.ButtonText(new Rect(buttons.x, buttons.y, half - 4f, 28f), "M3AT_ClothesChoose".Translate()))
+            // Three radio cells, one click each: the pack's garment, M3AT's automatic match, or a garment of the player's
+            // choosing (Custom, a menu, again while on to choose another).
+            string packName = figure.PieceName(packG);
+            string choice;
+            s.clothingChoices.TryGetValue(def.defName, out choice);
+            bool custom = own && choice != packName && choice != WalkFigures.M3atAutomatic;
+            Rect cells = new Rect(inner.x, inner.yMax - 28f, inner.width, 28f);
+            float third = cells.width / 3f;
+            if (ContentView.RadioCell(new Rect(cells.x, cells.y, third - 2f, 28f), packDrawn && !custom, "M3AT_SourcePack".Translate(), packByDefault,
+                "M3AT_ItemCellPackTip".Translate()) && !(packDrawn && !custom))
             {
-                string packName = figure.PieceName(packG);
+                Set(def, packByDefault ? null : packName);
+            }
+            bool m3atOn = !packDrawn && !custom;
+            if (ContentView.RadioCell(new Rect(cells.x + third, cells.y, third - 2f, 28f), m3atOn, "M3AT_SourceM3AT".Translate(), !packByDefault,
+                "M3AT_ItemCellM3ATTip".Translate(m3at.Length > 0 ? Names(figure, m3at) : (string)"M3AT_ClothesNotDrawn".Translate())) && !m3atOn)
+            {
+                Set(def, packByDefault ? WalkFigures.M3atAutomatic : null);
+            }
+            string customLabel = custom ? (now.Length > 0 ? Names(figure, now) : (string)"M3AT_ItemNone".Translate()) : (string)"M3AT_ItemCustom".Translate();
+            if (ContentView.RadioCell(new Rect(cells.x + third * 2f, cells.y, third - 2f, 28f), custom, customLabel, false,
+                custom ? (string)"M3AT_ItemCellCustomOnTip".Translate(customLabel) : (string)"M3AT_ItemCellCustomTip".Translate()))
+            {
                 List<FloatMenuOption> options = new List<FloatMenuOption>
                 {
-                    new FloatMenuOption("M3AT_ItemMenuPack".Translate(), () => Set(def, packByDefault ? null : packName)),
-                    new FloatMenuOption("M3AT_ItemMenuM3AT".Translate(m3at.Length > 0 ? Names(figure, m3at) : (string)"M3AT_ClothesNotDrawn".Translate()),
-                        () => Set(def, packByDefault ? WalkFigures.M3atAutomatic : null)),
                     new FloatMenuOption("M3AT_ClothesMenuNone".Translate(), () => Set(def, WalkFigures.NoneDrawn)),
                 };
                 foreach (int g in figure.ChoosableGarments().OrderBy(g => figure.GarmentLabel(g)))
@@ -456,11 +498,33 @@ namespace M3AT
                 }
                 Find.WindowStack.Add(new FloatMenu(options));
             }
-            if (own && Widgets.ButtonText(new Rect(buttons.x + half, buttons.y, half - 4f, 28f), "M3AT_ClothesReset".Translate()))
-            {
-                Set(def, null);
-            }
             return box.yMax + 6f;
+        }
+
+        // A pack's every item set to its garment (pack) or M3AT's, one write, for the clothing list's column heads.
+        internal static void SetAllItems(SkinnedFigure figure, IEnumerable<ThingDef> defs, bool pack)
+        {
+            Settings s = SettingsMod.Settings;
+            foreach (ThingDef def in defs)
+            {
+                int packG = figure.PackGarmentOf(def);
+                if (packG <= 0)
+                {
+                    continue;
+                }
+                bool packByDefault = ContentSources.UsesPack(figure.OwnerOf(packG), ContentSources.ClothingPartOf(def));
+                string want = pack == packByDefault ? null : pack ? figure.PieceName(packG) : WalkFigures.M3atAutomatic;
+                if (want == null)
+                {
+                    s.clothingChoices.Remove(def.defName);
+                }
+                else
+                {
+                    s.clothingChoices[def.defName] = want;
+                }
+            }
+            s.Write();
+            WalkFigures.ClothingChoicesChanged();
         }
 
         // Sets the choice (null: back to the automatic match) and saves it at once, as a pick is one click.

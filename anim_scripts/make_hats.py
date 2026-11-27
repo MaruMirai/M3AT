@@ -51,8 +51,20 @@ out_blend = None
 if '--blend' in argv:
     out_blend = argv[argv.index('--blend') + 1]
     argv = argv[:argv.index('--blend')] + argv[argv.index('--blend') + 2:]
+over = '--over' in argv
+argv = [a for a in argv if a != '--over']
 out_dir = os.path.abspath(argv[0])
 wanted = argv[1:]
+# Hats whose drawn file (Models/garments) is no longer what this script makes (checked 2026-11-27: made fresh and compared
+# with the drawn one; other triangle counts or shapes: Maru's hand edits (Glasses, Sunglasses, Gorget), lower-poly versions,
+# or a script changed since). A run leaves them out unless named with --over, so it can't replace them by mistake.
+# Still made exactly: AuthorityCap, Beret, Collar, Crown, Flophat, Hairband, HatLadies, HatTop, Headwrap,
+# MaidHeaddress, PsychicFoilHelmet, Shadecone, Slicecap, TribalHeaddress, Tuque, WarMask.
+NOT_THIS_SCRIPTS = {'AdvancedHelmet', 'AirwireHeadset', 'ArrayHeadset', 'Blindfold', 'BowlerHat', 'Broadwrap',
+                    'CE_AdvancedNightVision', 'CE_SimpleNightVision', 'CeremonialCultistMask', 'ClothMask', 'Coronet',
+                    'CowboyHat', 'CrownStellic', 'CultistMask', 'EltexSkullcap', 'GasMask', 'Glasses', 'Goggles',
+                    'Gorget', 'Gunlink', 'HatHood', 'IntegratorHeadset', 'PsyfocusHelmet', 'Ribbon', 'Scarf',
+                    'SimpleHelmet', 'Sunglasses', 'Tailcap', 'TortureCrown', 'VisageMask', 'WarVeil'}
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import walk
@@ -2437,6 +2449,9 @@ mat.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value = (0.8
 print('HEAD middle %s, radius %.3f, top %.3f' % (tuple(round(c, 3) for c in CENTRE), R, top))
 made_hats = []
 for name in (wanted or list(HATS)):
+    if name in NOT_THIS_SCRIPTS and not over:
+        print('HAT %s left out: the drawn one is not this script\'s (name it with --over to make it anyway)' % name)
+        continue
     o = (HATS.get(name) or PARTS[name])()
     if not o.data.materials:   # a coloured hat has its own
         o.data.materials.append(mat)

@@ -307,9 +307,20 @@ namespace M3AT
                 }
                 s.AppendLine("  parts: " + string.Join(", ", parts));
             }
-            foreach (string g in SkinnedFigure.Simplified)
+            SkinnedFigure f = WalkFigures.SkinForAddOns;
+            if (WalkFigures.CopyName != null)
             {
-                s.AppendLine("simplified: " + g);
+                s.AppendLine("running from " + WalkFigures.CopyName + "'s copy of M3AT, not M3AT itself" + (f != null ? ": body file " + f.BodyFileTriangles + " triangles" : ""));
+            }
+            if (f != null && f.BodyChanged)
+            {
+                f.OwnGarmentTriangles(out int made, out int now);
+                s.AppendLine("body changed by " + SkinnedFigure.BodyChangerName() + ", not optimized: body " + f.BodyFileTriangles + " -> " + f.TrianglesOf(0)
+                    + ", M3AT's garments " + made + " -> " + now);
+            }
+            foreach (string g in SkinnedFigure.Optimized)
+            {
+                s.AppendLine("optimized: " + g);
             }
             foreach (string g in SkinnedFigure.OverBudget)
             {

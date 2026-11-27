@@ -5,7 +5,7 @@ using Verse;
 
 namespace M3AT
 {
-    // Combat Extended's shields (its melee and ballistic shields, on its Shield apparel layer; anim_scripts/make_shields.py),
+    // Combat Extended's shields (its melee and ballistic shields, on its Shield apparel layer; Maru's meshes, Models/garments; archive/garment_scripts/make_shields.py),
     // and any other apparel with a garment exported with the held line: held in the left fist, riding hand.L whole. Shown
     // only when CE would draw the shield (ShieldShows, WornGarments), and then the guard (the shield clip, walk.shield_at:
     // the left fist out in front of the left shoulder) is laid over the rest with Top, the left arm only, on its feet with

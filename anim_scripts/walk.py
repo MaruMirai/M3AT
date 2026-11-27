@@ -962,6 +962,28 @@ CAGED_ARMS = 6.0      # the arms in closer to the sides than the walk's (on top 
 CAGED_ELBOW = 8.0     # the elbows all but straight
 CAGED_HAND = 0.3      # the hands closed, a share of FIST
 
+# Tied to a tree (tied_at, tied_tree: Tie to Tree's prisoner, WalkFigures.DrawTied, which sits it with its back to the
+# trunk and draws the rope round both): sat on the ground, the back upright and leant back a little against the trunk,
+# the knees drawn up and the feet flat, the wrists together behind the back, the head hung a little. On the clock, a loop
+# of TIED_SECONDS: breathing, the head looking slowly from side to side, and once a loop straining at the rope (the
+# shoulders pulled forward and the chest twisted, at TIED_STRAIN_AT). Leg lengths but the degrees.
+TIED_SECONDS = 9.0
+TIED_BREATHS = 3
+TIED_SEAT = 0.0        # the hip joints let down to this over the ankles (as low as they go: the seat then rests on the ground with the soles)
+TIED_FEET = 0.5        # the ankles ahead of the hip joints
+TIED_FEET_OUT = 0.1    # and out to the side
+TIED_KNEES_OUT = 0.35  # the knees fall out to the sides (a share of up)
+TIED_LEAN = -6.0       # the spine leant back (LEAN)
+TIED_WRISTS = (0.0, 0.12, 0.3)   # the wrists' middle from the hips' head: across, back, up (in the chest's frame)
+TIED_APART = 0.035     # each wrist out from that middle
+TIED_ELBOWS = (1.0, 1.4, -0.4)   # the way the elbows bend, out, back and down (the chest's frame, left side)
+TIED_NOD = 8.0         # the head hung forward
+TIED_LOOK = 22.0       # the head's slow look to either side
+TIED_STRAIN = 7.0      # the chest twisted and pulled forward at the height of the strain
+TIED_STRAIN_AT = 0.6   # where in the loop the strain peaks
+TIED_STRAIN_SPAN = 0.12   # and half its length, a share of the loop
+TIED_HAND = 0.55       # the hands closed, a share of FIST
+
 # Crawling (crawl_at): downed, pulling along on the belly. One hand reaches ahead while the other pulls back, and the leg
 # on the other side is drawn up and out to push. Made upright like lying (the game tips it face down, by its own crawl
 # angle, Crawl.ChestLift), so ahead is up here and the ground is in front. Timed by the ground covered, like the walk: the
@@ -2172,14 +2194,15 @@ HIP_DRAW_LEAN = 8.0  # and leans forward (degrees)
 HIP_UPPER = {'shoulder.L': 1.0}   # in place of UPPER: holding it, the left arm only
 HIP_AIM_UPPER = {'spine.001': 0.5, 'spine.002': 1.0}   # pointing it and taking it, as CAST_UPPER (the right arm left out)
 
-# Shields (Combat Extended's melee and ballistic shields, on its Shield apparel layer; anim_scripts/make_shields.py): held
+# Shields (Combat Extended's melee and ballistic shields, on its Shield apparel layer; Models/garments/CE_MeleeShield.glb and CE_BallisticShield.glb, Maru's meshes): held
 # by a grip in the left fist, as the round shield's boss is over a centre grip and a ballistic shield has a handle
 # behind it. The chibi's arms are too short to strap one across a forearm in front of the chest. The game shows a
 # shield only when CE would draw it (drafted, or a job or duty that shows the weapon), and then lays the guard (shield_at)
 # over the rest with the left arm only (SHIELD_UPPER): the left fist out in front of the left shoulder, palm in, the hand
 # straight on the forearm, so the grip stands upright and the shield faces forward. The shield rides hand.L
 # (shield_rest), placed from the guard's first frame: upright, its face turned SHIELD_YAW out to the left, so its right
-# edge falls back clear of a pistol held in the middle. Change these, then run make_shields.py again and export.
+# edge falls back clear of a pistol held in the middle. Change these, then export (the export finds each shield's frame
+# from its mesh, shield_held_at; make_shields.py, which built them in this frame, is archived in archive/garment_scripts/).
 SHIELD_SECONDS = 4.0   # the guard's loop: one breath
 SHIELD_FIST = (0.36, -0.34, 0.36)   # the left fist: leg lengths from the middle of the hips at rest, in the chest's frame
                                     # (x left, y back, z up): in front of the left shoulder, below it
@@ -3484,6 +3507,37 @@ def caged_pose():
         sh = 'shoulder.' + side
         turn_branch(X, sh, about(X[sh] @ head[sh], (0, 0, 1), -CAGED_ROLL * sign))
         close_hand(X, side, sign, CAGED_HAND)
+    return X, clamp
+
+def tied_at(t):
+    """Sat tied with the back to a tree at t (0 .. 1 round the loop, TIED_SECONDS long; see TIED_SEAT). Returns the pose
+    and the worst overreach."""
+    breath = 0.5 - 0.5 * math.cos(2 * math.pi * TIED_BREATHS * t)
+    d = (t - TIED_STRAIN_AT + 0.5) % 1.0 - 0.5
+    strain = math.exp(-(d / TIED_STRAIN_SPAN) ** 2 * 3.0)
+    X, _ = posed_with(dict(STILL, DROP=0.01, LEAN=TIED_LEAN), 0.29, breath=breath)
+    # Let down so the hip joints are TIED_SEAT over where the ankles stood.
+    ankle = X['foot.L'] @ head['foot.L']
+    hip = X[HIPS] @ head['thigh.L']
+    X = moved_all(T(Vector((0, 0, ankle.z + TIED_SEAT * LEG - hip.z))), X)
+    clamp = 0.0
+    up = Vector((0, 0, 1))
+    for side, sign in (('L', 1), ('R', -1)):
+        hip = X[HIPS] @ head['thigh.' + side]
+        foot = hip + FWD * (TIED_FEET * LEG) + Vector((sign * TIED_FEET_OUT * LEG, 0, -TIED_SEAT * LEG))
+        clamp = max(clamp, leg_to(side, hip, foot, up + Vector((sign * TIED_KNEES_OUT, 0, 0)), X))
+    # The strain: the chest pulled forward and twisted, the head down with it; the look, slow from side to side.
+    chest = X[SPINE] @ head[CHEST_BONE]
+    turn_branch(X, CHEST_BONE, about(chest, (0, 0, 1), TIED_STRAIN * strain) @ about(chest, (1, 0, 0), TIED_STRAIN * strain))
+    neck = X[NECK] @ head[NECK]
+    look = TIED_LOOK * math.sin(2 * math.pi * t) * (1.0 - strain)
+    turn_branch(X, NECK, about(neck, (0, 0, 1), look) @ about(neck, (1, 0, 0), TIED_NOD + 0.5 * TIED_STRAIN * strain))
+    middle = X[CHEST_BONE].to_3x3() @ Vector(TIED_WRISTS) * LEG + X[HIPS] @ head[HIPS]
+    for side, sign in (('L', 1), ('R', -1)):
+        wrist = middle + X[CHEST_BONE].to_3x3() @ Vector((sign * TIED_APART * LEG, 0, 0))
+        pole = Vector((sign * TIED_ELBOWS[0], TIED_ELBOWS[1], TIED_ELBOWS[2]))
+        clamp = max(clamp, arm_to(side, sign, wrist, X, pole=pole))
+        close_hand(X, side, sign, TIED_HAND)
     return X, clamp
 
 def crawl_at(p):
@@ -5745,7 +5799,7 @@ def shield_at(t):
 
 def shield_rest():
     """A shield in the left fist: the matrix from its own frame (armature units, the grip's middle at the origin, x to
-    the figure's left, y back, z up, its face toward -y; as make_shields.py builds it) to the rest pose (armature space),
+    the figure's left, y back, z up, its face toward -y; as the archived make_shields.py built it) to the rest pose (armature space),
     which hand.L's move takes to any pose; and the grip's way in that frame (toward the thumb), along which the fist
     closes round it. Placed from the guard's first frame, upright and turned SHIELD_YAW out to the left, tipped back
     SHIELD_TIP."""

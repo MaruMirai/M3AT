@@ -1,12 +1,13 @@
 # Paints the ears' textures (Source/EarLining.cs), grey, as the game multiplies them by the ear's colours (the outside the
-# hair's, the inside the lining's):
+# hair's, the inside the lining's, or for the fluffy ears the hair's paled by the alpha):
 #   python3 anim_scripts/make_ear_textures.py "<mod>/Models/chibi" [preview.png]
+# (preview: the fluffy texture on dark, ginger and pale hair beside the mouse's grey)
 # Each is two halves, the outside on the left and the inside on the right, and in each half an ear is laid out by its
 # place along it (v: the root at the bottom, the tip at the top) and across it (u: from one edge, LIMIT, to the other),
 # so one painting fits every ear shape. Written:
-#   ear_fluffy.png  the cat ears (the gene's and Kiiro's) and Wolfein's: fur streaks outside; inside, with PALE_INSIDE, a
-#                   small pale patch low in the middle (CORE, EDGE, LOW, TIP) with a shadowed cup and soft tufts of fluff,
-#                   fading out into the outside's fur toward the rim and the tip (off: the inside is the outside's fur)
+#   ear_fluffy.png  the cat ears (the gene's and Kiiro's), Wolfein's and Miho's: fur streaks outside; inside, grey fluff
+#                   with a shadowed cup, and in the alpha how pale each place goes (the shader blends the hair's colour
+#                   toward a warm white by it): bare along the rim, tufts growing up and in from it, fading out at the tip
 #   ear_mouse.png   Ratkin's: short velvet outside; inside, bare smooth skin with a shadowed cup, faint veins and a thin
 #                   fringe of fur along the rim
 # Our own art, procedural (a fixed seed), no game sprites.
@@ -20,13 +21,17 @@ from PIL import Image
 SIZE = 256
 HALF = 0.23     # of the width, half an ear's width in its half, as EarLining.cs's LiningHalf
 SEED = 11
-# Where the fluffy inside shows, as EarLining.cs's LiningShares colours it (keep them the same): whole within CORE of the
-# half width across and below LOW along, none past EDGE and TIP, eased between; elsewhere the inside is the outside's fur.
-CORE, EDGE = 0.3, 0.8
-LOW, TIP = 0.4, 0.85
-# Whether the fluffy inside is painted at all. Off (Nov 2026, asked for): the inside is the outside's fur, as EarLining.cs's
-# LiningMost of 0 leaves it in the hair's colour, so the inside of the ear is not pale.
-PALE_INSIDE = False
+# How pale the fluffy inside goes, the texture's alpha (MarusSmooth.frag.glsl's _Lining blends the hair's colour toward a
+# warm white by it, per pixel): across is of the inside's own width at each height (EarLining.cs's InsideEdge), so the rim
+# is +-1 all the way up. None within RIM_BARE of the rim, whole by RIM_FULL in; tufts start TUFT_FROM..TUFT_TO across and
+# grow up and in over the bare rim. Faded out along from TIP_FROM to TIP_TO, and in over ROOT at the root.
+RIM_BARE, RIM_FULL = 0.1, 0.55
+TUFT_FROM, TUFT_TO = 0.55, 0.9
+TIP_FROM, TIP_TO = 0.62, 0.92
+ROOT = 0.08
+# Whether the inside is paled at all (off Nov 2026, back on 2026-11-27 as a per-pixel fade).
+PALE_INSIDE = True
+LINING_PALE, LINING_KEEP = (0.97, 0.94, 0.9), 0.12   # MarusSmooth.frag.glsl's LiningPale and LiningKeep (keep them the same)
 
 
 def grid():
@@ -94,55 +99,51 @@ def strokes(img, mask_half, rng, count, start, direction, length, width, value, 
 
 
 def fluffy():
+    """The fluffy ears' grey and, in its alpha, how pale each place of the inside goes (the shader's _Lining)."""
     rng = np.random.default_rng(SEED)
     inside, across, along = grid()
-    img = np.zeros((SIZE, SIZE))
     # Outside: fur streaks along the ear, a little darker at the root.
     streak = smooth_noise(rng, (SIZE, SIZE), 70, 6)
     fine = smooth_noise(rng, (SIZE, SIZE), 140, 10)
     outside = 0.8 + 0.09 * (streak - 0.5) * 2 + 0.05 * (fine - 0.5) * 2 + 0.05 * np.clip(along, 0, 1)
-    # Inside: pale, the cup in shadow (deepest low and in the middle), soft noise for the skin under the fluff.
-    edge = np.abs(across) / width_at(along)
-    cup = np.exp(-(across / 0.45) ** 2) * np.exp(-((along - 0.38) / 0.3) ** 2)
-    base = 0.94 - 0.1 * cup + 0.04 * (smooth_noise(rng, (SIZE, SIZE), 30, 30) - 0.5)
-    fluff = np.zeros((SIZE, SIZE))
+    # Inside: across is its own width here (EarLining.cs's InsideEdge), so +-1 is the rim at every height.
+    rim = 1.0 - np.abs(across)          # 0 at the rim, 1 down the middle
+    cup = np.exp(-(across / 0.5) ** 2) * np.exp(-((along - 0.35) / 0.3) ** 2)
+    tufts = np.zeros((SIZE, SIZE))
 
     def start(rng):
-        # Anywhere across, most toward the edges, and more of them low down. (The layout's width is the ear's widest, so
-        # high up only the middle is on the ear: fluff out past its edge there is never seen.)
-        t = rng.uniform(0.0, 0.8) ** 1.3
-        side = rng.choice([-1.0, 1.0])
-        s = side * (1.05 - rng.uniform(0, 1) ** 1.8 * 0.95)
-        return s, t
+        # From just in from the rim, more of them low down, where the fluff is thickest.
+        t = rng.uniform(0.0, 0.85) ** 1.25
+        return rng.choice([-1.0, 1.0]) * rng.uniform(TUFT_FROM, TUFT_TO), t
 
     def direction(s, t, rng):
         # Up the ear and in toward its middle, more upward higher up.
-        inward = -np.sign(s) * rng.uniform(0.25, 0.7) * (1.0 - t)
+        inward = -np.sign(s) * rng.uniform(0.3, 0.9) * (1.1 - t)
         k = math.hypot(inward, 1.0)
         return inward / k, 1.0 / k
 
     def fade(s, t):
-        return float(np.clip(1.2 - t * 1.1, 0.25, 1.0))
+        return float(np.clip(1.15 - t * 0.9, 0.3, 1.0))
 
-    fluff = strokes(fluff, True, rng, 520, start, direction, lambda r: r.uniform(16, 40), lambda r: r.uniform(0.7, 1.4), 1.0, fade)
-    inner = np.maximum(base, 0.84 + 0.16 * fluff)
-    # Darker between the tufts low down, so they read as tufts.
-    inner -= 0.05 * (1 - fluff) * np.clip(1.0 - along * 1.3, 0, 1)
-    lined = lining_share(across, along) if PALE_INSIDE else np.zeros_like(along)
-    inner = outside + (inner - outside) * lined
-    img = np.where(inside, inner, outside)
-    return np.clip(img, 0, 1)
+    tufts = strokes(tufts, True, rng, 420, start, direction, lambda r: r.uniform(18, 46), lambda r: r.uniform(0.6, 1.1), 0.9, fade)
+    # The grey: soft skin under the fluff, the cup in shadow, the tufts lighter than what is between them.
+    grain = smooth_noise(rng, (SIZE, SIZE), 60, 14)
+    inner = 0.9 - 0.09 * cup + 0.03 * (grain - 0.5) + 0.1 * tufts
+    # How pale: none along the rim (RIM_BARE), rising into the middle, less in the shadowed cup; the tufts paler still
+    # and reaching out over the bare rim, so the edge is fur, not a line. Faded out toward the tip and at the root.
+    body = smoothstep((rim - RIM_BARE) / (RIM_FULL - RIM_BARE)) * (0.93 - 0.1 * cup + 0.06 * (grain - 0.5))
+    pale = np.maximum(body, tufts * smoothstep(rim / RIM_BARE) * 0.98)
+    pale *= (1 - smoothstep((along - TIP_FROM) / (TIP_TO - TIP_FROM))) * smoothstep(along / ROOT)
+    if not PALE_INSIDE:
+        pale = np.zeros_like(pale)
+    grey = np.clip(np.where(inside, inner, outside), 0, 1)
+    alpha = np.where(inside, np.clip(pale, 0, 1), 0.0)
+    return grey, alpha
 
 
 def smoothstep(x):
     x = np.clip(x, 0, 1)
     return x * x * (3 - 2 * x)
-
-
-def lining_share(across, along):
-    a = 1 - smoothstep((np.abs(across) - CORE) / (EDGE - CORE))
-    t = 1 - smoothstep((along - LOW) / (TIP - LOW))
-    return a * t
 
 
 def mouse():
@@ -172,10 +173,21 @@ def mouse():
     return np.clip(img, 0, 1)
 
 
-def save(img, path):
+def save(img, path, alpha=None):
     g = (img * 255 + 0.5).astype(np.uint8)
-    Image.fromarray(np.stack([g, g, g], axis=-1), 'RGB').save(path)
+    if alpha is None:
+        Image.fromarray(np.stack([g, g, g], axis=-1), 'RGB').save(path)
+    else:
+        a = (alpha * 255 + 0.5).astype(np.uint8)
+        Image.fromarray(np.stack([g, g, g, a], axis=-1), 'RGBA').save(path)
     print('EAR %s: %.2f .. %.2f, mean %.2f' % (os.path.basename(path), img.min(), img.max(), img.mean()))
+
+
+def preview(grey, alpha, hair):
+    """The inside half as the shader draws it on hair of that colour (LiningPale, LiningKeep)."""
+    pale = np.array(LINING_PALE) * (1 - LINING_KEEP) + np.array(hair) * LINING_KEEP
+    c = np.array(hair)[None, None, :] * (1 - alpha[..., None]) + pale[None, None, :] * alpha[..., None]
+    return c * grey[..., None]
 
 
 def main():
@@ -183,13 +195,16 @@ def main():
     if not args:
         raise SystemExit('give the chibi folder')
     folder = args[0]
-    f, m = fluffy(), mouse()
-    save(f, os.path.join(folder, 'ear_fluffy.png'))
+    (f, fa), m = fluffy(), mouse()
+    save(f, os.path.join(folder, 'ear_fluffy.png'), fa)
     save(m, os.path.join(folder, 'ear_mouse.png'))
     if len(args) > 1:
-        both = np.concatenate([f, np.ones((SIZE, 8)), m], axis=1)
-        g = (both * 255).astype(np.uint8)
-        Image.fromarray(g, 'L').resize((both.shape[1] * 2, SIZE * 2), Image.NEAREST).save(args[1])
+        # The fluffy texture's two halves on dark, ginger and pale hair, then the mouse's grey.
+        rows = [np.concatenate([preview(f, fa, h), np.ones((SIZE, 8, 3)), np.repeat(m[..., None], 3, axis=2)], axis=1)
+                for h in ((0.2, 0.16, 0.14), (0.85, 0.45, 0.2), (0.75, 0.72, 0.68))]
+        both = np.concatenate(rows, axis=0)
+        g = (np.clip(both, 0, 1) * 255).astype(np.uint8)
+        Image.fromarray(g, 'RGB').resize((both.shape[1] * 2, both.shape[0] * 2), Image.NEAREST).save(args[1])
 
 
 if __name__ == '__main__':

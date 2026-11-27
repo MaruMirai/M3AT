@@ -238,8 +238,9 @@ namespace M3AT
         private const float TalkEase = 2f;   // how fast a pawn takes up talking (a board game, a speech) or stops, per real second
         private const float PlayerReach = 3f;   // cells round a board game the other players are looked for in (PlaysWithOthers)
         private const float BoutEdge = 0.1f;   // of a bout (BoutOf): eased into at its start and out of at its end
-        private const float RubRestFrom = 15f;   // game seconds a cold pawn rests between bouts of rubbing its hands, at least
-        private const float RubRestTo = 40f;   // .. and at most
+        private const float RubRestFrom = 20f;   // game seconds a cold pawn rests between bouts of rubbing its hands, at least
+        private const float RubRestTo = 50f;   // .. and at most
+        private const float RubGrace = 1.5f;   // game seconds a bout of rubbing that comes due while the pawn is busy waits for it before it is let go
         private const float RubEase = 3f;   // how fast a pawn's hands leave off rubbing as it sets off somewhere, or may again, per real second
         private const float ChatRestFrom = 6f;   // game seconds a pawn at a party rests between bouts of talking, at least
         private const float ChatRestTo = 20f;   // .. and at most
@@ -462,6 +463,19 @@ namespace M3AT
         private const int ThrowRecover = 40;   // game ticks a throw takes from leaving the hand back to the guard
 
         private static ModContentPack content;
+
+        // The name of the mod M3AT is running from when that isn't M3AT itself but another mod that bundles a copy of its code
+        // and files (the RJW bridge, Workshop 3840211204, does). Such a copy patches nothing of ours, so no content pack is found
+        // for it, yet its body and garments can differ from ours: the content switcher and the About poly counts message say
+        // so (Costs.CopyLine). Null when running as M3AT, or before it has found its folder.
+        internal static string CopyName
+        {
+            get
+            {
+                return content != null && content.PackageId != null && !content.PackageId.StartsWith("marumirai.m3at", StringComparison.OrdinalIgnoreCase)
+                    ? content.Name : null;
+            }
+        }
         private static ModContentPack isoRim;   // IsoRim's own folder: its tool models (WorkOf, DrawTool)
         private static readonly Dictionary<string, ModelHandle> toolModels = new Dictionary<string, ModelHandle>();
         private static ModelHandle idle;
@@ -1435,7 +1449,9 @@ namespace M3AT
                 PatchSizeStat(harmony);   // the chibi's size on the info card (SizeStat.cs)
                 FaceLayers.PatchEyes(harmony);
                 FaceLayers.PatchBlush(harmony);
+                FaceLayers.BorrowFaces();   // a sub-race in its parent's faces (FaceStandIns.cs)
                 RomanceOnTheRim.PatchShareReading(harmony);
+                PatchTieToTree(harmony);   // its rope sprite left off a prisoner drawn tied (TieToTree.cs)
                 PatchGripTool(harmony);
                 Api.AddWeaponModelRule(WeaponRule);
                 Api.AddGroundModelRule(GroundRule);
@@ -1584,6 +1600,16 @@ namespace M3AT
                 if (Skinned)
                 {
                     Wounds.Root = content.RootDir;
+                    try
+                    {
+                        // Patches on reading the chibi (a pack changing the body's mesh) gated to the player's choices
+                        // before it is read, as they can't be taken back after (ContentSources.cs).
+                        ContentSources.Apply();
+                    }
+                    catch (Exception e)
+                    {
+                        Log.Error(Tag + "content packs could not be set to the choices made before the chibi loaded: " + e);
+                    }
                     skin = SkinnedFigure.Load(root);
                     for (int c = 0; skin != null && c <= levels; c++)
                     {
@@ -2064,7 +2090,7 @@ namespace M3AT
             string body = BodyKeyOf(pawn.story.bodyType, pawn.gender);   // a race's own body type by its name (OtherRaces.cs)
             // Bulked up by its armour (ArmourSize.cs): broader. Grown by it at all: its head shrunk to keep a normal pawn's size.
             bool bulky = body != "Child" && ArmourBulky(pawn);
-            float frame = body != "Child" ? ArmouredFrameOf(pawn) : 0f;   // its power armour's frame, the Armoured key (ArmourSize.cs)
+            List<KeyValuePair<string, float>> wornKeys = body != "Child" ? WornKeysOf(pawn) : null;   // its armour's frame, the Armoured key (ArmourSize.cs)
             shrink = ArmouredHeadShrink(pawn, shrink);
             string gender = pawn.gender == Gender.Female ? "Female" : pawn.gender == Gender.Male ? "Male" : null;
             float spread = SettingsMod.Settings != null && SettingsMod.Settings.variedBodies ? SettingsMod.Settings.bodySpread : 0f;
@@ -2079,17 +2105,17 @@ namespace M3AT
                 // The gender's key whole, as a Male or Female body has it and a build is added on (GenderOnBuilds), and the
                 // builds on top; a child's on the base body, with no gender's.
                 string key = body == "Child" ? null : gender ?? (body == "Male" || body == "Female" ? body : null);
-                return skin.ShapeOf(key, null, 0f, shrink, 1f, PregnancyOf(pawn), limbs, WithFrame(bulky ? ArmouredBuild(builds, body, strength) : builds, frame), genes);
+                return skin.ShapeOf(key, null, 0f, shrink, 1f, PregnancyOf(pawn), limbs, WithWornKeys(bulky ? ArmouredBuild(builds, body, strength) : builds, wornKeys), genes);
             }
             if (bulky)
             {
                 // Its body type's own key (a Thin, Fat or Hulk one) as a build, under the armour's Hulk, on its gender's shape.
                 string key = gender ?? (body == "Male" || body == "Female" ? body : null);
-                return skin.ShapeOf(key, null, 0f, shrink, 1f, PregnancyOf(pawn), limbs, WithFrame(ArmouredBuild(null, body, strength), frame), genes);
+                return skin.ShapeOf(key, null, 0f, shrink, 1f, PregnancyOf(pawn), limbs, WithWornKeys(ArmouredBuild(null, body, strength), wornKeys), genes);
             }
             // A Thin, Fat or Hulk body's own key at the strength; a Male or Female one is a gender's shape, left whole.
             float bodyAmount = body != null && System.Array.IndexOf(BuildKeys, body) >= 0 ? strength : 1f;
-            return skin.ShapeOf(body, gender, GenderOnBuilds, shrink, bodyAmount, PregnancyOf(pawn), limbs, WithFrame(null, frame), genes);
+            return skin.ShapeOf(body, gender, GenderOnBuilds, shrink, bodyAmount, PregnancyOf(pawn), limbs, WithWornKeys(null, wornKeys, body, bodyAmount), genes);
         }
 
         // Varied bodies (the mod options): the pawn's build as amounts of the Thin, Fat and Hulk keys, spread about its body
@@ -2509,7 +2535,7 @@ namespace M3AT
                     && castClip == null && strikeClip == null && cowering <= 0f && tossing <= 0f && swim <= 0f && !flying;
                 bool atLeisure = AtLeisure(pawn);
                 e.rubFree = recent ? Mathf.MoveTowards(e.rubFree, atLeisure ? 1f : 0f, RubEase * Time.deltaTime) : (atLeisure ? 1f : 0f);
-                e.rubAt = skin != null && skin.Has("rub") ? BoutOf(pawn, e.rub, "rub", idleHands && talking <= 0f && e.cold && atLeisure, RubRestFrom, RubRestTo) : -1f;
+                e.rubAt = skin != null && skin.Has("rub") ? BoutOf(pawn, e.rub, "rub", idleHands && talking <= 0f && e.cold && atLeisure, RubRestFrom, RubRestTo, RubGrace) : -1f;
                 // Talking now and then at a party, or while relaxing socially with someone near (to whom it turns).
                 e.chatAt = skin != null && skin.Has("talk") ? ChatOf(pawn, e, idleHands && talking <= 0f && e.rubAt < 0f) : -1f;
                 // A quick wave in passing at whom it just chatted with, with the hands free (WaveOf).
@@ -4312,7 +4338,9 @@ namespace M3AT
         // and after a rest of restFrom .. restTo game seconds, picked per pawn and bout (the first rest is a share of
         // one, so pawns that start wanting it together do not all start together), and is played through once on game
         // time, even if it stops being wanted part way.
-        private static float BoutOf(Pawn pawn, Bout b, string clip, bool wanted, float restFrom, float restTo)
+        // grace (game seconds; below 0, none) lets a bout that comes due while it isn't wanted go after that long, the next
+        // coming a rest later, so a pawn that keeps stopping and starting (or comes back on screen) doesn't play one at once.
+        private static float BoutOf(Pawn pawn, Bout b, string clip, bool wanted, float restFrom, float restTo, float grace = -1f)
         {
             int length = Mathf.Max(1, Mathf.RoundToInt(skin.SecondsOf(clip) * 60f));
             int now = Find.TickManager.TicksGame;
@@ -4339,6 +4367,10 @@ namespace M3AT
             {
                 b.start = now;
                 return 0f;
+            }
+            if (grace >= 0f && now > b.next + Mathf.RoundToInt(grace * 60f))
+            {
+                b.next = now + rest;   // missed while busy: let go
             }
             return -1f;
         }
@@ -4970,8 +5002,13 @@ namespace M3AT
                     case "UseCommsConsole":
                     case "AnalyzeItem":
                     case "Hack":
-                        kind = PlaceWork(pawn, a, "hands", true);
+                        // (by where it is, but a machine drawn tall stood at whatever its fillPercent: Ideology's ancient
+                        // terminals say 0.2, so they were knelt at, the head in IsoRim's 0.83-tall screen)
+                    {
+                        string tall = SeatUnder(pawn) != null ? "bench_sit" : "bench";
+                        kind = a.Thing is Building && DrawnTall(a.Thing.def) && skin.Has("work_" + tall) ? tall : PlaceWork(pawn, a, "hands", true);
                         break;
+                    }
                     case "Flick":
                     case "Open":
                         // (a switch, a lamp or a lid: the right hand reached out to it if it stands tall, knelt at it if
@@ -6190,6 +6227,18 @@ namespace M3AT
             return Api.AimPitch(pawn, handsY);
         }
 
+#if AUTOTEST
+        // <config>/M3AT/beam_kick puts the kick back on beam shots, to compare (the game is started through Steam, which
+        // passes it no environment).
+        internal static readonly bool BeamKick = System.IO.File.Exists(System.IO.Path.Combine(GenFilePaths.ConfigFolderPath, "M3AT", "beam_kick"));
+        internal static float AutoKick(Pawn pawn) => KickOf(pawn, false);
+        private static Matrix4x4 autoModel;
+        private static Vector3[] autoSoup;
+        internal static readonly Dictionary<int, KeyValuePair<float, string>> AutoFront = new Dictionary<int, KeyValuePair<float, string>>();   // the tip behind the drawn model's front along the aim (cells), and a note
+#else
+        private const bool BeamKick = false;
+#endif
+
         // How far into a shot's kick the pawn is (0 .. 1): all of it straight after it fired, easing out over the weapon's
         // recoil time (at least KickTicks), as strong as the weapon's recoil (KickLeast up to all of it); a bow's loose over
         // LooseTicks.
@@ -6199,6 +6248,12 @@ namespace M3AT
             Verb verb = busy != null && busy.verb != null ? busy.verb
                 : pawn.equipment != null && pawn.equipment.PrimaryEq != null ? pawn.equipment.PrimaryEq.PrimaryVerb : null;
             if (verb == null || pawn.equipment == null || pawn.equipment.Primary == null)
+            {
+                return 0f;
+            }
+            // A beam (Verb_ShootBeam: the beam graser) is one steady sweep the game counts as a burst of shots, so a kick per
+            // shot jolted the barrel up off the beam several times over; it is held steady instead.
+            if (verb is Verb_ShootBeam && !BeamKick)
             {
                 return 0f;
             }
@@ -6572,12 +6627,17 @@ namespace M3AT
             }
             // Turned in the fist as the player set it (GripTool): about the fist, in the plane of the art, + tipping the
             // art's right end toward its top (a gun's muzzle up). Before the slide, which then goes along the turned art.
+            // It is set on the weapon at rest, so it fades out as the weapon is brought up to aim (Ease.aim): aiming, the
+            // barrel goes along the aim as the stance has it. Kept, it pointed a gun turned 20 degrees 21 degrees above
+            // its target while it fired.
             Vector3 own;
-            if (GripOverrideOf(weapon.def, out own) && own.z != 0f)
+            // (no Ease: the grip tool's own placing in the stance at rest, GripTool's)
+            float atRest = drawing != null ? 1f - Mathf.Clamp01(drawing.aim) : 1f;
+            if (GripOverrideOf(weapon.def, out own) && own.z != 0f && atRest > 0f)
             {
                 Vector3 tx, ty;
                 SpriteAxes(a, top, weapon.def.equippedAngleOffset, out tx, out ty);
-                Quaternion tilt = Quaternion.AngleAxis(own.z, Vector3.Cross(tx, ty));
+                Quaternion tilt = Quaternion.AngleAxis(own.z * atRest, Vector3.Cross(tx, ty));
                 a = tilt * a;
                 top = tilt * top;
                 hand = closed + tilt * (hand - closed);
@@ -6660,6 +6720,26 @@ namespace M3AT
 
             Vector3 tip;
             Matrix4x4 world = DrawSlab(weapon, ScaleOf(weapon), hand, a, top, behind, at, yaw, size, out tip);
+#if AUTOTEST
+            // The drawn model's own front: its vertex furthest along the aim, against the tip reported.
+            if (autoSoup != null && !float.IsNaN(tip.x))
+            {
+                Vector3 aim = Quaternion.AngleAxis(yaw, Vector3.up) * a, front = Vector3.zero;
+                float most = float.NegativeInfinity;
+                foreach (Vector3 v in autoSoup)
+                {
+                    Vector3 q = autoModel.MultiplyPoint3x4(v);
+                    if (Vector3.Dot(q, aim) > most)
+                    {
+                        most = Vector3.Dot(q, aim);
+                        front = q;
+                    }
+                }
+                AutoFront[pawn.thingIDNumber] = new KeyValuePair<float, string>(Vector3.Dot(front - tip, aim), "tip " + tip.ToString("F3")
+                    + ", model's front " + front.ToString("F3") + ", aim " + aim.ToString("F2") + ", tip behind the front " + Vector3.Dot(front - tip, aim).ToString("F3"));
+            }
+            autoSoup = null;
+#endif
 #if AUTOTEST
             if (slab && drawn >= 1f && world != Matrix4x4.zero)
             {
@@ -6877,6 +6957,10 @@ namespace M3AT
                 Api.DrawModel(info.Model, Vector3.zero, 0f, model, info.Tint, info.Swatch);
             }
             tip = placed.MultiplyPoint3x4(h.tip);
+#if AUTOTEST
+            autoModel = model;
+            autoSoup = WeaponFit.SoupOf(info.Model);
+#endif
             return true;
         }
 
@@ -6971,11 +7055,11 @@ namespace M3AT
             string geneHorns = headless ? null : HornsOf(pawn);
             if (geneParts != 0)
             {
-                if (earFile != null && skin.GenePartCovers(geneParts, pawn, EarGenes))
+                if (earFile != null && skin.GenePartCovers(geneParts, pawn, earGenesTuned ?? (earGenesTuned = WithTuned(EarGenes))))
                 {
                     earFile = null;
                 }
-                if (geneTail && skin.GenePartCovers(geneParts, pawn, TailGenes))
+                if (geneTail && skin.GenePartCovers(geneParts, pawn, tailGenesTuned ?? (tailGenesTuned = WithTuned(TailGenes))))
                 {
                     geneTail = false;
                 }
@@ -7061,8 +7145,10 @@ namespace M3AT
                 float speaking = eases.TryGetValue(pawn.thingIDNumber, out said) && said.speakingFrame == Time.frameCount ? said.speaking : 0f;
                 speaking = Mathf.Max(speaking, SayOf(pawn));   // its part in a social interaction
                 FaceLayers.Coat = coat > 0 ? skin.CoatFace() : null;   // the lid cover in the coat's colours (FurCoat.cs)
+                FaceLayers.Skin = skinColour;   // and in the head's own skin colour, a race's tint and all
                 FaceLayers.Draw(pawn, fig.face, at, yaw, size, Wounds.EyeWoundsOn(fig), HasGeneKey(pawn, NosePig), speaking);
                 FaceLayers.Coat = null;
+                FaceLayers.Skin = null;
             }
             FaceLayers.Flash = 0f;
             return mask;
@@ -8357,6 +8443,13 @@ namespace M3AT
             if (placed.Situation == FigureSituation.Gibbet)
             {
                 return DrawCaged(ctx, placed, size);
+            }
+            // Tied to a tree by Tie to Tree (lying in its unseen restraint): sat against the trunk, roped to it (TieToTree.cs).
+            Thing tiedTo;
+            Building_Bed restraint;
+            if (placed.Situation == FigureSituation.InBed && skin.Has(TiedClip) && TiedToTree(pawn, out tiedTo, out restraint))
+            {
+                return DrawTied(ctx, placed, size, tiedTo, restraint);
             }
             SawAim(pawn, placed);
             // Posed by another mod (ExpansionApi): its clips at its place, none of the rules below.

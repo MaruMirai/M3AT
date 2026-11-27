@@ -104,7 +104,13 @@ if '--blend' in argv:
     out_blend = argv[i + 1]
     argv = argv[:i] + argv[i + 2:]
 plain = '--plain' in argv
-argv = [a for a in argv if a != '--plain']
+over = '--over' in argv
+argv = [a for a in argv if a not in ('--plain', '--over')]
+# Made only when named with --over (checked 2026-11-27, each made fresh and compared with Models/garments): Panties and
+# Boxers are drawn no more (the Underwear, Shorts and ShortShorts cut from the trousers replaced them); the drawn Bra,
+# Chestwrap, Loincloth and Leotard are not what this makes (Maru's hand edits, recuts); the Tanktop's join to the shirt
+# below its hem no longer meets since the shoulder reshape moved both. Still made as drawn: LongJohns, Stockings, Tights.
+NOT_THIS_SCRIPTS = {'Panties', 'Boxers', 'Bra', 'Chestwrap', 'Loincloth', 'Leotard', 'Tanktop'}
 out_dir = argv[0]
 wanted = argv[1:]
 
@@ -772,6 +778,9 @@ os.makedirs(out_dir, exist_ok=True)
 made = []
 for name, maker in MAKERS.items():
     if wanted and name not in wanted:
+        continue
+    if name in NOT_THIS_SCRIPTS and not over:
+        print('UNDERWEAR %s left out: the drawn one is not this script\'s (name it with --over to make it anyway)' % name)
         continue
     o = finish(name, maker())
     if name == 'Loincloth':

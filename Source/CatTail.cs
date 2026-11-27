@@ -541,11 +541,22 @@ namespace M3AT
             {
                 return true;   // a content pack's tail for its race
             }
+            if (ContentSources.PackOwnsGeneParts(pawn))
+            {
+                return false;   // the pack's race, and it has no tail for it here (its patches fill in theirs)
+            }
             foreach (GeneDef def in tailGenes)
             {
                 if (pawn.genes != null && pawn.genes.HasActiveGene(def))
                 {
                     return true;
+                }
+            }
+            foreach (string name in TailGenes)
+            {
+                if (HasGeneOrTuned(pawn, null, name))
+                {
+                    return true;   // another mod's tail gene drawn as ours (TunedGenes.cs)
                 }
             }
             // A cat-like race with a Humanoid Alien Races tail add-on (Kiiro's slender one) gets the smooth tail.
@@ -676,7 +687,7 @@ namespace M3AT
         // off, though still stepped, so it doesn't jump when the armour comes off.
         private static void DrawCatTail(Pawn pawn, SkinnedFigure.Posed fig, GarmentMask mask, Apparel[] worn, Vector3 at, float yaw, float size, float sat, float floor, bool onGround)
         {
-            fig.furTail = furTailGene != null && pawn.genes != null && pawn.genes.HasActiveGene(furTailGene);
+            fig.furTail = HasGeneOrTuned(pawn, furTailGene, "Tail_Furry");
             fig.packTail = ExpansionApi.TailFileFor(pawn);
             StepTail(pawn, fig, at, yaw, size, sat, onGround);
             if (ArmourHidesTail && skin.HidesTail(mask, worn))

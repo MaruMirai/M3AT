@@ -106,6 +106,7 @@ namespace M3AT
             public string textureFile;   // a garment's image, next to its file; null: none, drawn in the apparel's colour
             public int tint = -1;        // a textured garment's: 1 tinted by the apparel's colour, 0 not, -1 as the apparel is (Tinted)
             public Color mean = Color.white;   // a textured garment's mean colour, which its outline is drawn in (times the tint)
+            public float lining;        // ears with a lining texture (EarLining.cs): how pale their inside goes, the shader's _Lining; 0 none
             public int hideHair = -1, hideFace = -1;   // a garment's: 1 the hair (the face layers) left off while it is worn, 0 not, -1 if it hides most of the scalp (face); the hair's also 2, cut at its rim (HairUnderHat)
             public bool overHair;       // a garment's: worn over the hair, pushed out past it rather than tucking it (HatOverHair.cs)
             public bool hidesClothes;   // a garment's: the garments worn under it are left off (body armour, HidesClothes)
@@ -114,6 +115,12 @@ namespace M3AT
             public bool forBaby;        // a garment's: worn by a baby a few hours old (the baby romper, WalkFigures.BabyRomperOf)
             public bool pads;           // a garment's: worn with the Pauldrons garment (the marine and cataphract armour, WalkFigures.ArmourPads)
             public float sole;          // a garment's: how far it reaches below the body's soles at rest, model units (its sole line, SoleOf)
+            public List<KeyValuePair<string, float>> wearerKeys;   // a garment's wearer_key lines: body keys its wearer takes at least this
+                                        // much of while it is worn (armour's frame, Armoured: WalkFigures.WornKeysOf); null none
+            public Dictionary<string, Matrix4x4> frame;   // a garment's frame lines: each bone's deform from the base skeleton to
+                                        // the frame its wearer is drawn in (Frames.cs), game space; null none
+            internal Dictionary<string, Vector3[]> framedMoves;   // each frame's move of its vertices by its own weights, for a piece
+                                        // with no key of that frame's own, made when first shaped in it (Frames.cs); null none yet
             public string marineOf;     // a garment's: the garment it is drawn in place of on a pawn in Space Marine armour (PauldronsBig, WalkFigures.MarinePads)
             public bool held;           // a garment's: held in the hand (a shield, its held line), drawn only while the game shows
                                         // the weapon (WalkFigures.WornGarments); it hides nothing and is in no clearance (HeldMask)
@@ -124,10 +131,15 @@ namespace M3AT
             // Another mod's garment (ModGarments.cs): the lines that say how it is fitted to the body in the game.
             public string modRoot;      // the folder it was read from (its texture is found there); null: this mod's own
             public string modName;      // and the mod's name, for messages
+            public int madeTris;        // its triangles in its file, as its maker made it, before another mod changed it as it was read or the budget cut it (GarmentBudget.cs); 0 unknown
+            public int madeTexture;     // and its image's longer side as made, pixels (0: none, or this mod's)
+            public int ours;            // another mod's: the triangles of this mod's garment(s) it is matched to, as made (OursOf), that its budget is a share of; 0 not yet matched
+            public string oursName;     // and their names ("none": no match, a fallback by head or body)
             public string owner;        // the packageId of the mod it came from (any way: its M3ATgarments folder, or a file
                                         // another mod put on skin.txt's list); null: this mod's own (GarmentBudget.cs, Benchmark.cs)
             public string baseName;     // its base line: this mod's garment whose mesh it takes (a retexture)
             public string bodyStamp;    // its body line: the skin.txt hash it was exported against; its w, hide and key lines count only on that body
+            public int bodyGeneration;  // and the body's generation it gives after the hash (0: none given)
             public bool weightsGiven;   // it had w lines
             public string[] weightBones;   // its bones line: the bone each w line's number means, by name (own weights kept across a new body)
             public bool ownWeights;     // its own_weights line: its w lines are kept (by its bones line) though fitted for another body
@@ -161,6 +173,7 @@ namespace M3AT
             public Vector2[] uvs;       // texture places (hair); null: none
             public float[] shade;       // each vertex's colour against the tint (the Furskin tufts on the coat, CoatTufts); null: the tint alone
             public Vector3[] normal;    // normals from the file (hair, whose vertices are split where its sprites meet); null: worked out
+            public Vector3[] normalFix; // added to each worked-out normal before it is made unit length (nfix lines); null: none
             public Texture2D texture;   // hair: its sprites; a garment: its image
             public Material material;   // hair or a textured garment: its own textured material, made when first drawn
             public Material mark;       // and its light pass; null: the game's overlay lights it
@@ -194,6 +207,7 @@ namespace M3AT
             internal List<string> geneKeys;   // the gene keys it has whole (null: none), which MeasureHead leaves out too
             internal Vector3 headLow, headHigh;
             internal readonly Dictionary<(int, GarmentMask), PieceShape> letOut = new Dictionary<(int, GarmentMask), PieceShape>();   // webbing let out, by garment and garments under it (LetOut.cs)
+            internal readonly Dictionary<(int, GarmentMask), PieceShape> tucked = new Dictionary<(int, GarmentMask), PieceShape>();   // a garment kept under those over it, by garment and garments over it (TuckUnder.cs)
             internal readonly Dictionary<GarmentMask, ArmRoom> armRoom = new Dictionary<GarmentMask, ArmRoom>();   // the trunk's girth for the held arms, by garments worn (ArmsClear.cs)
             internal float[] handScale;   // each hand's size against the base body's, R then L (HandSize.cs); null until asked
         }
@@ -234,6 +248,8 @@ namespace M3AT
         private readonly Dictionary<string, Piece> hairImages = new Dictionary<string, Piece>();   // by style: the hair last read, whose texture and materials the next read keeps
         private float hairsDetail = -1f;   // the SettingsMod.HairDetail that hairs were cut down to
         private string stamp;   // skin.txt's hash: the cache folder of hair built for this body
+        private int bodyGeneration;   // skin.txt's generation line (export_frames.BODY_GENERATION): raised by hand when the body's
+                                      // surface or rest pose moves enough that a garment made on the last one can clip; 0 if none
         private HairBuilder builder;
         private HairBuilder beardBuilder;
         private readonly Dictionary<string, Material> ridges = new Dictionary<string, Material>();   // by design: its material (RidgesMaterial)
@@ -366,8 +382,6 @@ namespace M3AT
             internal PieceMeshes beard;
             internal PieceMeshes ears;   // its gene's ears (CatEars.cs), made when first drawn
             internal string earsMadeOf;  // and the file those meshes are of
-            internal Color32[] earPaint;  // the ears' colours with a lining fading out (EarLining.cs's LiningPaint), and what for
-            internal Color32 earPaintTint, earPaintInner;
             internal Piece hornsPiece;   // the horns its horn meshes are for (Horns.cs)
             internal PieceMeshes horns;
             internal readonly Dictionary<Piece, PieceMeshes> addons = new Dictionary<Piece, PieceMeshes>();   // its race parts built from their sprites (AddonBuilder.cs)
@@ -641,7 +655,7 @@ namespace M3AT
         }
 
         // A content pack's garment is drawn for its apparel only while the player has it so (ContentSources.cs): the
-        // pack draws that clothing and this item isn't armour (ArmourByDefault), or the player picked this garment for it
+        // pack draws this item's row (Clothing, or Armour for armour and helmets, ArmourByDefault), or the player picked this garment for it
         // in the clothing tool. Otherwise this mod's own garment for it, if the pack's took its place, else none, so the
         // apparel goes to the stand-ins (and any choice the player made among them).
         private int Wanted(ThingDef def, string defName, int g)
@@ -667,7 +681,26 @@ namespace M3AT
             {
                 return chosen == pieces[g].name;   // the player's pick: this very garment, or something else
             }
-            return ContentSources.UsesPack(owner, ContentPart.Clothing) && !ContentSources.ArmourByDefault(def);
+            return ContentSources.UsesPack(owner, ContentSources.ClothingPartOf(def));   // its row: Clothing, or Armour and helmets
+        }
+
+        // The part a content pack's piece is switched by: gene parts, armour and helmets (by the apparel it is for), or clothing.
+        internal ContentPart PartOfPiece(int g)
+        {
+            Piece p = pieces[g];
+            if (p.genes != null)
+            {
+                return ContentPart.GeneParts;
+            }
+            for (int i = 0; p.defs != null && i < p.defs.Length; i++)
+            {
+                ThingDef d = DefDatabase<ThingDef>.GetNamedSilentFail(p.defs[i]);
+                if (d != null && d.apparel != null)
+                {
+                    return ContentSources.ClothingPartOf(d);
+                }
+            }
+            return ContentPart.Clothing;
         }
 
         // A content pack's piece that is off now (AddOns.cs, ContentSources.cs): its mod off for a benchmark turn, or the
@@ -679,7 +712,7 @@ namespace M3AT
                 return false;
             }
             string owner = pieces[g].owner;
-            return AddOns.IsOff(owner) || !ContentSources.UsesPack(owner, pieces[g].genes != null ? ContentPart.GeneParts : ContentPart.Clothing);
+            return AddOns.IsOff(owner) || !ContentSources.UsesPack(owner, PartOfPiece(g));
         }
 
         // Whether a garment is another mod's (a content pack's), for the clothing tool.
@@ -727,13 +760,13 @@ namespace M3AT
         }
 
         // The mod each other mod's piece came from (one entry a piece), and whether it is a gene part, for AddOns.Find.
-        internal IEnumerable<KeyValuePair<string, bool>> GarmentOwners()
+        internal IEnumerable<KeyValuePair<string, ContentPart>> GarmentOwners()
         {
             for (int g = 1; g < pieces.Length; g++)
             {
                 if (pieces[g].owner != null)
                 {
-                    yield return new KeyValuePair<string, bool>(pieces[g].owner, pieces[g].genes != null);
+                    yield return new KeyValuePair<string, ContentPart>(pieces[g].owner, PartOfPiece(g));
                 }
             }
         }
@@ -904,6 +937,12 @@ namespace M3AT
             return piece > 0 && piece < pieces.Length && pieces[piece].pads;
         }
 
+        // The body keys this garment's wearer takes at least so much of (its wearer_key lines: armour's frame), or null.
+        public List<KeyValuePair<string, float>> WearerKeysOf(int piece)
+        {
+            return piece > 0 && piece < pieces.Length ? pieces[piece].wearerKeys : null;
+        }
+
         // The garment drawn in this one's place on a pawn in Space Marine armour (one whose marine_of line names it: the
         // big pauldrons for the pauldrons), or -1.
         public int MarineVersionOf(int piece)
@@ -971,18 +1010,33 @@ namespace M3AT
             }
             try
             {
+                System.Diagnostics.Stopwatch loading = System.Diagnostics.Stopwatch.StartNew();
+                LoadSeconds.Clear();
+                LoadPieces.Clear();
+                CutSeconds = FitSeconds = 0.0;
+                FitsCached = FitsMade = 0;
+                FitsMadeBy.Clear();
+                FitsCachedBy.Clear();
                 SkinnedFigure s = new SkinnedFigure { folder = folder, stamp = Stamp(skinPath) };
                 List<Piece> all = new List<Piece>();
                 List<string> garments = new List<string>();
+                double bodyStart = loading.Elapsed.TotalSeconds;
                 Piece body = s.ReadMesh(skinPath, true, garments);
+                AddLoadSeconds(null, loading.Elapsed.TotalSeconds - bodyStart);
                 all.Add(body);
+                // The body's triangles as exported, so a mod that changes the body as it is read (the Miho pack cuts its
+                // chest finer, for every pawn) is seen doing it (the content switcher, the pack report).
+                s.bodyFileTris = FileTriangles(skinPath);
                 // Turned round as the body is, if it is: the exporter writes every piece the same way.
                 bool turn = InsideOut(body.rest, body.tris);
                 s.turnRound = turn;
+                List<KeyValuePair<Piece, string>> budgeted = new List<KeyValuePair<Piece, string>>();
                 foreach (string file in garments)
                 {
                     string garmentPath = Path.Combine(folder, file);
+                    double garmentStart = loading.Elapsed.TotalSeconds;
                     Piece g = s.ReadMesh(garmentPath, false, null);
+                    g.madeTris = FileTriangles(garmentPath);   // as made, before any mod changes it as it is read
                     // A file from outside this mod's folder (another mod adds its own to the list): held to the budget
                     // (GarmentBudget.cs) and known as that mod's.
                     ModContentPack from = Path.IsPathRooted(file) ? ModOfPath(garmentPath) : null;
@@ -990,7 +1044,7 @@ namespace M3AT
                     {
                         g.owner = from.PackageId;
                         g.modName = from.Name;
-                        KeepWithinBudget(g, from.Name);
+                        budgeted.Add(new KeyValuePair<Piece, string>(g, garmentPath));   // (after the loop: matched against this mod's own)
                     }
                     foreach (int k in g.hides)
                     {
@@ -1008,6 +1062,18 @@ namespace M3AT
                         s.garmentOf[def] = all.Count;
                     }
                     all.Add(g);
+                    AddLoadSeconds(g.owner, loading.Elapsed.TotalSeconds - garmentStart);   // (this mod's own, or a pack's put on the list)
+                }
+                if (budgeted.Count > 0)
+                {
+                    s.pieces = all.ToArray();   // (for the matching; set again below)
+                    foreach (KeyValuePair<Piece, string> e in budgeted)
+                    {
+                        double cutStart = loading.Elapsed.TotalSeconds;
+                        s.KeepWithinBudget(e.Key, e.Key.modName, e.Value);
+                        AddLoadSeconds(e.Key.owner, loading.Elapsed.TotalSeconds - cutStart);
+                    }
+                    s.ForgetStandIns();
                 }
                 foreach (Piece p in all)
                 {
@@ -1040,7 +1106,11 @@ namespace M3AT
                 s.ReadCoat();
                 s.FindHeadHiders();
                 s.ReadAnim(animPath);
+                s.BuildFrames();   // garments' frames as body keys, once the bones are known (Frames.cs)
                 s.GrainFur();
+                LoadTotal = loading.Elapsed.TotalSeconds;
+                LogLoadCosts();
+                s.LogBodyChange();
                 return body.rest.Length > 0 && s.clips.Count > 0 ? s : null;
             }
             catch (Exception e)
@@ -1051,6 +1121,7 @@ namespace M3AT
         }
 
         private readonly Dictionary<string, Texture2D> garmentTextures = new Dictionary<string, Texture2D>();   // by file, shared
+        private readonly Dictionary<string, int> madeTextures = new Dictionary<string, int>();   // each image's longer side as made, by file
 
         // Loads a textured garment's image (shared with any other garment that has the same file) and its mean colour over
         // its vertices' places, which its outline is drawn in. Without the image it is drawn untextured, with a message.
@@ -1074,9 +1145,19 @@ namespace M3AT
                 t.wrapMode = TextureWrapMode.Clamp;
                 t.filterMode = FilterMode.Trilinear;
                 t.name = "Marus_Garment_" + Path.GetFileNameWithoutExtension(path);
+                madeTextures[path] = Mathf.Max(t.width, t.height);
+                if (g.owner != null || g.modName != null)
+                {
+                    t = WithinTextureBudget(t, g.name + " (" + (g.modName ?? g.owner) + ")");   // another mod's: held to the image budget (GarmentBudget.cs)
+                }
                 garmentTextures[path] = t;
             }
             g.texture = t;
+            int made;
+            if (madeTextures.TryGetValue(path, out made))
+            {
+                g.madeTexture = made;
+            }
             Color sum = Color.clear;
             foreach (Vector2 uv in g.uvs)
             {
@@ -1119,6 +1200,7 @@ namespace M3AT
             List<Vector3> fRest = new List<Vector3>();
             List<Vector2> fUvs = new List<Vector2>(), uvs = new List<Vector2>();
             List<Vector3> normals = new List<Vector3>();
+            List<KeyValuePair<int, Vector3>> fixes = new List<KeyValuePair<int, Vector3>>();
             Dictionary<int, int> faceIndex = new Dictionary<int, int>();
             Vector3[] keyMoves = null;
             Dictionary<int, Vector3> keyBones = null;
@@ -1145,6 +1227,9 @@ namespace M3AT
                         break;
                     case "n":
                         normals.Add(Vec(p, 1));
+                        break;
+                    case "nfix":
+                        fixes.Add(new KeyValuePair<int, Vector3>(int.Parse(p[1]), Vec(p, 2)));
                         break;
                     case "t":
                         uvs.Add(new Vector2(Num(p[1]), Num(p[2])));
@@ -1198,6 +1283,13 @@ namespace M3AT
                     case "marine_of":
                         piece.marineOf = p[1];
                         break;
+                    case "wearer_key":
+                        float keyAmount;
+                        if (p.Length > 2 && float.TryParse(p[2], NumberStyles.Float, CultureInfo.InvariantCulture, out keyAmount))
+                        {
+                            (piece.wearerKeys = piece.wearerKeys ?? new List<KeyValuePair<string, float>>()).Add(new KeyValuePair<string, float>(p[1], keyAmount));
+                        }
+                        break;
                     case "held":
                         piece.held = p[1] == "yes";
                         break;
@@ -1242,6 +1334,22 @@ namespace M3AT
                         break;
                     case "body":
                         piece.bodyStamp = p.Length > 1 ? p[1] : null;
+                        int generation;
+                        piece.bodyGeneration = p.Length > 2 && int.TryParse(p[2], out generation) ? generation : 0;
+                        break;
+                    case "frame":
+                        if (p.Length > 13)
+                        {
+                            Matrix4x4 m = Matrix4x4.identity;
+                            for (int r = 0; r < 3; r++)
+                            {
+                                for (int c = 0; c < 4; c++)
+                                {
+                                    m[r, c] = Num(p[2 + 4 * r + c]);
+                                }
+                            }
+                            (piece.frame = piece.frame ?? new Dictionary<string, Matrix4x4>())[p[1]] = m;
+                        }
                         break;
                     case "bones":
                         piece.weightBones = new string[p.Length - 1];
@@ -1354,6 +1462,12 @@ namespace M3AT
                     case "head":
                         headBone = int.Parse(p[1]);
                         break;
+                    case "generation":
+                        if (isBody)
+                        {
+                            bodyGeneration = int.Parse(p[1]);
+                        }
+                        break;
                     case "scalp":
                         for (int k = 1; k < p.Length; k++)
                         {
@@ -1431,6 +1545,17 @@ namespace M3AT
             }
             piece.uvs = uvs.Count == v.Count ? uvs.ToArray() : null;
             piece.normal = normals.Count == v.Count ? normals.ToArray() : null;
+            if (fixes.Count > 0)
+            {
+                piece.normalFix = new Vector3[v.Count];
+                foreach (KeyValuePair<int, Vector3> fix in fixes)
+                {
+                    if (fix.Key >= 0 && fix.Key < v.Count)
+                    {
+                        piece.normalFix[fix.Key] = fix.Value;
+                    }
+                }
+            }
             if (isBody)
             {
                 piece.name = "body";
@@ -1947,7 +2072,23 @@ namespace M3AT
         private static PieceShape ShapePiece(Piece piece, List<KeyValuePair<string, float>> mix)
         {
             Vector3[] rest = Mixed(piece.rest, piece.keys, mix);
+            AddFramed(rest, piece, mix);   // a frame it has no key of its own for, by its weights (Frames.cs)
             Vector3[] normal = piece.normal ?? Normals(rest, piece.tris);
+            if (piece.normal == null && piece.normalFix != null && piece.normalFix.Length == normal.Length)
+            {
+                // A cut through the mesh (the chest's, 2026-11) put vertices on the old surface's folds, which the
+                // area-weighted normals then show as creases; each such vertex carries, from the export, what its
+                // normal at rest lacked of the shading before the cut. Added in every shape, it gives back the old
+                // shading at rest while a key's reshaping still shades as worked out (export_frames.py, nfix).
+                for (int i = 0; i < normal.Length; i++)
+                {
+                    Vector3 fix = piece.normalFix[i];
+                    if (fix.x != 0f || fix.y != 0f || fix.z != 0f)
+                    {
+                        normal[i] = (normal[i] + fix).normalized;
+                    }
+                }
+            }
             Vector3[] hull = null;   // hair: outlined by its shell instead
             if (piece.shell == null)
             {
@@ -3487,7 +3628,13 @@ namespace M3AT
                 Shield(p, index, m);
                 return m;
             }
-            Pose(p, pieces[index], OverHairShape(p.shape, index, GarmentShape(p.shape, index, p.wornMask), p.hairOver), m);
+            // (m.hidden: the garments over it, from HideGarments, which runs first)
+            PieceShape shape = GarmentShape(p.shape, index, p.wornMask);
+            if (index != 0 && index != FurPiece)
+            {
+                shape = TuckedShape(p.shape, index, m.hidden & p.wornMask, shape);
+            }
+            Pose(p, pieces[index], OverHairShape(p.shape, index, shape, p.hairOver), m);
             return m;
         }
 
@@ -3624,6 +3771,23 @@ namespace M3AT
                 outlineTris[key] = tris;
             }
             return tris;
+        }
+
+        // The triangles a person in these garments draws: the body less what they hide, each garment less what goes over
+        // it hides (HideUnder, HideGarments; the same cached lists). Garments made from the body's own faces take the
+        // place of the skin under them, so a dressed person draws about what the bare body does. Hair is not counted.
+        internal int DrawnTriangles(GarmentMask mask, Apparel[] worn)
+        {
+            int sum = BodyTris(mask, 0).Length / 3;
+            for (int g = 1; g < pieces.Length && g < worn.Length; g++)
+            {
+                if (worn[g] == null)
+                {
+                    continue;
+                }
+                sum += g <= MaxHiding && (mask & GarmentBit(g)) != 0 ? GarmentTris(g, OverOf(g, mask, worn)).Length / 3 : TrianglesOf(g);
+            }
+            return sum;
         }
 
         private int[] BodyTris(GarmentMask mask, int bare)
@@ -4703,7 +4867,8 @@ namespace M3AT
                 m.parts[m.outlineMarkAt].material = Silhouette ? outlineMark : linesMark;
             }
             List<MeshPart> parts = m.parts;
-            bool skipAfter = m.afterAt >= 0 && (!OcclusionShows || (ClothesOcclusion && !m.isSkin));
+            bool skipAfter = m.afterAt >= 0 && (!OcclusionShows || (ClothesOcclusion && !m.isSkin && ClothesOcclusionStrength >= 1f)
+                || m.parts[m.afterAt].material == null);
             // The screen-space outline: no shell, a code part instead (ScreenOutlines.cs).
             bool screen = ScreenOutlinesNow;
             bool shells = Outlines && !screen;
@@ -4740,6 +4905,11 @@ namespace M3AT
         public static bool ClothesOcclusion   // true: IsoRim's ambient occlusion and screen-space shadows show on clothes and hair, never the skin (the mod's options set it)
         {
             get { return SettingsMod.Settings != null && SettingsMod.Settings.clothesOcclusion; }
+        }
+
+        public static float ClothesOcclusionStrength   // with ClothesOcclusion: the share of IsoRim's darkening clothes and hair keep, 0.1 to 1 (the mod's options set it)
+        {
+            get { return SettingsMod.Settings == null ? 1f : Mathf.Clamp(SettingsMod.Settings.clothesOcclusionStrength, 0.1f, 1f); }
         }
 
         public static bool Outlines   // false: the chibi is drawn without its outline (the mod's options set it)
@@ -4939,6 +5109,10 @@ namespace M3AT
             if (from.normal != null)
             {
                 p.normal = Array.ConvertAll(kept, o => from.normal[o]);
+            }
+            if (from.normalFix != null)
+            {
+                p.normalFix = Array.ConvertAll(kept, o => from.normalFix[o]);
             }
             if (from.skinVert != null)
             {
@@ -5589,6 +5763,7 @@ namespace M3AT
             m.name = hair.texture.name;
             m.mainTexture = hair.texture;
             m.SetFloat("_ShadeBands", ShadeBands);
+            m.SetFloat("_Lining", hair.lining);
             if (!Api.ConfigureFigureMaterial(m, FigureMaterialKind.Unlit))
             {
                 return null;   // IsoRim's materials aren't made yet: again next time
@@ -5601,6 +5776,7 @@ namespace M3AT
                 mark.name = m.name + "_Mark";
                 mark.mainTexture = hair.texture;
                 mark.SetFloat("_ShadeBands", ShadeBands);
+                mark.SetFloat("_Lining", hair.lining);
                 Api.ConfigureFigureMaterial(mark, FigureMaterialKind.Unlit);
                 mark.SetFloat("_LightMode", LightModelCurve);
                 mark.SetFloat("_GlowMode", GlowOwnCell);

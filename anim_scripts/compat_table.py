@@ -9,7 +9,7 @@ import csv, os, re, sys
 
 DOCS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "M3AT: Maru's 3D Animated Toons", "Docs")
 BEGIN, END = "<!-- compat-table:begin (made by anim_scripts/compat_table.py from Compatibility.csv; edit the CSV) -->", "<!-- compat-table:end -->"
-COLUMNS = ["Status", "Clothes", "Also needs", "What works", "Known gaps", "Settings"]
+COLUMNS = ["Status", "Clothes", "Gene parts", "Also needs", "What works", "Known gaps"]
 
 def cell(text):
     return text.replace("|", "\\|").replace("\n", " ")
@@ -23,6 +23,11 @@ def main():
     out = [BEGIN, ""]
     for c in categories:
         group = [r for r in rows if r["Category"] == c]
+        if c == "Required":
+            # One line, not a table: the four mods every player needs (what each does is under "Required mods" below).
+            out.append("**Required:** " + ", ".join("[%s](%s)" % (r["Mod"], r["Workshop"]) if r["Workshop"] else r["Mod"] for r in group))
+            out.append("")
+            continue
         shown = [k for k in COLUMNS if any(r[k] for r in group)]
         out.append("### " + c)
         out.append("")

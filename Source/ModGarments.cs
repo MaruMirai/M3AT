@@ -26,6 +26,10 @@ namespace M3AT
     //   hard yes|no        moved by its bones as a key moves the joints, not reshaped (plate armour, and by default
     //                      anything with a bone line); rigid yes: moved whole.
     //   own_keys <names>   its key lines kept for these keys; every other body key fitted.
+    //   wearer_key <key> <amount>   its wearer takes at least that much of a body key while it is worn (armour's frame:
+    //                      Armoured 0.25 light .. 1 the heaviest); one line a key (WalkFigures.WornKeysOf).
+    //   frame <bone> <12>  its own frame: that bone's deform (a 3x4 matrix, row by row, game space) from the skeleton to
+    //                      the body its wearer is drawn in, one line a moved bone; the file's mesh is at rest (Frames.cs).
     //   hides no           it hides no skin (a see-through veil); hide_bones <prefixes>: also hides every body triangle
     //                      with HideGroupWeight of each corner on bones starting with one of them (armour hiding a limb).
     //   genes <defNames>   a gene part, drawn while the pawn has one of these genes active, not for apparel;
@@ -47,7 +51,7 @@ namespace M3AT
         private const float FillShare = 0.5f;       // FILL_SHARE
         private const int FillPasses = 8, FillWayPasses = 4;   // FILL_PASSES, FILL_WAY_PASSES
         private static readonly string[] AlwaysFitted = { "thin", "fat", "hulk" };   // ALWAYS_FITTED
-        private static readonly string[] HardFitted = { "shrinkhead" };   // HARD_FITTED
+        private static readonly string[] HardFitted = { "shrinkhead", "armoured" };   // HARD_FITTED
         private static readonly string[] HangBones = { "thigh", "shin", "foot", "toe" };   // HANG_BONES
         private static readonly string[] HangNot = { "shoulder", "upper_arm", "forearm", "hand", "palm", "thumb", "f_" };   // HANG_NOT
 
@@ -69,15 +73,19 @@ namespace M3AT
                 own[all[g].name] = all[g];
             }
             HashSet<string> names = new HashSet<string>(own.Keys, StringComparer.OrdinalIgnoreCase);
+            pieces = all.ToArray();   // this mod's own, for each mod garment's budget to be matched against (OursOf); set again after
+
             List<GarmentFile> files = ModGarmentFiles().ToList();
             files.AddRange(PackGarmentFiles());
             foreach (GarmentFile found in files)
             {
                 string path = found.path, mod = found.modName;
                 Piece g;
+                System.Diagnostics.Stopwatch one = System.Diagnostics.Stopwatch.StartNew();
                 try
                 {
                     g = ReadModGarment(path, mod, own, body, found.textureDir, found.owner);
+                    AddLoadSeconds(g != null ? g.owner : found.owner, one.Elapsed.TotalSeconds, g != null && g.owner == null ? mod : null);   // read, cut and fitted
                 }
                 catch (Exception e)
                 {
@@ -109,8 +117,12 @@ namespace M3AT
                 all.Add(g);
                 Log.Message(Tag + "garment " + g.name + " from " + mod + (g.baseName != null ? " (on " + g.baseName + ")" : "") + ": "
                     + (g.genes != null ? "for the genes " + string.Join(", ", g.genes) : "for " + string.Join(", ", g.defs))
-                    + ", " + g.rest.Length + " vertices, hides " + g.hides.Length + " body triangles.");
+                    + ", " + g.rest.Length + " vertices, hides " + g.hides.Length + " body triangles."
+                    + (g.bodyGeneration > 0 && g.bodyGeneration < bodyGeneration
+                        ? " Made on body generation " + g.bodyGeneration + " (this M3AT's is " + bodyGeneration + "): it may clip where the body has changed since, and need re-exporting on the new body."
+                        : ""));
             }
+            ForgetStandIns();   // (worked out over this mod's own alone, for the budgets)
             if (all.Count - 1 > MaxHiding)
             {
                 Log.Warning(Tag + (all.Count - 1) + " garments are loaded, but worn-garment masks hold " + MaxHiding + ": those past it hide nothing.");
@@ -267,6 +279,8 @@ namespace M3AT
                     return null;
                 }
                 g = Retextured(b, g);
+                g.ours = Mathf.Max(b.madeTris > 0 ? b.madeTris : b.tris.Length / 3, OursLeast);   // (our mesh, so within its budget)
+                g.oursName = b.name;
             }
             else
             {
@@ -275,8 +289,8 @@ namespace M3AT
                     Log.Warning(Tag + mod + "'s garment " + g.name + " has no vertices or triangles (and no base line), so it is not drawn.");
                     return null;
                 }
-                KeepWithinBudget(g, mod);   // (before fitting, which then works on the triangles kept)
-                FitToBody(g, body);
+                KeepWithinBudget(g, mod, path);   // (before fitting, which then works on the triangles kept)
+                FitOrCached(g, body, path);       // (fitted once, then kept on disk: FitCache.cs)
             }
             if (g.genes == null && g.defs.Length == 0 && string.IsNullOrEmpty(g.layer) && g.standsFor == null)
             {
@@ -322,6 +336,11 @@ namespace M3AT
                 heldAt = b.heldAt,
                 heldGrip = b.heldGrip,
                 withLegwear = b.withLegwear,
+                pads = b.pads || file.pads,
+                sole = b.sole,          // (the mesh's: how far it reaches under the feet)
+                marineOf = b.marineOf,
+                wearerKeys = file.wearerKeys ?? b.wearerKeys,
+                frame = b.frame,        // (the mesh's: it was modelled at rest from that frame)
                 hides = file.hidesWanted == 0 ? new int[0] : b.hides,
                 opens = b.opens,
                 rest = b.rest,
@@ -331,6 +350,7 @@ namespace M3AT
                 weight = b.weight,
                 uvs = b.uvs,
                 normal = b.normal,
+                normalFix = b.normalFix,
                 glass = b.glass,
                 weightsGiven = true,
             };

@@ -32,3 +32,7 @@ Maths-only code (ragdoll solver, skinning, garment and holster placing) can run 
 - A scratch folder of symlinks to every file of the RimWorld install except `RimWorld.dll` (the harness's) and the `RimWorld` launcher, which must be copied: a symlinked one can resolve back to the real install and start the game.
 - IsoRim and Harmony loaded from their Workshop folders by an `AssemblyLoadContext.Default.Resolving` handler in `Main`.
 - The chibi read with the private `ReadMesh`/`ReadAnim` rather than `Load` (which wants the garment textures), and `faceFrom = null` before `NewPosed`. Posed meshes can be written as OBJ and rendered with Blender's Workbench.
+
+## Compatibility page
+
+`anim_scripts/compat_html.py` writes `Docs/Compatibility.csv` as one self-contained web page, `previews/compatibility.html` (not in git; another path as its argument): a tally of every mod by support level, a search box, a table per category (stacked on phones). The CSV is the one list; the page is only a view of it, so it is regenerated, never edited. Maru switches between three Claude accounts and artifacts don't carry across them, so the page is opened locally or republished from whichever account is in use (2026-11-26: published as artifact "M3AT Mod Compatibility" on one account).

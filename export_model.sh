@@ -10,4 +10,4 @@ cd "$(dirname "$0")"
 MOD="M3AT: Maru's 3D Animated Toons"   # the mod as the game loads it; the rest of this folder is tools
 
 "$BLENDER" -b Models/pawnHumanRig.blend --python-exit-code 1 --python anim_scripts/export_frames.py -- "$MOD/Models/chibi" "$@" \
-    | grep -E "^(SKIN|GARMENT|BODY_CUT|FIT|SOLID|SOLE|HEM|SHIELD|HIDE_EDGES|EXPORT|WARNING)|Error|rror:"
+    | grep -E "^(SKIN|BURIED|GARMENT|SEAM|BODY_CUT|FIT|SOLID|SOLE|HEM|SHIELD|HIDE_EDGES|EXPORT|WARNING)|Error|rror:"

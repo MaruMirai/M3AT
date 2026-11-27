@@ -9,19 +9,21 @@ using Verse;
 namespace M3AT
 {
     // What another mod's content replaces, by part. A content pack (a race pack: the Miho and Wolfein 3D packs) may change
-    // a race's ears and tail, face, hair, how hats fit, body shape, skin colour, its clothing, and draw gene parts.
+    // a race's face, hair, how hats fit, body shape, skin colour, its clothing, and its gene parts: the race's ears and
+    // tail and the parts drawn for genes, one switch. M3AT's side is its own models where it has them and its stand-ins
+    // built from the race's pictures elsewhere; the pack's side is the pack's (its ears and tail patches or API files, its
+    // gene part garments). Until Nov 2026 the ears and tail were a switch of their own (EarsTail, read as GeneParts now).
     internal enum ContentPart
     {
-        EarsTail, Face, Hair, HeadwearFit, BodyShape, SkinColour, Clothing, GeneParts, Poses, Other,
+        Face, Hair, HeadwearFit, BodyShape, SkinColour, Clothing, Armour, GeneParts, Poses, Other,
         Shared,   // a patch the pack's other patches rely on (the pawn being dressed): on while any of its parts is
     }
 
     // The player's choice, per content pack and part, of the pack's content or M3AT's own (ContentWindow.cs shows it), and
-    // the defaults when none is made. The packs side by side (Nov 2026, the packclothes and addoncost autotests): a pack is
-    // better at what M3AT has only a generic stand-in for (Miho's face, hair and fox ears; Wolfein's ears, tail and skin
-    // tint; the shapes of dresses, veils and stockings), M3AT at faces it fits from Facial Animation (Wolfein's), armour and
-    // helmets, and clothing colours. So by default the pack's, but M3AT's face where Facial Animation has faces for the race,
-    // and M3AT's clothing for armour and helmets (ArmourByDefault).
+    // the defaults when none is made: the pack's for every part (Default). The packs side by side (Nov 2026, the packclothes
+    // and addoncost autotests): a pack is better at what M3AT has only a generic stand-in for (Miho's face, hair and fox
+    // ears; the shapes of dresses, veils and stockings), M3AT at faces it fits from Facial Animation (Wolfein's), armour and
+    // helmets, clothing colours, and the races it has its own ears and tails for (Wolfein's); those are a click away.
     //
     // Enforced for a pack that patches M3AT's methods by taking those patches off (AddOns.Gate, by PartOf's table of our own
     // methods), for one that registers content through ExpansionApi 2 by not asking it, and for garments by GarmentOf.
@@ -33,9 +35,9 @@ namespace M3AT
         // change. FaceLayers' methods are all the face's.
         private static readonly Dictionary<string, ContentPart> PartByMethod = new Dictionary<string, ContentPart>
         {
-            { "EarFileOf", ContentPart.EarsTail }, { "RaceEars", ContentPart.EarsTail }, { "HasCatTail", ContentPart.EarsTail },
-            { "StepTail", ContentPart.EarsTail }, { "DrawCatTail", ContentPart.EarsTail }, { "TailOf", ContentPart.EarsTail },
-            { "LoadTail", ContentPart.EarsTail }, { "DrawGeneEars", ContentPart.EarsTail },
+            { "EarFileOf", ContentPart.GeneParts }, { "RaceEars", ContentPart.GeneParts }, { "HasCatTail", ContentPart.GeneParts },
+            { "StepTail", ContentPart.GeneParts }, { "DrawCatTail", ContentPart.GeneParts }, { "TailOf", ContentPart.GeneParts },
+            { "LoadTail", ContentPart.GeneParts }, { "DrawGeneEars", ContentPart.GeneParts },
             { "HairOf", ContentPart.Hair }, { "HairUnderHats", ContentPart.Hair }, { "DrawHair", ContentPart.Hair },
             { "HideUnder", ContentPart.Hair }, { "HideFur", ContentPart.Hair }, { "DrawBody", ContentPart.Hair },
             { "WornHair", ContentPart.HeadwearFit }, { "HidesEars", ContentPart.HeadwearFit }, { "RimOf", ContentPart.HeadwearFit },
@@ -48,9 +50,31 @@ namespace M3AT
 
         internal static readonly ContentPart[] Shown =
         {
-            ContentPart.EarsTail, ContentPart.Face, ContentPart.Hair, ContentPart.HeadwearFit, ContentPart.BodyShape,
-            ContentPart.SkinColour, ContentPart.Clothing, ContentPart.GeneParts, ContentPart.Poses, ContentPart.Other,
+            ContentPart.Clothing, ContentPart.Armour, ContentPart.GeneParts, ContentPart.Hair, ContentPart.Face,
+            ContentPart.SkinColour, ContentPart.HeadwearFit, ContentPart.BodyShape, ContentPart.Poses, ContentPart.Other,
         };
+
+        // A patch on reading the chibi (ReadMesh, Load) whose code's class is named for the body changes its mesh or shape
+        // (the Miho pack's MihoBustMesh cuts the chest of the body and every garment finer, MihoBustShape adds its key):
+        // that is the body shape's. Any other there is shared (adding garments, as MihoGarments does).
+        private static readonly Regex BodyPatchClass = new Regex("body|bust|shape", RegexOptions.IgnoreCase);
+
+        internal static ContentPart PartOf(MethodBase target, MethodInfo patch)
+        {
+            ContentPart part = PartOf(target);
+            if (part == ContentPart.Shared && patch != null && target.DeclaringType == typeof(SkinnedFigure)
+                && (target.Name == "ReadMesh" || target.Name == "Load") && BodyPatchClass.IsMatch(patch.DeclaringType.Name))
+            {
+                return ContentPart.BodyShape;
+            }
+            return part;
+        }
+
+        // Whether this is a patch that changes the body's mesh as it is read (paid by every pawn of every race).
+        internal static bool ChangesBodyMesh(MethodBase target, MethodInfo patch)
+        {
+            return target.DeclaringType == typeof(SkinnedFigure) && target.Name == "ReadMesh" && PartOf(target, patch) == ContentPart.BodyShape;
+        }
 
         internal static ContentPart PartOf(MethodBase target)
         {
@@ -112,10 +136,39 @@ namespace M3AT
             return false;
         }
 
+        private static bool migrated;
+
+        // Choices saved for the old ears and tail switch (key part EarsTail) become the gene parts' choice, unless that
+        // pack has one for gene parts already.
+        private static void Migrate(Settings s)
+        {
+            if (migrated || s == null || s.contentChoices == null)
+            {
+                return;
+            }
+            migrated = true;
+            const string old = "|EarsTail";
+            List<string> keys = s.contentChoices.Keys.Where(k => k.EndsWith(old, StringComparison.OrdinalIgnoreCase)).ToList();
+            foreach (string key in keys)
+            {
+                string now = key.Substring(0, key.Length - old.Length) + "|" + ContentPart.GeneParts;
+                if (!s.contentChoices.ContainsKey(now))
+                {
+                    s.contentChoices[now] = s.contentChoices[key];
+                }
+                s.contentChoices.Remove(key);
+            }
+            if (keys.Count > 0)
+            {
+                s.Write();
+            }
+        }
+
         // The player's choice, null for none (the default).
         internal static bool? Chosen(string packageId, ContentPart part)
         {
             Settings s = SettingsMod.Settings;
+            Migrate(s);
             string v;
             if (s == null || s.contentChoices == null || !s.contentChoices.TryGetValue(Key(packageId, part), out v))
             {
@@ -132,6 +185,7 @@ namespace M3AT
             {
                 return;
             }
+            NoteBody(packageId, part, pack);
             string key = Key(packageId, part);
             if (pack == null || pack.Value == Default(packageId, part))
             {
@@ -145,16 +199,27 @@ namespace M3AT
             Apply();
         }
 
-        internal static void Reset(string packageId)
+        // Sets several parts at once (each null: back to its default), saved and applied once, for the switcher's
+        // whole-pack columns and its swap.
+        internal static void SetMany(string packageId, IEnumerable<KeyValuePair<ContentPart, bool?>> choices)
         {
             Settings s = SettingsMod.Settings;
             if (s == null)
             {
                 return;
             }
-            foreach (string key in s.contentChoices.Keys.Where(k => k.StartsWith(packageId + "|", StringComparison.OrdinalIgnoreCase)).ToList())
+            foreach (KeyValuePair<ContentPart, bool?> c in choices)
             {
-                s.contentChoices.Remove(key);
+                NoteBody(packageId, c.Key, c.Value);
+                string key = Key(packageId, c.Key);
+                if (c.Value == null || c.Value.Value == Default(packageId, c.Key))
+                {
+                    s.contentChoices.Remove(key);
+                }
+                else
+                {
+                    s.contentChoices[key] = c.Value.Value ? PackWord : M3atWord;
+                }
             }
             s.Write();
             Apply();
@@ -165,24 +230,133 @@ namespace M3AT
             return packageId.ToLowerInvariant() + "|" + part;
         }
 
-        // The default: the pack's, but M3AT's face where Facial Animation has faces for the pack's races (M3AT fits those).
+        // The default: the pack's, for every part (the player asked for packs to show as their makers meant, M3AT's a click
+        // away). The one exception is the body: only one pack's body change may be on (OneBody), so of the packs that
+        // change it only the first (DefaultBody) is on by default.
         internal static bool Default(string packageId, ContentPart part)
         {
-            if (part == ContentPart.Face)
+            if (part == ContentPart.BodyShape && AddOns.ChangesBodyMesh(packageId))
             {
-                ModContentPack mod = AddOns.ModById(packageId);
-                List<string> races = mod != null ? RacesOf(mod) : new List<string>();
-                return races.Count == 0 || !races.Any(FacialAnimationHas);
+                return string.Equals(packageId, DefaultBody(), StringComparison.OrdinalIgnoreCase);
             }
             return true;
+        }
+
+        // The choice, else the default.
+        private static bool Effective(string packageId, ContentPart part)
+        {
+            return Chosen(packageId, part) ?? Default(packageId, part);
+        }
+
+        // The pack whose body change is on (OneBody leaves one at most), or null: M3AT's body. As chosen now, which may
+        // differ from the body loaded until a restart.
+        internal static AddOns.AddOn BodyPack()
+        {
+            return Packs().FirstOrDefault(a => AddOns.ChangesBodyMesh(a.packageId) && Effective(a.packageId, ContentPart.BodyShape));
+        }
+
+        private static string defaultBody;
+        private static int defaultBodyVersion = -1;
+
+        // The first content pack (as Packs lists them, OneBody's first too) whose patches change the body's mesh, or null.
+        private static string DefaultBody()
+        {
+            if (defaultBodyVersion != AddOns.Version)
+            {
+                AddOns.AddOn first = Packs().FirstOrDefault(a => AddOns.ChangesBodyMesh(a.packageId));
+                defaultBody = first != null ? first.packageId : null;
+                defaultBodyVersion = AddOns.Version;
+            }
+            return defaultBody;
+        }
+
+        // Stores a body choice as a key only where it differs from the default.
+        private static void StoreBody(Settings s, string packageId, bool pack)
+        {
+            string key = Key(packageId, ContentPart.BodyShape);
+            if (pack == Default(packageId, ContentPart.BodyShape))
+            {
+                s.contentChoices.Remove(key);
+            }
+            else
+            {
+                s.contentChoices[key] = pack ? PackWord : M3atWord;
+            }
         }
 
         // Takes the choices into effect: the gate on the packs' patches, then what is cached from them.
         internal static void Apply()
         {
+            OneBody();
             answers.Clear();
+            packRaces.Clear();
             AddOns.Gate();
             packs = null;
+        }
+
+        // The pack whose body change was chosen last (Set, SetMany), kept when another's has to go.
+        private static string bodyChosen;
+
+        private static void NoteBody(string packageId, ContentPart part, bool? pack)
+        {
+            if (part == ContentPart.BodyShape && pack == true && AddOns.ChangesBodyMesh(packageId))
+            {
+                bodyChosen = packageId;
+            }
+        }
+
+        // Only one pack's body change at a time. Each patches M3AT's body (and every garment) as it is read, each on what
+        // the one before left in Harmony's order: two that cut the mesh finer multiply its triangles, and two that disagree
+        // can leave garments naming body triangles that aren't there, which fails the load and leaves M3AT's figures off
+        // for the session. So choosing one pack's turns any other's back to M3AT's (the one chosen last kept, else the
+        // first; also settings saved before this rule), with a message. Body changes take a restart either way.
+        private static void OneBody()
+        {
+            Settings s = SettingsMod.Settings;
+            if (s == null || s.contentChoices == null)
+            {
+                return;
+            }
+            List<AddOns.AddOn> on = Packs().Where(a => AddOns.ChangesBodyMesh(a.packageId) && Effective(a.packageId, ContentPart.BodyShape)).ToList();
+            if (on.Count < 2)
+            {
+                return;
+            }
+            AddOns.AddOn keep = on.FirstOrDefault(a => string.Equals(a.packageId, bodyChosen, StringComparison.OrdinalIgnoreCase)) ?? on[0];
+            List<string> off = new List<string>();
+            foreach (AddOns.AddOn a in on)
+            {
+                if (a != keep)
+                {
+                    StoreBody(s, a.packageId, false);
+                    off.Add(a.name);
+                }
+            }
+            s.Write();
+            string names = string.Join(", ", off);
+            Log.Message(WalkFigures.Tag + "only one content pack may change the body: kept " + keep.name + "'s, turned off " + names + "'s.");
+            Messages.Message("M3AT_BodyOneOnly".Translate(keep.name, names), MessageTypeDefOf.CautionInput, false);
+        }
+
+        // The one body for everyone (the switcher's BodyChoice): this pack's body change, or none (null: M3AT's), every
+        // other pack's turned back to M3AT's, saved and applied once.
+        internal static void SetBody(string packageId)
+        {
+            Settings s = SettingsMod.Settings;
+            if (s == null)
+            {
+                return;
+            }
+            foreach (AddOns.AddOn a in Packs().Where(a => AddOns.ChangesBodyMesh(a.packageId)))
+            {
+                StoreBody(s, a.packageId, string.Equals(a.packageId, packageId, StringComparison.OrdinalIgnoreCase));
+            }
+            if (packageId != null)
+            {
+                bodyChosen = packageId;
+            }
+            s.Write();
+            Apply();
         }
 
         // ---- the packs found
@@ -210,22 +384,130 @@ namespace M3AT
             {
                 return;
             }
-            List<string> fresh = new List<string>();
+            // Packs that made loading the figures slow named once a session, with how long each took.
+            List<string> slow = new List<string>();
+            double slowSum = 0.0;
             foreach (AddOns.AddOn a in Packs())
             {
-                if (!s.contentSeen.Contains(a.packageId.ToLowerInvariant()))
+                double t = SkinnedFigure.LoadSecondsOf(a.packageId);
+                if (t >= 1.0)
                 {
-                    s.contentSeen.Add(a.packageId.ToLowerInvariant());
-                    fresh.Add(a.name);
+                    // Whether its garments were fitted this load (the first with it, or after it or M3AT changed) or taken
+                    // from the fits kept on disk (FitCache.cs).
+                    SkinnedFigure.FitsOf(a.packageId, out int made, out int cached);
+                    string how = made > 0 && cached == 0 ? "M3AT_ContentLoadFresh".Translate(made)
+                        : made > 0 ? "M3AT_ContentLoadSome".Translate(made, cached)
+                        : cached > 0 ? "M3AT_ContentLoadCached".Translate(cached) : (TaggedString)"";
+                    slow.Add(a.name + " " + t.ToString("0") + " s" + (how.NullOrEmpty() ? "" : " (" + how + ")"));
+                    slowSum += t;
                 }
             }
-            if (fresh.Count > 0)
+            if (slowSum >= SkinnedFigure.LoadWarnSeconds)
             {
-                s.Write();
-                string names = string.Join(", ", fresh);
-                Log.Message(WalkFigures.Tag + "content packs in use: " + names + ". Choose the pack's or M3AT's content per part in the Content tab of M3AT's options, the M3AT button or M3AT look on a pawn.");
-                Messages.Message("M3AT_ContentNew".Translate(names), MessageTypeDefOf.NeutralEvent, false);
+                Messages.Message("M3AT_ContentSlowLoad".Translate(slowSum.ToString("0"), string.Join(", ", slow)), MessageTypeDefOf.CautionInput, false);
             }
+            if (Packs().Count > 0)
+            {
+                Log.Message(WalkFigures.Tag + "content packs in use: " + string.Join(", ", Packs().Select(a => a.name))
+                    + ". Choose the pack's or M3AT's content per part in the Content tab of M3AT's options, the M3AT button or M3AT look on a pawn.");
+                if (s.contentNoticeShown)
+                {
+                    return;
+                }
+#if AUTOTEST
+                if (!AutoTest.Wants("contentnotice"))
+                {
+                    return;   // it would cover the other scenarios' pictures; contentnotice shows it itself
+                }
+#endif
+                QueueNotice();
+            }
+        }
+
+        // ---- the content manager's notice
+
+        // Once ever, the first time any content pack is loaded (Settings.contentNoticeShown): a message box saying the content manager is
+        // there and changes nothing by itself. It only says the manager exists; it doesn't weigh M3AT's content against the
+        // pack's, which is the player's call (Maru's wish, 2026-11-27). Held until NoticeDelay real seconds after the
+        // figures loaded, with a map up and no other message box open (another mod's notice at the start, Wolfein's),
+        // so it isn't lost under the first frames or stacked on another; it counts as shown only once it has shown.
+        private const float NoticeDelay = 4f;
+        private static bool noticeDue;
+        private static float noticeAt;
+
+        internal static void QueueNotice()
+        {
+            if (!noticeDue)
+            {
+                IsoRim.Api.BeforeViewUpdate += NoticeFrame;
+            }
+            noticeDue = true;
+            noticeAt = UnityEngine.Time.realtimeSinceStartup + NoticeDelay;
+        }
+
+        private static void NoticeFrame()
+        {
+            if (!noticeDue || UnityEngine.Time.realtimeSinceStartup < noticeAt || Find.CurrentMap == null || Find.WindowStack == null
+                || Find.WindowStack.Windows.Any(w => w is Dialog_MessageBox) || LongEventHandler.AnyEventNowOrWaiting)
+            {
+                return;
+            }
+            IsoRim.Api.BeforeViewUpdate -= NoticeFrame;
+            noticeDue = false;
+            Settings s = SettingsMod.Settings;
+            if (s == null)
+            {
+                return;
+            }
+            s.contentNoticeShown = true;
+            s.Write();
+            if (Packs().Count == 0)
+            {
+                return;
+            }
+            MainButtonDef button = DefDatabase<MainButtonDef>.AllDefs.FirstOrDefault(d => d.tabWindowClass == typeof(ContentTabWindow));
+            Dialog_MessageBox box = new Dialog_MessageBox("M3AT_NoticeText".Translate(),
+                "M3AT_NoticeOpen".Translate(), () =>
+                {
+                    if (button != null && Find.MainTabsRoot != null)
+                    {
+                        Find.MainTabsRoot.SetCurrentTab(button, false);
+                    }
+                },
+                "M3AT_NoticeClose".Translate(), null, "M3AT_NoticeTitle".Translate());
+            Find.WindowStack.Add(box);
+        }
+
+        // ---- gene parts, race by race
+
+        private static readonly Dictionary<string, bool> packRaces = new Dictionary<string, bool>();
+        private static int packRacesVersion = -1;
+
+        // True if a content pack the player has draw its gene parts names this pawn's race: then the pack's ears, tails,
+        // horns and the like are the only ones drawn on it, and none of M3AT's own (its gene ears, tail and horns, its
+        // models of a race's parts, the stand-ins built from the race's pictures), even for a part the pack has none of.
+        // The packs' patches (EarFileOf, HasCatTail) fill in an empty result, so they still draw theirs. Races no such pack
+        // names keep M3AT's, part by part; a pack's gene parts alone (no race) replace M3AT's gene by gene (GenePartCovers).
+        internal static bool PackOwnsGeneParts(Pawn pawn)
+        {
+            if (pawn == null || pawn.def == null)
+            {
+                return false;
+            }
+            if (packRacesVersion != AddOns.Version)
+            {
+                packRaces.Clear();
+                packRacesVersion = AddOns.Version;
+            }
+            bool owns;
+            if (!packRaces.TryGetValue(pawn.def.defName, out owns))
+            {
+                string race = pawn.def.defName;
+                owns = Packs().Any(a => a.parts.Contains(ContentPart.GeneParts) && a.races.Contains(race)
+                    && !AddOns.IsOff(a.packageId) && UsesPack(a.packageId, ContentPart.GeneParts));
+                packRaces[race] = owns;
+            }
+            return owns;
         }
 
         // ---- races
@@ -282,7 +564,7 @@ namespace M3AT
                     }
                 }
             }
-            return facialRaces.ContainsKey(race);
+            return facialRaces.ContainsKey(race) || FaceLayers.BorrowsFaces(race);
         }
 
         // ---- clothing, item by item
@@ -293,7 +575,13 @@ namespace M3AT
         private static readonly Dictionary<ThingDef, bool> armour = new Dictionary<ThingDef, bool>();
 
         // Armour and helmets, whose garments M3AT's were plainly better at than the packs' (their helmets a blob over the
-        // face, the arms bare under power armour): M3AT's by default even from a pack drawing the rest of its clothing.
+        // face, the arms bare under power armour): a row of their own, so the player can have M3AT's for them alone.
+        // Which part a pack's garment for this apparel belongs to: armour and helmets their own, the rest clothing.
+        internal static ContentPart ClothingPartOf(ThingDef def)
+        {
+            return ArmourByDefault(def) ? ContentPart.Armour : ContentPart.Clothing;
+        }
+
         internal static bool ArmourByDefault(ThingDef def)
         {
             bool found;

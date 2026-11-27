@@ -20,9 +20,9 @@ namespace M3AT
     // flared past the legs takes the art flared past the sprite's legs. The art is read as the game draws it: the
     // apparel's pictures in its material's colour (and its mask's second colour), their outline ink taken out and their
     // colours grown out past their edge so a part of the garment past the art (a longer hem, a sleeve, as the race bodies
-    // have no arms) takes the nearest. The garment's own image is multiplied back in as detail (its stitching, hems and
-    // folds), about its median, so the art keeps its colours. One image per garment, apparel material and body picture,
-    // made at most one a frame (ClothBakesPerFrame); until made the garment is drawn as before. Not for hats and masks
+    // have no arms) takes the nearest. The garment's own image is left out: multiplied back in as detail (even blurred
+    // to its folds), it printed our garment's design over the apparel's art and looked no better than the art alone.
+    // One image per garment, apparel material and body picture, made at most one a frame (ClothBakesPerFrame); until made the garment is drawn as before. Not for hats and masks
     // (riding one bone: a head sprite is laid on the head, not the body), held shields, the shoes worn with legwear,
     // the baby romper or the pajamas, or a corpse's clothes (the game's rotten colour).
     public sealed partial class SkinnedFigure
@@ -34,10 +34,10 @@ namespace M3AT
         private const int ClothViewsKept = 48;        // sprites kept read at once (each a few MB at 512), then all let go
         private const int ClothBands = 120;           // the chibi's body width measured in this many bands of height, its trunk's and legs' all
         private const int ClothBandSmooth = 2;        // and each band's width averaged with this many either side
+        private const float ClothEdgeSmooth = 1.5f;   // the body sprite's edges averaged over rows, a Gaussian this wide (rows at 128)
         private const int ClothBakesPerFrame = 1;
         private const int ClothMost = 600;            // images made at most this session (then the rest are drawn plain)
         private const float ClothArtWeight = 0.85f;   // how much more a view counts where it has art (by its alpha)
-        private const float ClothDetailLeast = 0.45f, ClothDetailMost = 1.15f;   // the garment's own image's detail, about its median, kept within these
         private const float ClothInkReach = 2.5f, ClothInkDark = 0.55f;   // its outline ink: dark pixels this near its edge (as Bled), pixels at 128
         // The heights on the chibi (the rig's units over its lowest point) the sprite body's measure (HemLengths.cs: 0 its
         // top, 1 its feet) is pinned at: its top on the neck, its shoulder line and its waist (both measured from each body
@@ -48,15 +48,16 @@ namespace M3AT
         private const float ClothShoulder = 0.08f, ClothWaist = 0.42f, ClothCrotch = 0.62f, ClothKnee = 0.81f;
         private const float RigAnkle = 1.025f, RigKnee = 6.351f;   // the rig's foot and shin heads, which give the units
         private const float WaistNarrower = 0.93f;   // a body sprite's waist is where it is narrowest, if this much narrower than above and below it
+        private const float ClothChinClear = 0.04f;   // the shoulder line is kept as a landmark only this far (a share of the body) below the chin
+        private const float ClothChinMost = 0.35f;    // a chin further down the body than this is taken as wrongly read (a race's odd head), and nothing as covered
+        private const float ClothLineReach = 1.25f;   // interior ink lines: dark lines up to about twice this wide (pixels at 128) taken out as the outline is
 
-        // Each garment's texels as placed on it at rest: the image's pixel, its place and way out (model space, cells),
-        // and the garment's own image there over its median (1: none).
+        // Each garment's texels as placed on it at rest: the image's pixel and its place and way out (model space, cells).
         private sealed class ClothTexels
         {
             public int[] at;
             public Vector3[] pos;
             public Vector3[] way;
-            public float[] detail;
         }
 
         // One painted image and its materials (a Piece only for TexturedMaterial's sake).
@@ -67,13 +68,31 @@ namespace M3AT
         }
 
         private readonly Dictionary<int, ClothTexels> clothTexels = new Dictionary<int, ClothTexels>();
-        private readonly Dictionary<(int, Material, Texture), ClothImage> clothImages = new Dictionary<(int, Material, Texture), ClothImage>();
+        private readonly Dictionary<(int, Material, Texture, Texture), ClothImage> clothImages = new Dictionary<(int, Material, Texture, Texture), ClothImage>();
         private float[] clothLowX, clothHighX, clothLowZ, clothHighZ;   // the chibi's trunk and legs, by band of height
         private float clothAnkle, clothScale;   // the ankle joint's height (cells) and cells per rig unit
         private float clothBandLow, clothBandHigh;   // the heights the bands span (cells)
         private static int clothFrame = -1, clothBakes;
         private static int clothMade;
         private static bool clothFull;
+        // How the art is laid on (the autotest compares them): 0 the edges smooth, 1 the edges a whole pixel at a time (as
+        // before 2026-11-27), 2 the edges smooth and each view upscaled along its edges (Upscaled).
+        internal static int clothStyle;
+        private static int clothEpoch;
+        private int clothEpochSeen;
+        private const int ClothFine = 512;            // a view upscaled to this many pixels a side (style 2)
+        private const float ClothFineReach = 1.5f;    // and smoothed along its edges this far either way (sprite pixels)
+        private const int ClothFinePasses = 2;
+
+        // Every painted image and read view let go, to be made again in another style (autotest only).
+        internal static void RestyleCloth(int style)
+        {
+            clothStyle = style;
+            clothEpoch++;
+            clothViews.Clear();
+            clothMade = 0;
+            clothFull = false;
+        }
 
         // True if the garment can be painted with the art of apparel it stands in for: it has texture places and an image
         // of its own, and is worn on the body, not riding one bone (a hat), held, a pack, the shoes or the baby romper.
@@ -131,8 +150,15 @@ namespace M3AT
                 {
                     return null;
                 }
-                var key = (g, worn[2], body[2].mainTexture);
+                // (By the head's picture too, as what it covers is left out.)
+                Texture headArt = pawn.Drawer.renderer.HeadGraphic?.MatAt(Rot4.South)?.mainTexture;
+                var key = (g, worn[2], body[2].mainTexture, headArt);
                 ClothImage made;
+                if (clothEpochSeen != clothEpoch)
+                {
+                    clothImages.Clear();
+                    clothEpochSeen = clothEpoch;
+                }
                 if (clothImages.TryGetValue(key, out made))
                 {
                     return made;
@@ -157,7 +183,7 @@ namespace M3AT
                 clothMade++;
                 bool legless = bodyGraphic.path != null && Array.Exists(LeglessBodies, b => bodyGraphic.path.StartsWith(b, StringComparison.OrdinalIgnoreCase));
                 System.Diagnostics.Stopwatch watch = System.Diagnostics.Stopwatch.StartNew();
-                made = PaintCloth(g, worn, body, legless, apparel.def.defName);
+                made = PaintCloth(g, worn, body, WalkFigures.HeadCoverOf(pawn), headArt, legless, apparel.def.defName);
                 clothImages[key] = made;
                 if (made != null && Prefs.DevMode)
                 {
@@ -276,12 +302,19 @@ namespace M3AT
         }
 
         // A height (model space, cells) in the sprite body's measure, 0 its top and 1 its feet, by the landmarks (RigTop ..):
-        // the body sprite's own shoulder line and waist (the view's), straight between them and past either end.
+        // the body sprite's own shoulder line and waist (the view's), straight between them and past either end. Where the
+        // game's head covers the body's top (ClothView.chin), the first row it shows is what meets the chibi's neck, as the
+        // collar it shows is under the chin: the art above it (a neck hole) would otherwise come halfway down the chest,
+        // as the chibi's head covers so much less of its trunk. With the shoulder line covered too (the head is as wide as
+        // the thin body's shoulders), the rows go straight from the chin to the waist.
         private float ClothShare(float y, ClothView v)
         {
             float h = RigAnkle + (y - clothAnkle) / clothScale;
-            float[] rig = { RigTop, RigShoulder, RigWaist, RigCrotch, RigKneeMark, RigAnkle };
-            float[] share = { 0f, v.shoulder, v.waist, ClothCrotch, ClothKnee, 1f };
+            bool shoulderShown = v.chin < v.shoulder - ClothChinClear;
+            float[] rig = shoulderShown ? new[] { RigTop, RigShoulder, RigWaist, RigCrotch, RigKneeMark, RigAnkle }
+                : new[] { RigTop, RigWaist, RigCrotch, RigKneeMark, RigAnkle };
+            float[] share = shoulderShown ? new[] { v.chin, v.shoulder, v.waist, ClothCrotch, ClothKnee, 1f }
+                : new[] { v.chin, v.waist, ClothCrotch, ClothKnee, 1f };
             int i = 0;
             while (i < rig.Length - 2 && h < rig[i + 1])
             {
@@ -290,9 +323,26 @@ namespace M3AT
             return share[i] + (h - rig[i]) * (share[i + 1] - share[i]) / (rig[i + 1] - rig[i]);
         }
 
-        private int ClothBand(float y)
+        // The chibi's trunk and legs' extent at a height, read between the bands' middles (taken a band at a time, each
+        // band's step in width moved its strip of art sideways).
+        private void ClothWidthAt(float y, out float xl, out float xh, out float zl, out float zh)
         {
-            return Mathf.Clamp(Mathf.FloorToInt((y - clothBandLow) / (clothBandHigh - clothBandLow) * ClothBands), 0, ClothBands - 1);
+            float b = Mathf.Clamp((y - clothBandLow) / (clothBandHigh - clothBandLow) * ClothBands - 0.5f, 0f, ClothBands - 1.001f);
+            int i = (int)b;
+            float t = b - i;
+            if (clothStyle == 1)
+            {
+                i = Mathf.Clamp(Mathf.FloorToInt((y - clothBandLow) / (clothBandHigh - clothBandLow) * ClothBands), 0, ClothBands - 1);
+                xl = clothLowX[i];
+                xh = clothHighX[i];
+                zl = clothLowZ[i];
+                zh = clothHighZ[i];
+                return;
+            }
+            xl = Mathf.Lerp(clothLowX[i], clothLowX[i + 1], t);
+            xh = Mathf.Lerp(clothHighX[i], clothHighX[i + 1], t);
+            zl = Mathf.Lerp(clothLowZ[i], clothLowZ[i + 1], t);
+            zh = Mathf.Lerp(clothHighZ[i], clothHighZ[i + 1], t);
         }
 
         // The garment's texels, placed on it at rest (once per garment): each triangle drawn into its image by its texture
@@ -340,37 +390,8 @@ namespace M3AT
                 byPlace.TryGetValue(placeKey(p.rest[i]), out sum);
                 way[i] = (sum * sign).normalized;
             }
-            // The garment's own image, for its detail.
-            Color32[] own = null;
-            int ow = 0, oh = 0;
-            try
-            {
-                own = p.texture.GetPixels32();
-                ow = p.texture.width;
-                oh = p.texture.height;
-            }
-            catch (Exception)
-            {
-                own = null;   // not readable: no detail
-            }
-            float median = 1f;
-            if (own != null && own.Length == ow * oh && own.Length > 0)
-            {
-                List<float> lights = new List<float>(own.Length / 7 + 1);
-                for (int i = 0; i < own.Length; i += 7)
-                {
-                    lights.Add(Light(own[i]) / 255f);
-                }
-                lights.Sort();
-                median = Mathf.Max(0.05f, lights[lights.Count / 2]);
-            }
-            else
-            {
-                own = null;
-            }
             List<int> at = new List<int>();
             List<Vector3> pos = new List<Vector3>(), ways = new List<Vector3>();
-            List<float> detail = new List<float>();
             bool[] done = new bool[ClothSize * ClothSize];
             for (int k = 0; k < p.tris.Length; k += 3)
             {
@@ -407,17 +428,10 @@ namespace M3AT
                         at.Add(i);
                         pos.Add(p.rest[ia] * wa + p.rest[ib] * wb + p.rest[ic] * wc);
                         ways.Add((way[ia] * wa + way[ib] * wb + way[ic] * wc).normalized);
-                        float d = 1f;
-                        if (own != null)
-                        {
-                            int ox = Mathf.Clamp((int)(px / ClothSize * ow), 0, ow - 1), oy = Mathf.Clamp((int)(py / ClothSize * oh), 0, oh - 1);
-                            d = Mathf.Clamp(Light(own[oy * ow + ox]) / 255f / median, ClothDetailLeast, ClothDetailMost);
-                        }
-                        detail.Add(d);
                     }
                 }
             }
-            t = new ClothTexels { at = at.ToArray(), pos = pos.ToArray(), way = ways.ToArray(), detail = detail.ToArray() };
+            t = new ClothTexels { at = at.ToArray(), pos = pos.ToArray(), way = ways.ToArray() };
             clothTexels[g] = t;
             return t;
         }
@@ -431,10 +445,14 @@ namespace M3AT
             public int size;           // pixels a side
             public float top, feet;    // the body's top and feet, pixels from the picture's top
             public float shoulder = ClothShoulder, waist = ClothWaist;   // and its shoulder line and waist, shares of the way down it (BodyMarks)
+            public float chin;         // and how far down it the head covers its middle as the game draws it (0: not covered, or not told)
             public int[] left, right;  // the body's opaque columns in each row from the top (filled from the nearest row with any)
+            public float[] edgeLow, edgeHigh;   // and its edges smooth (EdgesOf): where its left starts and its right ends, pixels
+            public Color32[] fine;     // colour upscaled along its edges (Upscaled), fineScale times size a side, or null
+            public int fineScale = 1;
         }
 
-        private ClothImage PaintCloth(int g, Material[] worn, Material[] body, bool legless, string defName)
+        private ClothImage PaintCloth(int g, Material[] worn, Material[] body, WalkFigures.HeadCover head, Texture headKey, bool legless, string defName)
         {
             ClothBody();
             ClothTexels t = TexelsOf(g);
@@ -447,7 +465,7 @@ namespace M3AT
                     views[3] = views[1];
                     continue;
                 }
-                views[f] = ViewOf(worn[f], body[f], legless);
+                views[f] = ViewOf(worn[f], body[f], head, f, headKey, legless);
             }
             if (views[2] == null)
             {
@@ -460,6 +478,7 @@ namespace M3AT
                 {
                     views[f].shoulder = views[2].shoulder;
                     views[f].waist = views[2].waist;
+                    views[f].chin = views[2].chin;
                 }
             }
             Color32[] img = new Color32[ClothSize * ClothSize];
@@ -467,8 +486,8 @@ namespace M3AT
             for (int k = 0; k < t.at.Length; k++)
             {
                 Vector3 p = t.pos[k], n = t.way[k];
-                int band = ClothBand(p.y);
-                float xl = clothLowX[band], xh = clothHighX[band], zl = clothLowZ[band], zh = clothHighZ[band];
+                float xl, xh, zl, zh;
+                ClothWidthAt(p.y, out xl, out xh, out zl, out zh);
                 Vector4 sum = Vector4.zero;
                 float weights = 0f;
                 for (int f = 0; f < 4; f++)
@@ -492,8 +511,7 @@ namespace M3AT
                         continue;
                     }
                     float row = v.top + ClothShare(p.y, v) * (v.feet - v.top);   // pixels from the top
-                    int r = Mathf.Clamp(Mathf.RoundToInt(row), 0, v.size - 1);
-                    float col = v.left[r] + across * (v.right[r] + 1 - v.left[r]);
+                    float col = ColumnAt(v, row, across);
                     Color32 c;
                     byte a;
                     Sample(v, col, v.size - row, out c, out a);
@@ -506,15 +524,14 @@ namespace M3AT
                     // Facing straight up or down: the front's.
                     ClothView v = views[2];
                     float row = v.top + ClothShare(p.y, v) * (v.feet - v.top);
-                    int r = Mathf.Clamp(Mathf.RoundToInt(row), 0, v.size - 1);
-                    float col = v.left[r] + (xh - p.x) / Mathf.Max(1e-4f, xh - xl) * (v.right[r] + 1 - v.left[r]);
+                    float col = ColumnAt(v, row, (xh - p.x) / Mathf.Max(1e-4f, xh - xl));
                     Color32 c;
                     byte a;
                     Sample(v, col, v.size - row, out c, out a);
                     sum = new Vector4(c.r, c.g, c.b, 0f);
                     weights = 1f;
                 }
-                float d = t.detail[k] / weights;
+                float d = 1f / weights;
                 img[t.at[k]] = new Color32((byte)Mathf.Clamp(sum.x * d, 0f, 255f), (byte)Mathf.Clamp(sum.y * d, 0f, 255f), (byte)Mathf.Clamp(sum.z * d, 0f, 255f), 255);
                 have[t.at[k]] = true;
             }
@@ -537,8 +554,17 @@ namespace M3AT
         // its lines; held within the colours round it, so it doesn't ring past them.
         private static void Sample(ClothView v, float col, float rowUp, out Color32 c, out byte a)
         {
-            int s = v.size;
-            float x = Mathf.Clamp(col - 0.5f, 0f, s - 1.001f), y = Mathf.Clamp(rowUp - 0.5f, 0f, s - 1.001f);
+            int s0 = v.size;
+            a = v.alpha[Mathf.Clamp((int)rowUp, 0, s0 - 1) * s0 + Mathf.Clamp((int)col, 0, s0 - 1)];
+            Color32[] colour = v.fine ?? v.colour;
+            int k = v.fine != null ? v.fineScale : 1;
+            c = CatmullRomAt(colour, s0 * k, col * k, rowUp * k);
+        }
+
+        // A picture's colour at (x, y) in pixels (rows bottom up), Catmull-Rom held within the four pixels round it.
+        private static Color32 CatmullRomAt(Color32[] colour, int s, float px, float py)
+        {
+            float x = Mathf.Clamp(px - 0.5f, 0f, s - 1.001f), y = Mathf.Clamp(py - 0.5f, 0f, s - 1.001f);
             int x0 = (int)x, y0 = (int)y;
             float fx = x - x0, fy = y - y0;
             float wx0, wx1, wx2, wx3, wy0, wy1, wy2, wy3;
@@ -553,7 +579,7 @@ namespace M3AT
                 for (int i = 0; i < 4; i++)
                 {
                     int xx = Mathf.Clamp(x0 + i - 1, 0, s - 1);
-                    Color32 p = v.colour[yy * s + xx];
+                    Color32 p = colour[yy * s + xx];
                     float w = wx[i] * wy[j];
                     r += p.r * w;
                     g += p.g * w;
@@ -565,8 +591,182 @@ namespace M3AT
                     }
                 }
             }
-            c = new Color32((byte)Mathf.Clamp(r, lo.r, hi.r), (byte)Mathf.Clamp(g, lo.g, hi.g), (byte)Mathf.Clamp(b, lo.b, hi.b), 255);
-            a = v.alpha[Mathf.RoundToInt(y) * s + Mathf.RoundToInt(x)];
+            return new Color32((byte)Mathf.Clamp(r, lo.r, hi.r), (byte)Mathf.Clamp(g, lo.g, hi.g), (byte)Mathf.Clamp(b, lo.b, hi.b), 255);
+        }
+
+        // The view's colour upscaled to ClothFine a side and smoothed along its edges, not across them, so the art's pixel
+        // steps (magnified some eight times onto the garment) come out as smooth lines: Catmull-Rom up, then each pixel
+        // averaged with the pixels along the edge through it (ClothFineReach either way), the edge's way from the
+        // smoothed structure tensor of the sprite's brightness, by how clearly there is one (none in flat colour or at
+        // corners), ClothFinePasses times.
+        private static void Upscaled(ClothView v)
+        {
+            int s = v.size, k = ClothFine / s;
+            if (k < 2)
+            {
+                return;
+            }
+            int n = s * k;
+            // The edge's way and how clear it is, at the sprite's pixels.
+            float[] lum = new float[s * s];
+            for (int i = 0; i < lum.Length; i++)
+            {
+                Color32 c = v.colour[i];
+                lum[i] = 0.299f * c.r + 0.587f * c.g + 0.114f * c.b;
+            }
+            float[] jxx = new float[s * s], jxy = new float[s * s], jyy = new float[s * s];
+            for (int y = 0; y < s; y++)
+            {
+                int y0 = Math.Max(0, y - 1), y1 = Math.Min(s - 1, y + 1);
+                for (int x = 0; x < s; x++)
+                {
+                    int x0 = Math.Max(0, x - 1), x1 = Math.Min(s - 1, x + 1);
+                    float gx = lum[y0 * s + x1] + 2f * lum[y * s + x1] + lum[y1 * s + x1] - lum[y0 * s + x0] - 2f * lum[y * s + x0] - lum[y1 * s + x0];
+                    float gy = lum[y1 * s + x0] + 2f * lum[y1 * s + x] + lum[y1 * s + x1] - lum[y0 * s + x0] - 2f * lum[y0 * s + x] - lum[y0 * s + x1];
+                    jxx[y * s + x] = gx * gx;
+                    jxy[y * s + x] = gx * gy;
+                    jyy[y * s + x] = gy * gy;
+                }
+            }
+            jxx = Blurred(jxx, s, 1f);
+            jxy = Blurred(jxy, s, 1f);
+            jyy = Blurred(jyy, s, 1f);
+            float[] tx = new float[s * s], ty = new float[s * s], clear = new float[s * s];
+            for (int i = 0; i < s * s; i++)
+            {
+                float a = jxx[i], b = jxy[i], d = jyy[i];
+                float half = 0.5f * (a + d), disc = Mathf.Sqrt(Mathf.Max(0f, half * half - (a * d - b * b)));
+                float l1 = half + disc, l2 = half - disc;
+                float q = (l1 - l2) / (l1 + l2 + 1e-3f);
+                clear[i] = q * q;
+                // The eigenvector of the smaller value: along the edge.
+                float ex = b, ey = l2 - a;
+                if (Mathf.Abs(ex) + Mathf.Abs(ey) < 1e-6f)
+                {
+                    ex = l2 - d;
+                    ey = b;
+                }
+                float len = Mathf.Sqrt(ex * ex + ey * ey);
+                if (len < 1e-6f)
+                {
+                    clear[i] = 0f;
+                    continue;
+                }
+                tx[i] = ex / len;
+                ty[i] = ey / len;
+            }
+            // Up, Catmull-Rom.
+            float[] img = new float[n * n * 3];
+            for (int y = 0; y < n; y++)
+            {
+                for (int x = 0; x < n; x++)
+                {
+                    Color32 c = CatmullRomAt(v.colour, s, (x + 0.5f) / k, (y + 0.5f) / k);
+                    int o = (y * n + x) * 3;
+                    img[o] = c.r;
+                    img[o + 1] = c.g;
+                    img[o + 2] = c.b;
+                }
+            }
+            // Along the edges.
+            const int Steps = 4;
+            float step = ClothFineReach * k / Steps, spread = ClothFineReach * k * 0.6f;
+            float[] w = new float[Steps + 1];
+            for (int i = 1; i <= Steps; i++)
+            {
+                w[i] = Mathf.Exp(-0.5f * (i * step / spread) * (i * step / spread));
+            }
+            float[] next = new float[img.Length];
+            for (int pass = 0; pass < ClothFinePasses; pass++)
+            {
+                for (int y = 0; y < n; y++)
+                {
+                    int cy = Math.Min(s - 1, y / k);
+                    for (int x = 0; x < n; x++)
+                    {
+                        int ci = cy * s + Math.Min(s - 1, x / k);
+                        int o = (y * n + x) * 3;
+                        float q = clear[ci];
+                        if (q < 0.02f)
+                        {
+                            next[o] = img[o];
+                            next[o + 1] = img[o + 1];
+                            next[o + 2] = img[o + 2];
+                            continue;
+                        }
+                        float r = img[o], g = img[o + 1], b = img[o + 2], sum = 1f;
+                        float dx = tx[ci] * step, dy = ty[ci] * step;
+                        for (int i = 1; i <= Steps; i++)
+                        {
+                            float wi = w[i] * q;
+                            for (int sign = -1; sign <= 1; sign += 2)
+                            {
+                                float sx = Mathf.Clamp(x + sign * dx * i, 0f, n - 1.001f), sy = Mathf.Clamp(y + sign * dy * i, 0f, n - 1.001f);
+                                int ix = (int)sx, iy = (int)sy;
+                                float fx = sx - ix, fy = sy - iy;
+                                int p00 = (iy * n + ix) * 3, p10 = p00 + 3, p01 = p00 + n * 3, p11 = p01 + 3;
+                                float w00 = (1f - fx) * (1f - fy) * wi, w10 = fx * (1f - fy) * wi, w01 = (1f - fx) * fy * wi, w11 = fx * fy * wi;
+                                r += img[p00] * w00 + img[p10] * w10 + img[p01] * w01 + img[p11] * w11;
+                                g += img[p00 + 1] * w00 + img[p10 + 1] * w10 + img[p01 + 1] * w01 + img[p11 + 1] * w11;
+                                b += img[p00 + 2] * w00 + img[p10 + 2] * w10 + img[p01 + 2] * w01 + img[p11 + 2] * w11;
+                                sum += wi;
+                            }
+                        }
+                        next[o] = r / sum;
+                        next[o + 1] = g / sum;
+                        next[o + 2] = b / sum;
+                    }
+                }
+                float[] t = img;
+                img = next;
+                next = t;
+            }
+            Color32[] fine = new Color32[n * n];
+            for (int i = 0; i < fine.Length; i++)
+            {
+                fine[i] = new Color32((byte)Mathf.Clamp(img[i * 3], 0f, 255f), (byte)Mathf.Clamp(img[i * 3 + 1], 0f, 255f), (byte)Mathf.Clamp(img[i * 3 + 2], 0f, 255f), 255);
+            }
+            v.fine = fine;
+            v.fineScale = k;
+        }
+
+        // A Gaussian blur of an s by s picture, sigma in pixels.
+        private static float[] Blurred(float[] a, int s, float sigma)
+        {
+            int reach = Mathf.CeilToInt(sigma * 2.5f);
+            float[] kern = new float[2 * reach + 1];
+            float total = 0f;
+            for (int d = -reach; d <= reach; d++)
+            {
+                kern[d + reach] = Mathf.Exp(-0.5f * d * d / (sigma * sigma));
+                total += kern[d + reach];
+            }
+            float[] mid = new float[a.Length], o = new float[a.Length];
+            for (int y = 0; y < s; y++)
+            {
+                for (int x = 0; x < s; x++)
+                {
+                    float sum = 0f;
+                    for (int d = -reach; d <= reach; d++)
+                    {
+                        sum += a[y * s + Mathf.Clamp(x + d, 0, s - 1)] * kern[d + reach];
+                    }
+                    mid[y * s + x] = sum / total;
+                }
+            }
+            for (int y = 0; y < s; y++)
+            {
+                for (int x = 0; x < s; x++)
+                {
+                    float sum = 0f;
+                    for (int d = -reach; d <= reach; d++)
+                    {
+                        sum += mid[Mathf.Clamp(y + d, 0, s - 1) * s + x] * kern[d + reach];
+                    }
+                    o[y * s + x] = sum / total;
+                }
+            }
+            return o;
         }
 
         private static void CatmullRom(float t, out float w0, out float w1, out float w2, out float w3)
@@ -578,18 +778,18 @@ namespace M3AT
             w3 = (t3 - t2) * 0.5f;
         }
 
-        private static readonly Dictionary<(Material, Material), ClothView> clothViews = new Dictionary<(Material, Material), ClothView>();
+        private static readonly Dictionary<(Material, Material, Texture), ClothView> clothViews = new Dictionary<(Material, Material, Texture), ClothView>();
 
-        // A facing's apparel picture coloured as the game draws it, its ink out and grown over the picture, with the body
-        // picture's rows and widths; null if it can't be read.
-        private static ClothView ViewOf(Material worn, Material body, bool legless)
+        // A facing's apparel picture coloured as the game draws it, its ink out and what the head covers in the game left
+        // out, grown over the picture, with the body picture's rows and widths; null if it can't be read.
+        private static ClothView ViewOf(Material worn, Material body, WalkFigures.HeadCover head, int f, Texture headKey, bool legless)
         {
             if (worn == null || body == null || worn.mainTexture == null || body.mainTexture == null)
             {
                 return null;
             }
             ClothView v;
-            if (clothViews.TryGetValue((worn, body), out v))
+            if (clothViews.TryGetValue((worn, body, headKey), out v))
             {
                 return v;
             }
@@ -606,7 +806,7 @@ namespace M3AT
             Color32[] bodyPx = Api.ReadSpritePixels(body.mainTexture, s);
             if (art == null || bodyPx == null || art.Length < s * s || bodyPx.Length < s * s)
             {
-                clothViews[(worn, body)] = null;
+                clothViews[(worn, body, headKey)] = null;
                 return null;
             }
             // Coloured as the game's shaders colour it: the colour, or with a mask its second colour by the mask's red.
@@ -632,6 +832,7 @@ namespace M3AT
             {
                 mask = null;
             }
+            bool[] covered = HeadCovered(head, f, s);
             Color32[] px = new Color32[s * s];
             byte[] alpha = new byte[s * s];
             for (int i = 0; i < px.Length; i++)
@@ -641,7 +842,7 @@ namespace M3AT
                 px[i] = new Color32((byte)(a.r * tint.r), (byte)(a.g * tint.g), (byte)(a.b * tint.b), a.a);
                 alpha[i] = a.a;
             }
-            v = new ClothView { colour = GrownArt(px, s), alpha = alpha, size = s };
+            v = new ClothView { alpha = alpha, size = s };
             // The body's rows and widths (rows from the top).
             int top = -1, bottom = -1;
             v.left = new int[s];
@@ -670,12 +871,48 @@ namespace M3AT
             }
             if (top < 0 || bottom - top < s / 10)
             {
-                clothViews[(worn, body)] = null;
+                clothViews[(worn, body, headKey)] = null;
                 return null;
             }
             v.top = top;
             v.feet = legless ? bottom + LeglessFeet * (bottom - top) : bottom + 1;
             BodyMarks(v, bottom + 1);
+            // How far down the head covers the body's middle third; what it covers is taken out of the art (as clear, so
+            // the art grows over it from what shows, and counts as little as clear art does), unless it reads too far down.
+            if (covered != null)
+            {
+                int chinRow = -1;
+                for (int r = top; r <= bottom; r++)
+                {
+                    int w = v.right[r] - v.left[r] + 1;
+                    for (int i = v.left[r] + w / 3; v.left[r] >= 0 && i <= v.right[r] - w / 3; i++)
+                    {
+                        if (covered[(s - 1 - r) * s + i])
+                        {
+                            chinRow = r;
+                            break;
+                        }
+                    }
+                }
+                float chin = chinRow < 0 ? 0f : (chinRow + 1 - v.top) / (v.feet - v.top);
+                if (chin > 0f && chin <= ClothChinMost && chin < v.waist - 0.1f)
+                {
+                    v.chin = chin;
+                    for (int i = 0; i < px.Length; i++)
+                    {
+                        if (covered[i])
+                        {
+                            px[i].a = 0;
+                            alpha[i] = 0;
+                        }
+                    }
+                }
+            }
+            v.colour = GrownArt(px, s);
+            if (clothStyle == 2)
+            {
+                Upscaled(v);
+            }
             // Rows with no body (above its top, below its feet, a gap) take the nearest row that has one.
             int last = -1;
             for (int r = 0; r < s; r++)
@@ -695,8 +932,112 @@ namespace M3AT
                 v.left[r] = v.left[top];
                 v.right[r] = v.right[top];
             }
-            clothViews[(worn, body)] = v;
+            EdgesOf(v, bodyPx);
+            clothViews[(worn, body, headKey)] = v;
             return v;
+        }
+
+        // The body sprite's edges to lay the art across by, smooth: each row's to a fraction of a pixel by the alpha of the
+        // pixels either side of it, then averaged over ClothEdgeSmooth rows. Taken whole a pixel at a time, every step in
+        // the sprite's outline moved its row of art sideways on the chibi, so the art's shading came out in saw-teeth
+        // (magnified some eight times onto the garment).
+        private static void EdgesOf(ClothView v, Color32[] bodyPx)
+        {
+            int s = v.size;
+            float[] lo = new float[s], hi = new float[s];
+            for (int r = 0; r < s; r++)
+            {
+                int j = s - 1 - r;
+                int l = v.left[r], h = v.right[r];
+                if (bodyPx[j * s + l].a < 128 || bodyPx[j * s + h].a < 128)
+                {
+                    // A row with no body of its own (above it, below it, a gap), given the nearest's columns.
+                    lo[r] = l;
+                    hi[r] = h + 1f;
+                    continue;
+                }
+                float outL = l > 0 ? bodyPx[j * s + l - 1].a / 255f : 0f, inL = bodyPx[j * s + l].a / 255f;
+                float outH = h < s - 1 ? bodyPx[j * s + h + 1].a / 255f : 0f, inH = bodyPx[j * s + h].a / 255f;
+                lo[r] = l + (1f - inL) - outL;
+                hi[r] = h + 1f - (1f - inH) + outH;
+            }
+            float sigma = ClothEdgeSmooth * s / 128f;
+            int reach = Mathf.CeilToInt(sigma * 2.5f);
+            v.edgeLow = new float[s];
+            v.edgeHigh = new float[s];
+            for (int r = 0; r < s; r++)
+            {
+                float sl = 0f, sh = 0f, w = 0f;
+                for (int d = -reach; d <= reach; d++)
+                {
+                    int rr = Mathf.Clamp(r + d, 0, s - 1);
+                    float k = Mathf.Exp(-0.5f * d * d / (sigma * sigma));
+                    sl += lo[rr] * k;
+                    sh += hi[rr] * k;
+                    w += k;
+                }
+                v.edgeLow[r] = sl / w;
+                v.edgeHigh[r] = sh / w;
+            }
+        }
+
+        // The view's column at a share across the body (0 its left edge, 1 its right) at a row (pixels from the top, any
+        // fraction), the edges read between rows.
+        private static float ColumnAt(ClothView v, float row, float across)
+        {
+            if (clothStyle == 1)
+            {
+                int rr = Mathf.Clamp(Mathf.RoundToInt(row), 0, v.size - 1);
+                return v.left[rr] + across * (v.right[rr] + 1 - v.left[rr]);
+            }
+            float y = Mathf.Clamp(row - 0.5f, 0f, v.size - 1.001f);
+            int r = (int)y;
+            float t = y - r;
+            float lo = Mathf.Lerp(v.edgeLow[r], v.edgeLow[r + 1], t), hi = Mathf.Lerp(v.edgeHigh[r], v.edgeHigh[r + 1], t);
+            return lo + across * (hi - lo);
+        }
+
+        // Which pixels of a body picture s pixels a side (rows bottom up) the pawn's head covers in facing f (the west as
+        // the east, as its views are): null if it can't be told.
+        private static bool[] HeadCovered(WalkFigures.HeadCover head, int f, int s)
+        {
+            int hf = f == 3 && head != null && head.map[3] == null ? 1 : f;
+            float[] m = head?.map[hf];
+            if (m == null)
+            {
+                return null;
+            }
+            const int hs = 128;
+            Color32[] hp = null;
+            foreach (Texture t in new[] { head.art[hf], head.typeArt[hf] })
+            {
+                Color32[] p = t != null ? Api.ReadSpritePixels(t, hs) : null;
+                if (p != null && p.Length >= hs * hs && Array.Exists(p, c => c.a >= AddonSolid))
+                {
+                    hp = p;
+                    break;
+                }
+            }
+            if (hp == null)
+            {
+                return null;
+            }
+            bool[] covered = new bool[s * s];
+            for (int j = 0; j < s; j++)
+            {
+                float v = (j + 0.5f) / s;
+                for (int i = 0; i < s; i++)
+                {
+                    float u = (i + 0.5f) / s;
+                    float hu = m[0] + m[1] * u + m[2] * v, hv = m[3] + m[4] * u + m[5] * v;
+                    if (hu < 0f || hu >= 1f || hv < 0f || hv >= 1f)
+                    {
+                        continue;
+                    }
+                    covered[j * s + i] = hp[(int)(hv * hs) * hs + (int)(hu * hs)].a >= AddonSolid;
+                }
+            }
+            return covered;
         }
 
         // The body sprite's shoulder line (the first row as wide as WideShare of its widest in its top third) and waist (its
@@ -756,7 +1097,10 @@ namespace M3AT
         }
 
         // The picture with its outline ink taken out and its colours grown over the rest of it (the rest past ClothGrow
-        // its mean), opaque, as Bled grows a race part's.
+        // its mean), opaque, as Bled grows a race part's. The ink lines drawn inside it go too (seams, a vest's edges, a
+        // collar's lines: dark lines up to about 2 ClothLineReach wide, pixels at 128, ClothInkDark of the lightest beside
+        // them), as the art is magnified many times onto the garment, where they came out as dark smears; what they
+        // parted stays parted by its colours. Wider dark parts (a belt, a dark panel) are kept.
         private static Color32[] GrownArt(Color32[] px, int s)
         {
             Color32[] o = (Color32[])px.Clone();
@@ -775,22 +1119,63 @@ namespace M3AT
                 lights.Sort();
                 float dark = ClothInkDark * lights[lights.Count / 2];
                 float[] edge = Distances(px, s);
-                int kept = 0;
-                bool[] ink = new bool[o.Length];
+                float[] light = new float[o.Length];
+                for (int i = 0; i < o.Length; i++)
+                {
+                    light[i] = solid[i] ? Light(o[i]) : 0f;
+                }
+                // A grey closing: each pixel's lightest round it, then the darkest of those, which fills a dark line
+                // narrower than the window from either side.
+                int reach = Mathf.Max(1, Mathf.RoundToInt(ClothLineReach * s / 128f));
+                float[] closed = Spread(Spread(light, s, reach, true), s, reach, false);
+                int kept = 0, keptEdge = 0;
+                bool[] ink = new bool[o.Length], line = new bool[o.Length];
                 for (int i = 0; i < o.Length; i++)
                 {
                     ink[i] = solid[i] && edge[i] < ClothInkReach * s / 128f && Light(o[i]) < dark;
-                    kept += solid[i] && !ink[i] ? 1 : 0;
+                    line[i] = solid[i] && !ink[i] && light[i] < ClothInkDark * closed[i];
+                    keptEdge += solid[i] && !ink[i] ? 1 : 0;
+                    kept += solid[i] && !ink[i] && !line[i] ? 1 : 0;
                 }
-                if (kept > lights.Count / 4)
+                bool lines = kept > lights.Count / 4;
+                if (lines || keptEdge > lights.Count / 4)
                 {
                     for (int i = 0; i < o.Length; i++)
                     {
-                        solid[i] &= !ink[i];
+                        solid[i] &= !ink[i] && !(lines && line[i]);
                     }
                 }
             }
             PullPush(o, solid, s);
+            return o;
+        }
+
+        // Each pixel's highest (or lowest) within reach either way, across and down (a square window, s a side).
+        private static float[] Spread(float[] a, int s, int reach, bool highest)
+        {
+            float[] across = new float[a.Length], o = new float[a.Length];
+            for (int pass = 0; pass < 2; pass++)
+            {
+                float[] from = pass == 0 ? a : across, to = pass == 0 ? across : o;
+                for (int y = 0; y < s; y++)
+                {
+                    for (int x = 0; x < s; x++)
+                    {
+                        float best = from[y * s + x];
+                        for (int d = -reach; d <= reach; d++)
+                        {
+                            int xx = pass == 0 ? x + d : x, yy = pass == 0 ? y : y + d;
+                            if (xx < 0 || yy < 0 || xx >= s || yy >= s)
+                            {
+                                continue;
+                            }
+                            float c = from[yy * s + xx];
+                            best = highest ? Mathf.Max(best, c) : Mathf.Min(best, c);
+                        }
+                        to[y * s + x] = best;
+                    }
+                }
+            }
             return o;
         }
 
@@ -973,7 +1358,8 @@ namespace M3AT
                         Texture m = worn[f].HasProperty(ShaderPropertyIDs.MaskTex) ? worn[f].GetTexture(ShaderPropertyIDs.MaskTex) : null;
                         said.Add(f + ": " + worn[f].mainTexture?.name + " colour " + worn[f].color + " two "
                             + (worn[f].HasProperty(ShaderPropertyIDs.ColorTwo) ? worn[f].GetColor(ShaderPropertyIDs.ColorTwo).ToString() : "-")
-                            + " mask " + (m != null ? m.name : "none") + (v != null ? " body rows " + v.top + ".." + v.feet : " unread"));
+                            + " mask " + (m != null ? m.name : "none") + (v != null ? " body rows " + v.top + ".." + v.feet + " shoulder " + v.shoulder.ToString("0.00")
+                            + " waist " + v.waist.ToString("0.00") + " chin " + v.chin.ToString("0.00") : " unread"));
                     }
                 }
                 sheet.Apply();

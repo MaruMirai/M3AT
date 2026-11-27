@@ -47,12 +47,12 @@ Boxes:
 - [x] Apparel_Parka: parka (Shell; torso, neck, shoulders, arms). Has a garment
 - [x] Apparel_FlakJacket: flak jacket (Shell; torso, neck, shoulders, arms). Has a garment
 - [x] Apparel_Duster: duster (Shell; torso to legs). Has a garment
-- [x] Apparel_Cape: cape (Shell; torso to legs). Has a garment (`make_cape.py`: a high collar, down the back behind the arms, opening out below the hands), check in game
+- [x] Apparel_Cape: cape (Shell; torso to legs). Has a garment (`make_cape.py`, archived 2026-11-27 in `archive/garment_scripts/` as what's drawn is another garment; it made a high collar, down the back behind the arms, opening out below the hands), check in game
 - [x] Apparel_Robe: robe (Shell; torso, shoulders, arms, legs). Has a garment (`make_duster.py --robe`: the duster closed below a V neck, to the ankle, vented back and front from the shin down), check in game
 - [x] Apparel_RobeRoyal: prestige robe (Shell) *Royalty*. The robe's mesh with its own texture (`RobeRoyal`: damask brocade, a patterned front panel), check in game
 - [x] Apparel_PsyfocusRobe: eltex robe (Shell) *Royalty*. As the robe
 - [x] Apparel_Burka: burka (Shell; head to legs) *Ideology*. Has a garment (`make_duster.py --burka`: the robe closed to the neck, to the top of the foot, vented only from the shin down, with a head piece joined on: `make_hats.py`'s `BurkaHood`, the broadwrap's cloth closed but for a slit over the eyes), untextured, check in game. Covers the torso, so IsoRim's head wear isn't used for it
-- [x] Apparel_BodyStrap: slave body strap (Shell; torso) *Ideology*. Has a garment (`make_body_strap.py`: straps over the shoulders to a ring on the chest, one down to a ring on a belt round the waist, straight down the back to the belt), check in game
+- [x] Apparel_BodyStrap: slave body strap (Shell; torso) *Ideology*. Has a garment (`make_body_strap.py`, archived 2026-11-27 in `archive/garment_scripts/` as what's drawn is another garment; it made straps over the shoulders to a ring on the chest, one down to a ring on a belt round the waist, straight down the back to the belt), check in game
 - [x] Apparel_Bandolier: heavy bandolier (Shell; torso) *Biotech*. Has a garment
 - [x] Apparel_LabCoat: lab coat (Shell; torso, neck, shoulders, arms) *Anomaly*
 
@@ -143,11 +143,11 @@ Every wearable in CE's own `Defs/ThingDefs_Misc/Apparel_*.xml` (`CETeam.CombatEx
 
 ### Body
 - [x] CE_Apparel_CompositeVest: composite vest (Middle; torso, neck). Has a garment (`make_from_groups.py`, `OWN_OFFSET` 0.25), check in game
-- [x] CE_Apparel_TacVest: tactical vest (Webbing; torso). Has a garment (`make_tac_vest.py`: a chest rig, a belt with magazine pouches and straps over the shoulders), let out over armour (`LetOut.cs`), check in game
-- [x] CE_Apparel_ExoFrame: powered exoframe (Shell; shoulders, torso). Has a garment (`make_exoframe.py`: a load-carrying exoskeleton: padded hip belt with a lumbar plate and battery, a spine of vertebra blocks, pack-frame rails and a yoke on the back, a shoulder harness down to the belt with a sternum strap, and on each leg hip, knee and ankle joint discs with struts down the thigh and shin and cuffs; untinted greys; the `--low` version is the one drawn, the full one in `Models/unused/CE_ExoFrame_full.glb`), exported, check in game
+- [x] CE_Apparel_TacVest: tactical vest (Webbing; torso). Has a garment (`make_tac_vest.py`, archived 2026-11-27 in `archive/garment_scripts/` as what's drawn is another garment; it made a chest rig, a belt with magazine pouches and straps over the shoulders), let out over armour (`LetOut.cs`), check in game
+- [x] CE_Apparel_ExoFrame: powered exoframe (Shell; shoulders, torso). Has a garment (`make_exoframe.py`, archived 2026-11-27 in `archive/garment_scripts/` as what's drawn is another garment; it made a load-carrying exoskeleton: padded hip belt with a lumbar plate and battery, a spine of vertebra blocks, pack-frame rails and a yoke on the back, a shoulder harness down to the belt with a sternum strap, and on each leg hip, knee and ankle joint discs with struts down the thigh and shin and cuffs; untinted greys; the `--low` version is the one drawn, the full one in `Models/unused/CE_ExoFrame_full.glb`), exported, check in game
 
 ### Packs (Backpack; shoulders)
-- [x] CE_Apparel_Backpack: backpack. Has a garment (`make_backpack.py`), drawn whole on the pack slot (`HOLSTER_PACKS`), check in game
+- [x] CE_Apparel_Backpack: backpack. Has a garment (`make_backpack.py`, archived 2026-11-27 in `archive/garment_scripts/` as what's drawn is another garment), drawn whole on the pack slot (`HOLSTER_PACKS`), check in game
 - [x] CE_Apparel_KidBackpack: kid backpack (no layers of its own, `ApparelBackpackBase`). The CE_Backpack (`AdultOf`, `KidPackSize`)
 - [x] CE_Apparel_TribalBackpack: tribal backpack. Has a garment (`Models/garments/CE_TribalBackpack.glb`, no script of its own), drawn whole on the pack slot (`HOLSTER_PACKS`), check in game
 - [x] CE_Apparel_RadioPack: radio pack. Has a garment (`make_radio_pack.py`: the backpack with no image, olive drab with two dark bands, a radio set on its back, a whip antenna leant out past the head on the left, a handset on the left side on a coiled cord), drawn whole on the pack slot (`HOLSTER_PACKS`) in place of the IsoRim CE pack's model, check in game
@@ -161,8 +161,8 @@ Every wearable in CE's own `Defs/ThingDefs_Misc/Apparel_*.xml` (`CETeam.CombatEx
 
 ### Shields (Shield; left shoulder)
 Held in the left fist (`walk.shield_at`'s guard, `Source/Shields.cs`), shown only when CE would draw them (drafted, or a job or duty that shows the weapon).
-- [x] CE_Apparel_MeleeShield: melee shield. Has a garment (`make_shields.py`: a dished twelve-sided shield of planks with an iron rim and boss), check in game
-- [x] CE_Apparel_BallisticShield: ballistic shield. Has a garment (`make_shields.py`: a tall curved plate with a glass viewport in a pale frame and four bolts), check in game
+- [x] CE_Apparel_MeleeShield: melee shield. Has a garment (`make_shields.py`, archived 2026-11-27 in `archive/garment_scripts/` as what's drawn is another garment; it made a dished twelve-sided shield of planks with an iron rim and boss), check in game
+- [x] CE_Apparel_BallisticShield: ballistic shield. Has a garment (`make_shields.py`, archived 2026-11-27 in `archive/garment_scripts/` as what's drawn is another garment; it made a tall curved plate with a glass viewport in a pale frame and four bolts), check in game
 
 ## Not worn clothes
 Targeters (`OrbitalTargeter*`) and `TornadoGenerator` have an apparel block but are not worn clothes. They are drawn anyway, as IsoRim's worn gear models in the `hip` slot.

@@ -194,9 +194,9 @@ namespace M3AT
                 miniHornsGene = DefDatabase<GeneDef>.GetNamedSilentFail("Headbone_MiniHorns");
                 centerHornGene = DefDatabase<GeneDef>.GetNamedSilentFail("Headbone_CenterHorn");
             }
-            if (pawn.genes == null)
+            if (pawn.genes == null || ContentSources.PackOwnsGeneParts(pawn))
             {
-                return null;
+                return null;   // none, or the pack's race: only the pack's horns
             }
             if (miniHornsGene != null && pawn.genes.HasActiveGene(miniHornsGene))
             {

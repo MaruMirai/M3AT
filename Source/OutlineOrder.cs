@@ -108,6 +108,7 @@ namespace M3AT
             copy.SetFloat("_GlowMode", from.GetFloat("_GlowMode"));
             copy.SetFloat("_OutlinePush", from.GetFloat("_OutlinePush"));
             copy.SetFloat("_MarkPass", from.GetFloat("_MarkPass"));
+            copy.SetFloat("_Lining", from.GetFloat("_Lining"));
         }
 
         // The pass that clears bit 64 again: no colour, no depth, over the whole of each mesh. Null without its def (the
@@ -138,19 +139,40 @@ namespace M3AT
         // has, without the stencil bit (OutlineOrder's clear has been and gone). The figure's depth is still in the image, so it
         // still darkens the walls beside it and casts its shadow.
         private const string AfterDef = "MarusSmoothAfterAO", AfterTexDef = "MarusSmoothTexAfterAO";
-        private static Shader afterShader, afterTexShader;
+        // The same blended over the occlusion at 1 - ClothesOcclusionStrength, for clothes and hair with ClothesOcclusion
+        // on: they keep that share of the darkening (a full share leaves the redraw out, SkinnedFigure.DrawMeshes).
+        private const string SoftDef = "MarusSmoothSoftAfterAO", SoftTexDef = "MarusSmoothTexSoftAfterAO";
+        private static Shader afterShader, afterTexShader, softShader, softTexShader;
         private static bool afterTried;
         private static readonly Dictionary<Material, Material> afters = new Dictionary<Material, Material>();
+        private static readonly Dictionary<Material, Material> softAfters = new Dictionary<Material, Material>();
+        private static float softShare = -1f;   // the _RedrawShare last set on the soft copies
 
-        // The solid material's copy for after the occlusion; null without the defs.
-        private static Material AfterOcclusion(Material solid)
+        // The solid material's copy for after the occlusion (soft: the blended one); null without the defs.
+        private static Material AfterOcclusion(Material solid, bool soft)
         {
             if (solid == null)
             {
                 return null;
             }
+            if (soft)
+            {
+                float share = 1f - ClothesOcclusionStrength;
+                if (share != softShare)
+                {
+                    softShare = share;
+                    foreach (Material s in softAfters.Values)
+                    {
+                        if (s != null)
+                        {
+                            s.SetFloat("_RedrawShare", share);
+                        }
+                    }
+                }
+            }
+            Dictionary<Material, Material> cache = soft ? softAfters : afters;
             Material m;
-            if (afters.TryGetValue(solid, out m))
+            if (cache.TryGetValue(solid, out m))
             {
                 return m;
             }
@@ -159,17 +181,24 @@ namespace M3AT
                 afterTried = true;
                 afterShader = DefDatabase<ShaderDef>.GetNamedSilentFail(AfterDef)?.Shader;
                 afterTexShader = DefDatabase<ShaderDef>.GetNamedSilentFail(AfterTexDef)?.Shader;
+                softShader = DefDatabase<ShaderDef>.GetNamedSilentFail(SoftDef)?.Shader;
+                softTexShader = DefDatabase<ShaderDef>.GetNamedSilentFail(SoftTexDef)?.Shader;
                 if (afterShader == null || afterTexShader == null)
                 {
                     Log.Warning(Tag + "the " + AfterDef + " shaders are missing, so IsoRim's ambient occlusion shows on the chibi.");
                 }
+                else if (softShader == null || softTexShader == null)
+                {
+                    Log.Warning(Tag + "the " + SoftDef + " shaders are missing, so clothes take IsoRim's ambient occlusion at full strength.");
+                }
             }
             bool textured = hairShader != null && solid.shader == hairShader;
-            Shader shader = textured ? afterTexShader : solid == smooth ? afterShader : null;
+            Shader shader = soft ? (textured ? softTexShader : solid == smooth ? softShader : null)
+                : textured ? afterTexShader : solid == smooth ? afterShader : null;
             if (shader != null)
             {
                 m = new Material(shader);
-                m.name = solid.name + "_AfterAO";
+                m.name = solid.name + (soft ? "_SoftAfterAO" : "_AfterAO");
                 if (textured)
                 {
                     m.mainTexture = solid.mainTexture;
@@ -178,8 +207,13 @@ namespace M3AT
                 Api.ConfigureFigureMaterial(m, FigureMaterialKind.Unlit);
                 m.SetFloat("_LightMode", LightModelCurve);
                 m.SetFloat("_GlowMode", solid.GetFloat("_GlowMode"));
+                m.SetFloat("_Lining", solid.GetFloat("_Lining"));   // an ear's pale inside (EarLining.cs)
+                if (soft)
+                {
+                    m.SetFloat("_RedrawShare", 1f - ClothesOcclusionStrength);
+                }
             }
-            afters[solid] = m;
+            cache[solid] = m;
             return m;
         }
 
@@ -198,7 +232,8 @@ namespace M3AT
             m.parts[0].material = Slotted(solid);
             m.parts[0].lit = solid == smooth;   // IsoRim's light pass of it (a textured one's is a part of its own)
             m.parts[1].material = Slotted(line);
-            Material after = AfterOcclusion(solid);
+            // Clothes and hair with ClothesOcclusion on take the blended redraw (with the strength full, none: DrawMeshes).
+            Material after = AfterOcclusion(solid, ClothesOcclusion && !m.isSkin);
             if (after != null)
             {
                 if (m.afterAt < 0)
@@ -206,7 +241,10 @@ namespace M3AT
                     m.afterAt = m.parts.Count;
                     m.parts.Add(new MeshPart { mesh = m.solid, material = after, outline = false });
                 }
-                m.parts[m.afterAt].material = after;
+            }
+            if (m.afterAt >= 0)
+            {
+                m.parts[m.afterAt].material = after;   // null (a soft shader missing): left out by DrawMeshes
             }
             Material c = Slotted(ClearMaterial());
             if (c == null)

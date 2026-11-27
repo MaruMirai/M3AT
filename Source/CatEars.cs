@@ -42,8 +42,6 @@ namespace M3AT
         private const float RacePink = 0.85f;           // the skin's colour this share of the way to RaceLining
         private const float EarPink = 0.5f;   // the lining's colour: the skin's, this share of the way to EarLining
         private static readonly Color EarLining = new Color(1f, 0.74f, 0.72f);
-        private const float FluffyPink = 0.75f;   // the fluffy ears' fading patch (EarLining.cs): the skin's this share of the way to FluffyLining,
-        private static readonly Color FluffyLining = new Color(1f, 0.9f, 0.88f);   // a paler pink than EarLining, as only a small patch shows
         private static readonly float[] EarShare = { 0.5f, 0.3f, 0.2f };   // each joint's share of a three-boned ear's swing, root first
         public const int EarMostBones = 8;   // on one ear, and how far apart in earBones the two ears' bones are
         // A floppy ear's curl: a joint's bend at a curl of 1 is taken out wholly, this many degrees past it, so the nearly straight
@@ -59,6 +57,7 @@ namespace M3AT
             public readonly float[] back = new float[2], backSpeed = new float[2];   // degrees the tip is swung back, and a second
             public readonly float[] down = new float[2], downSpeed = new float[2];   // and down
             public readonly float[] up = new float[2], low = new float[2];           // the shape keys in use, 0 .. 1
+            public readonly float[] lean = new float[2];      // degrees each ear rests leaned out past its model's own lean, at its root (a race's art draws it so: WalkFigures.EarLeanOf)
             public readonly float[] flickAt = new float[2];   // game seconds into its rest when the next flick starts
             public readonly float[] since = new float[2];     // game seconds since its last flick started
             public readonly int[] flicks = new int[2];        // how many it has done, for the next one's length and rest
@@ -83,7 +82,6 @@ namespace M3AT
             public int[] weightBone;    // side * EarMostBones + joint
             public float[] weight;
             public bool[] inner;        // the lining's vertices
-            public float[] liningShare; // with a lining texture, each vertex's share of the lining's colour (LiningShares), else null
             public Vector3[][] keyRest, keyNormal, keyHull;   // [up L, up R, down L, down R][vertex]: each key's whole move of them
             public PieceShape baseShape;   // its rest pose, normals and outline
             public Vector3 anchor;      // the top of the head's middle at rest, which they are scaled about for another shape
@@ -107,6 +105,17 @@ namespace M3AT
         private static readonly string[] EarKeys = { "up_L", "up_R", "down_L", "down_R" };
         private readonly Dictionary<string, Ears> earFiles = new Dictionary<string, Ears>();   // by file; null: the export has none
         private readonly Matrix4x4[] earBones = new Matrix4x4[2 * EarMostBones];
+
+        // The Ears_Cat gene's ears, both of them, in triangles (the About poly counts message); read now if no pawn has
+        // drawn them yet, 0 if the export has none.
+        internal int CatEarTriangles
+        {
+            get
+            {
+                Ears e = EarsOf(CatEarFile);
+                return e != null ? e.piece.tris.Length / 3 : 0;
+            }
+        }
 
         // A file's ears, read the first time a pawn with the gene is drawn; null if an export has none.
         private Ears EarsOf(string file)
@@ -404,7 +413,7 @@ namespace M3AT
                 LiningUvs(e);
                 if (lining == FluffyEars)
                 {
-                    LiningShares(e);
+                    e.piece.lining = LiningPale;   // the pale inside, faded out per pixel by the texture's alpha (EarLining.cs)
                 }
                 e.piece.texture = liningTexture;
                 e.piece.mean = Color.white;   // its outline stays in its own colour, as the grain's does
@@ -643,13 +652,10 @@ namespace M3AT
             PoseEars(p, p.ears, e, s, goneL, goneR);
             // The lining goes in the scalp's place: DrawMeshes shades that ScalpShade, which is taken back out here.
             Color inner = (file == RaceEarFile ? Color.Lerp(skin, RaceLining, RacePink) : Color.Lerp(skin, EarLining, EarPink)) / ScalpShade;
-            if (e.liningShare != null)
+            if (piece.lining > 0f)
             {
-                // Pale only in the cup's low middle, fading out to the hair's colour at the rim and toward the tip.
-                // Paler than a whole lining's, as only a small patch of it shows (FluffyPink).
-                Color patch = file == RaceEarFile ? inner * ScalpShade : Color.Lerp(skin, FluffyLining, FluffyPink);
-                DrawMeshes(p, p.ears, piece.rest.Length, solid, position, yaw, size, tint, null, default(Color), null, default(Color), null,
-                    LiningPaint(p, e, tint, patch));
+                // All in the hair's colour: the shader pales the inside from there, by the texture (EarLining.cs).
+                DrawMeshes(p, p.ears, piece.rest.Length, solid, position, yaw, size, tint, null, default(Color), null, default(Color));
                 return;
             }
             DrawMeshes(p, p.ears, piece.rest.Length, solid, position, yaw, size, tint, null, default(Color), e.inner, inner);
@@ -681,6 +687,10 @@ namespace M3AT
                     Quaternion turn = e.flops
                         ? Quaternion.AngleAxis(s.swing[side][j] * e.share[j], f.axisSwing[side][j]) * Quaternion.AngleAxis(-s.curl[side][j] * f.curlTurn[side][j], f.axisCurl[side][j])
                         : Quaternion.AngleAxis(back * e.share[j], f.axisBack[side]) * Quaternion.AngleAxis(down * e.share[j], f.axisDown[side]);
+                    if (j == 0 && s.lean[side] != 0f)
+                    {
+                        turn = Quaternion.AngleAxis(s.lean[side], f.axisDown[side]) * turn;   // the whole ear, stiffly, as the art tilts it
+                    }
                     chain = chain * TurnAbout(joints[j], turn);
                     earBones[side * EarMostBones + j] = chain;
                 }
@@ -713,7 +723,6 @@ namespace M3AT
 
         private static void RetireEars(Posed p)
         {
-            p.earPaint = null;
             if (p.ears != null)
             {
                 Api.RetireMesh(p.ears.solid);
@@ -772,13 +781,18 @@ namespace M3AT
                 pigEarsGene = DefDatabase<GeneDef>.GetNamedSilentFail("Ears_Pig");
                 floppyEarsGene = DefDatabase<GeneDef>.GetNamedSilentFail("Ears_Floppy");
             }
+            if (ContentSources.PackOwnsGeneParts(pawn))
+            {
+                return PackEars(pawn);   // the pack's race: its ears or none (its patches fill in theirs)
+            }
             if (pawn.genes == null)
             {
                 return PackEars(pawn) ?? RaceEars(pawn);
             }
-            string file = catEarsGene != null && pawn.genes.HasActiveGene(catEarsGene) ? SkinnedFigure.CatEarFile
-                : pigEarsGene != null && pawn.genes.HasActiveGene(pigEarsGene) ? SkinnedFigure.PigEarFile
-                : floppyEarsGene != null && pawn.genes.HasActiveGene(floppyEarsGene) ? SkinnedFigure.FloppyEarFile : null;
+            // (Other mods' ear genes drawn as these by hand, TunedGenes.cs, count as them.)
+            string file = HasGeneOrTuned(pawn, catEarsGene, "Ears_Cat") ? SkinnedFigure.CatEarFile
+                : HasGeneOrTuned(pawn, pigEarsGene, "Ears_Pig") ? SkinnedFigure.PigEarFile
+                : HasGeneOrTuned(pawn, floppyEarsGene, "Ears_Floppy") ? SkinnedFigure.FloppyEarFile : null;
             return file != null && skin.HasEars(file) ? file : PackEars(pawn) ?? RaceEars(pawn);
         }
 

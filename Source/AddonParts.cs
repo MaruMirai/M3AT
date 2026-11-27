@@ -34,6 +34,7 @@ namespace M3AT
             public bool ears;
             public string modelEars, modelTail;   // the race's own model ears and tail drawn in place of those add-ons (RaceModels), null for none
             public Color earTint, tailTint;       // in the add-on's colour times its art's
+            public readonly float[] earLean = new float[2];   // degrees each model ear rests leaned out, by its add-on's picture (EarLeanOf)
             public bool wingL, wingR;             // a winged race's model wings (RaceModels' wings), by its wing parts
             public Color wingTint;
         }
@@ -283,6 +284,13 @@ namespace M3AT
                     {
                         r.modelEars = model[i];
                         r.earTint = tint;
+                        RaceModel lean;
+                        if (RaceModels.TryGetValue(pawn.def.defName, out lean))
+                        {
+                            int side;
+                            float by = EarLeanOf(lean, s, out side);
+                            r.earLean[side] = Mathf.Max(r.earLean[side], by);   // (each ear its own add-on: Miho's EarLeft, EarRight)
+                        }
                     }
                     else
                     {
@@ -414,6 +422,90 @@ namespace M3AT
                 }
             }
             return false;
+        }
+
+        // Where the pawn's head lies over its body picture as the game draws it, per facing (SpriteClothes.cs: what the head
+        // hides there in the game, a shirt's neck hole or a collar's back, is left off the painted garment): the head's
+        // picture (its node's, and its head type's in case that one is blank, as Facial Animation's can be) and the map
+        // from a place on the body's picture to one on the head's: hu = m0 + m1 u + m2 v, hv = m3 + m4 u + m5 v. Through the
+        // render tree, as the race parts are, so the body type's head offset, a child's head size and HAR's offsets and
+        // sizes are all in it. A facing left null can't be told (then nothing is taken as covered).
+        internal sealed class HeadCover
+        {
+            public readonly Texture[] art = new Texture[4];
+            public readonly Texture[] typeArt = new Texture[4];
+            public readonly float[][] map = new float[4][];
+        }
+
+        internal static HeadCover HeadCoverOf(Pawn pawn)
+        {
+            PawnRenderTree tree = pawn?.Drawer?.renderer?.renderTree;
+            if (tree == null || tree.rootNode == null)
+            {
+                return null;
+            }
+            if (!adjustLooked)
+            {
+                adjustLooked = true;
+                MethodInfo m = AccessTools.Method(typeof(PawnRenderTree), "AdjustParms");
+                adjustParms = m != null ? (AdjustParmsCall)Delegate.CreateDelegate(typeof(AdjustParmsCall), null, m) : null;
+            }
+            PawnRenderNode headNode, bodyNode;
+            if (!tree.TryGetNodeByTag(PawnRenderNodeTagDefOf.Head, out headNode) || !tree.TryGetNodeByTag(PawnRenderNodeTagDefOf.Body, out bodyNode)
+                || headNode == null || bodyNode == null)
+            {
+                return null;
+            }
+            HeadCover cover = new HeadCover();
+            string[] suffix = { "_north", "_east", "_south", "_west" };
+            for (int f = 0; f < 4; f++)
+            {
+                PawnDrawParms parms = PawnDrawParms.Default;
+                parms.pawn = pawn;
+                parms.matrix = Matrix4x4.identity;
+                parms.facing = new Rot4(f);
+                parms.rotDrawMode = RotDrawMode.Fresh;
+                parms.posture = PawnPosture.Standing;
+                parms.flags = PawnRenderFlags.Clothes | PawnRenderFlags.Headgear;
+                parms.dead = false;
+                if (adjustParms != null)
+                {
+                    adjustParms(tree, ref parms);
+                }
+                Matrix4x4 headM, bodyM;
+                Mesh headMesh = headNode.GetMesh(parms), bodyMesh = bodyNode.GetMesh(parms);
+                if (headMesh == null || bodyMesh == null || !tree.TryGetMatrix(headNode, parms, out headM) || !tree.TryGetMatrix(bodyNode, parms, out bodyM))
+                {
+                    continue;
+                }
+                float[] body = UvMap(bodyMesh, Matrix4x4.identity);              // body uv from the body's frame
+                float[] head = UvMap(headMesh, bodyM.inverse * headM);         // head uv from the body's frame
+                if (body == null || head == null)
+                {
+                    continue;
+                }
+                float det = body[1] * body[5] - body[2] * body[4];
+                if (Mathf.Abs(det) < 1e-9f)
+                {
+                    continue;
+                }
+                // The body's frame from its uv: X = (b5 (u - b0) - b2 (v - b3)) / det, Z = (-b4 (u - b0) + b1 (v - b3)) / det.
+                float xu = body[5] / det, xv = -body[2] / det, x0 = -(xu * body[0] + xv * body[3]);
+                float zu = -body[4] / det, zv = body[1] / det, z0 = -(zu * body[0] + zv * body[3]);
+                cover.map[f] = new[]
+                {
+                    head[0] + head[1] * x0 + head[2] * z0, head[1] * xu + head[2] * zu, head[1] * xv + head[2] * zv,
+                    head[3] + head[4] * x0 + head[5] * z0, head[4] * xu + head[5] * zu, head[4] * xv + head[5] * zv,
+                };
+                Material mat = headNode.Worker.GetFinalizedMaterial(headNode, parms);
+                cover.art[f] = mat != null ? mat.mainTexture : null;
+                if (pawn.story != null && pawn.story.headType != null)
+                {
+                    cover.typeArt[f] = ContentFinder<Texture2D>.Get(pawn.story.headType.graphicPath + suffix[f], false)
+                        ?? (f == 3 ? ContentFinder<Texture2D>.Get(pawn.story.headType.graphicPath + suffix[1], false) : null);
+                }
+            }
+            return cover;
         }
 
         // A drawn quad's map from its parent's frame (X across, Z up the picture, cells) to its texture's uv, from three
@@ -569,9 +661,10 @@ namespace M3AT
         // or with no head; a tail under the armour that hides the cat tail; none under a blanket.
         private static void DrawRaceParts(Pawn pawn, SkinnedFigure.Posed fig, GarmentMask mask, int worn, bool headless, Vector3 at, float yaw, float size, float sat, float tailFloor, bool tailOnGround)
         {
-            if ((!RacePartsOn && !RaceModelsOn) || racePartsFailed || fig.tucked || !(pawn.def is ThingDef) || pawn.def.defName == "Human")
+            if ((!RacePartsOn && !RaceModelsOn) || racePartsFailed || fig.tucked || !(pawn.def is ThingDef) || pawn.def.defName == "Human"
+                || ContentSources.PackOwnsGeneParts(pawn))
             {
-                return;
+                return;   // (the pack's race with its gene parts on: only the pack's are drawn)
             }
             RaceParts r = RacePartsOf(pawn, worn);
             if (r.sources.Count == 0 && r.modelEars == null && r.modelTail == null && !r.wingL && !r.wingR)
@@ -585,7 +678,7 @@ namespace M3AT
             {
                 if (r.modelEars != null && !headless && !earsHidden)
                 {
-                    DrawModelEars(pawn, fig, r.modelEars, at, yaw, size, r.earTint, Color.Lerp(r.earTint, m.lining, m.liningShare));
+                    DrawModelEars(pawn, fig, r.modelEars, r.earLean, at, yaw, size, r.earTint, Color.Lerp(r.earTint, m.lining, m.liningShare));
                 }
                 if (r.modelTail != null)
                 {

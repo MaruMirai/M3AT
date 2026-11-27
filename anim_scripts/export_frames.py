@@ -65,7 +65,7 @@ GARMENT_PROPS = {
     # (make_grenadier.py); so do the phoenix armour, a cataphract base with a flamebolt launcher (make_grenadier.py
     # --phoenix), the locust armour, a recon base, with boosters on its boots (make_locust.py), and Biotech's mechlord
     # suit, a recon base with fins, blades and a core (make_mechlord.py). Marine armour's helmet also stands in for
-    # Odyssey's vacsuit helmet (its suit has a garment of its own, make_vacsuit.py).
+    # Odyssey's vacsuit helmet (its suit has a garment of its own, make_from_groups.py's WHOLE).
     'PowerArmor': {'hide_body': True, 'sole': True, 'pads': True, 'hard': True, 'solid_parts': 'marine_backpack',
                    'defs': 'Apparel_PowerArmor'},
     # The grenadier armour (make_grenadier.py): the marine armour with a launcher tube over the left shoulder, weighted as
@@ -110,10 +110,22 @@ GARMENT_PROPS = {
     'ArmorHelmetReconPrestige': {'hard': True, 'hide_hair': True, 'hide_face': False},
     'ArmorHelmetCataphractPrestige': {'hide_head': True, 'hard': True},
     'PlateArmor': {'hide_body': True, 'hard': True},
-    # Odyssey's vacsuit, gloves and boots included (make_vacsuit.py), so it hides the body whole; soft, so it takes the keys.
+    # Odyssey's vacsuit, gloves and boots included (make_from_groups.py's WHOLE), so it hides the body whole; soft, so it takes the keys.
     'Vacsuit': {'hide_body': True},
     'CE_PlateHelmet': {'hide_hair': 'tuck'},
 }
+# The frame a suit of armour gives its wearer: the body's Armoured key (make_armoured.py) at this amount on whoever wears
+# it, written as the garment's wearer_key line (WalkFigures.WornKeysOf), so another mod's armour can say the same in its
+# own file. The recon armour and its family a little, the plate and marine armour half, the cataphract all. The body under
+# such armour is never seen, so the key is the suit's volume; hard armour is fitted to it from the body (HARD_FITTED).
+ARMOURED_FRAME = {
+    'ArmorRecon': 0.25, 'ArmorReconPrestige': 0.25, 'ArmorLocust': 0.25, 'MechlordSuit': 0.25,
+    'PlateArmor': 0.5,
+    'PowerArmor': 0.5, 'PowerArmorPrestige': 0.5, 'ArmorMarineGrenadier': 0.5,
+    'ArmorCataphract': 1.0, 'ArmorCataphractPrestige': 1.0, 'ArmorCataphractPhoenix': 1.0,
+}
+for _name, _amount in ARMOURED_FRAME.items():
+    GARMENT_PROPS[_name]['wearer_key'] = 'Armoured %g' % _amount
 # The hats anim_scripts/make_hats.py makes: on the head bone, keeping their shape, the hair cut at their rim.
 for _hat in ('SimpleHelmet', 'AdvancedHelmet', 'Tuque', 'CowboyHat', 'BowlerHat', 'HatHood', 'TribalHeaddress', 'PsychicFoilHelmet',
              'Beret', 'HatTop', 'HatLadies', 'AuthorityCap', 'Flophat', 'Headwrap', 'Shadecone', 'Slicecap', 'Tailcap'):
@@ -232,6 +244,11 @@ GARMENTS['Shoes'] = ('Middle', 'Feet')
 # The sandals' straps are narrower than the body's faces under them, so they hide none of the foot (a hidden face beside a
 # strap would be a hole).
 GARMENT_PROPS['Sandals'] = {'hides': False}
+# The parka's quilting stands 0.04-0.07 cells off the trunk (make_parka.py's OFFSET and PUFF), past HIDE_REACH, so most
+# of the skin under it was drawn, and a Hulk's trunk, grown under it, came through it as the figure moved: 'hide_reach'
+# (cells) is how near the garment must be for hidden_under, the line out from the skin still keeping the cuffs and
+# collar's openings.
+GARMENT_PROPS['Parka'] = {'hide_reach': 0.1}
 GARMENT_PROPS['Pauldrons'] = {'hard': True, 'part_weights': True}
 GARMENT_PROPS['PauldronsBig'] = {'hard': True, 'part_weights': True, 'marine_of': 'Pauldrons'}
 # The Furskin gene's tufts (anim_scripts/make_fur_edges.py): drawn for the gene, not for apparel (its def is no apparel's, and
@@ -258,6 +275,14 @@ GARMENT_PROPS['RobeRoyal'] = {'defs': 'Apparel_RobeRoyal'}
 GARMENT_PROPS['CollarShirt'] = {'defs': 'Apparel_CollarShirt, Apparel_PsyfocusShirt'}
 GARMENT_PROPS['TribalA'] = {'bridge': True}   # cut skin-tight from the body, so lifted out of its creases (bridged)
 GARMENT_PROPS['Shoes'] = {'with_legwear': True, 'colour': (0.30, 0.21, 0.15)}
+# Garments that meet edge to edge: the trousers' cuffs were moved onto the shoes' top rings (in Pants.glb), but each
+# garment's fit is smoothed over its own neighbours (filled(), the push back out of the skin), so in Fat and Thin the two
+# rings drifted apart again (by up to 0.013 cells) and the seam showed through. Each vertex of the garment named here
+# that sits on one of the other's takes the other's move in every key (its own hand-made keys too, as the shoes'
+# Babylimbs); the other is written first.
+SEAMS = {'Pants': 'Shoes'}
+SEAM_NEAR = 1e-4   # Blender units: how near at rest a vertex must be to the other garment's to share its moves
+seam_fits = {}     # a SEAMS source written so far: (its rest places, {key: its moves})
 # The baby romper (make_baby_romper.py: the kid romper sleeveless and short in the leg) is apparel of no def: "baby_romper"
 # has the game put it on a baby a few hours old wearing nothing over its trunk or legs (WalkFigures.BabyRomperOf), in its
 # own colour.
@@ -267,10 +292,10 @@ GARMENT_PROPS['BabyRomper'] = {'baby_romper': True, 'colour': (0.95, 0.88, 0.64)
 # fist while CE would draw it (drafted, or a job or duty that shows the weapon), laying the guard (walk.shield_at) over
 # the rest meanwhile; it hides nothing of the body or the clothes, nor counts in a holster's or pack's clearance. The
 # fist's place is the held_at line (shield_held_at): standoff is how far behind the back of the shield's middle the
-# grip is, armature units, as make_shields.py's STANDOFF.
+# grip is, armature units, as the archived make_shields.py's STANDOFF.
 for _shield, _standoff in (('CE_MeleeShield', 1.25), ('CE_BallisticShield', 1.75)):
     GARMENT_PROPS[_shield] = {'bone': walk.GEAR['pack']['bone'], 'hard': True, 'held': True, 'standoff': _standoff}
-# Combat Extended's powered exoframe (make_exoframe.py): a load-carrying exoskeleton, each vertex on the trunk weighted
+# Combat Extended's powered exoframe (Maru's edit of the archived make_exoframe.py's): a load-carrying exoskeleton, each vertex on the trunk weighted
 # in the file (the body's less the arms', neck's and head's, as the skin over the shoulder blades is mostly the arms'),
 # the leg struts and joint discs whole on their bones, so "part_weights" keeps them all but the belt's and cuffs'.
 GARMENT_PROPS['CE_ExoFrame'] = {'hard': True, 'part_weights': True}
@@ -378,6 +403,121 @@ for _name, _defs in {
                                'GM_TotE_ShieldPraesidium', 'GM_TotE_ShieldSCaptain'),
         }.items():
     STANDS_FOR[_name] = STANDS_FOR.get(_name, ()) + _defs
+# Cane Aternitigno (War Dogs)'s apparel the scoring can't place, by their sprites: its psyker hat is a peaked cap, its
+# mechanitor's visor a peaked cap with a headset's boom mic; its suits a double-breasted jacket over trousers (the scoring
+# took the collared shirt); its heavy bulletproof set a vest with pouches and a groin plate, modern flak, not plate armour;
+# its space army's armour (labelled in Italian, "armatura motorizzata") a white powered suit, not plate armour.
+for _name, _defs in {
+        'AuthorityCap': ('CG_PsykerHat', 'CG_MechVisor'),
+        'AirwireHeadset': ('CG_MechVisor',),
+        'Jacket': ('CGSuit', 'CGSingleSuit'),
+        'Pants': ('CGSuit', 'CGSingleSuit'),
+        'FlakVest': ('CG_HFA',),
+        'FlakPants': ('CG_HFA',),
+        'PowerArmor': ('CG_SpaceArmor',),
+        }.items():
+    STANDS_FOR[_name] = STANDS_FOR.get(_name, ()) + _defs
+# The race mods' apparel the scoring can't place, by their sprites (2026-11-26; a dress or skirt's length and sleeves are
+# then picked from the art, HemLengths.cs). NewRatkinPlus (Ratkin): its flat-colour coat, apron skirts and red work outfit
+# are dresses (the scoring took a shirt and trousers), its garden uniform a dress under a hooded cape, its order uniform
+# a long closed coat (it is in the armour category: plate armour), its research gown a lab coat over a skirt, its cross
+# back a strap harness (not a pack); its mask helmets a helmet over a gas mask (CE's plate helmet alone), its bulletproof
+# helmet a helmet with goggles on it.
+for _name, _defs in {
+        'Dress': ('RK_ApronSkirt', 'RK_ApronSkirtChildren', 'RK_FlatColorCoat', 'RK_GaurdenUniform', 'RK_WorkerWear'),
+        'Cape': ('RK_GaurdenUniform',),
+        'Robe': ('RK_OrderUniform',),
+        'LabCoat': ('RK_ResearchGown',),
+        'Skirt': ('RK_ResearchGown',),
+        'BodyStrap': ('RK_CrossBack',),
+        'SimpleHelmet': ('RK_Mask', 'RK_MaskB', 'RK_BulletProofHelmet'),
+        'GasMask': ('RK_Mask', 'RK_MaskB'),
+        'Goggles': ('RK_BulletProofHelmet',),
+        }.items():
+    STANDS_FOR[_name] = STANDS_FOR.get(_name, ()) + _defs
+# Wolfein: its business, office-lady and staff uniforms a shirt over a skirt, its sailor suit a sailor top over a pleated
+# skirt (all took trousers); its youth outfit (a pinafore), sleep gown (a sheer babydoll, on its own underwear layer:
+# long johns), AIPT combat suit (a belted tunic) and suit with sweater (a sweater dress under an open jacket) dresses;
+# its cropped jacket and vanguard uniform a jacket over shorts, its guerrilla uniform a wrap top over shorts, its special
+# military uniform a sleeveless turtleneck over cargo trousers (a robe); its flak jacket (no sleeves) the flak vest and
+# heavy flak jacket the flak jacket (both took the plain jacket); its lab gown and medical gowns a lab coat over trousers
+# (on OnSkin, so the lab coat's Shell layer never matched); its lightweight and tight combat uniforms bodysuits with
+# straps, its mechanitor suit a bodysuit (a robe); its bandage a chest wrap (long johns), its mesh socks fishnet tights;
+# its muzzle a mask over the mouth and its warm scarf a scarf (both on its own layers: nothing); its combat unit exciter
+# and mech signal booster bands over the eyes (nothing); its helmet with filter and red-eyed helmet (a stahlhelm, as the
+# Death Korps') a helmet over a gas mask, its red combat helmet a hood over a gas mask, its psionic combat helmet a
+# conical hat over a mask with lit eyes (all took one helmet or the gas mask alone); its red-eyed armour power armour
+# (a robe), its rebel dustproof cloak a one-sided cape (the jacket).
+for _name, _defs in {
+        'CollarShirt': ('Wolfein_BusinessUniform', 'Wolfein_OLSuit', 'Wolfein_StaffUniform'),
+        'Skirt': ('Wolfein_BusinessUniform', 'Wolfein_OLSuit', 'Wolfein_StaffUniform', 'Wolfein_SailorSuit'),
+        'BasicShirt': ('Wolfein_SailorSuit', 'Wolfein_RebelGuerrillaUniform'),
+        'Dress': ('Wolfein_YouthOutfit', 'Wolfein_SleepGown', 'Wolfein_AIPTCombatSuit', 'Wolfein_SuitWithSweater'),
+        'Jacket': ('Wolfein_CroppedJacket', 'Wolfein_VanguardUniform', 'Wolfein_SuitWithSweater'),
+        'ShortShorts': ('Wolfein_CroppedJacket',),
+        'Shorts': ('Wolfein_VanguardUniform', 'Wolfein_RebelGuerrillaUniform'),
+        'Tanktop': ('Wolfein_SpecialmilitaryUniform',),
+        'Pants': ('Wolfein_SpecialmilitaryUniform', 'Wolfein_Labgown', 'Wolfein_MedicalUniform'),
+        'FlakVest': ('Wolfein_FlakJacket',),
+        'FlakJacket': ('Wolfein_HeavyFlakJacket',),
+        'LabCoat': ('Wolfein_Labgown', 'Wolfein_MedicalUniform'),
+        'Leotard': ('Wolfein_LightweightCombatUniform',),
+        'LongJohns': ('Wolfein_TightCombatUniform', 'Wolfein_MechanitorSuit'),
+        'BodyStrap': ('Wolfein_LightweightCombatUniform', 'Wolfein_TightCombatUniform'),
+        'Chestwrap': ('Wolfein_Bandage',),
+        'Tights': ('Wolfein_MeshSocks',),
+        'ClothMask': ('Wolfein_MetalDogMuzzle',),
+        'Scarf': ('Wolfein_Scarf',),
+        'Goggles': ('Wolfein_CombatUnitExciter', 'Wolfein_PrototypicalMechSignalBooster'),
+        'SimpleHelmet': ('Wolfein_Helmet_Filter',),
+        'AdvancedHelmet': ('Wolfein_Red-EyedHelmet',),
+        'HatHood': ('Wolfein_RedCombatHelmet',),
+        'Shadecone': ('Wolfein_PsionicCombatHelmet',),
+        'GasMask': ('Wolfein_Helmet_Filter', 'Wolfein_Red-EyedHelmet', 'Wolfein_RedCombatHelmet',
+                    'Wolfein_PsionicCombatHelmet'),
+        'PowerArmor': ('Wolfein_Red-EyedArmor',),
+        'Cape': ('Wolfein_RebelDustproofCloak',),
+        }.items():
+    STANDS_FOR[_name] = STANDS_FOR.get(_name, ()) + _defs
+# Milira: its Milian units' armour is their whole mech body (a robe and shoes), so power armour; the Milian light armour
+# a chest plate on a belt (the psyfocus vest), the bishop's cloak a wide cape; its traditional attire a bandeau over a
+# split skirt (a dress); its Artemis armour and pathfinder cloak long coats open down the front (a shirt and trousers;
+# the pathfinder's over shorts), its traveller cloak a long hooded cloak; its Milian lining a bodysuit (the shirt); its
+# Artemis eye an ear piece with an eye lens (the power armour helmet) and its hunter cap a feathered hood.
+for _name, _defs in {
+        'PowerArmor': ('Milian_CitadelArmor', 'Milian_FortressArmor', 'Milian_GuardArmor', 'Milian_GuardianArmor',
+                       'Milian_PaladinArmor', 'Milian_RangerArmor', 'Milian_RookArmor', 'Milian_StalkerArmor',
+                       'Milian_StrikerArmor'),
+        'FlakVest': ('Milian_LightArmor',),
+        'Cape': ('Milian_BishopCloak',),
+        'CropTop': ('Milira_BasicDressI', 'Milira_BasicDressII', 'Milira_BasicDressIII'),
+        'Skirt': ('Milira_BasicDressI', 'Milira_BasicDressII', 'Milira_BasicDressIII'),
+        'Duster': ('Milira_ArtemisArmor', 'Milira_ArtemisArmorII', 'Milira_PathfinderCloak'),
+        'Shorts': ('Milira_PathfinderCloak',),
+        'Robe': ('Milira_Cloak',),
+        'Leotard': ('Milian_Lining',),
+        'IntegratorHeadset': ('Milira_ArtemisHelmet',),
+        'HatHood': ('Milira_HunterCap',),
+        }.items():
+    STANDS_FOR[_name] = STANDS_FOR.get(_name, ()) + _defs
+# Kiiro (beyond its underwear, above): its guerrilla uniform (sleeveless, belted), logistics uniform "skirt" (a full
+# dress) and valor armour (a breastplate over a skirt) dresses; its judge's coat and simple coat long closed coats (a
+# shirt and trousers, and the long dress); its phantom cloak a cape (the duster); its white gown an open white coat (the
+# jacket); its chest plate and simple leather armour light cuirasses and its waistcoat a vest (the royal vest, and the
+# plain shirt); its suspender trousers a shirt and shorts on suspenders; its dorsal crossbow worn on a strap harness
+# (the royal vest).
+for _name, _defs in {
+        'Dress': ('Kiiro_GuerrillaUniform', 'Kiiro_NoelleDress', 'Kiiro_ValorArmor'),
+        'Robe': ('Kiiro_Penance', 'Kiiro_SimpleCoat'),
+        'Cape': ('Kiiro_PhantomCloak',),
+        'LabCoat': ('Kiiro_WhiteGown',),
+        'FlakVest': ('Kiiro_ChestPlate', 'Kiiro_SimpleLeatherArmor'),
+        'VestRoyal': ('Kiiro_Waistcoat',),
+        'CollarShirt': ('Kiiro_SuspenderTrousers',),
+        'Shorts': ('Kiiro_SuspenderTrousers',),
+        'BodyStrap': ('Kiiro_SuspenderTrousers', 'Kiiro_Apparel_DorsalCrossbow'),
+        }.items():
+    STANDS_FOR[_name] = STANDS_FOR.get(_name, ()) + _defs
 for _name, _defs in STANDS_FOR.items():
     GARMENT_PROPS.setdefault(_name, {})['stands_for'] = ' '.join(_defs)
 # Garments that keep the weights on them: loose ones standing well off the skin, which on the body's weights stretch
@@ -412,7 +552,9 @@ HIDE_HEAD = 'Head'
 # vertex only moves as its bones do (the middle of each bone, by its weights), so a plate stays on a limb that a key
 # moves (a Hulk's wider shoulders) without growing or shrinking with the flesh. Keys in HARD_FITTED are fitted from the
 # body as on any garment (a smaller head takes a smaller helmet).
-HARD_FITTED = ('shrinkhead',)   # lower case: matched without regard to case, as the rig's key has been spelt both ways
+# Armoured too: that key is a suit's volume, made for the armour over it to follow (by its bones alone, the plates only
+# moved apart with the wider shoulders, the suit no bigger).
+HARD_FITTED = ('shrinkhead', 'armoured')   # lower case: matched without regard to case, as the rig's key has been spelt both ways
 # Keys always fitted from the body, whatever a garment has of its own by that name. The make scripts (make_from_groups,
 # make_duster, make_parka, ...) write a copy of each body key into the garment as the body had it then, which then
 # counts as a hand fix and wins; when the body's Thin, Fat and Hulk were made stronger (Hulk about three times, over the
@@ -438,6 +580,7 @@ HANG_KEEP = 0.03   # cells: the least a smoothed vertex is kept off the reshaped
 # where following each vertex's patch of skin pressed it in.
 FILL_SHARE = 0.5
 FILL_PASSES = 8
+BURIED = 0.005   # cells: a garment vertex this far under the skin at rest is buried, and a key never pushes it out (write_garment)
 BRIDGE_BONES = ('thigh',)   # with walk.HIPS: where bridged() lifts a garment out of the body's creases
 BRIDGE_SLACK = 0.004   # cells: a curve in no deeper than this is left (the garment's own shape)
 BRIDGE_SHARE = 0.5
@@ -611,7 +754,7 @@ def write_frame(name, scale, files=True):
     ks = skin_matrices()
     skin_worst = max(skin_worst, skin_error(ks, verts))
     if CHECK_FITS:
-        check_fits(ks, verts)
+        check_fits(ks, verts, name)
     clip_frames.append(ks)
     return tris
 
@@ -673,6 +816,13 @@ def hairline_points():
     print('WARNING: %s is neither a curve nor a mesh of edges; no hairline written' % HAIRLINE)
     return []
 
+# The body's generation, skin.txt's generation line. Raise it by hand when the body's surface or rest pose moves enough
+# that a garment made on the last one could clip or float (a reshape, a cut that moves skin outward; not a re-weighting,
+# new edges or vertices moved along the skin): other mods' garments carry the generation they were made on (the
+# kit's body line), and M3AT notes in the log any made on an older one. skin.txt's hash changes with every export, so it
+# can't say this. dev_notes/garment_scripts.md, Docs/Apparel.md.
+BODY_GENERATION = 1
+
 def write_skin(path):
     lift = FACE_LIFT / scale
     head = bone_index[walk.HEAD]
@@ -684,12 +834,20 @@ def write_skin(path):
         f.write('# v x y z: a vertex. w bone weight ...: its weights (bones as in anim.txt). f a b c: a triangle.\n')
         f.write('# fv i u v x y z: a face patch vertex, made from vertex i, its texture place and its rest place lifted off the head.\n')
         f.write('# ff a b c: a face patch triangle (vertex numbers). centre x y z: the head\'s middle. head b: the head bone.\n')
+        f.write('# generation n: the body\'s generation, raised when it changes enough to move garments made on it (Docs/Apparel.md).\n')
+        f.write('generation %d\n' % BODY_GENERATION)
         for v in rest:
             f.write('v %.5f %.5f %.5f\n' % tuple(to_game(v)))
         for ws in weights:
             f.write('w %s\n' % ' '.join('%d %.5f' % bw for bw in ws))
         for a, b, c in rest_tris:
             f.write('f %d %d %d\n' % (a, c, b))
+        fixes = normal_fixes(body, NORMAL_FIX)
+        if fixes:
+            f.write('# nfix i x y z: added to vertex i\'s worked-out normal in every shape (normal_fix.py: a cut\'s creases).\n')
+            for i, d in fixes:
+                f.write('nfix %d %.5f %.5f %.5f\n' % ((i,) + tuple(d)))
+            print('SKIN normal fix on %d vertices' % len(fixes))
         for i in sorted(face_uvs):
             p = to_game(rest[i] + rest_normals[i] * lift)
             f.write('fv %d %.5f %.5f %.5f %.5f %.5f\n' % ((i,) + face_uvs[i] + tuple(p)))
@@ -726,6 +884,27 @@ def write_skin(path):
         f.write('# garment name file: a garment mesh on the same rig (its own file).\n')
         for g in garments:
             f.write('garment %s garment_%s.txt\n' % (g.name, g.name))
+
+NORMAL_FIX = 'normal_fix'          # the body's point attribute (Blender axes), from anim_scripts/normal_fix.py
+NORMAL_FIX_GLB = '_NORMAL_FIX'     # a garment's, from its .glb (glTF axes: Blender imports a custom attribute unturned)
+
+def normal_fixes(o, name, gltf=False):
+    """The object's normal fixes as [(vertex, game-axes vector)], those not zero; [] if it has none. Directions only:
+    the game adds them to unit normals, so they are not scaled to cells."""
+    a = o.data.attributes.get(name)
+    if a is None or a.domain != 'POINT':
+        return []
+    m3 = o.matrix_world.to_3x3()
+    out = []
+    for i, d in enumerate(a.data):
+        v = Vector(d.vector)
+        if v.length < 1e-6:
+            continue
+        if gltf:
+            v = Vector((v.x, -v.z, v.y))
+        v = m3 @ v
+        out.append((i, Vector((-v.x, v.z, -v.y))))
+    return out
 
 def game_vector(d):
     """A move (world units) in the game's axes and cells."""
@@ -866,7 +1045,7 @@ def moved(a, deltas):
 
 HIDE_RIDES_WITH = 0.5    # a garment riding one bone whole hides only skin with this share of its weights on that bone or below
 
-def hidden_under(g_rest, tris, bone=None):
+def hidden_under(g_rest, tris, bone=None, reach=HIDE_REACH):
     """The body triangles (numbered as in skin.txt) under the garment, which the game leaves out while it is worn so the
     skin can't show through it. Tested once, at rest: the garment follows the skin, so what it covers stays covered.
     A body vertex is under it if the nearest point of the garment is within HIDE_REACH (outside the skin, or inside
@@ -881,7 +1060,7 @@ def hidden_under(g_rest, tris, bone=None):
     riding = None
     if bone:
         riding = {bone_index[n] for n in [bone] + [b.name for b in rig.data.bones[bone].children_recursive] if n in bone_index}
-    reach = HIDE_REACH / scale
+    reach = reach / scale
     look = HIDE_LOOK / scale
     def covered(p, n):
         if tree.find_nearest(p, reach)[0] is None:
@@ -1131,6 +1310,13 @@ def write_garment(g, path):
         first.setdefault(k, v)
     neighbours = [[first[k] for k in near[place[v]]] for v in range(len(g_rest))]
     cut_gap = list(gap)   # (body_cut_weights: how far off the skin as made, before any bridging)
+    # (inside the body at rest, more than BURIED cells under the skin: a parka sleeve's end, started inside the trunk)
+    buried = []
+    for p in g_rest:
+        loc, nrm, _, dist = body_tree.find_nearest(p)
+        buried.append(dist * scale > BURIED and nrm.dot(p - loc) < 0)
+    if any(buried):
+        print('BURIED %s: %d of %d vertices inside the body at rest, never pushed out by a key' % (g.name, sum(buried), len(buried)))
     if props.get('bridge', False):
         # Its rest shape lifted out of the body's creases over the hips (bridged()), then laid over the body again.
         g_rest = bridged(g_rest, over, outward, neighbours)
@@ -1221,7 +1407,7 @@ def write_garment(g, path):
     for part in [x.strip() for x in props.get('solid_parts', '').split(',') if x.strip()]:
         solid_weights(g.name, part, g_rest, g_weights)
     garment_fits.append({'name': g.name, 'rest': g_rest, 'weights': g_weights, 'over': over, 'gap': gap, 'sink': 0.0})
-    hide = [] if props.get('fur', False) or props.get('held', False) or not props.get('hides', True) else hidden_under(g_rest, [t for k, t in enumerate(tris) if k not in glass_tris], props.get('bone'))
+    hide = [] if props.get('fur', False) or props.get('held', False) or not props.get('hides', True) else hidden_under(g_rest, [t for k, t in enumerate(tris) if k not in glass_tris], props.get('bone'), props.get('hide_reach', HIDE_REACH))
     hide_groups = [x.strip() for x in props.get('hide_groups', '').split(',') if x.strip()]
     hide_parts = [x for flag, x in (('hide_body', HIDE_BODY), ('hide_head', HIDE_HEAD)) if props.get(flag, False)]
     hide_groups += [walk.PART_GROUP % x for x in hide_parts if walk.PART_GROUP % x not in hide_groups]
@@ -1269,6 +1455,10 @@ def write_garment(g, path):
         if props.get('pads', False):
             f.write('# pads: worn with the Pauldrons garment (its own colour), unless apparel of its own has them drawn.\n')
             f.write('pads yes\n')
+        if props.get('wearer_key'):
+            f.write('# wearer_key: the wearer takes at least this much of that body key (its frame, Armoured) while it is worn.\n')
+            for _wk in props['wearer_key'].split(','):
+                f.write('wearer_key %s\n' % _wk.strip())
         if props.get('marine_of'):
             f.write('# marine_of: drawn in place of that garment on a pawn in Space Marine armour.\n')
             f.write('marine_of %s\n' % props['marine_of'])
@@ -1327,9 +1517,33 @@ def write_garment(g, path):
                 f.write('n %.5f %.5f %.5f\n' % tuple(game_vector(sum((rest_normals[k] * b for k, b in zip(tri, bw)), Vector()).normalized())))
         for a, b, c in out_tris:
             f.write('f %d %d %d\n' % (a, c, b))
+        fixes = dict(normal_fixes(g, NORMAL_FIX_GLB, gltf=True))
+        if fixes:
+            f.write('# nfix i x y z: added to vertex i\'s worked-out normal in every shape (normal_fix.py: a cut\'s creases).\n')
+            for k, i in enumerate(order):
+                if i in fixes:
+                    f.write('nfix %d %.5f %.5f %.5f\n' % ((k,) + tuple(fixes[i])))
         # (not a sleeve: at rest the arms hang by the hips, so the body nearest a sleeve's end can be the thigh)
         arms = {i for i, n in enumerate(deform) if n.startswith(HANG_NOT)}
         hang = [h * max(0.0, 1.0 - 2.0 * sum(w for b, w in ws if b in arms)) for h, ws in zip(hang, g_weights)]
+        # (SEAMS: which of its vertices sit on the other garment's, and which of the other's each one sits on)
+        shared = {}
+        if g.name in SEAMS:
+            if SEAMS[g.name] not in seam_fits:
+                print('WARNING: %s meets %s (SEAMS), which is not written before it, so their seam may show' % (g.name, SEAMS[g.name]))
+            else:
+                other = seam_fits[SEAMS[g.name]][0]
+                seam_tree = kdtree.KDTree(len(other))
+                for j, p in enumerate(other):
+                    seam_tree.insert(p, j)
+                seam_tree.balance()
+                for i, p in enumerate(g_rest):
+                    _, j, dist = seam_tree.find(p)
+                    if dist < SEAM_NEAR:
+                        shared[i] = j
+                print('SEAM %s: %d vertices take %s\'s moves in every key' % (g.name, len(shared), SEAMS[g.name]))
+        if g.name in SEAMS.values():
+            seam_fits[g.name] = (list(g_rest), {})
         for name, deltas in body_keys.items():
             mine = own.get(name)
             if mine and any(d.length > 1e-6 for d in mine):
@@ -1350,10 +1564,15 @@ def write_garment(g, path):
                 else:
                     fitted = hung(fitted, hang, neighbours)
                     # Where the body under a vertex changed which way it faces (between the thighs), following the
-                    # nearest triangle can leave it under the reshaped skin: pushed back out to the gap it had.
+                    # nearest triangle can leave it under the reshaped skin: pushed back out to the gap it had. Not
+                    # one buried in the body at rest (a parka sleeve's end, started inside the trunk): pushed out by
+                    # its gap, it came through the coat's front in Hulk and turned its triangles over, a hole there.
+                    followed = list(fitted)
                     shaped = [p + d for p, d in zip(rest, deltas)]
                     tree = BVHTree.FromPolygons(shaped, rest_tris)
                     for i, p in enumerate(g_rest):
+                        if buried[i]:
+                            continue
                         q = p + fitted[i]
                         loc, _, ti, dist = tree.find_nearest(q)
                         a, b, c = (shaped[j] for j in rest_tris[ti])
@@ -1365,13 +1584,21 @@ def write_garment(g, path):
                             fitted[i] = loc + n * (gap[i] if least == 0.0 else least) - p
                     # (after the push, which in a deepened crease shoves a vertex across it, as the skin there faces
                     # sideways; filling only lifts, so nothing goes back under)
-                    fitted = filled(fitted, outward, neighbours)
+                    fitted = [f if buried[i] else d for i, (f, d) in enumerate(zip(followed, filled(fitted, outward, neighbours)))] \
+                        if any(buried) else filled(fitted, outward, neighbours)
                 # A piece with its own weights (a launcher, a booster) is solid: each key moves it whole, by the mean of
                 # what the skin under it does, as fitting each vertex bent the grenadier's tube near the shrunk head.
                 for piece in pieces.values():
                     mean = sum((fitted[i] for i in piece), Vector()) / len(piece)
                     for i in piece:
                         fitted[i] = mean
+            if shared:
+                theirs = seam_fits[SEAMS[g.name]][1].get(name)
+                fitted = list(fitted)
+                for i, j in shared.items():
+                    fitted[i] = theirs[j].copy() if theirs else Vector()
+            if g.name in seam_fits:
+                seam_fits[g.name][1][name] = list(fitted)
             f.write('key %s\n' % name)
             for i, vi in enumerate(order):
                 d = fitted[vi]
@@ -1408,7 +1635,7 @@ def fit_setup():
     return (numpy.array(rest_at).reshape(-1, 4), numpy.array(weight).reshape(-1, len(deform)),
             numpy.array(tri, dtype=numpy.int64).reshape(-1, 3), numpy.array(bary).reshape(-1, 3), numpy.array(starts))
 
-def check_fits(ks, verts):
+def check_fits(ks, verts, frame=None):
     """For each garment, skins it with ks and keeps the furthest any vertex gets below the body triangle it was over at
     rest (cells, along that triangle's posed normal; nothing if it stays outside). verts: the body as Blender posed it.
     In numpy over every garment at once, as it runs on every frame of every clip."""
@@ -1434,7 +1661,10 @@ def check_fits(ks, verts):
     ends = list(starts[1:]) + [len(q)]
     for fit, s, e in zip(garment_fits, starts, ends):
         if e > s:
-            fit['sink'] = max(fit['sink'], float(depth[s:e].max()))
+            k = int(depth[s:e].argmax())
+            if float(depth[k + s]) > fit['sink']:   # and where: the vertex's rest place (body units) and the frame
+                fit['sink'] = float(depth[k + s])
+                fit['where'] = (tuple(round(float(x), 2) for x in rest_at[k + s][:3]), frame)
 
 def write_anim(path, clips):
     """Each clip's frames, one line per bone: the rotation (w x y z) and where the bone's rest head ends up, in cells."""
@@ -1647,7 +1877,14 @@ for i, p in enumerate(rest):
 rest_tree.balance()
 body_tree = BVHTree.FromPolygons(rest, rest_tris)
 write_skin(os.path.join(out, 'skin.txt'))
+# (a SEAMS garment moved to just after its source, the rest in their order, as which garment is written first names an
+# image shared by several)
+write_order = [g for g in garments if g.name not in SEAMS]
 for g in garments:
+    if g.name in SEAMS:
+        at = next((k + 1 for k, s in enumerate(write_order) if s.name == SEAMS[g.name]), len(write_order))
+        write_order.insert(at, g)
+for g in write_order:
     write_garment(g, os.path.join(out, 'garment_%s.txt' % g.name))
 # What an older export wrote for a garment since renamed or removed: skin.txt no longer lists it, so the game never reads
 # it, but it ships, and a name differing from a kept one only by case is one file on Windows, which may keep either.
@@ -2172,6 +2409,9 @@ if walk.DIE_CLIP is not None:
 pose_worst = max(pose_worst, export_loop('ragdoll', lambda t: walk.ragdoll_pose(), 1, 1.0))
 # A corpse slumped in a gibbet cage (one frame, standing; WalkFigures.DrawCaged).
 pose_worst = max(pose_worst, export_loop('caged', lambda t: walk.caged_pose(), 1, 1.0))
+# Sat tied with the back to a tree (Tie to Tree's prisoner; WalkFigures.DrawTied, which draws the rope).
+if hasattr(walk, 'tied_at'):
+    pose_worst = max(pose_worst, export_loop('tied_tree', walk.tied_at, walk.loop_frames(walk.TIED_SECONDS), walk.TIED_SECONDS))
 for name in ('knockdown', 'die'):
     if walk.fall_clip(name) is not None and (walk.FALL_INTO[name] != 'downed_side' or walk.DOWNED_SIDE_CLIP is not None):
         # By functions, so a variant with another mocap clip has its own length.
@@ -2219,8 +2459,9 @@ print('SKIN %s: %d vertices, %d bones, keys %s; skinning matches Blender within 
 if not CHECK_FITS:
     print('FIT not checked (export with --fit to see how far each garment sinks into the body)')
 for fit in garment_fits if CHECK_FITS else []:
-    print('FIT %s: in every frame, sinks at most %.4f cells into the body (stands %.4f to %.4f off it at rest)'
-          % (fit['name'], fit['sink'], min(fit['gap']) * scale, max(fit['gap']) * scale))
+    print('FIT %s: in every frame, sinks at most %.4f cells into the body (stands %.4f to %.4f off it at rest)%s'
+          % (fit['name'], fit['sink'], min(fit['gap']) * scale, max(fit['gap']) * scale,
+             ', deepest at rest place %s in %s' % fit['where'] if fit.get('where') else ''))
 print('STAND idle over %.1f s; drafted %s over %.1f s each, laid over the gait from %s (a free arm keeps the gait\'s)'
       % (walk.IDLE_SECONDS, ', '.join(drafted_clips), walk.DRAFT_SECONDS, ', '.join('%s %.1f' % kv for kv in walk.UPPER.items())))
 print('AIM %s, %d pitches %.0f .. %.0f degrees; overreach %.4f' % (', '.join(walk.aimed_names()), walk.AIM_PITCHES,

@@ -57,7 +57,8 @@ OPEN_WIDTH = 1.5       # half the opening's width at OPEN_LOW, Blender units, na
 OPEN_LOW = 12.3        # its height
 OPEN_SNAP = 0.08       # a vertex this near the cut is put on it, so the cut leaves no slivers
 HEM = 3.8              # the hem's height (mid shin; the shin runs from 6.5 to 1.2)
-RINGS = 7              # rings of vertices from the bottom edge down to the hem
+RINGS = 5              # rings of vertices from the bottom edge down to the hem: one about every 1.8 down, as the dresses'
+                       # (7 at first; the flare and the bends read as well with fewer, and each ring is 30 triangles)
 EASE = 0.5             # extra room the skirt is given at the hem over the body's reach, growing from none at the top
 FLARE = 0.7            # and more again, growing with the square of the way down, so it swings out rather than hanging as a tube
 FRONT_THIGH = 1.0      # the legs' share of the weights at the hem, at the front
@@ -95,20 +96,20 @@ WAIST_DIP_WIDTH = 1.5  # out to this far either side of the middle
 RING_STEP = 1.2        # with RINGS None, a ring about this far down each column
 
 # The robe: open in a V at the neck, closed below, to the ankle and fuller, vented back and front from the shin down.
-ROBE = dict(NAME='Robe', CLOSED=True, OPEN_WIDTH=0.8, OPEN_LOW=17.9, HEM=1.9, RINGS=10, EASE=0.7, FLARE=1.1,
+ROBE = dict(NAME='Robe', CLOSED=True, OPEN_WIDTH=0.8, OPEN_LOW=17.9, HEM=1.9, RINGS=6, EASE=0.7, FLARE=1.1,
             VENTS={'back': 5.0, 'front': 4.2}, FRONT_THIGH=0.8, BACK_THIGH=0.5, FRONT_SHIN=0.6, BACK_SHIN=0.4)
 
 # The burka: the robe closed right up to the neck (no V: an opening of no width, so the cut down
 # the middle leaves the two halves sharing their vertices), down to the top of the foot and fuller again, its vents only
 # from the shin down; with its head piece (HOOD: make_hats.py's BurkaHood, the broadwrap's cloth closed over the face but
 # for a slit over the eyes) joined on, as the game has one garment per apparel.
-BURKA = dict(ROBE, NAME='Burka', OPEN_WIDTH=0.0, HEM=1.3, RINGS=11, EASE=0.8, FLARE=1.3,
+BURKA = dict(ROBE, NAME='Burka', OPEN_WIDTH=0.0, HEM=1.3, RINGS=6, EASE=0.8, FLARE=1.3,
              VENTS={'back': 3.6, 'front': 3.0}, HOOD='Models/bases/burkaHood.glb')
 
 # Anomaly's lab coat: the duster open all the way down, the opening a little narrower, knee length (the hem just under
 # the knee's 6.5) and hanging closer, so less ease and flare; the shin takes little, as the hem is barely past the knee,
 # and the back vent starts lower.
-LABCOAT = dict(NAME='LabCoat', OPEN_WIDTH=1.2, HEM=5.6, RINGS=5, EASE=0.3, FLARE=0.4, VENTS={'back': 8.2},
+LABCOAT = dict(NAME='LabCoat', OPEN_WIDTH=1.2, HEM=5.6, RINGS=4, EASE=0.3, FLARE=0.4, VENTS={'back': 8.2},
                FRONT_SHIN=0.3, BACK_SHIN=0.2)
 
 # Skirts and dresses for other mods' (Ratkin's, Kiiro's, Milira's, Wolfein's), in LENGTHS: the T-shirt's group
@@ -454,12 +455,16 @@ def skirt_verts(sk):
 verts = upper + skirt_verts(skirt)
 polys = [list(f) for f in faces]
 n_faces = len(polys)
+skirt_places = []
 for k in range(RINGS):
     for c in range(n_cols - 1):
         j, j2 = cols[c], cols[c + 1]
         between = [chain[i] for i in range(j2 - 1, j, -1)] if k == 0 else []   # the edge's vertices between, back along it
         polys.append([index[key_of(k, j, 'after')], index[key_of(k + 1, j, 'after')],
                       index[key_of(k + 1, j2, 'before')], index[key_of(k, j2, 'before')]] + between)
+        # where each corner is in the skirt's layout (ring, column of the bottom edge), as a closed skirt's last column
+        # is its first column's vertex, but at the other end of the row
+        skirt_places.append([(k, j), (k + 1, j), (k + 1, j2), (k, j2)] + [(0, i) for i in range(j2 - 1, j, -1)])
 
 old = bpy.data.objects.get(NAME)
 if old is not None:
@@ -524,7 +529,6 @@ def add_uvs():
     for i in range(1, n_chain):
         chain_u.append(chain_u[-1] + (rest[chain[i]] - rest[chain[i - 1]]).length)
     chain_u = [u - (chain_u[0] + chain_u[-1]) / 2 for u in chain_u]
-    at_chain = {q: i for i, q in enumerate(chain)}
     loops_uv = mesh.uv_layers['UVMap']   # again: going in and out of Edit Mode leaves the old reference pointing at freed data
     ring_u, down = {}, {j: 0.0 for j in cols}
     for k in range(1, RINGS + 1):
@@ -535,16 +539,15 @@ def add_uvs():
             above = rest[chain[j]] if k == 1 else ring_at(skirt, k - 1, j)
             down[j] += (ring_at(skirt, k, j) - above).length
             ring_u[k, j] = (row[c] - (row[0] + row[-1]) / 2, -down[j])
+    # Each corner by its place in its face (by vertex, as flip() turned some faces round): a closed skirt's last
+    # column is its first column's vertex, so by vertex alone the last faces' UVs ran back across the whole row.
     for p in mesh.polygons:
         if p.index < n_faces:
             continue
+        place_of = dict(zip(polys[p.index], skirt_places[p.index - n_faces]))
         for li in p.loop_indices:
-            vi = mesh.loops[li].vertex_index
-            if vi < n_upper:
-                loops_uv.data[li].uv = (chain_u[at_chain[vi]], 0.0)
-            else:
-                _, k, j, _ = keys[vi - n_upper]
-                loops_uv.data[li].uv = ring_u[k, j]
+            k, j = place_of[mesh.loops[li].vertex_index]
+            loops_uv.data[li].uv = (chain_u[j], 0.0) if k == 0 else ring_u[k, j]
 
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.mesh.select_all(action='SELECT')

@@ -86,22 +86,21 @@ namespace M3AT
             SkinnedFigure skin = WalkFigures.SkinForAddOns;
             if (skin != null)
             {
-                foreach (KeyValuePair<string, bool> owner in skin.GarmentOwners())
+                foreach (KeyValuePair<string, ContentPart> owner in skin.GarmentOwners())
                 {
                     ModContentPack mod = ModById(owner.Key);
                     if (mod != null)
                     {
                         AddOn a = of(mod);
-                        if (owner.Value)
+                        if (owner.Value == ContentPart.GeneParts)
                         {
                             a.geneParts++;
-                            a.parts.Add(ContentPart.GeneParts);
                         }
                         else
                         {
                             a.garments++;
-                            a.parts.Add(ContentPart.Clothing);
                         }
+                        a.parts.Add(owner.Value);   // GeneParts, Armour (armour and helmets) or Clothing
                     }
                 }
             }
@@ -112,7 +111,7 @@ namespace M3AT
                 {
                     AddOn a = of(mod);
                     a.patches++;
-                    ContentPart part = ContentSources.PartOf(p.Key);
+                    ContentPart part = ContentSources.PartOf(p.Key, p.Value.PatchMethod);
                     if (part != ContentPart.Shared)
                     {
                         a.parts.Add(part);
@@ -138,6 +137,46 @@ namespace M3AT
                 }
             }
             return byId.Values.OrderBy(a => a.name).ToList();
+        }
+
+        // The M3AT methods a mod patches (those taken off by the gate too), as "Type.Method", for its pack report.
+        internal static List<KeyValuePair<MethodBase, string>> PatchedBy(string packageId)
+        {
+            List<KeyValuePair<MethodBase, string>> found = new List<KeyValuePair<MethodBase, string>>();
+            foreach (KeyValuePair<MethodBase, Patch> p in PatchesOnOurs().Concat(taken.Select(t => new KeyValuePair<MethodBase, Patch>(t.original, t.patch))))
+            {
+                ModContentPack mod = ModOf(p.Value.PatchMethod.DeclaringType.Assembly);
+                if (mod != null && string.Equals(mod.PackageId, packageId, StringComparison.OrdinalIgnoreCase)
+                    && !found.Any(f => f.Key == p.Key))
+                {
+                    found.Add(new KeyValuePair<MethodBase, string>(p.Key, p.Key.DeclaringType.Name + "." + p.Key.Name));
+                }
+            }
+            return found;
+        }
+
+        private static readonly Dictionary<string, bool> bodyMesh = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+
+        // Whether a mod has a patch that changes the body's mesh as it is read (ContentSources.ChangesBodyMesh), on or taken off.
+        internal static bool ChangesBodyMesh(string packageId)
+        {
+            bool found;
+            if (bodyMesh.TryGetValue(packageId, out found))
+            {
+                return found;
+            }
+            found = false;
+            foreach (KeyValuePair<MethodBase, Patch> p in PatchesOnOurs().Concat(taken.Select(t => new KeyValuePair<MethodBase, Patch>(t.original, t.patch))))
+            {
+                ModContentPack mod = ModOf(p.Value.PatchMethod.DeclaringType.Assembly);
+                if (mod != null && string.Equals(mod.PackageId, packageId, StringComparison.OrdinalIgnoreCase) && ContentSources.ChangesBodyMesh(p.Key, p.Value.PatchMethod))
+                {
+                    found = true;
+                    break;
+                }
+            }
+            bodyMesh[packageId] = found;
+            return found;
         }
 
         // Turns these add-ons wholly off for a benchmark turn (none: all back on, to the player's choices).
@@ -195,7 +234,7 @@ namespace M3AT
             {
                 return false;
             }
-            ContentPart part = ContentSources.PartOf(original);
+            ContentPart part = ContentSources.PartOf(original, patch.PatchMethod);
             return part == ContentPart.Shared ? !ContentSources.UsesPackForAny(mod.PackageId) : !ContentSources.UsesPack(mod.PackageId, part);
         }
 

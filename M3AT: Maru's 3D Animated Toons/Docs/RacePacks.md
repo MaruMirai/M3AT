@@ -4,7 +4,17 @@ A **content pack** is a mod that gives M3AT's figures something of their own: a 
 
 Players choose, part by part, whether your pack's content or M3AT's own is drawn. They choose in the Content tab of M3AT's options, with the M3AT button on the bottom bar in game, or with M3AT look on a pawn. So make each part as good as you can, and know that a player may prefer M3AT's for some of them.
 
-Read [Apparel.md](Apparel.md) for garments and [GeneParts.md](GeneParts.md) for gene parts. This guide covers the rest and how it all fits together.
+Read [Apparel.md](Apparel.md) for garments and [GeneParts.md](GeneParts.md) for gene parts. This guide covers the rest and how it all fits together. Using an AI assistant to make your pack? Point it at [AGENTS.md](AGENTS.md) first.
+
+## What players see of your pack's cost
+
+The content switcher shows players, beside each part and garment:
+- its triangles against M3AT's budget, green, amber or red, with M3AT's own garments for scale;
+- "M3AT auto-optimized from N" where M3AT had to cut it down;
+- how many of M3AT's methods your pack patches;
+- your pack's cost as their last benchmark measured it, in milliseconds a frame.
+
+Packs within the budget look good there, and players notice. The **Pack report** (development mode) gives you the same numbers with what to fix, and a line for your Workshop page.
 
 ## The parts players choose between
 
@@ -17,9 +27,7 @@ Read [Apparel.md](Apparel.md) for garments and [GeneParts.md](GeneParts.md) for 
 | Clothing | Your garments | M3AT's closest garments, painted with the clothing's art |
 | Gene parts | Your meshes for genes | M3AT's cat ears, tails and horns |
 
-The defaults are yours, except:
-- **Face** is M3AT's where Facial Animation has faces for the race, because M3AT fits those faces to its figure.
-- **Armour and helmets** are M3AT's: apparel with a high sharp armour rating, or named a helmet.
+The defaults are yours for every part. Only one pack's body change can be on at a time, so if several packs reshape the body, the first one's is on by default.
 
 Players can change any of these.
 
@@ -54,13 +62,13 @@ public static class MyPackForM3AT
 - **The face drawer** gets the place, yaw and size M3AT would draw its face patch at, and how far the mouth is open (0 to 1). Return true if you drew it, or false to have M3AT draw its own.
 - **Players' choices are respected for you.** M3AT asks you only for the parts the player has set to your pack. You don't need to check the player's choice yourself.
 
-Garments held to M3AT's triangle budget are simplified as they load (2500 for the body, 1500 for the head). See [Apparel.md](Apparel.md), Keep it low poly.
+Garments over M3AT's triangle budget are optimized as they load (twice M3AT's own garment for the same thing, at least 400). See [Apparel.md](Apparel.md), Keep it low poly.
 
 ## Packs that patch M3AT instead
 
 A pack that patches M3AT's own methods with Harmony still works, but:
 - **Players still choose.** When a player sets a part to M3AT, your patches on the methods for that part are taken off, and put back when they set it to yours again. A patch on a method M3AT doesn't know the part of counts as "Other changes".
-- **Updates can break it.** M3AT's private methods change between updates, so your patches can stop working without warning.
+- **Updates can break it.** M3AT's private methods change between updates, so your patches can stop working without warning. So does its body: its vertex and triangle numbers, edges and skin can change in any update ([Apparel.md](Apparel.md#when-m3ats-body-changes)), so a patch that edits the body's mesh by number, or ears and other parts placed against it, may need redoing.
 
 Move to the API when you can. Your hooks map to it like this:
 

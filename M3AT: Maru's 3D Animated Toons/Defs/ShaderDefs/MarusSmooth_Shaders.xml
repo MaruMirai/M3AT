@@ -116,6 +116,42 @@
     </shaderProgram>
   </ShaderDef>
 
+  <!-- The same redraw blended over IsoRim's occlusion and shadows rather than painted over them, for clothes and hair with
+       clothesOcclusion on and its strength under full (OutlineOrder.cs AfterOcclusion, MarusSmooth.frag.glsl _RedrawShare):
+       written at alpha 1 - strength, so they keep that share of the darkening. The engine's Alpha blend writes alpha as
+       a + dst * (1 - a), so the picture's alpha stays 1 for the screen-space outline's code pass (2455). -->
+  <ShaderDef>
+    <defName>MarusSmoothSoftAfterAO</defName>
+    <shaderProgram>
+      <vertexShaderFileName>MarusSmooth.vert.glsl</vertexShaderFileName>
+      <fragmentShaderFileName>MarusSmooth.frag.glsl</fragmentShaderFileName>
+      <useTexture>false</useTexture>
+      <blendMode>Alpha</blendMode>
+      <depthWrite>false</depthWrite>
+      <cullMode>None</cullMode>
+      <renderQueue>2454</renderQueue>
+    </shaderProgram>
+  </ShaderDef>
+
+  <ShaderDef>
+    <defName>MarusSmoothTexSoftAfterAO</defName>
+    <shaderProgram>
+      <vertexShaderFileName>MarusSmoothTex.vert.glsl</vertexShaderFileName>
+      <fragmentShaderFileName>MarusSmooth.frag.glsl</fragmentShaderFileName>
+      <useTexture>true</useTexture>
+      <blendMode>Alpha</blendMode>
+      <depthWrite>false</depthWrite>
+      <cullMode>None</cullMode>
+      <renderQueue>2454</renderQueue>
+      <textureWrapOverrides>
+        <li>
+          <key>_MainTex</key>
+          <value>Clamp</value>
+        </li>
+      </textureWrapOverrides>
+    </shaderProgram>
+  </ShaderDef>
+
   <!-- The chibi's outlines (SkinnedFigure.OutlineMaterial): IsoRim's IsoRimOutline (an inside-out shell, only the faces
        turned away from the camera, pushed back in depth; the moving outline's push away from the camera comes from
        _OutlinePush in the vertex stage), on the chibi's own program, so that it can have a light pass of its own.

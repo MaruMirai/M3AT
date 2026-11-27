@@ -23,8 +23,8 @@ namespace M3AT
         private const float AddonCellLeast = 0.007f;   // cells: a voxel no smaller, so a small tuft isn't thousands of triangles
         private const byte AddonSolid = 128;        // alpha counted as in the picture
         private const int AddonSmooth = 4;          // passes smoothing the surface
-        private const int AddonTriangles = 150;     // an ear, tuft or horn is cut down to about this many triangles, as low-poly as the garments
-        private const int AddonTailTriangles = 250; // and a tail, longer, to this many
+        internal const int AddonTriangles = 150;     // an ear, tuft or horn is cut down to about this many triangles, as low-poly as the garments
+        internal const int AddonTailTriangles = 250; // and a tail, longer, to this many
         private const int AddonBleed = 6;           // pixels each picture's colour is grown past its edge in the atlas
         private const float AddonInkReach = 3f;     // pixels (of AddonTexSize) in from a picture's edge its outline ink may be
         private const float AddonInkDark = 0.5f;    // and as dark as this share of the picture's median lightness or darker

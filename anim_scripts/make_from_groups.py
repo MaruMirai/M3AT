@@ -80,7 +80,11 @@ if '--blend' in argv:
     del argv[k:k + 2]
 if not argv:
     sys.exit('make_from_groups.py: give an out folder')
+over = '--over' in argv
+argv = [a for a in argv if a != '--over']
 out, only = os.path.abspath(argv[0]), set(argv[1:])
+# The drawn Sandals (106 triangles) are not this script's (698): made only when named with --over (checked 2026-11-27).
+NOT_THIS_SCRIPTS = {'Sandals'}
 os.makedirs(out, exist_ok=True)
 
 for o in bpy.data.objects:   # a mesh saved in Edit Mode has its edits outside its data, and skips its Armature modifier
@@ -410,6 +414,9 @@ def make_gloves():
 
 for name, made in (('Socks', make_socks), ('Boots', make_boots), ('Sandals', make_sandals), ('Gloves', make_gloves)):
     if only and name not in only:
+        continue
+    if name in NOT_THIS_SCRIPTS and not over:
+        print('GROUP %s left out: the drawn one is not this script\'s (name it with --over to make it anyway)' % name)
         continue
     have = bpy.data.objects.get(name)
     if have is not None and not have.get('from_group'):

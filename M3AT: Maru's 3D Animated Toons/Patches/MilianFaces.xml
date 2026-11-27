@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  A humanized Milian (Milira Race's humanlike Milian_Race, made when a Milian mech is humanized) is drawn as an M3AT
+  chibi, which takes its eyes and mouth from Facial Animation. Milian_Race replaces its parent's comps (Inherit="false"),
+  so it gets none of Facial Animation's controllers, and Milira Race Facial Animation patches Milira_Race only: the
+  chibi came out faceless. These are the comps that mod gives Milira_Race; FaceLayers.MilianFaces then points Facial
+  Animation's face choices for Milian_Race at Milira's, so it wears a Milira face (the Milian head sprite's own eyes are
+  painted on, and don't animate).
+-->
+<Patch>
+  <Operation Class="PatchOperationFindMod">
+    <mods>
+      <li>Milira Race Facial Animation</li>
+    </mods>
+    <match Class="PatchOperationSequence">
+      <success>Always</success>
+      <operations>
+        <li Class="PatchOperationTest">
+          <xpath>Defs/AlienRace.ThingDef_AlienRace[defName="Milian_Race"]/comps</xpath>
+        </li>
+        <li Class="PatchOperationTest">
+          <xpath>Defs/AlienRace.ThingDef_AlienRace[defName="Milian_Race"]/comps/li[compClass="FacialAnimation.DrawFaceGraphicsComp"]</xpath>
+          <success>Invert</success>
+        </li>
+        <li Class="PatchOperationAdd">
+          <xpath>Defs/AlienRace.ThingDef_AlienRace[defName="Milian_Race"]/comps</xpath>
+          <value>
+            <li><compClass>FacialAnimation.DrawFaceGraphicsComp</compClass></li>
+            <li><compClass>FacialAnimation.HeadControllerComp</compClass></li>
+            <li><compClass>FacialAnimation.EyeballControllerComp</compClass></li>
+            <li><compClass>FacialAnimation.LidControllerComp</compClass></li>
+            <li><compClass>FacialAnimation.BrowControllerComp</compClass></li>
+            <li><compClass>FacialAnimation.MouthControllerComp</compClass></li>
+            <li><compClass>FacialAnimation.SkinControllerComp</compClass></li>
+            <li><compClass>FacialAnimation.FacialAnimationControllerComp</compClass></li>
+            <li><compClass>FacialAnimation.LidOptionControllerComp</compClass></li>
+            <li><compClass>FacialAnimation.EmotionControllerComp</compClass></li>
+          </value>
+        </li>
+      </operations>
+    </match>
+  </Operation>
+</Patch>

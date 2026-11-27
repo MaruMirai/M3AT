@@ -1,0 +1,7 @@
+# M3AT rope colours (anim_scripts/make_rope.py); fixed (no stuff)
+
+newmtl rope
+Kd 0.600 0.480 0.300
+
+newmtl rope_strand
+Kd 0.500 0.390 0.240

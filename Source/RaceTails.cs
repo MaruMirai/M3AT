@@ -502,15 +502,75 @@ namespace M3AT
             public string[] wings;   // left and right, for a race whose wings are body parts (Milira's, drawn by AncotLibrary's nodes)
             public Color lining, tip;
             public float liningShare, tipShare;
+            // The lean out (degrees, EarLeanOf) of the race's upright ears in its front pictures: an ear whose picture leans
+            // out further rests leaned out by the difference. NaN: the model's own lean always (the race's art doesn't vary).
+            public float earUpright = float.NaN;
         }
 
         private static readonly Dictionary<string, RaceModel> RaceModels = new Dictionary<string, RaceModel>
         {
             { "Ratkin", new RaceModel { ears = "race_ratkin_ears.txt", tail = "race_ratkin_tail.txt", lining = new Color(1f, 0.55f, 0.55f), liningShare = 0.9f } },
-            { "Wolfein_Race", new RaceModel { ears = "race_wolfein_ears.txt", tail = "race_wolfein_tail.txt", lining = new Color(0.97f, 0.95f, 0.92f), liningShare = 0f,   // no pale inside (was 0.7)
+            { "Wolfein_Race", new RaceModel { ears = "race_wolfein_ears.txt", tail = "race_wolfein_tail.txt", lining = new Color(0.97f, 0.95f, 0.92f), liningShare = 0f,   // the inner colour the hair's: the pale inside is the fluffy texture's (EarLining.cs)
                 tip = new Color(0.97f, 0.95f, 0.92f), tipShare = 0.75f } },
+            // Miho's (Miho, the celestial fox): Wolfein's ears broader, shorter and more upright, its tail longer, bushier
+            // and pointed (anim_scripts/make_miho_parts.py). The art has each ear upright (Ear1) or leaning out about 31
+            // degrees (Ear), picked per ear, so many Miho have one ear tilted: earUpright 0 leans those.
+            { "Alien_Miho", new RaceModel { ears = "race_miho_ears.txt", tail = "race_miho_tail.txt", earUpright = 0f } },
             { "Milira_Race", new RaceModel { wings = new[] { "race_milira_wing_L.txt", "race_milira_wing_R.txt" }, tip = new Color(0.82f, 0.84f, 0.9f), tipShare = 0.35f } },
         };
+
+        private const float EarLeanLeast = 8f;   // degrees past the race's upright an ear's picture must lean to lean the model ear
+        private const float EarLeanMost = 50f;   // and the most it is leaned
+
+        // How far the model ear an ear add-on stands for rests leaned out (EarState.lean, degrees) and on which side (0 the
+        // pawn's left, 1 its right), by its front (south) picture: the line from the middle of its opaque pixels to its
+        // highest, from upright. In the front picture the pawn's left is on the right, so a tip toward the picture's right
+        // is the left ear leaning out. 0 for a race whose art doesn't vary (earUpright NaN), an ear within EarLeanLeast of
+        // upright, or no front picture.
+        private static float EarLeanOf(RaceModel m, SkinnedFigure.AddonSource s, out int side)
+        {
+            side = 0;
+            Color32[] px = s.px[2];
+            int size = SkinnedFigure.AddonTexSize;
+            if (float.IsNaN(m.earUpright) || px == null || px.Length < size * size)
+            {
+                return 0f;
+            }
+            int n = 0, topRow = -1, topN = 0;
+            float sumC = 0f, sumR = 0f, topC = 0f;
+            for (int r = 0; r < size; r++)   // rows bottom first, as Api.ReadSpritePixels gives them
+            {
+                for (int c = 0; c < size; c++)
+                {
+                    if (px[r * size + c].a < 128)
+                    {
+                        continue;
+                    }
+                    n++;
+                    sumC += c;
+                    sumR += r;
+                    if (r > topRow)
+                    {
+                        topRow = r;
+                        topC = 0f;
+                        topN = 0;
+                    }
+                    if (r == topRow)
+                    {
+                        topC += c;
+                        topN++;
+                    }
+                }
+            }
+            if (n < 20)
+            {
+                return 0f;
+            }
+            float lean = Mathf.Atan2(topC / topN - sumC / n, topRow - sumR / n) * Mathf.Rad2Deg;   // + toward the picture's right
+            side = lean >= 0f ? 0 : 1;
+            float past = Mathf.Abs(lean) - m.earUpright;
+            return past < EarLeanLeast ? 0f : Mathf.Min(past, EarLeanMost);
+        }
 
         // The race's model for an add-on of this name ("ear" or "tail" among its words, or in it), or null.
         private static string ModelFileFor(ThingDef race, string addonName, out bool ears)
@@ -619,6 +679,49 @@ namespace M3AT
             return null;
         }
 
+        // Whether M3AT has ears or a tail of its own made for this race (RaceModels), for the content switcher's hint.
+        // M3AT's own models of these races' ears and tails (RaceModels), for the content switcher's M3AT column: how many
+        // files and their mean triangles. 0 files when any race has none (its parts are then built from its sprites, whose
+        // counts are known only once drawn).
+        internal static void OwnRaceParts(SkinnedFigure figure, IEnumerable<string> races, out int files, out int mean)
+        {
+            files = 0;
+            long sum = 0;
+            foreach (string race in races)
+            {
+                RaceModel m;
+                if (!HasOwnEarsTail(race) || !RaceModels.TryGetValue(race, out m))
+                {
+                    files = 0;
+                    mean = 0;
+                    return;
+                }
+                foreach (string file in new[] { m.ears, m.tail })
+                {
+                    int n = figure.ModelFileTriangles(file);
+                    if (n > 0)
+                    {
+                        files++;
+                        sum += n;
+                    }
+                }
+            }
+            mean = files > 0 ? (int)(sum / files) : 0;
+        }
+
+        // Whether M3AT has any model of its own for this race's parts (ears, tail or wings), for Races without a pack.
+        internal static bool HasOwnRaceModel(string race)
+        {
+            RaceModel m;
+            return race != null && RaceModelsOn && RaceModels.TryGetValue(race, out m) && (m.ears != null || m.tail != null || m.wings != null);
+        }
+
+        internal static bool HasOwnEarsTail(string race)
+        {
+            RaceModel m;
+            return race != null && RaceModelsOn && RaceModels.TryGetValue(race, out m) && (m.ears != null || m.tail != null);
+        }
+
         internal static bool RaceModelsOn
         {
             get
@@ -634,12 +737,12 @@ namespace M3AT
                     return false;   // to see the parts built from the pictures in their place
                 }
 #endif
-                return SettingsMod.Settings == null || SettingsMod.Settings.raceModels;
+                return true;   // no option of its own since Nov 2026: the content switcher's GeneParts choice is it
             }
         }
 
         // Steps and draws a race's model ears (both, from one file) on the gene ears' springs.
-        private static void DrawModelEars(Pawn pawn, SkinnedFigure.Posed fig, string file, Vector3 at, float yaw, float size, Color tint, Color lining)
+        private static void DrawModelEars(Pawn pawn, SkinnedFigure.Posed fig, string file, float[] lean, Vector3 at, float yaw, float size, Color tint, Color lining)
         {
             SkinnedFigure.EarState s;
             if (!fig.modelEars.TryGetValue(file, out s))
@@ -647,6 +750,8 @@ namespace M3AT
                 s = new SkinnedFigure.EarState();
                 fig.modelEars[file] = s;
             }
+            s.lean[0] = lean[0];
+            s.lean[1] = lean[1];
             Vector3 rootL, rootR;
             Quaternion turn;
             skin.EarRoot(fig, file, 0, out rootL, out turn);

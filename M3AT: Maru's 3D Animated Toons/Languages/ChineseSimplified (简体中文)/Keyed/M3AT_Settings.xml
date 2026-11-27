@@ -40,10 +40,6 @@
   <M3AT_OtherRacesTip>模组种族（鼠族、米莉拉等）的小人会显示为带动画的3D小人，而不是平面图片，除非已有IsoRim扩展包为该种族提供3D外观。它们会使用该种族的肤色、头发、服装和面部；开启下方选项时还会有耳朵、尾巴等部件。IsoRim的"保持纸片"列表仍可让任意种族保持平面。</M3AT_OtherRacesTip>
   <M3AT_RaceParts>根据图片生成种族部件</M3AT_RaceParts>
   <M3AT_RacePartsTip>模组种族的耳朵、尾巴、角、翅膀等会根据该种族自己的图片生成3D形状，让种族在3D小人上保持其外观。它们只是粗略的替代：现实中很薄的部件可能会显得较厚。</M3AT_RacePartsTip>
-  <M3AT_RaceModels>热门种族的专属耳朵和尾巴模型</M3AT_RaceModels>
-  <M3AT_RaceModelsTip>鼠族（Ratkin）和狼族（Wolfein）使用专门制作的耳朵和尾巴模型，会像基因耳朵和尾巴一样摆动，取代根据其图片生成的形状。</M3AT_RaceModelsTip>
-  <M3AT_FullDetailGarments>保留其他模组服装的完整细节</M3AT_FullDetailGarments>
-  <M3AT_FullDetailGarmentsTip>其他模组的服装若三角面数超过 M3AT 的预算（衣物 {0}，头部穿戴 {1}），会在加载时简化，因为每一帧每个穿着它的小人都要绘制它的全部三角面。勾选后按作者原样保留，最多 {2} 个三角面。本次已简化：{3} 件；错误报告中会列出。重启游戏后生效。</M3AT_FullDetailGarmentsTip>
   <M3AT_RaceMouthInk>更清晰的嘴巴</M3AT_RaceMouthInk>
   <M3AT_RaceMouthInkTip>柔和的手绘嘴巴（Facial Animation - Experimentals 自带的以及模组种族的）会重新绘制为深色轮廓，去掉浅色光晕和嘴唇阴影，使其在较大的3D脸上更清楚。已经是硬线条的面部（如 Facial Animation - Retexture）保留其线条。</M3AT_RaceMouthInkTip>
   <M3AT_MouthSizeFit>调整嘴巴大小</M3AT_MouthSizeFit>
@@ -124,6 +120,8 @@
   <M3AT_FirstPersonEyeTip>IsoRim 的第一人称从小人眼睛绘制的位置看出去：儿童更低，高个子成人更高，坐下、躺下或游泳时也会更低。关闭：所有人都使用 IsoRim 自己的视线高度设置。需要较新版本的 IsoRim。</M3AT_FirstPersonEyeTip>
   <M3AT_ClothesOcclusion>衣服上的环境光遮蔽与阴影</M3AT_ClothesOcclusion>
   <M3AT_ClothesOcclusionTip>开启 IsoRim 的环境光遮蔽或屏幕空间阴影时，衣服和头发会像世界其他部分一样在褶皱处和阴影中变暗。这会凸显平面，使其看起来不那么平滑。关闭：小人不受这两者影响，但仍会投下阴影。皮肤和面部始终不受影响，因为会破坏眼睛的效果。</M3AT_ClothesOcclusionTip>
+  <M3AT_ClothesOcclusionStrength>衣服上的强度</M3AT_ClothesOcclusionStrength>
+  <M3AT_ClothesOcclusionStrengthTip>衣服和头发受 IsoRim 环境光遮蔽与屏幕空间阴影影响的程度。调低可减轻褶皱处和平面上的暗斑；100% 与世界其他部分相同。</M3AT_ClothesOcclusionStrengthTip>
   <M3AT_Combat>战斗</M3AT_Combat>
   <M3AT_Ragdolls>布娃娃物理</M3AT_Ragdolls>
   <M3AT_RagdollsTip>在原地被击倒或击杀的小人会在自身重量下瘫软倒地，落地是什么样就保持什么样。关闭：改为播放固定的倒地动画。</M3AT_RagdollsTip>
@@ -155,15 +153,15 @@
   <M3AT_OutlineDetailHeader>屏幕空间描边精度</M3AT_OutlineDetailHeader>
   <M3AT_OutlineDetailIntro>仅限屏幕空间描边样式。每条线是通过在小人附近的每个像素周围查找更靠前的部位得到的。这些设置决定查找的仔细程度：越高，近距离时线条越平滑，但小人占满屏幕时开销越大。在通常的游戏距离下几乎没有区别。</M3AT_OutlineDetailIntro>
   <M3AT_OutlineReach>近距离宽度上限（像素）</M3AT_OutlineReach>
-  <M3AT_OutlineReachTip>线条最宽可绘制的像素数，以1080行屏幕计（更高的屏幕相应更多）。放大到上方宽度达到此值后，线条保持此宽度，上方滑块在此距离不再起作用。越低：放大时线条越细，开销越小。下方的快速和精细按钮也会设置它。默认：{0}。</M3AT_OutlineReachTip>
+  <M3AT_OutlineReachTip>线条最宽可绘制的像素数，以1080行屏幕计（更高的屏幕相应更多）。放大到上方宽度达到此值后，线条保持此宽度，上方滑块在此距离不再起作用。越低：放大时线条越细，开销越小。下方的默认和更快按钮也会设置它。默认：{0}。</M3AT_OutlineReachTip>
   <M3AT_OutlineProbeDirs>快速检查点数</M3AT_OutlineProbeDirs>
   <M3AT_OutlineProbeDirsTip>完整查找之前，先检查每个像素周围的少数像素，看那里是否可能有线条。点越多：细小部位和转角处的缺口越少，但更慢。默认：{0}。</M3AT_OutlineProbeDirsTip>
   <M3AT_OutlineProbeRings>快速检查圈数</M3AT_OutlineProbeRings>
   <M3AT_OutlineProbeRingsTip>这些检查点的圈数，从最宽线条处向像素内收。越多：越能发现小部位，但更慢。默认：{0}。</M3AT_OutlineProbeRingsTip>
   <M3AT_OutlineRings>查找圈数</M3AT_OutlineRings>
   <M3AT_OutlineRingsTip>完整查找在像素周围最多查看的圈数。越多：近距离的宽线条边缘越平滑，转角处不再有阶梯和缺口，但开销最大。默认：{0}。</M3AT_OutlineRingsTip>
-  <M3AT_OutlineDetailFast>快速（默认）</M3AT_OutlineDetailFast>
-  <M3AT_OutlineDetailDetailed>精细</M3AT_OutlineDetailDetailed>
+  <M3AT_OutlineDetailFast>默认</M3AT_OutlineDetailFast>
+  <M3AT_OutlineDetailFaster>更快</M3AT_OutlineDetailFaster>
   <M3AT_FewerPoses>小人多时减少更新</M3AT_FewerPoses>
   <M3AT_FewerPosesTip>画面中小人很多时降低其动画更新频率，产生类似定格动画的效果。可将 M3AT 的性能开销降低约 6–9%。关闭：小人正常播放动画。（默认）</M3AT_FewerPosesTip>
   <M3AT_BenchmarkButton>测试 M3AT 的性能影响</M3AT_BenchmarkButton>
@@ -296,6 +294,7 @@
   <M3AT_ClothesNotDrawn>不显示</M3AT_ClothesNotDrawn>
   <M3AT_ClothesMenuNone>不显示</M3AT_ClothesMenuNone>
   <M3AT_ClothesPaint>用其自身贴图绘制</M3AT_ClothesPaint>
+  <M3AT_PackPaint>M3AT 重绘贴图</M3AT_PackPaint>
   <M3AT_ClothesPaintTip>像"用服装自身贴图绘制替代服装"选项那样，用这件服装自己的贴图绘制该服装。如果这件的贴图效果不对，取消勾选：它将以该服装的普通纹理和这件服装的颜色显示。</M3AT_ClothesPaintTip>
   <M3AT_ClothesHelp>更改会立即显示在所有穿着这件服装的人身上，对所有存档都有效。"再加一件"可同时显示两件，例如用衬衫和裤子表现连体服。可在模组设置中全部清除。</M3AT_ClothesHelp>
   <M3AT_ClothesClearAll>清除服装选择（{0}）</M3AT_ClothesClearAll>
@@ -376,22 +375,35 @@
   <M3AT_TabOptions>选项</M3AT_TabOptions>
   <M3AT_TabContent>内容</M3AT_TabContent>
   <M3AT_TabContentCount>内容（{0}）</M3AT_TabContentCount>
-  <M3AT_ContentTitle>内容包</M3AT_ContentTitle>
-  <M3AT_ContentIntro>为 M3AT 小人提供自己的耳朵、尾巴、脸、头发或服装的模组。可为每个部分选择绘制内容包的还是 M3AT 自己的。更改立即生效，并在所有存档中保留。</M3AT_ContentIntro>
+  <M3AT_ContentTitle>M3AT 内容管理器</M3AT_ContentTitle>
+  <M3AT_PolyAbout>关于多边形面数</M3AT_PolyAbout>
+  <M3AT_PolyAboutTip>这里显示的面数为什么重要，以及多少算轻、多少算重。</M3AT_PolyAboutTip>
+  <M3AT_PolyAboutTitle>关于多边形面数</M3AT_PolyAboutTitle>
+  <M3AT_PolyAboutText>面数更高的模型会给 M3AT 的动画系统带来很大的性能负担，而画面几乎没有提升。\n\n&lt;b&gt;M3AT 自带模型的面数，供参考&lt;/b&gt;\n  小人身体：{0} 个面\n  衬衫：{1}\n  风衣：{2}\n  动力装甲：{3}\n  猫耳（一对）：{4}{5}\n\nM3AT 会自动把过高的面数降到更合理的水平（可在“自动优化”中设置），但从一开始就做好优化的内容，性能和画面都是最好的。\n\n正在为 M3AT 制作内容？M3AT 附带的服装指南（在模组的 Docs 文件夹中）可以帮助你或 AI 以最佳方式完成。</M3AT_PolyAboutText>
+  <M3AT_PolyAboutGuides>打开指南文件夹</M3AT_PolyAboutGuides>
+  <M3AT_PolyAboutBodyChanged>当前使用的身体已被 {0} 修改：{1} 个面。</M3AT_PolyAboutBodyChanged>
+  <M3AT_BodyCopy>M3AT 正从 {0} 自带的 M3AT 副本运行，因此绘制的身体和服装来自该模组，可能与 M3AT 原版不同。</M3AT_BodyCopy>
+  <M3AT_BodyCopyChanged>M3AT 正从 {0} 自带的 M3AT 副本运行，其身体已被修改：{1} 个面（M3AT 原版：{2}）。</M3AT_BodyCopyChanged>
   <M3AT_ContentButton>底栏上的 M3AT 按钮</M3AT_ContentButton>
-  <M3AT_ContentButtonTip>有内容包启用时，在游戏底栏显示 M3AT 按钮，可在地图上打开此列表。</M3AT_ContentButtonTip>
+  <M3AT_ContentButtonTip>有内容包启用时，在游戏底栏显示 M3AT 按钮，可在地图上打开“内容”标签页中的内容包列表。</M3AT_ContentButtonTip>
   <M3AT_ContentNotLoaded>M3AT 小人加载后才能找到内容包：请先在 3D 视图中打开一个存档。</M3AT_ContentNotLoaded>
   <M3AT_ContentNone>没有启用的内容包。内容包是为 M3AT 小人提供自己的部件或服装的模组；模组作者请参阅 M3AT 文件夹中的 Docs/RacePacks.md。</M3AT_ContentNone>
   <M3AT_ContentSummary>{0} · {1} 件服装 · 种族：{2}</M3AT_ContentSummary>
-  <M3AT_ContentReset>重置此内容包</M3AT_ContentReset>
   <M3AT_ContentItems>逐件（{0}）</M3AT_ContentItems>
   <M3AT_ContentCompatLine>内容包（为 M3AT 提供自己部件或服装的模组）：请见顶部的“内容”标签页。</M3AT_ContentCompatLine>
-  <M3AT_ContentNew>正在使用来自 {0} 的内容。可通过底栏的 M3AT 按钮或 M3AT 选项的“内容”标签页，为每个部分选择内容包的或 M3AT 自己的。</M3AT_ContentNew>
+  <M3AT_NoticeTitle>M3AT 内容管理器</M3AT_NoticeTitle>
+  <M3AT_NoticeText>M3AT 为向其 3D 人物添加内容的模组提供了内容管理器。你可以在其中逐个部分选择绘制哪些内容。\n\n可通过底栏的 M3AT 按钮或 M3AT 选项的“内容”标签页打开内容管理器。</M3AT_NoticeText>
+  <M3AT_NoticeOpen>打开内容管理器</M3AT_NoticeOpen>
+  <M3AT_NoticeClose>关闭</M3AT_NoticeClose>
   <M3AT_SourcePack>内容包的</M3AT_SourcePack>
   <M3AT_SourceM3AT>M3AT 的</M3AT_SourceM3AT>
-  <M3AT_SourceDefault>{0}（默认）</M3AT_SourceDefault>
-  <M3AT_SourceMenuDefault>默认（{0}）</M3AT_SourceMenuDefault>
-  <M3AT_Part_EarsTail>耳朵和尾巴</M3AT_Part_EarsTail>
+  <M3AT_ContentDefaultTip>这是默认选项。</M3AT_ContentDefaultTip>
+  <M3AT_ContentCellPackTip>此部分使用内容包的。</M3AT_ContentCellPackTip>
+  <M3AT_ContentCellM3ATTip>此部分使用 M3AT 自带的。</M3AT_ContentCellM3ATTip>
+  <M3AT_ContentEveryPart>所有部分</M3AT_ContentEveryPart>
+  <M3AT_ContentEveryPartTip>一次设置此内容包的所有部分。所有部分都来自同一边时选中，混合时都不选中。</M3AT_ContentEveryPartTip>
+  <M3AT_ContentAllPackTip>此内容包的所有部分都使用内容包的。</M3AT_ContentAllPackTip>
+  <M3AT_ContentAllM3ATTip>此内容包的所有部分都使用 M3AT 自带的。</M3AT_ContentAllM3ATTip>
   <M3AT_Part_Face>脸</M3AT_Part_Face>
   <M3AT_Part_Hair>头发</M3AT_Part_Hair>
   <M3AT_Part_HeadwearFit>帽子与头发、耳朵的贴合</M3AT_Part_HeadwearFit>
@@ -401,26 +413,172 @@
   <M3AT_Part_GeneParts>基因部件</M3AT_Part_GeneParts>
   <M3AT_Part_Poses>姿势</M3AT_Part_Poses>
   <M3AT_Part_Other>其他更改</M3AT_Part_Other>
-  <M3AT_PartTip_EarsTail>种族的耳朵和尾巴。M3AT 自己的根据种族图片生成，少数热门种族有专门模型。</M3AT_PartTip_EarsTail>
   <M3AT_PartTip_Face>脸。M3AT 的是适配到小人上的 Facial Animation 脸；没有 Facial Animation 脸的种族则没有脸。</M3AT_PartTip_Face>
   <M3AT_PartTip_Hair>头发。M3AT 根据种族的头发图片生成。</M3AT_PartTip_Hair>
   <M3AT_PartTip_HeadwearFit>帽子和头盔如何覆盖头发和耳朵。</M3AT_PartTip_HeadwearFit>
   <M3AT_PartTip_BodyShape>内容包为该种族对体型所做的更改。</M3AT_PartTip_BodyShape>
   <M3AT_PartTip_SkinColour>肤色。M3AT 的肤色与游戏中该种族显示的颜色一致。</M3AT_PartTip_SkinColour>
   <M3AT_PartTip_Clothing>服装使用内容包的模型，或 M3AT 最接近的模型并用服装原图上色。“逐件”可为每件分别选择。</M3AT_PartTip_Clothing>
-  <M3AT_PartTip_GeneParts>内容包为基因绘制的部件，取代 M3AT 的猫耳、尾巴和角。</M3AT_PartTip_GeneParts>
+  <M3AT_PartTip_GeneParts>种族的耳朵和尾巴，以及为基因绘制的部件（耳朵、尾巴、角、鳞片等）。M3AT 自己的：有专门模型的用模型（少数热门种族、猫耳、尾巴和角），其余根据种族图片生成替代品。内容包的：内容包的种族只绘制内容包的；其他小人由内容包的基因部件取代 M3AT 的。</M3AT_PartTip_GeneParts>
   <M3AT_PartTip_Poses>内容包添加的姿势和动画。</M3AT_PartTip_Poses>
   <M3AT_PartTip_Other>内容包对 M3AT 绘制方式的其他更改。</M3AT_PartTip_Other>
-  <M3AT_HintNoFace>M3AT 没有此种族的脸：将不绘制脸。</M3AT_HintNoFace>
-  <M3AT_HintBuiltEars>M3AT 根据种族图片生成。</M3AT_HintBuiltEars>
-  <M3AT_HintArmour>护甲和头盔默认使用 M3AT 的；可逐件选择。</M3AT_HintArmour>
+  <M3AT_HintNoFace>Facial Animation 没有此种族的脸，因此将不绘制脸。请下载适用于此种族的 Facial Animation 脸部包（例如从 Steam 创意工坊）来为其添加脸。</M3AT_HintNoFace>
+  <M3AT_HintBuiltEars>M3AT 根据种族图片生成。仍是早期原型：比 M3AT 其他自动生成的部分粗糙。</M3AT_HintBuiltEars>
+  <M3AT_HintArmour>M3AT 自己的护甲和头盔。最初几个内容包的头盔会遮住脸。</M3AT_HintArmour>
+  <M3AT_HintMatchedArmour>M3AT 没有该模组部分护甲和头盔的专属模型：每件都以 M3AT 最接近的服装绘制。</M3AT_HintMatchedArmour>
+  <M3AT_NoteMatchedArmour>自动匹配</M3AT_NoteMatchedArmour>
+  <M3AT_HintModelEars>M3AT 为此种族自制的耳朵和尾巴模型。</M3AT_HintModelEars>
+  <M3AT_NoteModelEars>定制模型</M3AT_NoteModelEars>
+  <M3AT_HintMatchedClothes>M3AT 没有为此内容包的服装制作模型：每件都以 M3AT 服装中最接近的一件绘制。</M3AT_HintMatchedClothes>
+  <M3AT_NoteMatchedClothes>自动匹配</M3AT_NoteMatchedClothes>
+  <M3AT_NoteNoFace>需要 FA 脸</M3AT_NoteNoFace>
+  <M3AT_HintFace>Facial Animation 有该种族的脸，已适配到模型上。</M3AT_HintFace>
+  <M3AT_NoteFace>可用</M3AT_NoteFace>
+  <M3AT_NoteBuiltEars>自动生成（开发中）</M3AT_NoteBuiltEars>
+  <M3AT_HintHair>M3AT 根据该种族的发型图片生成头发。</M3AT_HintHair>
+  <M3AT_NoteHair>自动生成</M3AT_NoteHair>
+  <M3AT_HintHeadwearFit>M3AT 自己调整帽子和头盔在头发和耳朵上的贴合。</M3AT_HintHeadwearFit>
+  <M3AT_NoteHeadwearFit>–</M3AT_NoteHeadwearFit>
+  <M3AT_HintSkinColour>M3AT 的肤色与游戏中该种族显示的颜色一致。</M3AT_HintSkinColour>
+  <M3AT_NoteSkinColour>–</M3AT_NoteSkinColour>
+  <M3AT_PartPolysTip>此内容包在这一部分的 {0} 个部件平均每个 {1} 个面。M3AT 对它们的平均预算为 {2}：绿色为远低于预算，黄色为在预算内，红色为超出预算。</M3AT_PartPolysTip>
+  <M3AT_PartPolysCutTip>此内容包在这一部分的 {0} 个部件绘制时平均每个 {1} 个面，由原始的 {2} 个自动优化而来。M3AT 对它们的平均预算为 {3}：绿色为远低于预算，黄色为在预算内，红色为超出预算。</M3AT_PartPolysCutTip>
+  <M3AT_ColPack>内容包</M3AT_ColPack>
+  <M3AT_ColM3AT>M3AT</M3AT_ColM3AT>
+  <M3AT_ColMade>内容包</M3AT_ColMade>
+  <M3AT_ColMade2>平均面数 →</M3AT_ColMade2>
+  <M3AT_ColMade3>自动优化为</M3AT_ColMade3>
+  <M3AT_ColMadeTip>此内容包各部分部件的平均面数。M3AT 不得不削减它们时（自动优化），前一个数字是内容包制作时的面数（超出预算为红色，否则为灰色），箭头后的彩色数字是 M3AT 实际绘制的面数。绿色为远低于 M3AT 的预算，黄色为在预算内，红色为超出预算。</M3AT_ColMadeTip>
+  <M3AT_ColPolys>M3AT</M3AT_ColPolys>
+  <M3AT_ColPolys2>平均面数</M3AT_ColPolys2>
+  <M3AT_ColPolysTip>M3AT 自己对应部分的平均面数：M3AT 为该内容包物品绘制的服装，或它为该种族制作的耳朵和尾巴模型。</M3AT_ColPolysTip>
+  <M3AT_ColNote>M3AT</M3AT_ColNote>
+  <M3AT_ColNote2>支持状态</M3AT_ColNote2>
+  <M3AT_OursPolysTip>对于此内容包的 {0} 件物品，M3AT 绘制自己的服装或最接近的匹配：平均 {1} 个面。</M3AT_OursPolysTip>
+  <M3AT_OursPartsTip>M3AT 自己为该种族制作的耳朵和尾巴模型（{0} 个）：平均 {1} 个面。</M3AT_OursPartsTip>
+  <M3AT_OursBuiltTip>M3AT 会在首次绘制时根据该种族的图片生成这些部件，每个约精简到 {0} 个面（耳朵、毛簇或角）或 {1} 个面（尾巴）：这里显示的是两者的平均值。</M3AT_OursBuiltTip>
+  <M3AT_ContentDetails>详情</M3AT_ContentDetails>
+  <M3AT_ContentFold>隐藏内容包的详情。</M3AT_ContentFold>
+  <M3AT_ContentUnfold>显示内容包的详情：它修改了什么、完整的开销，以及“立即测量”。</M3AT_ContentUnfold>
+  <M3AT_CostPackShort>平均 {0} 面</M3AT_CostPackShort>
   <M3AT_PackClothesTitle>{0}：服装</M3AT_PackClothesTitle>
   <M3AT_ItemPack>内容包的模型</M3AT_ItemPack>
   <M3AT_ItemM3AT>M3AT 的：{0}</M3AT_ItemM3AT>
   <M3AT_ItemNone>不绘制</M3AT_ItemNone>
   <M3AT_ItemDefault>显示为 {0}</M3AT_ItemDefault>
-  <M3AT_ItemMenuPack>内容包的模型</M3AT_ItemMenuPack>
-  <M3AT_ItemMenuM3AT>M3AT 自动匹配（{0}）</M3AT_ItemMenuM3AT>
+  <M3AT_ItemCustom>自定义…</M3AT_ItemCustom>
+  <M3AT_ItemCellPackTip>此物品使用内容包自带的服装模型。</M3AT_ItemCellPackTip>
+  <M3AT_ItemCellM3ATTip>此物品使用 M3AT 自动匹配的：{0}。</M3AT_ItemCellM3ATTip>
+  <M3AT_ItemCellCustomTip>为此物品从 M3AT 的服装模型中任选一个，或不绘制。</M3AT_ItemCellCustomTip>
+  <M3AT_ItemCellCustomOnTip>显示为你选的 {0}。点击另选。</M3AT_ItemCellCustomOnTip>
+  <M3AT_ItemsAllPack>全部用内容包的</M3AT_ItemsAllPack>
+  <M3AT_ItemsAllM3AT>全部用 M3AT 的</M3AT_ItemsAllM3AT>
+  <M3AT_ItemsAllPackTip>下面每件物品都使用内容包自带的服装模型（包括自定义的）。</M3AT_ItemsAllPackTip>
+  <M3AT_ItemsAllM3ATTip>下面每件物品都使用 M3AT 自动匹配的（包括自定义的）。</M3AT_ItemsAllM3ATTip>
+  <M3AT_ItemsCustomHead>自定义：逐件选择</M3AT_ItemsCustomHead>
   <M3AT_PackPaintTip>用这件服装自己的贴图（按游戏的上色方式）为内容包的模型上色，保留模型形状。适用于颜色不对的模型。</M3AT_PackPaintTip>
   <M3AT_LookTitle>M3AT 外观</M3AT_LookTitle>
+  <M3AT_GarmentDetail>自动优化</M3AT_GarmentDetail>
+  <M3AT_GarmentDetail_0>高</M3AT_GarmentDetail_0>
+  <M3AT_GarmentDetail_1>默认</M3AT_GarmentDetail_1>
+  <M3AT_GarmentDetail_2>无</M3AT_GarmentDetail_2>
+  <M3AT_GarmentDetail_3>低</M3AT_GarmentDetail_3>
+  <M3AT_GarmentDetailRange>{0}（M3AT 的 {1} 倍，{2}-{3} 个面）</M3AT_GarmentDetailRange>
+  <M3AT_GarmentDetailUpTo>{0}（最多 {1} 个面）</M3AT_GarmentDetailUpTo>
+  <M3AT_GarmentDetailTip>其他模组的每件服装都有自己的预算，以 M3AT 对应的同类服装为准（或 M3AT 会为它绘制的服装：连体服即 M3AT 的衬衫加裤子），超过时会在加载时优化。边长超过 {4} 像素的贴图会被缩小。因为每一帧每个穿着它的小人都要绘制它的全部面。\n\n高：最多为 M3AT 的 {1} 倍，削减最多，适合较慢的电脑。\n默认：最多为 M3AT 的 {0} 倍。\n低：最多为 M3AT 的 {2} 倍，保留更多作者的细节。\n无：按作者原样保留，最多 {5} 个面，贴图上限加倍。\n\n默认下，任何服装的预算都不低于 {3} 个面。本次已优化：{6} 件；内容切换器和错误报告中会列出。重启游戏后生效。</M3AT_GarmentDetailTip>
+  <M3AT_ContentPatches>修改了 M3AT 自己的 {0} 个方法，其中一些每帧都会运行。使用 M3AT API 的内容包无需这样做。</M3AT_ContentPatches>
+  <M3AT_HintOther>以 M3AT 无法识别的方式修改了 M3AT 的代码；切换为 M3AT 的会移除这些修改。</M3AT_HintOther>
+  <M3AT_CostTris>{0} 个面</M3AT_CostTris>
+  <M3AT_GarmentDetailBody>&lt;color=#ff8080&gt;{0} 修改了 M3AT 的身体：身体 {1} 个面，现在 {2}；M3AT 自己的服装 {3}，现在 {4}。M3AT 在任何等级下都无法自动优化这些：此选项只减轻其他模组自己的服装。在内容切换器中选择 M3AT 的身体即可撤销。&lt;/color&gt;</M3AT_GarmentDetailBody>
+  <M3AT_CostTrisCut>{0} 个面（M3AT 已从 {1} 自动优化）</M3AT_CostTrisCut>
+  <M3AT_CostItem>{0} · M3AT 的：{1}</M3AT_CostItem>
+  <M3AT_CostTrisTip>服装的每个面都会在每一帧为每个穿着它的人绘制，所以服装越轻，殖民者多时游戏越流畅。\n\n作为参照，M3AT 自己的：整个身体 {0} 个面，一件衬衫 {1}，动力装甲 {2}。其他模组的服装最多可为 M3AT 同类服装的 {3} 倍：这件为 {4}。超过时 M3AT 会在加载时将其优化。\n\n绿色：轻。黄色：在预算内。红色：超出预算。</M3AT_CostTrisTip>
+  <M3AT_CostVsOurs>约为 M3AT 对应服装的 {0} 倍（{1} 个面）。</M3AT_CostVsOurs>
+  <M3AT_CostTextureCut>其贴图边长原为 {0} 像素，已缩小到 {1}（预算为 {2}）。</M3AT_CostTextureCut>
+  <M3AT_CostColony>当前着装下的殖民者：{1} 人共 {0} 个面，每人 {2}。</M3AT_CostColony>
+  <M3AT_CostColonyTip>按绘制计算的身体和服装。M3AT 的身体加一整套 M3AT 自己的服装约为 {0}；每人超过 {1} 时，画面中人多就会明显影响性能。</M3AT_CostColonyTip>
+  <M3AT_CostPawn>绘制为 {0} 个面（身体和服装）。</M3AT_CostPawn>
+  <M3AT_CostPack>{0} 件服装，原始面数平均 {1}；{2} 件已优化，{3} 张贴图已缩小</M3AT_CostPack>
+  <M3AT_CostPackOver>；{0} 件超出预算（“优化模组内容”为“无”时保留原样）</M3AT_CostPackOver>
+  <M3AT_CostPackTip>每件服装按各自的预算：M3AT 同类服装的 {0} 倍（至少 {1} 个面），贴图边长 {2} 像素。红色表示内容包有服装超出预算。</M3AT_CostPackTip>
+  <M3AT_CostMeasured>实测：每帧 {0} 毫秒（±{1}），绘制 {2} 人，{3}。</M3AT_CostMeasured>
+  <M3AT_CostMeasuredSmall>实测：小到无法分辨（±{0} 毫秒），绘制 {1} 人，{2}。</M3AT_CostMeasuredSmall>
+  <M3AT_CostNotMeasured>尚未测量。</M3AT_CostNotMeasured>
+  <M3AT_CostMeasureNow>立即测量</M3AT_CostMeasureNow>
+  <M3AT_CostMeasureNowTip>打开 M3AT 的性能测试，它会把每个内容包的开销与 M3AT 本身分开测量。请让画面中有穿着该内容包内容的人。</M3AT_CostMeasureNowTip>
+  <M3AT_PackReport>内容包报告</M3AT_PackReport>
+  <M3AT_PackReportWritten>内容包报告已写入 {0}</M3AT_PackReportWritten>
+  <M3AT_HintBodyMeshPack>为所有种族的每个人重塑 M3AT 的身体和所有服装：面数成倍增加。重启游戏后生效。</M3AT_HintBodyMeshPack>
+  <M3AT_BodyChoice>身体</M3AT_BodyChoice>
+  <M3AT_BodyChoiceTip>有些内容包会在加载时改变 M3AT 的身体和所有服装。这个身体会用于所有种族的每个小人，所以只能选一个。</M3AT_BodyChoiceTip>
+  <M3AT_BodyChoiceNote>当前影响所有小人。需要重启。</M3AT_BodyChoiceNote>
+  <M3AT_BodyOverride>目前以下列面数覆盖每个小人的身体和所有服装：</M3AT_BodyOverride>
+  <M3AT_BodyOverrideAtRestart>将覆盖每个小人的身体和所有服装！重新启动游戏后生效，因为身体只在游戏加载时读取一次；届时会显示面数。</M3AT_BodyOverrideAtRestart>
+  <M3AT_BodyOverrideBody>身体：</M3AT_BodyOverrideBody>
+  <M3AT_BodyOverrideGarments>服装：</M3AT_BodyOverrideGarments>
+  <M3AT_BodyOverrideOurs>（M3AT 的：{0}）</M3AT_BodyOverrideOurs>
+  <M3AT_BodyOverrideNoAuto>这也会使 M3AT 的自动优化失效，因为它没有使用身体 API。</M3AT_BodyOverrideNoAuto>
+  <M3AT_BodyPendingRestart>在重新启动游戏之前，该模组包的身体仍会保持加载。</M3AT_BodyPendingRestart>
+  <M3AT_BodyChoicePack>{0} 的</M3AT_BodyChoicePack>
+  <M3AT_BodyChoiceM3ATTip>M3AT 自带的身体，原样。</M3AT_BodyChoiceM3ATTip>
+  <M3AT_BodyChosenAbove>身体：{0}，在顶部的“身体”中选择。</M3AT_BodyChosenAbove>
+  <M3AT_BodyOneOnly>同一时间只能有一个内容包改变 M3AT 的身体，两个会互相叠加：保留 {0} 的，{1} 的已改回 M3AT 的。重启后生效。</M3AT_BodyOneOnly>
+  <M3AT_CostLoadShort>3D 加载用时 {0} 秒</M3AT_CostLoadShort>
+  <M3AT_CostLoadTip>加载小人时读取、优化此内容包的服装并适配到 M3AT 身体所花的时间（整个加载用时 {0} 秒）。优化后的服装会保存到磁盘，下次加载更快；在预算内的服装加载最快。</M3AT_CostLoadTip>
+  <M3AT_ContentSlowLoad>内容包使 M3AT 小人的加载增加了 {0} 秒：{1}。底栏的 M3AT 按钮会显示每个内容包的开销。</M3AT_ContentSlowLoad>
+  <M3AT_ContentLoadFresh>{0} 件服装已适配并保存，下次加载更快</M3AT_ContentLoadFresh>
+  <M3AT_ContentLoadSome>{0} 件服装已适配并保存，{1} 件来自之前</M3AT_ContentLoadSome>
+  <M3AT_ContentLoadCached>已适配，{0} 件服装来自之前</M3AT_ContentLoadCached>
+  <M3AT_Part_Armour>护甲和头盔</M3AT_Part_Armour>
+  <M3AT_PartTip_Armour>内容包为护甲和头盔提供的模型（名称含护甲或头盔，或属于游戏的护甲类别）。单独成行，因为 M3AT 的护甲和头盔比最初几个内容包的效果更好（它们的头盔会遮住脸）。仍可在“服装”一行的列表中逐件选择。</M3AT_PartTip_Armour>
+  <M3AT_RacesTitle>其他模组</M3AT_RacesTitle>
+  <M3AT_RaceColRace>种族或模组</M3AT_RaceColRace>
+  <M3AT_RaceColDrawn>显示</M3AT_RaceColDrawn>
+  <M3AT_RaceColDrawnTip>该种族是否以 M3AT 小人显示。</M3AT_RaceColDrawnTip>
+  <M3AT_RaceColParts>基因部件</M3AT_RaceColParts>
+  <M3AT_RaceColPartsTip>种族自身的身体部件：M3AT 的专属模型，或根据种族图片生成。</M3AT_RaceColPartsTip>
+  <M3AT_RaceColFace>脸</M3AT_RaceColFace>
+  <M3AT_RaceColFaceTip>Facial Animation（或其脸部模组）是否有该种族的脸。</M3AT_RaceColFaceTip>
+  <M3AT_RaceColClothes>其模组的服装</M3AT_RaceColClothes>
+  <M3AT_RaceColClothesTip>该种族模组添加的服装：M3AT 的专属服装，或用其贴图绘制的最接近的 M3AT 服装。</M3AT_RaceColClothesTip>
+  <M3AT_RaceColStatus>测试情况</M3AT_RaceColStatus>
+  <M3AT_RaceColStatusTip>该种族模组的支持程度，来自 M3AT 的兼容性列表（M3AT 文件夹中的 Docs/Compatibility.md）。</M3AT_RaceColStatusTip>
+  <M3AT_RaceRowTip>{0}，来自 {1}</M3AT_RaceRowTip>
+  <M3AT_RacePackedTip>内容包也支持此种族：{0}。此处所列为 M3AT 自身的绘制方式，适用于你在上方该内容包一行中设为 M3AT 的部分。</M3AT_RacePackedTip>
+  <M3AT_RaceChibi>3D</M3AT_RaceChibi>
+  <M3AT_RaceChibiTip>通过“其他种族显示为3D小人”选项，以 M3AT 小人显示。</M3AT_RaceChibiTip>
+  <M3AT_RaceChibiIsoPackTip>{0}（IsoRim 包）使该种族成为3D，因此 M3AT 以小人显示它。</M3AT_RaceChibiIsoPackTip>
+  <M3AT_RaceCard>2D 卡片</M3AT_RaceCard>
+  <M3AT_RaceCardPaperTip>在 IsoRim 的“保持纸片人”列表中，因此保持为平面卡片。要以3D显示，请将其从列表中移除：模组设置 → IsoRim → 生物与特效 → 保持纸片人。</M3AT_RaceCardPaperTip>
+  <M3AT_RaceCardIsoPackTip>{0}（IsoRim 包）将该种族保持为平面卡片。这是该包自己的设置，而非 M3AT 的：请查看该包的说明或选项。</M3AT_RaceCardIsoPackTip>
+  <M3AT_RaceCardOptionTip>M3AT 的“其他种族显示为3D小人”选项已关闭，因此人类以外的种族保持为平面卡片。要开启：模组设置 → M3AT: Maru's 3D Animated Toons → 模组兼容 → 其他种族显示为3D小人。</M3AT_RaceCardOptionTip>
+  <M3AT_RacePartsNoneTip>种族部件中没有找到耳朵、尾巴、角或翅膀：无需生成。</M3AT_RacePartsNoneTip>
+  <M3AT_RaceOff>关闭</M3AT_RaceOff>
+  <M3AT_RacePartsOffTip>M3AT 的“根据图片生成种族部件”选项已关闭，因此不绘制种族的耳朵、尾巴等。</M3AT_RacePartsOffTip>
+  <M3AT_RaceClothesNoneTip>该种族模组没有添加服装。</M3AT_RaceClothesNoneTip>
+  <M3AT_RaceClothesOwnTip>M3AT 为该模组全部 {0} 件服装都有专属服装模型。</M3AT_RaceClothesOwnTip>
+  <M3AT_RaceClothesMatchedTip>该模组 {1} 件服装中有 {0} 件没有 M3AT 专属服装：每件以最接近的 M3AT 服装绘制，并使用其贴图。</M3AT_RaceClothesMatchedTip>
+  <M3AT_RaceUntested>未测试</M3AT_RaceUntested>
+  <M3AT_RaceUntestedTip>不在 M3AT 的兼容性列表中：它获得 M3AT 对任意种族的通用支持，可能显示异常。</M3AT_RaceUntestedTip>
+  <M3AT_NoteTunedParts>对应</M3AT_NoteTunedParts>
+  <M3AT_HintTunedParts>以 M3AT 自己的部件绘制，按其图片手动匹配，因此会像 M3AT 的基因耳朵和尾巴一样活动：\n{0}</M3AT_HintTunedParts>
+  <M3AT_NoteTunedClothes>自动匹配（已调整）</M3AT_NoteTunedClothes>
+  <M3AT_HintTunedClothes>M3AT 没有为此内容包的服装制作模型：每件都以 M3AT 服装中最接近的一件绘制并使用其贴图，其中部分服装是手动挑选的。</M3AT_HintTunedClothes>
+  <M3AT_HintTunedArmour>M3AT 没有该模组部分护甲和头盔的专属模型：每件都以 M3AT 最接近的服装绘制，其中部分服装是手动挑选的。</M3AT_HintTunedArmour>
+  <M3AT_NoteTunedArmour>自动匹配（已调整）</M3AT_NoteTunedArmour>
+  <M3AT_RaceClothesTunedTip>该模组 {1} 件服装中有 {0} 件没有 M3AT 专属服装：每件以最接近的 M3AT 服装绘制，并使用其贴图。其中 {2} 件的 M3AT 服装是手动挑选的。</M3AT_RaceClothesTunedTip>
+  <M3AT_ModRowTip>{0}：不添加自己的种族。M3AT 已为其基因或服装做过调校匹配。</M3AT_ModRowTip>
+  <M3AT_ModDrawnTip>其人物是人类（其自有的异种），以 M3AT 人物绘制。</M3AT_ModDrawnTip>
+  <M3AT_ModNoRaceTip>不添加自己的种族。</M3AT_ModNoRaceTip>
+  <M3AT_ModFaceTip>其人物是人类，使用 Facial Animation 的人类面孔。</M3AT_ModFaceTip>
+  <M3AT_ModPartsNoneTip>没有 M3AT 绘制的耳朵或尾巴基因。</M3AT_ModPartsNoneTip>
+  <M3AT_ModUntestedTip>不在 M3AT 的兼容性列表中。</M3AT_ModUntestedTip>
+  <M3AT_RaceListedTip>在 M3AT 的兼容性列表中为 {0}。</M3AT_RaceListedTip>
+  <M3AT_RaceWorks>可用：{0}</M3AT_RaceWorks>
+  <M3AT_RaceGaps>已知问题：{0}</M3AT_RaceGaps>
+  <M3AT_RaceNeeds>还需要：{0}</M3AT_RaceNeeds>
+  <M3AT_RaceStatus_Full>完整</M3AT_RaceStatus_Full>
+  <M3AT_RaceStatus_Partialearly>部分（早期）</M3AT_RaceStatus_Partialearly>
+  <M3AT_RaceStatus_Partial>部分</M3AT_RaceStatus_Partial>
+  <M3AT_RaceStatus_Untested>未测试</M3AT_RaceStatus_Untested>
 </LanguageData>

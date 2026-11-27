@@ -3,8 +3,8 @@ and saved without its rig, keeping the edits.
 
     blender -b Models/pawnHumanRig.blend --python anim_scripts/reweight_exoframe.py -- <source.glb> <edited.glb> <out.glb>
 
-source.glb is make_exoframe.py's output with its weights (run it again with the same switches, e.g. --low, to a scratch
-file if the one in Models/garments has been overwritten by the edit). The edited mesh is split into pieces joined by
+source.glb is make_exoframe.py's output with its weights: Models/unused/CE_ExoFrame_low_source.glb (its --low output,
+made from the rig of 2026-11-27 before the script was archived in archive/garment_scripts/). The edited mesh is split into pieces joined by
 edges (copies split at a texture seam counted as one). A piece along the spine (taller than BEND_SPAN, narrower than
 BEND_WIDTH and about the middle: the spine bar, not a leg strut) bends with it: each vertex takes the body's weights at the trunk's skin nearest it, less the
 arms', shoulders', neck's and head's (make_exoframe.py's plate_weights). Every other piece is rigid: wholly on the one

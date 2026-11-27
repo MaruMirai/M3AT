@@ -26,6 +26,7 @@ namespace M3AT
             public bool armour, noble, vacsuit, childOnly;
             public bool namedOnly;          // a garment of NoStandIn: stands in only for apparel with all its name words
             public bool mask;               // a garment of Masks; apparel with one of MaskWords in its name or label
+            public bool helmet;             // apparel named a helmet but not armour, a hat or a mask (SoftForHelmet)
             public TechLevel tech;
             public HashSet<string> stuff = new HashSet<string>();
             public string[] tokens;         // a garment's: the words of its def's name (NameTokens)
@@ -119,6 +120,7 @@ namespace M3AT
         {
             { "scarf", new[] { "headscarf", "head scarf" } },
             { "pants", new[] { "hotpant", "underpant" } },   // hotpants are shorts, underpants underwear
+            { "socks", new[] { "cassock" } },   // (words are found anywhere in a word, as mods run them together: fieldcap, VoxBackpack)
             { "glasses", new[] { "sunglass", "hourglass", "glass armo", "glassworks" } },   // sunglasses are the sunglasses'
         };
         // Words in an apparel's name or label saying it is a garment's kind, though not in the garment's own name words: the
@@ -132,18 +134,26 @@ namespace M3AT
             { "Vacsuit", new[] { "space suit", "spacesuit", "airtight suit", "pressure suit" } },
             { "VacsuitHelmet", new[] { "space suit helmet", "spacesuit helmet", "airtight helmet" } },
             { "HatLadies", new[] { "sun hat", "sunhat", "straw hat", "summer hat", "sun bonnet" } },
-            { "BowlerHat", new[] { "melonik", "pith", "explorer hat", "safari", "school cap" } },
+            { "BowlerHat", new[] { "melonik", "pith", "explorer hat", "safari", "school cap", "fedora", "trilby", "homburg", "panama hat" } },
+            // A peaked (service, officer's) cap or kepi: the authority cap, not the tuque (Cane Aternitigno's army caps).
+            { "AuthorityCap", new[] { "peaked cap", "visor cap", "service cap", "officer cap", "officers cap", "officer's cap", "kepi" } },
             { "Shadecone", new[] { "rain hat", "conical hat", "bamboo hat" } },
             { "LabCoat", new[] { "lab gown", "labgown", "medical gown", "research gown", "white coat" } },
             { "Parka", new[] { "winter coat", "wintercoat", "puffer", "down jacket" } },
             { "SimpleHelmet", new[] { "miner hat", "minerhat", "hard hat", "hardhat", "safety helmet", "military helmet" } },
             { "Coronet", new[] { "tiara", "diadem" } },
+            // Knitwear and sweatshirts have no collar (Cane Aternitigno's sweater and hoodie took the collared shirt).
+            { "BasicShirt", new[] { "sweater", "jumper", "pullover", "hoodie", "sweatshirt" } },
+            // A side (garrison) cap is soft and has no peak: the beret, not the authority cap.
+            { "Beret", new[] { "side cap", "garrison", "overseas cap" } },
             { "Hairband", new[] { "hairband", "hair band", "headband", "head band", "headbond", "alice band" } },
             { "Ribbon", new[] { "ribbon", "bowknot", "hairtie", "hair tie", "hair bow", "corsage", "flower headwear", "hairclip",
                                 "hair clip", "scrunchie" } },
             { "MaidHeaddress", new[] { "maid cap", "maid head", "maidcap", "maid hat" } },
             { "Broadwrap", new[] { "nun ", "veil", "wimple", "sister hat" } },   // a nun's veil: the broadwrap, clear of the back
             { "Stockings", new[] { "stocking", "thigh high", "thighhigh", "knee high", "suspender" } },
+            // Straps over the shoulders to the waist (Cane Aternitigno's army suspenders took the royal vest).
+            { "BodyStrap", new[] { "suspenders", "braces" } },
             { "Tights", new[] { "pantyhose", "pantynose", "tights", "leggings" } },
             { "Leotard", new[] { "leotard", "swimsuit", "swim suit", "bunny girl" } },
             { "ShoulderBag", new[] { "messenger", "satchel", "shoulder bag" } },
@@ -157,8 +167,10 @@ namespace M3AT
             { "Dress", new[] { "dress", "onepiece", "one piece", "frock", "maid outfit", "maid uniform" } },
             { "SleevelessDress", new[] { "sleeveless dress", "sundress", "sun dress", "slip dress", "strapless dress", "camisole dress", "halter dress" } },
             { "DressMidi", new[] { "midi dress", "mididress", "tea dress" } },
+            // (A cassock or a nun's habit hangs to the feet: Cane Aternitigno's took the socks, by "sock" in cassock, and
+            // a shirt and trousers.)
             { "DressLong", new[] { "long dress", "gown", "nun outfit", "nun dress", "sister dress", "evening dress", "wedding dress",
-                                   "maxi dress" } },
+                                   "maxi dress", "cassock", "soutane", "habit" } },
         };
         // Phrases holding a hint that don't say it: a headdress is no dress, suspender trousers no stockings.
         private static readonly Dictionary<string, string[]> HintNot = new Dictionary<string, string[]>
@@ -171,7 +183,7 @@ namespace M3AT
             { "Skirt", new[] { "long skirt", "longskirt", "longuette", "maxi skirt", "knee skirt", "knee length skirt", "mini skirt",
                                "miniskirt", "micro skirt", "microskirt",
                                "knee-length skirt", "pencil skirt", "midi skirt", "midiskirt", "calf skirt" } },
-            { "Stockings", new[] { "suspender trouser", "suspender pant", "suspender skirt", "suspender short" } },
+            { "Stockings", new[] { "suspender trouser", "suspender pant", "suspender skirt", "suspender short", "suspenders" } },
             { "Broadwrap", new[] { "war veil", "warveil" } },
         };
         private const float HintCover = 0.5f;
@@ -221,7 +233,7 @@ namespace M3AT
         // Headgear whose label says it is one of these is a hat, even if armour: GrimWorld's Space Marine hoods cover the
         // whole head as armour and took the power armour helmet.
         private static readonly HashSet<string> HatNouns = new HashSet<string> { "hood", "cap", "hat", "beret", "bandana", "headwrap", "turban", "bonnet" };
-        private static readonly string[] WebbingWords = { "webbing", "chest rig", "load bearing", "load-bearing" };
+        private static readonly string[] WebbingWords = { "webbing", "chest rig", "load bearing", "load-bearing", "load carrier" };   // (Kiiro's load carrier took the royal vest)
 
         // Name words too common to tell garments apart.
         private static readonly HashSet<string> CommonWords = new HashSet<string> { "hat", "helmet", "armor", "armour", "apparel", "kid" };
@@ -263,6 +275,21 @@ namespace M3AT
                 standInsOf[def] = found;
             }
             return found;
+        }
+
+        // The stand-ins worked out so far dropped, for the pool to be made again: after the budgets matched other mods'
+        // garments against this mod's own alone while loading (GarmentBudget.cs, OursOf).
+        internal void ForgetStandIns()
+        {
+            standInsOf.Clear();
+            standInProfiles = null;
+        }
+
+        // This mod's garments the scoring picks for this apparel, whatever the player chose and not cached: for a mod
+        // garment's budget (OursOf), while the pieces are only partly read.
+        internal int[] OwnMatchFor(ThingDef def)
+        {
+            return def != null && def.apparel != null ? WorkOutStandIns(def) : NoStandIns;
         }
 
         // The garments the player may pick for apparel in the clothing tool: every one that can stand in (StandInProfiles),
@@ -327,9 +354,10 @@ namespace M3AT
                 return NoStandIns;
             }
             Profile a = ProfileOf(def, 0);
-            a.mask = IsMaskNamed(a.text);
+            a.mask = IsMaskNamed(def, a.text);
             a.headNouns = HeadNouns(def.label);
             bool hatNamed = a.headNouns.Overlaps(HatNouns);
+            a.helmet = !a.armour && !hatNamed && !a.mask && HelmetWords.IsMatch(a.text);
             if ((!a.armour || hatNamed) && !a.mask && a.groups.Contains("UpperHead") && (hatNamed || !HelmetWords.IsMatch(a.text)))
             {
                 // A hat, however much of the head its groups say: matched as a hat, not as a mask or full helmet. Armour
@@ -346,7 +374,7 @@ namespace M3AT
             for (int i = 0; i < all.Count; i++)
             {
                 // Apparel with a content pack's garment comes here only because that garment was turned down (the player
-                // chose M3AT's, or it is armour, ContentSources.ArmourByDefault): so M3AT's own garments, not that one nor
+                // chose M3AT's for this item, its clothing or its armour row): so M3AT's own garments, not that one nor
                 // another pack garment whose name matches (the Wolfein pack's AIPT power armour for its heavy power armour).
                 if (IsPackGarment(all[i].piece) && PackGarmentOf(def) > 0)
                 {
@@ -400,8 +428,9 @@ namespace M3AT
         internal string StandInScores(ThingDef def, string[] names)
         {
             Profile a = ProfileOf(def, 0);
-            a.mask = IsMaskNamed(a.text);
+            a.mask = IsMaskNamed(def, a.text);
             a.headNouns = HeadNouns(def.label);
+            a.helmet = !a.armour && !a.headNouns.Overlaps(HatNouns) && !a.mask && HelmetWords.IsMatch(a.text);
             List<string> parts = new List<string> { "text '" + a.text + "' layers " + string.Join(" ", a.layers) + " groups "
                 + string.Join(" ", a.groups) + " never " + NeverStoodIn(def) };
             foreach (Profile g in StandInProfiles())
@@ -495,6 +524,14 @@ namespace M3AT
             return both > 0f ? both / either : 0f;
         }
 
+        // Whether g is soft headgear (not armour, no Helmet in its name) and a a helmet by name only: behind as armour is for
+        // a garment that isn't, as Cane Aternitigno's chemical protection helmet, a plain hat by its def, took the broadwrap
+        // over the helmets. (Not for a helmet also named a mask, which may take the gas mask; the vacsuit helmet is a helmet.)
+        private static bool SoftForHelmet(Profile a, Profile g)
+        {
+            return a.helmet && !g.armour && (g.name ?? "").IndexOf("Helmet", StringComparison.OrdinalIgnoreCase) < 0;
+        }
+
         // What a garment's kind makes of its score for a: a share it is multiplied by and an amount added.
         private static void Factors(Profile a, Profile g, out float times, out float plus)
         {
@@ -504,7 +541,7 @@ namespace M3AT
             {
                 plus += HintBonus;
             }
-            if (a.armour != g.armour)
+            if (a.armour != g.armour || SoftForHelmet(a, g))
             {
                 times *= NotArmour;
             }
@@ -800,8 +837,15 @@ namespace M3AT
             return groups.Contains("Neck") && groups.Contains("Shoulders");
         }
 
-        private static bool IsMaskNamed(string text)
+        // Named a mask (MaskWords), unless its label names it a helmet and no mask: Cane Aternitigno's CG_HeavyMask is a
+        // "Heavy Infantry Helmet", a closed visored helmet, which took the gas mask.
+        private static bool IsMaskNamed(ThingDef def, string text)
         {
+            string label = (def.label ?? "").ToLowerInvariant();
+            if (HelmetWords.IsMatch(label) && !Array.Exists(MaskWords, w => label.Contains(w)))
+            {
+                return false;
+            }
             for (int i = 0; i < MaskWords.Length; i++)
             {
                 if (text != null && text.Contains(MaskWords[i]))
@@ -817,7 +861,7 @@ namespace M3AT
         // WornGears.cs; but GrimWorld's Terminator armour lists the belt and its Custodes plate has a shield in it, while
         // Biotech's heavy shield unit, Middle over the torso, is a shield); power armour's packs (ArmourPack): never drawn
         // as clothes. A pack or webbing on the belt (AsWhatItIs) takes a pack or webbing garment.
-        private static readonly Regex Jewellery = new Regex(@"\b(rings?|psyrings?|bracelets?|anklets?|bangles?)\b");
+        private static readonly Regex Jewellery = new Regex(@"\b(rings?|psyrings?|bracelets?|anklets?|bangles?|pendants?|necklaces?|amulets?|lockets?)\b");
         private static bool NeverStoodIn(ThingDef def)
         {
             ApparelProperties ap = def.apparel;
@@ -825,7 +869,8 @@ namespace M3AT
             List<string> names, labels;
             LayerNames(ap, out names, out labels);
             bool packLayers = PackLayers(names, labels);
-            // Jewellery (a ring, bracelet or anklet) worn on the hands or feet is not a glove or a boot.
+            // Jewellery (a ring, bracelet or anklet) worn on the hands or feet is not a glove or a boot, nor a pendant on
+            // the neck a vest (Milira's psychic defense pendant, Middle over the torso, took the psyfocus vest).
             if (Jewellery.IsMatch(text))
             {
                 return true;

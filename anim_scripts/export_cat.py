@@ -15,7 +15,8 @@
 #   v, f                   as above
 #   tail b x y z           joint b's rest place, from the root down; the last is the tip
 #   tw i b w ...           vertex i's weights on the bones (b the joint it turns about)
-# tail_furry.txt:          as tail.txt, the same tail made shorter and tufted (fur_tail.py), for the Tail_Furry gene
+# tail_furry.txt:          as tail.txt, the same tail made shorter and tufted (fur_tail.py), for the Tail_Furry gene; left alone
+#                          when anim_scripts/make_fluffy_tail.py made it (from Wolfein's tail, the one shipped since Nov 2026)
 # race_*.txt:              the races' own ears (as the ears) and tails and wings (as the tail, with an inner group the tip and
 #                          bone, mirror and plain lines), from the meshes import_race_parts.py put in (m3at_race_file)
 # Both are untextured: the game colours them with the pawn's hair.
@@ -215,7 +216,13 @@ def write(out, scale=None):
         for file, mesh, rig, gene in EARS:
             write_ears(os.path.join(out, file), scale, mesh, rig, gene)
         write_tail(os.path.join(out, 'tail.txt'), scale)
-        write_fur_tail(os.path.join(out, 'tail_furry.txt'), scale)
+        # The furry tail is made from Wolfein's since Nov 2026 (make_fluffy_tail.py, after this export writes
+        # race_wolfein_tail.txt): one made so is left alone, as fur_tail.py's from the cat tail would replace it.
+        fluffy = os.path.join(out, 'tail_furry.txt')
+        if os.path.exists(fluffy) and 'make_fluffy_tail.py' in open(fluffy).readline():
+            print('tail_furry.txt is make_fluffy_tail.py\'s: left alone (run it again if Wolfein\'s tail changed)')
+        else:
+            write_fur_tail(fluffy, scale)
         write_race_parts(out, scale)
     finally:
         for o, p in was.items():

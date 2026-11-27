@@ -69,3 +69,6 @@ workshop_i18n/out/
 workshop_i18n/uploaded_english.txt
 autotest-runs/
 autotest-by-scenario/
+
+# Drafts of API requests for IsoRim's dev, kept locally until posted.
+isorim_requests/

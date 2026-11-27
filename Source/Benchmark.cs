@@ -503,6 +503,38 @@ namespace M3AT
             return Mean(kept);
         }
 
+        // A pack's cost as last measured: ms a frame, its noise, people drawn a frame, the date (Settings.packCosts).
+        private static void KeepMeasured(string packageId, float ms, float noise, float people)
+        {
+            Settings s = SettingsMod.Settings;
+            if (s == null)
+            {
+                return;
+            }
+            s.packCosts[packageId.ToLowerInvariant()] = string.Join(";", ms.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture),
+                noise.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture), people.ToString("0", System.Globalization.CultureInfo.InvariantCulture),
+                DateTime.Now.ToString("yyyy-MM-dd"));
+            s.Write();
+        }
+
+        // That, read back: false if never measured.
+        internal static bool LastMeasured(string packageId, out float ms, out float noise, out int people, out string date)
+        {
+            ms = noise = 0f;
+            people = 0;
+            date = null;
+            Settings s = SettingsMod.Settings;
+            string v;
+            if (s == null || s.packCosts == null || !s.packCosts.TryGetValue(packageId.ToLowerInvariant(), out v))
+            {
+                return false;
+            }
+            string[] p = v.Split(';');
+            System.Globalization.CultureInfo inv = System.Globalization.CultureInfo.InvariantCulture;
+            return p.Length == 4 && float.TryParse(p[0], System.Globalization.NumberStyles.Float, inv, out ms)
+                && float.TryParse(p[1], System.Globalization.NumberStyles.Float, inv, out noise) && int.TryParse(p[2], out people) && (date = p[3]) != null;
+        }
+
         private static float Median(List<float> xs)
         {
             if (xs.Count == 0)
@@ -585,9 +617,15 @@ namespace M3AT
                     : "M3AT_BenchAddOnsCost".Translate(F(extra, 2), F(extraNoise, 2)));
                 addOnLines.Add("M3AT alone (no add-ons) over IsoRim's figures: " + F(own, 2) + " ms a frame (+/-" + F(ownNoise, 2) + ")");
                 addOnLines.Add("All add-ons together: " + F(extra, 2) + " ms a frame (+/-" + F(extraNoise, 2) + ")");
+                // Each pack's measured cost kept for the content switcher (ContentWindow.cs), the only one's from the bare turn.
+                if (addOns.Count == 1)
+                {
+                    KeepMeasured(addOns[0].packageId, extra, extraNoise, people);
+                }
                 foreach (Condition c in conditions.Where(c => c.without != null))
                 {
                     float one = Paired(chibi, c, out float oneNoise);
+                    KeepMeasured(c.without.packageId, one, oneNoise, people);
                     summary.Add(Mathf.Abs(one) <= oneNoise ? "M3AT_BenchAddOnSame".Translate(c.without.name, F(oneNoise, 2))
                         : "M3AT_BenchAddOnCost".Translate(c.without.name, F(one, 2), F(oneNoise, 2)));
                     addOnLines.Add("  " + c.without.name + ": " + F(one, 2) + " ms a frame (+/-" + F(oneNoise, 2) + ")");

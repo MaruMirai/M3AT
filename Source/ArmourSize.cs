@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using IsoRim;
 using RimWorld;
 using UnityEngine;
@@ -21,57 +22,119 @@ namespace M3AT
         // The powerArmourBulk option, the game's own Spacer power armour bulking its wearer up as a Space Marine's does, is
         // off and out of the options window for now (its setting is still saved): that armour lifts its wearer on its
         // soles instead (SkinnedFigure.SoleOf).
+        // Whether a loaded mod has body armour drawn scaled up when worn (its drawData scale), and whether GrimWorld 40,000 is
+        // loaded (any of its mods: their packageIds all hold "grimworld"), so the options window shows the armourDrawScale and
+        // marineBulk options only where they would do something. Worked out once: the loaded mods don't change in a session.
+        private static bool? scaledArmourLoaded, grimWorldLoaded;
+
+        internal static bool ScaledArmourLoaded
+        {
+            get
+            {
+                if (scaledArmourLoaded == null)
+                {
+                    scaledArmourLoaded = DefDatabase<ThingDef>.AllDefsListForReading.Exists(d => d.apparel != null && d.apparel.drawData != null
+                        && d.apparel.drawData.scale > 1f && BodyArmour(d));
+                }
+                return scaledArmourLoaded.Value;
+            }
+        }
+
+        internal static bool GrimWorldLoaded
+        {
+            get
+            {
+                if (grimWorldLoaded == null)
+                {
+                    grimWorldLoaded = LoadedModManager.RunningMods.Any(m => m.PackageId != null && m.PackageId.IndexOf("grimworld", StringComparison.OrdinalIgnoreCase) >= 0);
+                }
+                return grimWorldLoaded.Value;
+            }
+        }
+
         internal static bool PowerArmourBulk = false;   // (not readonly: the armoured autotest turns it on to compare)
         private const float ArmourHulk = 0.8f;          // the Hulk key's least amount on a bulked wearer, of the body shape strength
 
         // The Armoured key (anim_scripts/make_armoured.py): the frame a full suit of power armour gives its wearer, broader
         // and thicker round the bones but no longer along them, so the clips still land. The body under such armour is
-        // never seen (the armour hides it), so the key is the suit's volume, and the armour garments are fitted to it at
-        // export as to any body key. By the suit: the recon armour and its family (the locust armour and mechlord suit are
-        // made from it) a little, the plate and marine armour half, the cataphract all; other armour none. Not on a child.
+        // never seen (the armour hides it), so the key is the suit's volume, and hard armour is fitted to it from the body
+        // (HARD_FITTED, ModGarments.HardFitted) as soft garments are to every key. How much of it a suit gives is the
+        // garment's to say, by its wearer_key line (any body key, so another mod's armour can give its own amount): ours
+        // are export_frames.py's ARMOURED_FRAME, the recon armour and its family a quarter, the plate and marine armour
+        // half, the cataphract all. Not on a child.
         private const string ArmouredKey = "Armoured";
         private const float FrameGrows = 0.05f;          // of the wearer's size, added at the whole key (ArmourSizeOf)
         internal static bool ArmouredFrames = true;     // (not readonly: the armoured autotest turns it off to compare)
-        private static readonly Dictionary<string, float> FrameOf = new Dictionary<string, float>
+
+        // The body keys the pawn's garments give it (their wearer_key lines), each the most any worn garment asks, the
+        // Thin, Fat and Hulk ones times the body shape strength as the body type's own are; null for none.
+        private static List<KeyValuePair<string, float>> WornKeysOf(Pawn pawn)
         {
-            { "Apparel_ArmorRecon", 0.25f }, { "Apparel_ArmorReconPrestige", 0.25f }, { "Apparel_ArmorLocust", 0.25f }, { "Apparel_MechlordSuit", 0.25f },
-            { "Apparel_PlateArmor", 0.5f },
-            { "Apparel_PowerArmor", 0.5f }, { "Apparel_ArmorMarinePrestige", 0.5f }, { "Apparel_ArmorMarineGrenadier", 0.5f },
-            { "Apparel_ArmorCataphract", 1f }, { "Apparel_ArmorCataphractPrestige", 1f }, { "Apparel_ArmorCataphractPhoenix", 1f },
-        };
+            List<Apparel> worn = pawn.apparel != null ? pawn.apparel.WornApparel : null;
+            List<KeyValuePair<string, float>> found = null;
+            for (int i = 0; ArmouredFrames && skin != null && worn != null && i < worn.Count; i++)
+            {
+                List<KeyValuePair<string, float>> keys = skin.WearerKeysOf(skin.GarmentOf(worn[i].def));
+                for (int k = 0; keys != null && k < keys.Count; k++)
+                {
+                    float amount = Array.IndexOf(BuildKeys, keys[k].Key) >= 0 ? keys[k].Value * BodyShapeStrength : keys[k].Value;
+                    found = found ?? new List<KeyValuePair<string, float>>();
+                    int at = found.FindIndex(f => f.Key == keys[k].Key);
+                    if (at < 0)
+                    {
+                        found.Add(new KeyValuePair<string, float>(keys[k].Key, amount));
+                    }
+                    else if (found[at].Value < amount)
+                    {
+                        found[at] = new KeyValuePair<string, float>(keys[k].Key, amount);
+                    }
+                }
+            }
+            return found;
+        }
+
+        // How much of the Armoured key the pawn's armour gives it (0: none).
+        private static float ArmouredFrameOf(Pawn pawn)
+        {
+            List<KeyValuePair<string, float>> keys = WornKeysOf(pawn);
+            int at = keys != null ? keys.FindIndex(k => k.Key == ArmouredKey) : -1;
+            return at >= 0 ? keys[at].Value : 0f;
+        }
+
+        // builds with the worn garments' keys raised to at least their amounts (a new list; builds itself when there is
+        // none to add). bodyKey at bodyAmount is the shape's own body type key, which a worn key of that name only adds to.
+        private static List<KeyValuePair<string, float>> WithWornKeys(List<KeyValuePair<string, float>> builds, List<KeyValuePair<string, float>> keys,
+            string bodyKey = null, float bodyAmount = 0f)
+        {
+            if (keys == null)
+            {
+                return builds;
+            }
+            List<KeyValuePair<string, float>> found = builds != null ? new List<KeyValuePair<string, float>>(builds) : new List<KeyValuePair<string, float>>();
+            foreach (KeyValuePair<string, float> k in keys)
+            {
+                float wanted = k.Key == bodyKey ? k.Value - bodyAmount : k.Value;
+                int at = found.FindIndex(f => f.Key == k.Key);
+                if (at < 0)
+                {
+                    if (wanted > 0f)
+                    {
+                        found.Add(new KeyValuePair<string, float>(k.Key, wanted));
+                    }
+                }
+                else if (found[at].Value < wanted)
+                {
+                    found[at] = new KeyValuePair<string, float>(k.Key, wanted);
+                }
+            }
+            return found;
+        }
+
         // Power armour that keeps its wearer's own size, whatever powerArmourBulk says: light, close-fitting suits.
         private static readonly HashSet<string> KeepsOwnFrame = new HashSet<string>
         {
             "Apparel_ArmorRecon", "Apparel_ArmorReconPrestige", "Apparel_ArmorLocust", "Apparel_MechlordSuit",
         };
-
-        // How much of the Armoured key the pawn's armour gives it (0: none).
-        private static float ArmouredFrameOf(Pawn pawn)
-        {
-            List<Apparel> worn = pawn.apparel != null ? pawn.apparel.WornApparel : null;
-            float most = 0f;
-            for (int i = 0; ArmouredFrames && worn != null && i < worn.Count; i++)
-            {
-                float f;
-                if (FrameOf.TryGetValue(worn[i].def.defName, out f))
-                {
-                    most = Mathf.Max(most, f);
-                }
-            }
-            return most;
-        }
-
-        // builds with the Armoured key added at frame (a new list; builds itself when there is none to add).
-        private static List<KeyValuePair<string, float>> WithFrame(List<KeyValuePair<string, float>> builds, float frame)
-        {
-            if (frame <= 0f)
-            {
-                return builds;
-            }
-            List<KeyValuePair<string, float>> found = builds != null ? new List<KeyValuePair<string, float>>(builds) : new List<KeyValuePair<string, float>>();
-            found.Add(new KeyValuePair<string, float>(ArmouredKey, frame));
-            return found;
-        }
 
         // Whether power armour bulks its wearer up by powerArmourBulk: not the suits that keep their wearer's frame.
         private static bool PowerBulks(ThingDef def)

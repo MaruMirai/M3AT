@@ -310,18 +310,102 @@ namespace M3AT
             {
                 return false;   // none of its add-ons is hair
             }
+            object best = AddonOfPath(addons, path);
+            return best != null && IsHairAddon(best);
+        }
+
+        // The add-on a graphic's path is from: the one with a path its own starts with (the longest such), among each
+        // add-on's own path and those of its extended graphics (HAR's variants by gene, age, body type ...: Miho's head is
+        // Miho/HeadArctic/Head with the arctic gene, whose add-on's path is Miho/Head/Head), or null.
+        private static object AddonOfPath(List<object> addons, string path)
+        {
             object best = null;
             int bestLength = -1;
             foreach (object a in addons)
             {
-                string own = addonPathField.GetValue(a) as string;
-                if (own != null && own.Length > bestLength && path.StartsWith(own, StringComparison.OrdinalIgnoreCase))
+                foreach (string own in PathsOf(a))
                 {
-                    best = a;
-                    bestLength = own.Length;
+                    if (own.Length > bestLength && path.StartsWith(own, StringComparison.OrdinalIgnoreCase))
+                    {
+                        best = a;
+                        bestLength = own.Length;
+                    }
                 }
             }
-            return best != null && IsHairAddon(best);
+            return best;
+        }
+
+        private static readonly Dictionary<object, List<string>> addonPaths = new Dictionary<object, List<string>>();
+
+        // Every path an add-on may draw from: its path, paths and pathsFallback, and its extended graphics', nested.
+        private static List<string> PathsOf(object addon)
+        {
+            List<string> found;
+            lock (addonPaths)
+            {
+                if (addonPaths.TryGetValue(addon, out found))
+                {
+                    return found;
+                }
+            }
+            found = new List<string>();
+            try
+            {
+                GatherPaths(addon, found, 0);
+            }
+            catch (Exception)
+            {
+                // Its own path, below, is enough to go on.
+            }
+            string main = addonPathField.GetValue(addon) as string;
+            if (main != null && !found.Contains(main))
+            {
+                found.Add(main);
+            }
+            lock (addonPaths)
+            {
+                addonPaths[addon] = found;
+            }
+            return found;
+        }
+
+        private static void GatherPaths(object graphic, List<string> into, int depth)
+        {
+            if (graphic == null || depth > 8)
+            {
+                return;
+            }
+            Type t = graphic.GetType();
+            foreach (string name in new[] { "path", "paths", "pathsFallback" })
+            {
+                FieldInfo f = FieldOf(t, name);
+                object v = f != null ? f.GetValue(graphic) : null;
+                string one = v as string;
+                if (!string.IsNullOrEmpty(one) && !into.Contains(one))
+                {
+                    into.Add(one);
+                }
+                IEnumerable many = v as IList<string>;
+                if (many != null)
+                {
+                    foreach (string p in many)
+                    {
+                        if (!string.IsNullOrEmpty(p) && !into.Contains(p))
+                        {
+                            into.Add(p);
+                        }
+                    }
+                }
+            }
+            FieldInfo nested = FieldOf(t, "extendedGraphics");
+            IEnumerable children = nested != null ? nested.GetValue(graphic) as IEnumerable : null;
+            if (children != null)
+            {
+                foreach (object c in children)
+                {
+                    GatherPaths(c, into, depth + 1);
+                }
+            }
         }
 
         // For AddonParts.cs: a file name's words (WordsOf).
@@ -343,12 +427,23 @@ namespace M3AT
         }
 
         // The stand-in hairstyle for these add-on graphics, its sprites put together; null if none of them is hair.
+        //
+        // Each add-on is laid in each view by the layer HAR draws it at there (LayerOf), against the head's: below it, it
+        // is behind the head (cut by the head, and left out of the front view); above it, over the head. HAR's
+        // inFrontOfBody alone doesn't say which: Miho's front hair is inFrontOfBody false with a layerOffset of -0.326,
+        // which HAR draws at -0.3 - -0.326 = +0.026, over its head; taken as behind, it lost its front view and had the
+        // head cut out of the others, leaving a ring of hair round the back (a mullet) or nothing (bald).
+        // The head is the race's head add-on where it has one (HeadAddonPixels: Miho draws a blank head and its real head
+        // as an add-on), else the pawn's head sprite.
         private static HairDef Make(Pawn pawn, HairDef own, List<object> addons, IList graphics)
         {
-            // Each graphic's add-on: the one whose path its own starts with (the longest such), as HAR leaves out of its
-            // list any add-on with no graphic, so the two lists don't line up by index.
+            // Each graphic's add-on, by path (AddonOfPath), as HAR leaves out of its list any add-on with no graphic, so the
+            // two lists don't line up by index.
             // HAR's list can hold a graphic twice (Kiiro's did), which would lay its art over itself, so each path once.
-            List<Graphic> behind = new List<Graphic>(), front = new List<Graphic>();
+            List<Graphic> hair = new List<Graphic>();
+            List<object> hairAddons = new List<object>();
+            List<Graphic> heads = new List<Graphic>();
+            List<object> headAddons = new List<object>();
             HashSet<string> seen = new HashSet<string>();
             foreach (object o in graphics)
             {
@@ -357,28 +452,39 @@ namespace M3AT
                 {
                     continue;
                 }
-                object best = null;
-                int bestLength = -1;
-                foreach (object a in addons)
+                object best = AddonOfPath(addons, g.path);
+                if (best != null && IsHairAddon(best))
                 {
-                    string path = addonPathField.GetValue(a) as string;
-                    if (path != null && path.Length > bestLength && g.path.StartsWith(path, StringComparison.OrdinalIgnoreCase))
-                    {
-                        best = a;
-                        bestLength = path.Length;
-                    }
+                    hair.Add(g);
+                    hairAddons.Add(best);
                 }
-                if (best == null || !IsHairAddon(best))
+                else if (best != null && IsHeadAddon(best))
                 {
-                    continue;
+                    heads.Add(g);   // (Miho's list has a ghoul's blank head add-on, from its Facial Animation patch, ahead of its head)
+                    headAddons.Add(best);
                 }
-                ((bool)inFrontField.GetValue(best) ? front : behind).Add(g);
             }
-            if (behind.Count == 0 && front.Count == 0)
+            if (hair.Count == 0)
             {
                 return null;
             }
-            Color32[][] headPx = HeadPixels(pawn);
+            // The first head add-on with a head in it: HAR makes every add-on's graphic whatever its conditions.
+            Graphic headGraphic = null;
+            object headAddon = null;
+            Color32[][] headPx = null;
+            for (int i = 0; i < heads.Count && headPx == null; i++)
+            {
+                headPx = HeadAddonPixels(pawn, heads[i]);
+                if (headPx != null)
+                {
+                    headGraphic = heads[i];
+                    headAddon = headAddons[i];
+                }
+            }
+            if (headPx == null)
+            {
+                headPx = HeadPixels(pawn);
+            }
             if (headPx == null || !HumanBoxes())
             {
                 return null;   // no head to fit it by
@@ -388,45 +494,76 @@ namespace M3AT
             {
                 headArea += c.a >= Solid ? 1 : 0;
             }
-            List<Graphic> kept = new List<Graphic>();
-            string key = "";
-            Color32[][] layers = new Color32[3][];
+            bool female = pawn.gender == Gender.Female;
+            float[] headLayer = new float[3];
             for (int v = 0; v < 3; v++)
             {
-                layers[v] = new Color32[Size * Size];
-            }
-            // Behind the body, under the head; then the pawn's own hairstyle, drawn on the race's head as these are; then in front.
-            foreach (Graphic g in behind)
-            {
-                if (AddLayer(layers, g, headPx, headArea))
+                headLayer[v] = headAddon != null ? LayerOf(headAddon, v, female) : 0f;
+                if (float.IsNaN(headLayer[v]))
                 {
-                    key += (key.Length > 0 ? "+" : "") + System.IO.Path.GetFileName(g.path);
+                    headLayer[v] = 0f;
                 }
             }
-            Sprites ownSprites = own != null && own.texPath != null ? Read(own.texPath) : null;
-            bool ownHair = false;
-            if (ownSprites != null)
+            // Each hair add-on's views (null if too small to count as hair) and whether it is behind the head in each.
+            List<Color32[][]> views = new List<Color32[][]>();
+            List<float[]> layerOf = new List<float[]>();
+            List<string> keyNames = new List<string>();
+            string key = "";
+            for (int i = 0; i < hair.Count; i++)
             {
+                Color32[][] px = AddonViews(hair[i], headArea);
+                if (px == null)
+                {
+                    continue;
+                }
+                float[] layer = new float[3];
                 for (int v = 0; v < 3; v++)
                 {
-                    Color32[] over = v == 1 ? ownSprites.px[1] : v == 2 ? ownSprites.px[2] : ownSprites.px[0];
-                    foreach (Color32 c in over)
+                    layer[v] = LayerOf(hairAddons[i], v, female);
+                    if (float.IsNaN(layer[v]))
                     {
-                        ownHair |= c.a >= Solid;
+                        layer[v] = (bool)inFrontField.GetValue(hairAddons[i]) ? headLayer[v] + 1f : headLayer[v] - 1f;   // HAR's offsets unread: by inFrontOfBody
                     }
-                    Over(layers[v], over);
                 }
-            }
-            foreach (Graphic g in front)
-            {
-                if (AddLayer(layers, g, null, headArea))
-                {
-                    key += (key.Length > 0 ? "+" : "") + System.IO.Path.GetFileName(g.path);
-                }
+                views.Add(px);
+                layerOf.Add(layer);
+                keyNames.Add(System.IO.Path.GetFileName(hair[i].path));
+                key += (key.Length > 0 ? "+" : "") + System.IO.Path.GetFileName(hair[i].path);
             }
             if (key.Length == 0)
             {
                 return null;
+            }
+            Sprites ownSprites = own != null && own.texPath != null ? Read(own.texPath) : null;
+            bool ownHair = false;
+            Color32[][] layers = new Color32[3][];
+            for (int v = 0; v < 3; v++)
+            {
+                layers[v] = new Color32[Size * Size];
+                // In HAR's order in this view: behind the head (cut by it; none in the front view, below), the pawn's own
+                // hairstyle (drawn on the head as these are), then over the head.
+                int view = v;
+                List<int> order = new List<int>();
+                for (int k = 0; k < views.Count; k++)
+                {
+                    order.Add(k);
+                }
+                order.Sort((a, b) => layerOf[a][view] != layerOf[b][view] ? layerOf[a][view].CompareTo(layerOf[b][view]) : a.CompareTo(b));
+                bool ownDone = false;
+                foreach (int k in order)
+                {
+                    bool behind = layerOf[k][v] < headLayer[v];
+                    if (!behind && !ownDone)
+                    {
+                        ownHair |= LayOwn(layers[v], ownSprites, v);
+                        ownDone = true;
+                    }
+                    LayView(layers[v], views[k][v], behind ? headPx[v] : null, v);
+                }
+                if (!ownDone)
+                {
+                    ownHair |= LayOwn(layers[v], ownSprites, v);
+                }
             }
             key = AddonPrefix + GenText.SanitizeFilename(pawn.def.defName) + "/" + GenText.SanitizeFilename(key) + (ownHair ? OwnKey(own) : "");
             HairDef def;
@@ -440,9 +577,146 @@ namespace M3AT
                 fitted[v] = FitToHuman(layers[v], headPx[v], humanBoxes[v]);
             }
             combined[key] = From(fitted[0], fitted[1], fitted[2]);
+            System.Text.StringBuilder laid = new System.Text.StringBuilder();
+            for (int k = 0; k < views.Count; k++)
+            {
+                laid.Append(k > 0 ? "; " : "").Append(keyNames[k]).Append(" at ").Append(string.Join(", ", Array.ConvertAll(layerOf[k], l => l.ToString("+0.000;-0.000"))));
+            }
+            Log.Message(Tag + key + ": laid by HAR's layers (south, east, north) against the head's " + string.Join(", ", Array.ConvertAll(headLayer, l => l.ToString("+0.000;-0.000")))
+                + " (" + (headAddon != null ? "its head add-on " + headGraphic.path : "the head type's sprite" + (heads.Count > 0 ? ", its head add-ons too faint" : "")) + "): " + laid + ".");
             def = new HairDef { defName = "M3AT_" + key.Replace('/', '_'), label = own != null ? own.label : "hair", texPath = key };
             standIns[key] = def;
             return def;
+        }
+
+        // The pawn's own hairstyle's view laid over the layer; true if it has any hair.
+        private static bool LayOwn(Color32[] layer, Sprites own, int v)
+        {
+            if (own == null)
+            {
+                return false;
+            }
+            Color32[] over = own.px[v];
+            bool any = false;
+            foreach (Color32 c in over)
+            {
+                any |= c.a >= Solid;
+            }
+            Over(layer, over);
+            return any;
+        }
+
+        // ---- HAR's layers and the race's head add-on.
+        private static FieldInfo offsetsField, femaleOffsetsField, defaultOffsetsField, layerInvertField;
+        private static bool layersTried, layersFailed;
+        private static readonly string[] ViewNames = { "south", "east", "north" };
+
+        // The layer HAR draws a head-aligned add-on at in a view (0 south, 1 east, 2 north), relative to the head
+        // (AlienPawnRenderNodeWorker_BodyAddon.OffsetFor): its default and own (a female's own if it has them) layer
+        // offsets there, l, then 0.3 + l in front of the body or -0.3 - l behind, turned round from the north with
+        // layerInvert. NaN if HAR's offsets can't be read.
+        private static float LayerOf(object addon, int view, bool female)
+        {
+            if (!layersTried)
+            {
+                layersTried = true;
+                BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
+                Type t = addon.GetType();
+                offsetsField = t.GetField("offsets", all);
+                femaleOffsetsField = t.GetField("femaleOffsets", all);
+                defaultOffsetsField = t.GetField("defaultOffsets", all);
+                layerInvertField = t.GetField("layerInvert", all);
+                layersFailed = offsetsField == null || layerInvertField == null;
+                if (layersFailed)
+                {
+                    Log.Warning(Tag + "Humanoid Alien Races' add-on offsets aren't where they were, so add-on hair is laid by inFrontOfBody alone.");
+                }
+            }
+            if (layersFailed)
+            {
+                return float.NaN;
+            }
+            object mine = female && femaleOffsetsField != null ? femaleOffsetsField.GetValue(addon) : null;
+            float l = LayerIn(defaultOffsetsField != null ? defaultOffsetsField.GetValue(addon) : null, view)
+                + LayerIn(mine ?? offsetsField.GetValue(addon), view);
+            if (float.IsNaN(l))
+            {
+                return float.NaN;
+            }
+            float y = (bool)inFrontField.GetValue(addon) ? 0.3f + l : -0.3f - l;
+            return view == 2 && (bool)layerInvertField.GetValue(addon) ? -y : y;
+        }
+
+        // A DirectionalOffset's layerOffset for a view (0 if it or that view's offset is null).
+        private static float LayerIn(object directional, int view)
+        {
+            if (directional == null)
+            {
+                return 0f;
+            }
+            FieldInfo facing = FieldOf(directional.GetType(), ViewNames[view]);
+            object rotation = facing != null ? facing.GetValue(directional) : null;
+            if (facing == null)
+            {
+                return float.NaN;
+            }
+            if (rotation == null)
+            {
+                return 0f;
+            }
+            FieldInfo layer = FieldOf(rotation.GetType(), "layerOffset");
+            return layer != null ? (float)layer.GetValue(rotation) : float.NaN;
+        }
+
+        private static FieldInfo FieldOf(Type t, string name)
+        {
+            FieldInfo f;
+            string key = t.FullName + "." + name;
+            lock (layerFieldsByName)
+            {
+                if (!layerFieldsByName.TryGetValue(key, out f))
+                {
+                    f = t.GetField(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                    layerFieldsByName[key] = f;
+                }
+            }
+            return f;
+        }
+
+        private static readonly Dictionary<string, FieldInfo> layerFieldsByName = new Dictionary<string, FieldInfo>();
+
+        // A race's head drawn as an add-on (Miho's: its head type's sprite is blank): aligned with the head, in the skin's
+        // colour, "head" a word of its file name.
+        private static bool IsHeadAddon(object addon)
+        {
+            string path = addonPathField.GetValue(addon) as string;
+            return path != null && (bool)alignWithHeadField.GetValue(addon) && (colorChannelProp.GetValue(addon) as string) == "skin"
+                && WordsOf(System.IO.Path.GetFileName(path)).Contains("head");
+        }
+
+        // The head add-on's south, east and north views, or null if it doesn't read or is nearly blank (a ghoul's blank
+        // head add-on): under half the pawn's head type sprite's solid pixels in front.
+        private static Color32[][] HeadAddonPixels(Pawn pawn, Graphic g)
+        {
+            Color32[][] px = AddonViews(g, 0);
+            Color32[][] own = HeadPixels(pawn);
+            if (px == null)
+            {
+                return null;
+            }
+            int area = 0, ownArea = 0;
+            foreach (Color32 c in px[0])
+            {
+                area += c.a >= Solid ? 1 : 0;
+            }
+            if (own != null)
+            {
+                foreach (Color32 c in own[0])
+                {
+                    ownArea += c.a >= Solid ? 1 : 0;
+                }
+            }
+            return area * 2 < ownArea || area == 0 ? null : px;
         }
 
         // The pawn's head sprite's south, east and north views (the east from the west mirrored if it has none), or null.
@@ -564,65 +838,71 @@ namespace M3AT
             return true;
         }
 
-        // Lays one add-on graphic's three views over the layers, cut by the head where it is drawn behind it (under not
-        // null). One drawn behind the body is left out of the front view altogether: there it shows below the chin and
-        // beside the neck, hanging behind them, but the builder can't tell that from one picture and built a thick
-        // collar of hair round the front of the neck. Its back and side views still give the hair at the back. False if it is too small to count as hair (its front view under AddonLeast of the head's area).
-        private static bool AddLayer(Color32[][] layers, Graphic g, Color32[][] under, int headArea)
+        // An add-on graphic's south, east and north views, or null if one doesn't read or it is too small to count as hair
+        // (its front view under AddonLeast of headArea; 0 counts any).
+        private static Color32[][] AddonViews(Graphic g, int headArea)
         {
             Texture2D south = g.MatSouth != null ? g.MatSouth.mainTexture as Texture2D : null;
             Texture2D east = g.MatEast != null ? g.MatEast.mainTexture as Texture2D : null;
             Texture2D north = g.MatNorth != null ? g.MatNorth.mainTexture as Texture2D : null;
             if (south == null || east == null || north == null)
             {
-                return false;
+                return null;
             }
             bool small;
             Color32[] s = Pixels(south, false);
             if (s == null)
             {
-                return false;
+                return null;
             }
-            if (!smallAddon.TryGetValue(south, out small))
+            if (headArea > 0)
             {
-                int area = 0;
-                foreach (Color32 c in s)
+                if (!smallAddon.TryGetValue(south, out small))
                 {
-                    area += c.a >= Solid ? 1 : 0;
+                    int area = 0;
+                    foreach (Color32 c in s)
+                    {
+                        area += c.a >= Solid ? 1 : 0;
+                    }
+                    small = area < AddonLeast * headArea;
+                    smallAddon[south] = small;
                 }
-                small = area < AddonLeast * headArea;
-                smallAddon[south] = small;
-            }
-            if (small)
-            {
-                return false;
+                if (small)
+                {
+                    return null;
+                }
             }
             Color32[][] px = { s, Pixels(east, false), Pixels(north, false) };
             for (int v = 0; v < 3; v++)
             {
                 if (px[v] == null)
                 {
-                    return false;
+                    return null;
                 }
             }
-            for (int v = 0; v < 3; v++)
+            return px;
+        }
+
+        // One view of an add-on laid over the layer, cut by the head (under) where it is drawn behind it. One behind the
+        // head is left out of the front view altogether: there it shows below the chin and beside the neck, hanging
+        // behind them, but the builder can't tell that from one picture and built a thick collar of hair round the front
+        // of the neck. Its back and side views still give the hair at the back.
+        private static void LayView(Color32[] layer, Color32[] px, Color32[] under, int v)
+        {
+            if (under != null && v == 0)
             {
-                if (under != null && v == 0)
-                {
-                    continue;   // behind the body: not in the front view
-                }
-                if (under != null)
-                {
-                    for (int i = 0; i < px[v].Length; i++)
-                    {
-                        Color32 c = px[v][i];
-                        c.a = (byte)(c.a * (255 - under[v][i].a) / 255);
-                        px[v][i] = c;
-                    }
-                }
-                Over(layers[v], px[v]);
+                return;   // behind the head: not in the front view
             }
-            return true;
+            if (under != null)
+            {
+                for (int i = 0; i < px.Length; i++)
+                {
+                    Color32 c = px[i];
+                    c.a = (byte)(c.a * (255 - under[i].a) / 255);
+                    px[i] = c;
+                }
+            }
+            Over(layer, px);
         }
 
         // top over bottom, in place in bottom (straight alpha).

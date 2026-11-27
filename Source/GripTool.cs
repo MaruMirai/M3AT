@@ -34,6 +34,24 @@ namespace M3AT
             }
         }
 
+        private static Texture2D toolsIcon;
+        private static bool toolsIconLooked;
+
+        // The play settings toggle's icon: the mod's fox-eared head (Textures/UI/M3AT_ToolsToggle.png, made from the mod icon by
+        // anim_scripts/make_tools_icon.py), white on clear; the grip icon if missing.
+        internal static Texture2D ToolsIcon
+        {
+            get
+            {
+                if (!toolsIconLooked)
+                {
+                    toolsIconLooked = true;
+                    toolsIcon = ContentFinder<Texture2D>.Get("UI/M3AT_ToolsToggle", false);
+                }
+                return toolsIcon ?? GripIcon;
+            }
+        }
+
         internal static GripToolWindow gripTool;   // the open window, if any: DrawWeapon notes the fist for its pawn
         internal static Vector2 GripSeen;          // where that pawn's fist was last drawn on its weapon's art (0..1, y up)
         internal static int gripSeenFrame = -1000;
@@ -60,7 +78,10 @@ namespace M3AT
 
         private static Vector3? ReadGripTest()
         {
-            string[] v = (Environment.GetEnvironmentVariable("M3AT_GRIP_TEST") ?? "").Split(',');
+            // (or the file <config>/M3AT/grip_test holding the same: a game started through Steam gets no environment)
+            string file = System.IO.Path.Combine(GenFilePaths.ConfigFolderPath, "M3AT", "grip_test");
+            string[] v = (Environment.GetEnvironmentVariable("M3AT_GRIP_TEST")
+                ?? (System.IO.File.Exists(file) ? System.IO.File.ReadAllText(file).Trim() : "")).Split(',');
             float u, w, t;
             if (v.Length == 3 && float.TryParse(v[0], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out u)
                 && float.TryParse(v[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out w)
@@ -460,7 +481,7 @@ namespace M3AT
                 return;
             }
             bool on = s.gripTool;
-            row.ToggleableIcon(ref on, GripIcon, "M3AT_ToolsToggleTip".Translate(), SoundDefOf.Mouseover_ButtonToggle);
+            row.ToggleableIcon(ref on, ToolsIcon, "M3AT_ToolsToggleTip".Translate(), SoundDefOf.Mouseover_ButtonToggle);
             if (on != s.gripTool)
             {
                 s.gripTool = on;

@@ -142,6 +142,15 @@ for n, v in made.items():
         if to is None:
             sys.exit('mirror_cut.py: no vertex group %s to mirror %s onto' % (flipped(names[g]), names[g]))
         v[deform][to] = w
+    # A dashed group by its own edge's ends, not the mirror vertex's: a one-sided garment (-Sash) isn't on this side.
+    a, b, _ = split[n]
+    ma, mb = pair[a], pair[b]
+    for g in list(v[deform].keys()):
+        if names[g].startswith('-') and (ma[deform].get(g, 0.0) <= 0 or mb[deform].get(g, 0.0) <= 0):
+            del v[deform][g]
+    for g in range(len(names)):
+        if names[g].startswith('-') and g not in v[deform] and ma[deform].get(g, 0.0) > 0 and mb[deform].get(g, 0.0) > 0:
+            v[deform][g] = 1.0
 for n in new:
     for e in n.link_edges:
         x, y = (mirror[w] for w in e.verts)

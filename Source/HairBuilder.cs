@@ -42,7 +42,7 @@ namespace M3AT
     internal sealed partial class HairBuilder
     {
         private const string Tag = "[M3AT] ";
-        public const int Version = 41;   // raise when the build changes, so cached hair is made again
+        public const int Version = 43;   // raise when the build changes, so cached hair is made again
         public const int BeardVersion = 6;   // and cached beards
         internal static bool Tapered = true;    // the hull's flanks narrowing behind the head's middle (Hull; M3AT_NO_TAPER off)
         internal static bool ForeOn = true;     // the side sprites having no say over what the front one carried out (Textured; M3AT_NO_FORE off)
@@ -1421,12 +1421,274 @@ namespace M3AT
             return true;
         }
 
+        // A beard some hair mods draw into the hairstyle's own sprites (Gloomy Hair's wolf2, loss2, allback2 and allback3,
+        // Smith): a band round the jaw, a moustache and a goatee over the face. Built as hair, it came out as dark strands
+        // and flakes stuck across the chibi's face. Such a style is told by hair over the middle of the chin below the mouth
+        // while the face between the eyes and the mouth shows: of the 270-odd styles installed in Nov 2026, those five
+        // covered 0.63 to 0.85 of the chin box and the next 0.35 (AFUf071's hair ties beside the jaw). Below the eye line,
+        // over the head (front sprite) or the front half of it (side sprites), and BeardPast past its outline below the
+        // mouth, the hair joined to the chin's is cleared,
+        // as are pieces there joined to no hair above (a moustache); locks hanging from above and not reaching the chin
+        // stay. The north sprite is left: no beard shows from behind. A copy. Harness: BEARDLESS line, M3AT_NO_BEARDLESS.
+        internal static bool BeardlessOn = true;
+        internal int lastBeardless;               // pixels cleared in the last build, for the harness
+        private const float ChinHair = 0.5f;      // least share of the chin box with hair for a drawn-in beard
+        private const float FaceShows = 0.4f;     // and least share of the face box clear of it
+        private const float ChinBox = 0.15f;      // head widths either side of the middle the chin box spans (mouth row to chin)
+        private const float FaceBox = 0.2f;       // and the face box (eye row to just above the mouth row)
+        private const float ChinFront = 0.6f;     // share of the side head's depth from its back where a side sprite's chin starts
+        private const int BeardPast = 12;         // pixels past the head's outline below the mouth row a beard is looked for (a goatee's tip)
+        private Sprites Beardless(Sprites sp)
+        {
+            lastBeardless = 0;
+            int width = hx1 - hx0, chinIn = 0, chinAll = 0, faceClear = 0, faceAll = 0;
+            for (int r = Mathf.CeilToInt(EyeRow); r < Size; r++)
+            {
+                for (int c = 0; c < Size; c++)
+                {
+                    int i = r * Size + c;
+                    if (!headMask[0][i])
+                    {
+                        continue;
+                    }
+                    float off = Math.Abs(c - midX);
+                    bool hair = sp.px[0][i].a >= Solid;
+                    if (r >= MouthRow && off <= ChinBox * width)
+                    {
+                        chinAll++;
+                        chinIn += hair ? 1 : 0;
+                    }
+                    else if (r < MouthRow - 2f && off <= FaceBox * width)
+                    {
+                        faceAll++;
+                        faceClear += hair ? 0 : 1;
+                    }
+                }
+            }
+            if (chinAll == 0 || faceAll == 0 || chinIn < ChinHair * chinAll || faceClear < FaceShows * faceAll)
+            {
+                return sp;
+            }
+            Sprites clean = new Sprites { hash = sp.hash, west = sp.west };
+            float chinZ = hz0 + ChinFront * (hz1 - hz0), midZ = (hz0 + hz1) / 2f;
+            for (int v = 0; v < 4; v++)
+            {
+                if (v == 2 || (v == 3 && sp.px[3] == sp.px[1]))
+                {
+                    clean.px[v] = v == 2 ? sp.px[2] : clean.px[1];
+                    continue;
+                }
+                bool side = v != 0;
+                bool[] region = new bool[Size * Size], seed = new bool[Size * Size], past = Grow(headMask[v], BeardPast);
+                for (int r = Mathf.CeilToInt(EyeRow); r < Size; r++)
+                {
+                    for (int c = side ? Mathf.CeilToInt(midZ) : 0; c < Size; c++)
+                    {
+                        int i = r * Size + c;
+                        if (r >= MouthRow ? past[i] : headMask[v][i])
+                        {
+                            region[i] = true;
+                            seed[i] = r >= MouthRow && (side ? c >= chinZ : Math.Abs(c - midX) <= ChinBox * width);
+                        }
+                    }
+                }
+                clean.px[v] = Unbearded(sp.px[v], region, seed, ref lastBeardless);
+            }
+            return clean;
+        }
+
+        // The sprite with the hair in region cleared where it is joined (within region) to a seed pixel's or to no hair
+        // outside region. A lock hanging from above that the beard joins is cleared from where it enters the region, but
+        // tapered to a point there (Tipped) rather than cut off square across the eye line. Then what is left of the beard
+        // past the region (a goatee's tip below the chin) and its soft edge pixels are cleared too (Strays).
+        private const int StrayMost = 80;   // pixels: a piece of hair touching the cleared beard this small or smaller goes with it
+        private static Color32[] Unbearded(Color32[] px, bool[] region, bool[] seed, ref int cleared)
+        {
+            int n = Size * Size;
+            bool[] gone = new bool[n], hung = new bool[n];   // hung: cleared from a lock that hangs on into the region
+            Pieces(px, region, (members, touches) =>
+            {
+                bool seeded = false;
+                foreach (int i in members)
+                {
+                    seeded |= seed[i];
+                }
+                if (seeded || !touches)
+                {
+                    foreach (int i in members)
+                    {
+                        gone[i] = true;
+                        hung[i] = touches;
+                    }
+                }
+            });
+            Tipped(px, gone, hung);
+            Strays(px, gone);
+            Color32[] clean = (Color32[])px.Clone();
+            for (int i = 0; i < n; i++)
+            {
+                if (gone[i])
+                {
+                    clean[i].a = 0;
+                    cleared++;
+                }
+            }
+            // Soft edge pixels beside cleared hair and no kept hair.
+            for (int i = 0; i < n; i++)
+            {
+                if (gone[i] || px[i].a >= Solid || px[i].a == 0)
+                {
+                    continue;
+                }
+                bool nearGone = false, nearKept = false;
+                int r = i / Size, c = i % Size;
+                for (int dr = -2; dr <= 2; dr++)
+                {
+                    for (int dc = -2; dc <= 2; dc++)
+                    {
+                        int rr = r + dr, cc = c + dc;
+                        if (rr < 0 || rr >= Size || cc < 0 || cc >= Size)
+                        {
+                            continue;
+                        }
+                        int j = rr * Size + cc;
+                        nearGone |= gone[j];
+                        nearKept |= !gone[j] && px[j].a >= Solid;
+                    }
+                }
+                if (nearGone && !nearKept)
+                {
+                    clean[i].a = 0;
+                }
+            }
+            return clean;
+        }
+
+        // Calls found with each piece of solid hair inside within (8-connected; all of the sprite when within is null),
+        // and whether it touches solid hair outside within.
+        private static void Pieces(Color32[] px, bool[] within, Action<List<int>, bool> found, bool[] skip = null)
+        {
+            int n = Size * Size;
+            bool[] seen = new bool[n];
+            Stack<int> todo = new Stack<int>();
+            for (int start = 0; start < n; start++)
+            {
+                if (seen[start] || px[start].a < Solid || (within != null && !within[start]) || (skip != null && skip[start]))
+                {
+                    continue;
+                }
+                List<int> members = new List<int>();
+                bool touches = false;
+                seen[start] = true;
+                todo.Push(start);
+                while (todo.Count > 0)
+                {
+                    int i = todo.Pop();
+                    members.Add(i);
+                    int r = i / Size, c = i % Size;
+                    for (int dr = -1; dr <= 1; dr++)
+                    {
+                        for (int dc = -1; dc <= 1; dc++)
+                        {
+                            int rr = r + dr, cc = c + dc;
+                            if ((dr == 0 && dc == 0) || rr < 0 || rr >= Size || cc < 0 || cc >= Size)
+                            {
+                                continue;
+                            }
+                            int j = rr * Size + cc;
+                            if (px[j].a < Solid || (skip != null && skip[j]))
+                            {
+                                continue;
+                            }
+                            if (within != null && !within[j])
+                            {
+                                touches = true;
+                            }
+                            else if (!seen[j])
+                            {
+                                seen[j] = true;
+                                todo.Push(j);
+                            }
+                        }
+                    }
+                }
+                found(members, touches);
+            }
+        }
+
+        // Gives back to a hanging lock the pixels that make a point below where it was cleared: row by row down, a pixel
+        // is kept if the one above it is, and two rows up the ones either side of that, so the lock narrows a pixel a
+        // row, ending in a point about as long as it is wide, as the art's own locks end.
+        private static void Tipped(Color32[] px, bool[] gone, bool[] hung)
+        {
+            Func<int, int, bool> kept = (r, c) => r >= 0 && c >= 0 && c < Size && px[r * Size + c].a >= Solid && !gone[r * Size + c];
+            for (int r = 1; r < Size; r++)
+            {
+                List<int> back = new List<int>();
+                for (int c = 0; c < Size; c++)
+                {
+                    int i = r * Size + c;
+                    if (hung[i] && kept(r - 1, c) && (r < 2 || (kept(r - 2, c - 1) && kept(r - 2, c + 1))))
+                    {
+                        back.Add(i);
+                    }
+                }
+                foreach (int i in back)
+                {
+                    gone[i] = false;   // a whole row at once, so it narrows evenly from both sides
+                }
+            }
+        }
+
+        // Clears small pieces of hair left touching the cleared beard (or its soft edge) and joined to nothing bigger:
+        // the beard's ends past the region.
+        private static void Strays(Color32[] px, bool[] gone)
+        {
+            int n = Size * Size;
+            Pieces(px, null, (members, touches) =>
+            {
+                if (members.Count > StrayMost)
+                {
+                    return;
+                }
+                bool besideGone = false;
+                foreach (int i in members)
+                {
+                    int r = i / Size, c = i % Size;
+                    for (int dr = -2; dr <= 2 && !besideGone; dr++)
+                    {
+                        for (int dc = -2; dc <= 2 && !besideGone; dc++)
+                        {
+                            int rr = r + dr, cc = c + dc;
+                            besideGone = rr >= 0 && rr < Size && cc >= 0 && cc < Size && gone[rr * Size + cc];
+                        }
+                    }
+                    if (besideGone)
+                    {
+                        break;
+                    }
+                }
+                if (besideGone)
+                {
+                    foreach (int i in members)
+                    {
+                        gone[i] = true;
+                    }
+                }
+            }, gone);
+        }
+
         internal Built Build(string style, Sprites sp)
         {
             Built built = new Built();
             west = sp.west && !beard;
             lastLineUp = 0;
             lastSideBack = 0;
+            lastBeardless = 0;
+            if (!beard && BeardlessOn)
+            {
+                sp = Beardless(sp);
+            }
             if (!beard && LineUpOn)
             {
                 sp = LinedUp(sp);

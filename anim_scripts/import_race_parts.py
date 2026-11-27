@@ -33,6 +33,8 @@ PARTS = {   # file: (object name stem, kind)
     'race_ratkin_tail.txt': ('Ratkin_Tail', 'tail'),
     'race_wolfein_ears.txt': ('Wolfein_Ears', 'ears'),
     'race_wolfein_tail.txt': ('Wolfein_Tail', 'tail'),
+    'race_miho_ears.txt': ('Miho_Ears', 'ears'),   # made from Wolfein's by make_miho_parts.py; once imported, the .blend's
+    'race_miho_tail.txt': ('Miho_Tail', 'tail'),   # are written over them by a full export
     'race_milira_wing_L.txt': ('Milira_Wing_L', 'tail'),
     'race_milira_wing_R.txt': ('Milira_Wing_R', 'tail'),
 }

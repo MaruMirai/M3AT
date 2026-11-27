@@ -77,7 +77,8 @@ NAME_ALIKE = {'frame': ('exoskelet', 'exosuit'),   # CE's exoframe is any exoske
               'boots': ('boot',), 'sandals': ('sandal', 'flip flop', 'flipflop'),
               'socks': ('sock', 'feetwrap', 'footwrap', 'feet wrap', 'foot wrap'),
               'shoes': ('shoe', 'heel', 'sneaker', 'loafer', 'slipper', 'clog', 'moccasin')}   # a tank top is the tank top's, not the crop top's
-NAME_NOT = {'scarf': ('headscarf', 'head scarf'), 'pants': ('hotpant', 'underpant'),
+# (Words are found anywhere in a word, as mods run them together: fieldcap, VoxBackpack, AIPTGoggle.)
+NAME_NOT = {'scarf': ('headscarf', 'head scarf'), 'pants': ('hotpant', 'underpant'), 'socks': ('cassock',),
             'glasses': ('sunglass', 'hourglass', 'glass armo', 'glassworks')}
 # A NO_STAND_IN garment named by the apparel is the thing itself: coverage at least NAMED_COVER, NAMED_BONUS ahead.
 NAMED_COVER = 0.5
@@ -92,18 +93,25 @@ HINTS = {
     'Vacsuit': ('space suit', 'spacesuit', 'airtight suit', 'pressure suit'),
     'VacsuitHelmet': ('space suit helmet', 'spacesuit helmet', 'airtight helmet'),
     'HatLadies': ('sun hat', 'sunhat', 'straw hat', 'summer hat', 'sun bonnet'),
-    'BowlerHat': ('melonik', 'pith', 'explorer hat', 'safari', 'school cap'),
+    'BowlerHat': ('melonik', 'pith', 'explorer hat', 'safari', 'school cap', 'fedora', 'trilby', 'homburg', 'panama hat'),
+    # a peaked (service, officer's) cap or kepi: the authority cap, not the tuque (Cane Aternitigno's army caps)
+    'AuthorityCap': ('peaked cap', 'visor cap', 'service cap', 'officer cap', 'officers cap', "officer's cap", 'kepi'),
     'Shadecone': ('rain hat', 'conical hat', 'bamboo hat'),
     'LabCoat': ('lab gown', 'labgown', 'medical gown', 'research gown', 'white coat'),
     'Parka': ('winter coat', 'wintercoat', 'puffer', 'down jacket'),
     'SimpleHelmet': ('miner hat', 'minerhat', 'hard hat', 'hardhat', 'safety helmet', 'military helmet'),
     'Coronet': ('tiara', 'diadem'),
+    # knitwear and sweatshirts have no collar (Cane Aternitigno's sweater and hoodie took the collared shirt)
+    'BasicShirt': ('sweater', 'jumper', 'pullover', 'hoodie', 'sweatshirt'),
+    # a side (garrison) cap is soft and has no peak: the beret, not the authority cap
+    'Beret': ('side cap', 'garrison', 'overseas cap'),
     'Hairband': ('hairband', 'hair band', 'headband', 'head band', 'headbond', 'alice band'),
     'Ribbon': ('ribbon', 'bowknot', 'hairtie', 'hair tie', 'hair bow', 'corsage', 'flower headwear', 'hairclip', 'hair clip',
                'scrunchie'),
     'MaidHeaddress': ('maid cap', 'maid head', 'maidcap', 'maid hat'),
     'Broadwrap': ('nun ', 'veil', 'wimple', 'sister hat'),   # a nun's veil: the broadwrap, which hangs clear of the back
     'Stockings': ('stocking', 'thigh high', 'thighhigh', 'knee high', 'suspender'),
+    'BodyStrap': ('suspenders', 'braces'),   # straps over the shoulders to the waist (Cane Aternitigno's army suspenders)
     'Tights': ('pantyhose', 'pantynose', 'tights', 'leggings'),
     'Leotard': ('leotard', 'swimsuit', 'swim suit', 'bunny girl'),
     'ShoulderBag': ('messenger', 'satchel', 'shoulder bag'),
@@ -118,7 +126,7 @@ HINTS = {
     'SleevelessDress': ('sleeveless dress', 'sundress', 'sun dress', 'slip dress', 'strapless dress', 'camisole dress', 'halter dress'),
     'DressMidi': ('midi dress', 'mididress', 'tea dress'),
     'DressLong': ('long dress', 'gown', 'nun outfit', 'nun dress', 'sister dress', 'evening dress', 'wedding dress',
-                  'maxi dress'),
+                  'maxi dress', 'cassock', 'soutane', 'habit'),   # a cassock or a nun's habit hangs to the feet
 }
 # Phrases holding a hint that don't say it: a headdress is no dress, suspender trousers no stockings.
 HINT_NOT = {'Dress': ('headdress', 'dressing', 'long dress', 'nun dress', 'sister dress', 'evening dress', 'wedding dress',
@@ -129,7 +137,7 @@ HINT_NOT = {'Dress': ('headdress', 'dressing', 'long dress', 'nun dress', 'siste
             'Skirt': ('long skirt', 'longskirt', 'longuette', 'maxi skirt', 'knee skirt', 'knee length skirt', 'mini skirt',
                       'miniskirt', 'micro skirt', 'microskirt',
                       'knee-length skirt', 'pencil skirt', 'midi skirt', 'midiskirt', 'calf skirt'),
-            'Stockings': ('suspender trouser', 'suspender pant', 'suspender skirt', 'suspender short'),
+            'Stockings': ('suspender trouser', 'suspender pant', 'suspender skirt', 'suspender short', 'suspenders'),
             'Broadwrap': ('war veil', 'warveil')}
 HINT_COVER = 0.5
 HINT_COVER_HEAD = 0.8   # for headgear, which takes one garment: a nun's hat the broadwrap, which covers far more than a cap
@@ -166,6 +174,12 @@ def texture_index(folders):
         t = os.path.join(folder, 'Textures')
         for f in glob.glob(os.path.join(t, '**', '*.png'), recursive=True):
             index.setdefault(os.path.relpath(f, t)[:-4].replace(os.sep, '/').lower(), f)
+        # a mod's textures packed as the game's are, in an Assets.zip at its root (Cane Aternitigno's), read by the game too
+        z = os.path.join(folder, 'Assets.zip')
+        if os.path.exists(z):
+            for name, info in game_sprite.entries(z).items():
+                key = name.split('Textures/', 1)[-1].lower()
+                index.setdefault(key[:-4] if key.endswith('.png') else key, (z, info))
     root = os.path.dirname(GAME)
     for z in [os.path.join(root, 'Assets.zip')] + sorted(glob.glob(os.path.join(GAME, '*', 'Assets.zip'))):
         if os.path.exists(z):
@@ -317,7 +331,7 @@ def under(layer):
 PACK_LAYER, PACK_GROUP = 'Backpack', 'Back'
 WEBBING_LAYER = 'Webbing'
 SHOULDER_LAYER = 'Shoulder'
-WEBBING_WORDS = ('webbing', 'chest rig', 'load bearing', 'load-bearing')
+WEBBING_WORDS = ('webbing', 'chest rig', 'load bearing', 'load-bearing', 'load carrier')   # (Kiiro's load carrier)
 
 
 def pack_layer(layer):
@@ -379,12 +393,21 @@ def as_what_it_is(p, layers):
     return p
 
 
+def mask_named(d):
+    """Named a mask (MASK_WORDS), unless its label names it a helmet and no mask: Cane Aternitigno's CG_HeavyMask is a
+    "Heavy Infantry Helmet", a closed visored helmet, which took the gas mask (StandIns.cs's IsMaskNamed)."""
+    label = d['label'].lower()
+    if HELMET_WORDS.search(label) and not any(w in label for w in MASK_WORDS):
+        return False
+    return any(w in (d['name'] + ' ' + d['label']).lower() for w in MASK_WORDS)
+
+
 def profile(d):
     return as_what_it_is(_profile(d), d['layers'])
 
 
 def _profile(d):
-    return dict(def_=d, mask=any(w in (d['name'] + ' ' + d['label']).lower() for w in MASK_WORDS),
+    return dict(def_=d, mask=mask_named(d),
                 name=d['name'], layers=list(dict.fromkeys(under(x) for x in d['layers'])), groups=groups_of(d['groups']),
                 armour=any('armor' in c.lower() for c in d['cats']), noble=any('noble' in c.lower() for c in d['cats']),
                 vacsuit='Vacsuit' in d['tags'] or 'vacsuit' in d['name'].lower(), child='Adult' not in d['stage'],
@@ -408,7 +431,7 @@ def never(d):
     it; Biotech's heavy shield unit, Middle over the torso, is a shield); power armour's packs (armour_pack). A pack or
     webbing on the belt (as_what_it_is) takes a pack or webbing garment."""
     text = text_of(d)
-    if re.search(r'\b(rings?|psyrings?|bracelets?|anklets?|bangles?)\b', text):   # jewellery is no glove or boot
+    if re.search(r'\b(rings?|psyrings?|bracelets?|anklets?|bangles?|pendants?|necklaces?|amulets?|lockets?)\b', text):   # jewellery is no glove, boot or vest
         return True
     if is_webbing(text):
         return False
@@ -452,7 +475,7 @@ def factors(a, g):
     times, plus = 1.0, 0.0
     if hinted(a, g):
         plus += HINT_BONUS
-    if a['armour'] != g['armour']:
+    if a['armour'] != g['armour'] or soft_for_helmet(a, g):
         times *= NOT_ARMOUR
     if g['vacsuit'] and not a['vacsuit']:
         times *= NOT_VACSUIT
@@ -475,6 +498,13 @@ def factors(a, g):
     if g['garment'] in GENERIC:
         plus += GENERIC_BONUS
     return times, plus
+
+
+def soft_for_helmet(a, g):
+    """Whether g is soft headgear (not armour, no Helmet in its name) and a a helmet by name only (as_hat): behind as
+    armour is for a garment that isn't, as Cane Aternitigno's chemical protection helmet, a plain hat by its def, took the
+    broadwrap over the helmets (StandIns.cs's SoftForHelmet)."""
+    return a.get('helmet', False) and not a['armour'] and not g['armour'] and 'helmet' not in g['garment'].lower()
 
 
 def head_nouns(label):
@@ -523,6 +553,7 @@ def as_hat(a):
     the face its groups say."""
     hat_named = head_nouns(a['def_']['label']) & HAT_NOUNS
     if HELMET_WORDS.search(a['text']) and not hat_named:
+        a['helmet'] = not a['mask']   # (a helmet with a gas mask may still take the gas mask)
         return a
     if (not a['armour'] or hat_named) and not a['mask'] and 'UpperHead' in a['groups']:
         a['groups'] = a['groups'] - {'Eyes', 'Mouth'}

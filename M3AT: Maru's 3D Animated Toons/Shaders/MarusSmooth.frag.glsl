@@ -31,6 +31,9 @@
 // pulled overlay skips the pixel; 2 sky colour only (roofs), in this pass; 3 own cell, in this
 // pass (ghosts, drawn after the overlay).
 
+const vec3 LiningPale = vec3(0.97, 0.94, 0.9);   // _Lining: a warm white, the colour of an ear's inside fluff
+const float LiningKeep = 0.12;                    // and the share of the hair's colour kept in it
+
 #define QUANTIZE 1   // 1: snap normals to IsoRim's 26 direction groups (original look); 0: exact face normals
 
 layout(location = 0) in vec4 vColor;
@@ -68,6 +71,8 @@ layout(set = 2, binding = 0) uniform MaterialUniforms
     float _Glass;     // @default = 0.0   1: a visor's glass (def MarusGlass, SkinnedFigure.DrawVisor), see GlassColour
     float _IsoFlash;  // @default = 0.0   per draw (IsoRim's HitFlash, M3AT's HitFlash.cs): how red a hit figure is now, 0 = not at all
     float _OutlineId; // @default = 0.0   the screen-space outline's part pass (defs MarusOutlineId*, ScreenOutlines.cs): above 0, write only this into alpha
+    float _RedrawShare; // @default = 0.0   the soft redraw after IsoRim's occlusion (defs Marus*SoftAfterAO, alpha blended): above 0, the alpha written
+    float _Lining;    // @default = 0.0   an ear's pale inside (EarLining.cs): above 0, the texture's alpha is how far each pixel goes from the vertex colour toward LiningPale, times this; drawn opaque
 } uMaterial;
 
 layout(set = 2, binding = 1) uniform sampler2D _MainTex;
@@ -401,7 +406,16 @@ void main()
 
     vec4 color = vColor * uMaterial._Color;
 #ifdef USE_TEXTURE
-    color *= texture(_MainTex, vUv * uMaterial._MainTex_ST.zw + uMaterial._MainTex_ST.xy);
+    vec4 texel = texture(_MainTex, vUv * uMaterial._MainTex_ST.zw + uMaterial._MainTex_ST.xy);
+    if (uMaterial._Lining > 0.0)
+    {
+        // An ear's lining, blended per pixel: the mesh is too coarse to fade it by vertex colour (every vertex of the
+        // inside is on its rim). The pale keeps a little of the hair's own colour, so it sits in it rather than on it.
+        vec3 pale = mix(LiningPale, color.rgb, LiningKeep);
+        color = vec4(mix(color.rgb, pale, texel.a * uMaterial._Lining) * texel.rgb, color.a);
+        texel = vec4(1.0);
+    }
+    color *= texel;
     if (color.a < 0.5)
         discard;
 #endif
@@ -485,5 +499,7 @@ void main()
         color.rgb = min(color.rgb, vec3(1.0));   // the 8-bit colour the overlay would multiply
         color.rgb *= glowLight;
     }
+    if (uMaterial._RedrawShare > 0.0)
+        color.a = uMaterial._RedrawShare;
     outColor = color;
 }

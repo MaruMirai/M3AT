@@ -69,13 +69,15 @@ namespace M3AT
         // chest is about 0.1 to 0.2 in front, a curve of the body seen side on gains far less over a line's width.
         public const float DefaultSelfOutlineStep = 0.08f;
         // The screen-space outline's edge pass (MarusEdge.frag.glsl's _EdgeShape and _EdgeTune.x): the widest line in pixels
-        // at 1080 rows, the quick look's points a ring and its rings, the full search's most rings. The defaults are the old
-        // high detail option's off, 6.2.6 at 8 pixels (a pawn filling the screen 2.7 ms a frame over the silhouette);
-        // DetailedOutline* its on, 8.2.10 at 16 (6.1 ms; at the usual distance both about 0.5 ms).
-        public const float DefaultOutlineReach = 8f;
-        public const int DefaultOutlineProbeDirs = 6, DefaultOutlineProbeRings = 2, DefaultOutlineRings = 6;
-        public const float DetailedOutlineReach = 16f;
-        public const int DetailedOutlineProbeDirs = 8, DetailedOutlineProbeRings = 2, DetailedOutlineRings = 10;
+        // at 1080 rows, the quick look's points a ring and its rings, the full search's most rings. The defaults are 10.3.3 at
+        // 10 pixels (the old Detailed 8.2.10 at 16 cost more and looked no better); FasterOutline* is 6.2.3 at 8. Measured on
+        // the performance test save at 2814x2125, 6 chibis in view 6 cells off: the silhouette 11.96 ms a frame, the defaults
+        // +1.0, Faster +0.7 (the old 6.2.6 at 8 +0.5); the quick look's points are most of the difference, the other numbers
+        // within noise. 22 cells off, 10 chibis: every setting within noise (about 14.3 ms).
+        public const float DefaultOutlineReach = 10f;
+        public const int DefaultOutlineProbeDirs = 10, DefaultOutlineProbeRings = 3, DefaultOutlineRings = 3;
+        public const float FasterOutlineReach = 8f;
+        public const int FasterOutlineProbeDirs = 6, FasterOutlineProbeRings = 2, FasterOutlineRings = 3;
         // How tall a grown pawn is drawn, cells, before gender and height variety; -1 (the default, not saved) the export's
         // standard (WalkFigures.StandardHeight). Absolute, so a height chosen stays when the standard changes
         // (WalkFigures.PawnSize, in SizeOf).
@@ -91,8 +93,7 @@ namespace M3AT
         public bool sharpFaceArt = true;   // face art read a sharper mip and its edges re-sharpened when magnified (MarusFace.frag.glsl's FaceArt)
         public bool raceMouthInk = true;   // soft mouths (races', Experimentals') redrawn with the retexture's hard lines (FaceRestyle.cs)
         public bool mouthSizeFit = true;   // races' mouths sized to a human's and very wide mouth shapes narrowed (FaceRestyle.cs, FaceLayers.MouthSizeFit)
-        public bool fullDetailGarments = false;   // other mods' garments over the triangle budget kept as made, up to its ceiling (GarmentBudget.cs; read as the chibi loads)
-        public bool raceModels = true;  // the popular races' own ears and tails, modelled for them, in place of their built parts (RaceTails.cs)
+        public int garmentDetail = 1;   // Auto Optimization: 0 High, 1 Default, 2 None (kept as made, to the ceiling), 3 Low (GarmentBudget.cs; read as the chibi loads)
         public bool raceParts = true;   // a race's ears, tails, horns and wings built in 3D from their sprites on the chibi (AddonParts.cs)
         public bool otherRaces = true;   // humanlike races with no IsoRim alien pack drawn as chibis rather than flat cards (OtherRaces.cs)
         public bool variedBodies = true;    // each pawn's build spread about its body type's by the Thin, Fat and Hulk keys (WalkFigures.VariedBuild)
@@ -129,8 +130,13 @@ namespace M3AT
         // The player's choice of a content pack's or M3AT's content, by "<packageId>|<part>" (lower case): "pack" or "m3at";
         // only choices other than the default are kept (ContentSources.cs). An option: Restore all defaults clears it.
         public Dictionary<string, string> contentChoices = new Dictionary<string, string>();
-        public List<string> contentSeen = new List<string>();   // content packs named once already (ContentSources.Started); not an option
-        public bool contentButton = true;   // the M3AT button on the bottom bar in game while content packs are active (ContentWindow.cs)
+        // Whether the content manager's notice has been shown (ContentSources.QueueNotice): once ever, the first time any
+        // content pack is loaded. Not an option. A new key, not the old fading message's contentSeen list, so players who
+        // saw that get the notice once too.
+        public bool contentNoticeShown;
+        public bool contentButton = true;
+        // Each content pack's cost as the benchmark last measured it, by packageId (lower case): "ms;noise;people;date" (Benchmark.cs). Not an option.
+        public Dictionary<string, string> packCosts = new Dictionary<string, string>();   // the M3AT button on the bottom bar in game while content packs are active (ContentWindow.cs)
         // The player's own grips, by weapon defName (GripTool.cs, WalkFigures.GripOverrideOf): x and y the fist's place on
         // the weapon's art (0..1, y up; x below 0 for the grip left as it was), z degrees the weapon is turned in the fist.
         public Dictionary<string, Vector3> gripOverrides = new Dictionary<string, Vector3>();
@@ -173,7 +179,9 @@ namespace M3AT
         public bool screenSelfOutlines = false;   // the screen-space outline also over the pawn's own body, where a part is well in front of the rest
         public float selfOutlineStep = DefaultSelfOutlineStep;   // cells: how far in front a part must be for that line (ScreenOutlines.cs)
         public bool firstPersonEye = true;   // IsoRim's first person looks out from the chibi's eyes (WalkFigures.FirstPersonEye); off: IsoRim's eye height option
-        public bool clothesOcclusion = true;    // IsoRim's ambient occlusion and screen-space shadows on clothes and hair too, never the skin (SkinnedFigure.ClothesOcclusion)
+        public bool clothesOcclusion = true;     // IsoRim's ambient occlusion and screen-space shadows on clothes and hair too, never the skin (SkinnedFigure.ClothesOcclusion)
+        public float clothesOcclusionStrength = DefaultClothesOcclusionStrength;   // with it on, the share of that darkening they keep, 0.1 to 1 (SkinnedFigure.ClothesOcclusionStrength)
+        public const float DefaultClothesOcclusionStrength = 0.4f;
         public bool fewerPoses = false;   // with many pawns on screen, each one's limbs move every second or third frame (SkinnedFigure.FewerPoses)
         public bool gpuSkinning = true;   // pawns' bodies, clothes and hair posed by the graphics card (SkinnedFigure.GpuSkinning); off: on the CPU
         public float hairDetail = DefaultHairDetail;   // the share of its triangles each built hairstyle and its shell keep as they are read (SettingsMod.HairDetail)
@@ -211,13 +219,13 @@ namespace M3AT
         // WalkFigures.SizesToHeight divides them by that height's share once, so each weapon keeps the size it had.
         public bool weaponSizesAtStandard = true;
 
-        // The edge pass's numbers set to the cheap defaults or the detailed ones (the options' two buttons, an old save).
-        public void SetDetailedOutlines(bool detailed)
+        // The edge pass's numbers set to the defaults or the faster ones (the options' two buttons).
+        public void SetFasterOutlines(bool faster)
         {
-            outlineReach = detailed ? DetailedOutlineReach : DefaultOutlineReach;
-            outlineProbeDirs = detailed ? DetailedOutlineProbeDirs : DefaultOutlineProbeDirs;
-            outlineProbeRings = detailed ? DetailedOutlineProbeRings : DefaultOutlineProbeRings;
-            outlineRings = detailed ? DetailedOutlineRings : DefaultOutlineRings;
+            outlineReach = faster ? FasterOutlineReach : DefaultOutlineReach;
+            outlineProbeDirs = faster ? FasterOutlineProbeDirs : DefaultOutlineProbeDirs;
+            outlineProbeRings = faster ? FasterOutlineProbeRings : DefaultOutlineProbeRings;
+            outlineRings = faster ? FasterOutlineRings : DefaultOutlineRings;
         }
 
         public override void ExposeData()
@@ -243,8 +251,13 @@ namespace M3AT
             Scribe_Values.Look(ref greyingHair, "greyingHair", true);
             Scribe_Values.Look(ref otherRaces, "otherRaces", true);
             Scribe_Values.Look(ref raceParts, "raceParts", true);
-            Scribe_Values.Look(ref raceModels, "raceModels", true);
-            Scribe_Values.Look(ref fullDetailGarments, "fullDetailGarments", false);
+            Scribe_Values.Look(ref garmentDetail, "garmentDetail", 1);
+            bool oldFullDetail = false;   // (before garmentDetail: a checkbox, kept as made)
+            Scribe_Values.Look(ref oldFullDetail, "fullDetailGarments", false);
+            if (Scribe.mode == LoadSaveMode.LoadingVars && oldFullDetail)
+            {
+                garmentDetail = 2;
+            }
             Scribe_Values.Look(ref raceMouthInk, "raceMouthInk", true);
             Scribe_Values.Look(ref mouthSizeFit, "mouthSizeFit", true);
             Scribe_Values.Look(ref sharpFaceArt, "sharpFaceArt", true);
@@ -322,20 +335,9 @@ namespace M3AT
             Scribe_Values.Look(ref outlineProbeDirs, "outlineProbeDirs", DefaultOutlineProbeDirs);
             Scribe_Values.Look(ref outlineProbeRings, "outlineProbeRings", DefaultOutlineProbeRings);
             Scribe_Values.Look(ref outlineRings, "outlineRings", DefaultOutlineRings);
-            if (Scribe.mode == LoadSaveMode.LoadingVars)
-            {
-                // An older save's high detail outlines on (the option these replaced) is the detailed numbers, read once:
-                // the old key isn't written again.
-                bool highDetail = false;
-                Scribe_Values.Look(ref highDetail, "highDetailOutlines", false);
-                if (highDetail && outlineReach == DefaultOutlineReach && outlineProbeDirs == DefaultOutlineProbeDirs
-                    && outlineProbeRings == DefaultOutlineProbeRings && outlineRings == DefaultOutlineRings)
-                {
-                    SetDetailedOutlines(true);
-                }
-            }
             Scribe_Values.Look(ref selfOutlineStep, "selfOutlineStep", DefaultSelfOutlineStep);
             Scribe_Values.Look(ref clothesOcclusion, "clothesOcclusion", true);
+            Scribe_Values.Look(ref clothesOcclusionStrength, "clothesOcclusionStrength", DefaultClothesOcclusionStrength);
             Scribe_Values.Look(ref fewerPoses, "fewerPoses", false);
             // Saved under a new key since the option moved to Advanced, so anyone who had turned it off has it back on once.
             Scribe_Values.Look(ref gpuSkinning, "gpuSkinningOn", true);
@@ -416,12 +418,13 @@ namespace M3AT
             {
                 contentChoices = new Dictionary<string, string>();
             }
-            Scribe_Collections.Look(ref contentSeen, "contentSeen", LookMode.Value);
-            if (contentSeen == null)
-            {
-                contentSeen = new List<string>();
-            }
+            Scribe_Values.Look(ref contentNoticeShown, "contentNoticeShown", false);
             Scribe_Values.Look(ref contentButton, "contentButton", true);
+            Scribe_Collections.Look(ref packCosts, "packCosts", LookMode.Value, LookMode.Value);
+            if (packCosts == null)
+            {
+                packCosts = new Dictionary<string, string>();
+            }
             if (weaponScales == null)
             {
                 weaponScales = new Dictionary<string, float>();
@@ -561,6 +564,80 @@ namespace M3AT
         // Every option back to what a new install has (a fresh Settings' field values), but whether the freecam is on,
         // which is where the player left it rather than an option. The hair's detail and the items baked on the ground
         // follow as the window closes, as when they are changed by hand.
+        // The garmentDetail option ("Auto Optimization"), here and in the content switcher (ContentView). Listed
+        // High, Default, Low, None, though stored 0 High, 1 Default, 2 None (kept as made, to the ceiling), 3 Low, as saves have it so;
+        // each label gives the share of M3AT's like garment it holds a mod's to, and the polys that comes to across ours.
+        private static readonly int[] DetailOrder = { 0, 1, 3, 2 };
+
+        internal static string GarmentDetailLabel(int level)
+        {
+            level = Mathf.Clamp(level, 0, 3);
+            if (level == 2)
+            {
+                return "M3AT_GarmentDetailUpTo".Translate(("M3AT_GarmentDetail_2").Translate(), SkinnedFigure.Ceiling.ToString("N0"));
+            }
+            float share = SkinnedFigure.ShareAt(level);
+            int least = Mathf.RoundToInt(SkinnedFigure.OursLeast * share);
+            SkinnedFigure f = WalkFigures.SkinForAddOns;
+            int most = Mathf.RoundToInt((f != null ? f.HeaviestOwnGarment() : 1494) * share);
+            return "M3AT_GarmentDetailRange".Translate(("M3AT_GarmentDetail_" + level).Translate(), share.ToString("0.0#"), least.ToString("N0"), most.ToString("N0"));
+        }
+
+        // besideLabel (the content window): the button sized to its text and set just after the label, so the two read as
+        // one; in the options it lines up with the other options' buttons.
+        internal static void GarmentDetailOption(Listing_Standard list, bool besideLabel = false)
+        {
+            string label = "M3AT_GarmentDetail".Translate();
+            string value = GarmentDetailLabel(Settings.garmentDetail);
+            string tip = (string)"M3AT_GarmentDetailTip".Translate(SkinnedFigure.DefaultShare.ToString("0.0#"), SkinnedFigure.FastShare.ToString("0.0#"), SkinnedFigure.LightShare.ToString("0.#"),
+                Mathf.RoundToInt(SkinnedFigure.OursLeast * SkinnedFigure.DefaultShare), SkinnedFigure.TextureBudget, SkinnedFigure.Ceiling, SkinnedFigure.Optimized.Count) + BodyNotOptimized();
+            bool clicked;
+            if (besideLabel)
+            {
+                Rect row = list.GetRect(28f);
+                float labelWidth = Text.CalcSize(label).x;
+                Text.Anchor = TextAnchor.MiddleLeft;
+                Widgets.Label(new Rect(row.x, row.y, labelWidth + 4f, row.height), label);
+                Text.Anchor = TextAnchor.UpperLeft;
+                Rect button = new Rect(row.x + labelWidth + 12f, row.y + 1f, Mathf.Min(Text.CalcSize(value).x + 28f, row.width - labelWidth - 12f), 26f);
+                clicked = Widgets.ButtonText(button, value);
+                Widgets.DrawHighlightIfMouseover(new Rect(row.x, row.y, button.xMax - row.x, row.height));
+                TooltipHandler.TipRegion(new Rect(row.x, row.y, button.xMax - row.x, row.height), tip);
+            }
+            else
+            {
+                clicked = list.ButtonTextLabeledPct(label, value, SliderLabelShare, TextAnchor.MiddleLeft, null, tip);
+            }
+            if (clicked)
+            {
+                List<FloatMenuOption> levels = new List<FloatMenuOption>();
+                foreach (int i in DetailOrder)
+                {
+                    int picked = i;
+                    levels.Add(new FloatMenuOption(GarmentDetailLabel(i), () =>
+                    {
+                        // Saved at once, as the content switcher has no close to save it on.
+                        Settings.garmentDetail = picked;
+                        Settings.Write();
+                    }));
+                }
+                Find.WindowStack.Add(new FloatMenu(levels));
+            }
+        }
+
+        // Added to the detail option's tooltip while a pack has changed the body: the option can't lighten that.
+        private static string BodyNotOptimized()
+        {
+            SkinnedFigure f = WalkFigures.SkinForAddOns;
+            if (f == null || !f.BodyChanged)
+            {
+                return "";
+            }
+            f.OwnGarmentTriangles(out int made, out int now);
+            return "\n\n" + "M3AT_GarmentDetailBody".Translate(SkinnedFigure.BodyChangerName(), f.BodyFileTriangles.ToString("N0"), f.TrianglesOf(0).ToString("N0"),
+                made.ToString("N0"), now.ToString("N0"));
+        }
+
         private static void RestoreDefaults()
         {
             Settings fresh = new Settings();
@@ -570,7 +647,7 @@ namespace M3AT
                 if (field.IsInitOnly || field.Name == nameof(Settings.freecamOn) || field.Name == nameof(Settings.freecam3D)
                     || field.Name == nameof(Settings.gripOverrides) || field.Name == nameof(Settings.offHandGrips)
                     || field.Name == nameof(Settings.clothingChoices) || field.Name == nameof(Settings.plainClothes)
-                    || field.Name == nameof(Settings.paintedPackClothes) || field.Name == nameof(Settings.contentSeen)
+                    || field.Name == nameof(Settings.paintedPackClothes) || field.Name == nameof(Settings.contentNoticeShown) || field.Name == nameof(Settings.packCosts)
                     || field.Name == nameof(Settings.faceTunes) || field.Name == nameof(Settings.mouthTunes)
                     || field.Name == nameof(Settings.faceFits) || field.Name == nameof(Settings.faceFitRows) || field.Name == nameof(Settings.faceFitMouths))   // the player's own work, not an option: cleared by its own button
                 {
@@ -851,6 +928,12 @@ namespace M3AT
                 "M3AT_FirstPersonEyeTip".Translate());
             list.CheckboxLabeled("M3AT_ClothesOcclusion".Translate(), ref Settings.clothesOcclusion,
                 "M3AT_ClothesOcclusionTip".Translate());
+            if (Settings.clothesOcclusion)
+            {
+                Settings.clothesOcclusionStrength = Mathf.Round(Slider(list, "M3AT_ClothesOcclusionStrength".Translate(),
+                    Settings.clothesOcclusionStrength.ToStringPercent(), Settings.clothesOcclusionStrength, 0.1f, 1f,
+                    "M3AT_ClothesOcclusionStrengthTip".Translate()) * 20f) / 20f;
+            }
         }
 
         // Falls, flings and weapons.
@@ -1072,7 +1155,9 @@ namespace M3AT
         }
 
         // Options for other mods' things, folded away until its header is clicked: other races (OtherRaces.cs) and their parts
-        // (AddonParts.cs), and GrimWorld 40,000's armour sizes (its Space Marines' size slider under their checkbox).
+        // (AddonParts.cs), and armour sizes (GrimWorld 40,000's Space Marines' size slider under their checkbox), each shown only
+        // with a mod loaded it does something for. The race models' own switch went in Nov 2026: the content switcher's GeneParts
+        // column chooses between M3AT's ears and tails and a pack's.
         private static void CompatibilitySection(Listing_Standard list)
         {
             FoldHeader(list, "M3AT_Compatibility".Translate(), "M3AT_CompatibilityTip".Translate(), ref compatibilityOpen);
@@ -1087,12 +1172,18 @@ namespace M3AT
                 "M3AT_OtherRacesTip".Translate());
             list.CheckboxLabeled("M3AT_RaceParts".Translate(), ref Settings.raceParts,
                 "M3AT_RacePartsTip".Translate());
-            list.CheckboxLabeled("M3AT_RaceModels".Translate(), ref Settings.raceModels,
-                "M3AT_RaceModelsTip".Translate());
-            list.CheckboxLabeled("M3AT_FullDetailGarments".Translate(), ref Settings.fullDetailGarments,
-                "M3AT_FullDetailGarmentsTip".Translate(SkinnedFigure.ClothesBudget, SkinnedFigure.HeadBudget, SkinnedFigure.Ceiling, SkinnedFigure.Simplified.Count));
-            list.CheckboxLabeled("M3AT_ArmourDrawScale".Translate(), ref Settings.armourDrawScale,
-                "M3AT_ArmourDrawScaleTip".Translate());
+            GarmentDetailOption(list);
+            // Shown only where they would do something: the drawn scale with a mod's body armour that has one loaded, the
+            // Space Marines with GrimWorld 40,000 loaded (WalkFigures.ScaledArmourLoaded, GrimWorldLoaded).
+            if (WalkFigures.ScaledArmourLoaded)
+            {
+                list.CheckboxLabeled("M3AT_ArmourDrawScale".Translate(), ref Settings.armourDrawScale,
+                    "M3AT_ArmourDrawScaleTip".Translate());
+            }
+            if (!WalkFigures.GrimWorldLoaded)
+            {
+                return;
+            }
             list.CheckboxLabeled("M3AT_MarineBulk".Translate(), ref Settings.marineBulk,
                 "M3AT_MarineBulkTip".Translate());
             if (Settings.marineBulk)
@@ -1164,11 +1255,14 @@ namespace M3AT
                 "M3AT_FreecamClickOffLooksTip".Translate());
             list.CheckboxLabeled("M3AT_GripToolButton".Translate(), ref Settings.gripToolButton,
                 "M3AT_GripToolButtonTip".Translate());
+            // Moved here from the Content tab, where it took room from the packs: few will want the button gone.
+            list.CheckboxLabeled("M3AT_ContentButton".Translate(), ref Settings.contentButton,
+                "M3AT_ContentButtonTip".Translate());
         }
 
         // The screen-space outline's edge pass, under the outline style while it is screen-space (the only style that reads
         // them): the numbers trade the lines' look close up against the frame time. The widest line's slider is with the
-        // widths, though Fast and Detailed set it too.
+        // widths, though the Default and Faster buttons set it too.
         private static void OutlineDetail(Listing_Standard list)
         {
             list.Gap(6f);
@@ -1182,11 +1276,11 @@ namespace M3AT
             Rect row = list.GetRect(30f);
             if (Widgets.ButtonText(row.LeftHalf().ContractedBy(2f, 0f), "M3AT_OutlineDetailFast".Translate()))
             {
-                Settings.SetDetailedOutlines(false);
+                Settings.SetFasterOutlines(false);
             }
-            if (Widgets.ButtonText(row.RightHalf().ContractedBy(2f, 0f), "M3AT_OutlineDetailDetailed".Translate()))
+            if (Widgets.ButtonText(row.RightHalf().ContractedBy(2f, 0f), "M3AT_OutlineDetailFaster".Translate()))
             {
-                Settings.SetDetailedOutlines(true);
+                Settings.SetFasterOutlines(true);
             }
             list.Gap(6f);
         }

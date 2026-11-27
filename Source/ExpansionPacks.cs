@@ -122,7 +122,7 @@ namespace M3AT
             }
             if (p.ears.Count > 0 || p.tails.Count > 0)
             {
-                yield return ContentPart.EarsTail;
+                yield return ContentPart.GeneParts;
             }
             if (p.faces.Count > 0)
             {
@@ -176,13 +176,13 @@ namespace M3AT
 
         internal static string EarFileFor(Pawn pawn)
         {
-            Func<Pawn, string> f = Ask(pawn, ContentPart.EarsTail, p => p.ears);
+            Func<Pawn, string> f = Ask(pawn, ContentPart.GeneParts, p => p.ears);
             return Safe(f, pawn, "ears");
         }
 
         internal static string TailFileFor(Pawn pawn)
         {
-            Func<Pawn, string> f = Ask(pawn, ContentPart.EarsTail, p => p.tails);
+            Func<Pawn, string> f = Ask(pawn, ContentPart.GeneParts, p => p.tails);
             return Safe(f, pawn, "tail");
         }
 
